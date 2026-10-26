@@ -82,3 +82,23 @@ module with `export function foo(` renamed to `function __foo(`, and appends
 directory together with the rest of the `web/` tree. `record` encodes arguments *before* the call,
 since JS functions sometimes mutate them. It caps each function's cases (the default is 200,
 which the recorder can override) and picks them deterministically: the first N, then every Kth.
+
+## Standard references in captured args (M1+)
+
+A captured call's arguments often include the topology, an `analyze` result or a seated part
+soup. Encoding those in full for every call would make corpora huge. They are always derivable
+from the scene, so recorders replace them with references, and the Rust replay rebuilds them
+through the ported functions. That way the replay also tests those functions.
+
+| JS argument | recorded as | Rust replay resolves it with |
+|---|---|---|
+| a topology from `buildTopology` | `{"$topo": "<model id>"}` | `sf_testkit::parity::topo(id)`: `read_stl` + `build_topology`, cached per id |
+| an `analyze` result | `{"$analysis": {"model": id, "threshold": t, "rot": [9 numbers]}}` | `sf_testkit::parity::analysis(..)`: `analyze(topo(id), t, rot)` |
+| `seatedPartTris(topo, rot, offset)` | `{"$seated": {"model": id, "rot": [...], "offset": {x, y, z}}}` | `sf_testkit::parity::seated(..)` |
+| a `Config` snapshot (the JS config objects at call time) | `{"$config": {"PROP": {...}, "FIN": {...}, ...}}`, only the objects the function reads | `sf_testkit::parity::config(..)`: `Config::default()`, then overwrite each listed field |
+
+`<model id>` is the stress model's bare name (`cube`), or `fixtures/<name>` for `tests/fixtures`.
+The recorder identifies the objects by identity: `capture.js` keeps a `WeakMap` from each
+topology or result object it has seen to its reference, filled when `buildTopology`, `analyze` and
+`seatedPartTris` return inside the captured tree. An argument that matches none of the
+references is encoded in full.
