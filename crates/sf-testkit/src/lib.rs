@@ -11,6 +11,7 @@
 
 mod bore;
 mod circular;
+pub mod parity_config;
 mod util;
 
 pub mod parity;
