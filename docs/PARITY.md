@@ -102,3 +102,8 @@ The recorder identifies the objects by identity: `capture.js` keeps a `WeakMap` 
 topology or result object it has seen to its reference, filled when `buildTopology`, `analyze` and
 `seatedPartTris` return inside the captured tree. An argument that matches none of the
 references is encoded in full.
+
+Recorder API: `captureModules([{rel, fns}], {refs: true, config: {fn: ['PROP', ...]}, configs: {PROP: () => obj}})`.
+A function listed in `config` gets **one extra trailing argument**, `{"$config": {...}}`, snapshotted at
+call time. Its replay strips that argument and builds the `&Config` (the last parameter, per the type
+mapping) with `sf_testkit::parity::config(..)`.
