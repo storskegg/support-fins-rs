@@ -203,18 +203,46 @@ fn decode(raw: &Raw) -> Value {
     }
 }
 
-fn corpus_path(module: &str, function: &str) -> PathBuf {
+fn corpus_path(module: &str, function: &str, ext: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("corpus")
         .join(module)
-        .join(format!("{function}.jsonl"))
+        .join(format!("{function}.{ext}"))
 }
 
-/// Loads `parity/corpus/<module>/<function>.jsonl`. Panics with the path if it is missing.
+/// Reads the corpus file as text: `<function>.jsonl`, else `<function>.jsonl.zst` (decoded by a
+/// `zstd -dc` subprocess; files over 5 MB are stored compressed).
+fn read_corpus(path: &std::path::Path, zst: &std::path::Path) -> String {
+    if path.exists() {
+        return std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("corpus file {} unreadable: {e}", path.display()));
+    }
+    if !zst.exists() {
+        panic!(
+            "corpus file {} (or {}) missing",
+            path.display(),
+            zst.display()
+        );
+    }
+    let out = std::process::Command::new("zstd")
+        .arg("-dc")
+        .arg(zst)
+        .output()
+        .unwrap_or_else(|e| panic!("cannot run zstd to read {}: {e}", zst.display()));
+    assert!(
+        out.status.success(),
+        "zstd failed on {} (is it a git LFS pointer? run `git lfs pull`): {}",
+        zst.display(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).unwrap_or_else(|e| panic!("{} is not UTF-8: {e}", zst.display()))
+}
+
+/// Loads `parity/corpus/<module>/<function>.jsonl` (or `.jsonl.zst`). Panics with the path if
+/// it is missing.
 pub fn load_cases(module: &str, function: &str) -> Vec<Case> {
-    let path = corpus_path(module, function);
-    let text = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("corpus file {} unreadable: {e}", path.display()));
+    let path = corpus_path(module, function, "jsonl");
+    let text = read_corpus(&path, &corpus_path(module, function, "jsonl.zst"));
     text.lines()
         .enumerate()
         .filter(|(_, l)| !l.is_empty())

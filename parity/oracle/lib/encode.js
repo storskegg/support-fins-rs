@@ -73,7 +73,7 @@ export function encode(value) {
  * Writes parity/corpus/<module>/<fn>.jsonl. `cases` is [{id, args, out} | {id, args, throws}].
  * One encoded case per line, `\n` line ends, trailing newline. Throws on a duplicate id.
  */
-export function writeCases(module, fn, cases) {
+export function writeCases(module, fn, cases, { encoded = false } = {}) {
   const seen = new Set();
   const lines = [];
   for (const c of cases) {
@@ -86,12 +86,48 @@ export function writeCases(module, fn, cases) {
     if (hasThrows === hasOut) {
       throw new Error(`writeCases ${module}/${fn}: '${c.id}' needs exactly one of out / throws`);
     }
-    const line = { id: c.id, args: c.args.map(encode) };
+    const enc = encoded ? (x) => x : encode; // `encoded`: values already went through encode()
+    const line = { id: c.id, args: c.args.map(enc) };
     if (hasThrows) line.throws = String(c.throws);
-    else line.out = encode(c.out);
+    else line.out = enc(c.out);
     lines.push(JSON.stringify(line) + "\n");
   }
   const dir = new URL(`${module}/`, CORPUS);
   Deno.mkdirSync(dir, { recursive: true });
-  Deno.writeTextFileSync(new URL(`${fn}.jsonl`, dir), lines.join(""));
+  const bytes = new TextEncoder().encode(lines.join(""));
+  const plain = new URL(`${fn}.jsonl`, dir);
+  const packed = new URL(`${fn}.jsonl.zst`, dir);
+  // Over 5 MB the file is zstd-compressed (git LFS tracks *.zst). Only one form exists at a time.
+  if (bytes.length > ZST_OVER) {
+    writeZstd(packed, bytes);
+    rmIfExists(plain);
+  } else {
+    Deno.writeFileSync(plain, bytes);
+    rmIfExists(packed);
+  }
+}
+
+const ZST_OVER = 5 * 1024 * 1024;
+
+function rmIfExists(path) {
+  try {
+    Deno.removeSync(path);
+  } catch (e) {
+    if (!(e instanceof Deno.errors.NotFound)) throw e;
+  }
+}
+
+// `zstd -19` is deterministic for the same input and zstd version.
+function writeZstd(dest, bytes) {
+  const tmp = Deno.makeTempFileSync();
+  try {
+    Deno.writeFileSync(tmp, bytes);
+    const o = new Deno.Command("zstd", {
+      args: ["-q", "-19", "-f", tmp, "-o", dest.pathname],
+      stderr: "piped",
+    }).outputSync();
+    if (!o.success) throw new Error(`zstd failed: ${new TextDecoder().decode(o.stderr)}`);
+  } finally {
+    rmIfExists(tmp);
+  }
 }
