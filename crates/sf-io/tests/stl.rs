@@ -206,3 +206,59 @@ fn facet_needs_word_boundaries_for_the_binary_exception() {
 fn error_type_carries_message() {
     assert_eq!(read_stl(b"").unwrap_err(), StlError(err(b"")));
 }
+
+// ---- write_binary_stl ---------------------------------------------------------------
+
+use sf_io::stl::write_binary_stl;
+
+const T: [[f64; 3]; 3] = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+
+#[test]
+fn write_header_count_and_length() {
+    let b = write_binary_stl(&T, "Support Fins");
+    assert_eq!(b.len(), 84 + 50);
+    assert_eq!(&b[..27], b"Support Fins - support-fins");
+    assert!(b[27..80].iter().all(|&x| x == 0));
+    assert_eq!(u32::from_le_bytes(b[80..84].try_into().unwrap()), 1);
+    // attribute word is zero
+    assert_eq!(&b[84 + 48..84 + 50], &[0, 0]);
+}
+
+#[test]
+fn write_header_is_cut_at_79_and_masked_to_7_bits() {
+    let b = write_binary_stl(&T, &"x".repeat(200));
+    assert!(b[..79].iter().all(|&x| x == b'x'));
+    assert_eq!(b[79], 0);
+    // an em dash (U+2014) masks to 0x14, a non-BMP char is two UTF-16 units
+    let b = write_binary_stl(&T, "a\u{2014}\u{1F600}");
+    assert_eq!(&b[..3], &[b'a', 0x14, 0x3d]);
+    assert_eq!(b[3], 0x00); // low surrogate DE00 & 0x7f
+}
+
+#[test]
+fn write_normal_from_winding_and_degenerate_normal_is_zero() {
+    let b = write_binary_stl(&T, "n");
+    let f = |o: usize| f32::from_le_bytes(b[84 + o..84 + o + 4].try_into().unwrap());
+    assert_eq!((f(0), f(4), f(8)), (0.0, 0.0, 1.0));
+    assert_eq!(f(12 + 12), 1.0); // second vertex x
+    let z = write_binary_stl(&[[1.0; 3], [1.0; 3], [1.0; 3]], "n");
+    assert_eq!(&z[84..96], &[0u8; 12]);
+}
+
+#[test]
+fn write_drops_a_partial_triangle_and_handles_empty() {
+    assert_eq!(write_binary_stl(&[], "n").len(), 84);
+    assert_eq!(write_binary_stl(&[T[0], T[1]], "n").len(), 84);
+    assert_eq!(
+        write_binary_stl(&[T[0], T[1], T[2], T[0]], "n").len(),
+        84 + 50
+    );
+}
+
+#[test]
+fn write_then_read_round_trips_f32_values() {
+    let tris = [[0.1, 0.2, 0.3], [1e-3, 2.5, -7.0], [3.0, 4.0, 5.5]];
+    let got = read_stl(&write_binary_stl(&tris, "rt")).unwrap();
+    let want: Vec<f64> = tris.iter().flatten().map(|&v| (v as f32) as f64).collect();
+    assert_eq!(got, want);
+}
