@@ -77,9 +77,38 @@ you start a ticket, and again whenever a review sends you back.
 7. **No `unsafe`.** The workspace denies it. If you think you need it, ask.
 8. **No performance work** before milestone M5, beyond not being needlessly quadratic where JS
    isn't. No SIMD, no Rayon, no caching JS doesn't do, no restructuring "for speed".
-9. **Don't change signatures you were given.** The orchestrator owns public interfaces. If one
-   is wrong or can't express the JS, ask.
+9. **Don't change signatures you were given.** Signatures already in the code (a `todo!()`
+   with a doc comment) or in your ticket are fixed. If one is wrong or can't express the JS,
+   ask. For every other function you port, derive the signature from the JS with the type
+   mapping below. List each new `pub` signature in the PR's **New signatures** section, and the
+   review will check it.
 10. **No new dependencies** beyond `[workspace.dependencies]` and the ones your ticket names.
+
+## Type mapping (JS → Rust)
+
+| JS | Rust |
+|---|---|
+| number | `f64`. Use `usize`/`i32` only where the JS value is purely an index or count and never takes part in float arithmetic. If unsure, keep `f64`. |
+| `Float64Array` | `Vec<f64>` / `&[f64]` |
+| `Float32Array` | `Vec<f64>` holding f32-rounded values: round with `(v as f32) as f64` at every store |
+| `Int32Array` / `Uint32Array` / `Uint8Array` | `Vec<i32>` / `Vec<u32>` / `Vec<u8>` (stores wrap: `jsnum::to_int32` etc.) |
+| `[x, y, z]` / `[x, y]` | `[f64; 3]` / `[f64; 2]` |
+| `{ x, y, z }` | `types::Xyz` |
+| the 9-element column-major rotation | `types::Rot3` |
+| a print-space triangle soup (`Float64Array`, 9 per face) that `surface.js` caches on | `&Tris` (`tris::Tris`) |
+| an array of vertex triples | `&[[f64; 3]]` / `Vec<[f64; 3]>` |
+| an `out` array a function pushes onto | `out: &mut Vec<…>` (same element type) |
+| an object returned or passed | a named `struct`, with fields in JS key order and snake_case names |
+| `null` / `undefined` as a possible value | `Option<T>` |
+| a parameter with a default (`rMax = 0.45`) | a plain parameter. Callers pass the default explicitly, and the doc comment states it |
+| an options object `{ a, b = 1 }` | a struct whose `Default` gives the JS defaults |
+| `Map` / `Set` | `IndexMap` / `IndexSet` (insertion order) |
+| a callback parameter | `impl Fn(…) -> …` (or `&dyn Fn` if it is stored) |
+| `PROP.x`, `FIN.y`, … (module config) | `cfg.prop.x`, `cfg.fin.y`, with `cfg: &Config` as the **last** parameter |
+| a `WeakMap` or `topo._x` cache keyed on the topology | its slot in `overhangs::TopoCache` (`OnceLock`) |
+| a `WeakMap` keyed on a tris array | a cache field on `Tris` |
+| a `WeakMap` keyed on the `analyze` result | ask: the orchestrator adds a slot |
+| `throw new Error(msg)` | if a JS caller catches it: `Result<T, String>` with the identical message. Otherwise `panic!` with the identical message. Say which in the PR |
 
 ## Tests (the acceptance gate)
 
@@ -116,6 +145,9 @@ The port is accepted when it passes the ported JS tests. See `docs/PORT-PLAN.md`
 - New Rust tests: <count, what they cover>
 - Parity: <cases recorded / replayed / passing, tolerance>
 - `just check`: green
+
+## New signatures
+<every `pub` fn/struct you added that the ticket didn't give, with its JS origin>
 
 ## Divergences
 <Every place the Rust isn't a literal port of the JS, and why. "None" if none.
