@@ -15,4 +15,11 @@ parity:
 
 # Re-record oracle cases from the JS engine at UPSTREAM. `just oracle` = all, `just oracle jsnum` = one.
 oracle module="":
-    @echo "not yet implemented (M0 track C)"; exit 1
+    #!/usr/bin/env bash
+    set -euo pipefail
+    flags="--allow-read --allow-write --allow-run=git --allow-env"
+    if [ -n "{{module}}" ]; then
+        deno run $flags "parity/oracle/{{module}}.js"
+    else
+        for f in parity/oracle/*.js; do deno run $flags "$f"; done
+    fi
