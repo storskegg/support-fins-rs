@@ -1,0 +1,84 @@
+# Parity: the oracle corpus
+
+The JS engine at the `UPSTREAM` commit is the oracle. Deno scripts in `parity/oracle/` run
+real JS functions and record `{args, out}` cases. Rust tests replay them through the
+ported function and compare.
+
+## Layout
+
+```
+parity/
+  oracle/
+    lib/encode.js          the encoder (this format) -- the only writer
+    lib/pin.js             refuses to run unless the JS checkout is at UPSTREAM
+    lib/capture.js         capture-by-rename: wrap a module's exports to record real calls
+    <module>.js            one recorder per JS module, e.g. jsnum.js, three.js, overhangs.js
+  corpus/
+    <module>/<function>.jsonl[.zst]
+  src/lib.rs               the decoder + replay helpers -- the only reader
+```
+
+`just oracle [module]` runs the recorders (all of them, or one) and rewrites their corpus
+files. `just parity` runs the Rust replay tests. Corpus files are committed. Any file
+over 5 MB is zstd-compressed (`.jsonl.zst`) and tracked with git LFS.
+
+## Case format
+
+One JSON object per line:
+
+```json
+{"id": "<stable unique id within the file>", "args": [<value>, ...], "out": <value>}
+```
+
+- `id` is deterministic (derived from the inputs, never a timestamp or random number), so
+  re-recording an unchanged function gives an identical file.
+- `args` holds the function's arguments in order. Recorders for methods put the receiver first,
+  and the recorder's header comment says so.
+- `out` is the return value. A function that throws records
+  `{"id", "args", "throws": "<message>"}` instead of `out`.
+
+## Value encoding
+
+Plain JSON can't carry every JS number (`JSON.stringify(-0)` is `"0"`, and NaN and ±∞ become
+`null`), so numbers and binary data are encoded:
+
+| JS value | encoding |
+|---|---|
+| finite number, not -0 | JSON number, written by `JSON.stringify` (shortest round-trip) |
+| -0, NaN, Infinity, -Infinity | `{"$n": "-0"}`, `{"$n": "NaN"}`, `{"$n": "Infinity"}`, `{"$n": "-Infinity"}` |
+| `Float64Array` | `{"$f64": "<base64 of little-endian bytes>"}` |
+| `Float32Array` | `{"$f32": "<base64 LE>"}` |
+| `Int32Array` / `Uint32Array` / `Uint8Array` | `{"$i32": …}` / `{"$u32": …}` / `{"$u8": …}` |
+| string, boolean, null | JSON as-is |
+| `undefined` | `{"$u": 1}` |
+| Array | JSON array of encoded values |
+| plain object | JSON object of encoded values. Key order is preserved, and a key starting with `$` is escaped as `$$` |
+| `Map` | `{"$map": [[k, v], ...]}` in insertion order |
+| `Set` | `{"$set": [v, ...]}` in insertion order |
+
+Typed arrays are encoded from their exact bytes, so a decoded `$f64` is bit-identical to what
+JS held. Rust decodes with `serde_json`'s `float_roundtrip` feature on, so JSON numbers
+round-trip exactly too.
+
+## Comparing
+
+`parity::compare(actual, expected, tol)` walks both values together and fails on the
+**first** difference it finds, reporting the path (`out.fins[3].line[7][2]`), both values and the case id.
+
+- Discrete values (strings, booleans, null, integers stored as integers, array lengths, object
+  keys, Map and Set order) must be **equal**.
+- Floats: `Tol::Exact` compares bits (all NaNs are equal; -0 ≠ +0). `Tol::Abs(t)`
+  passes when `|a - e| <= t`, NaN only matches NaN, and ±∞ only matches itself.
+- Default tolerances:
+  - `jsnum`, `three`, file-format parsers: **`Exact`**
+  - geometry outputs: **`Abs(1e-6)`** (mm). The ticket can set something tighter, never looser.
+
+## Capture-by-rename
+
+To record what a function actually sees inside a real build, `capture.js` loads a copy of the
+module with `export function foo(` renamed to `function __foo(`, and appends
+`export const foo = record('foo', __foo)`. The same technique is described in upstream
+`docs/PERFORMANCE-SPEC.md`. The JS checkout is never modified: the copy is written to a temp
+directory together with the rest of the `web/` tree. `record` encodes arguments *before* the call,
+since JS functions sometimes mutate them. It caps each function's cases (the default is 200,
+which the recorder can override) and picks them deterministically: the first N, then every Kth.

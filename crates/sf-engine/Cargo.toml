@@ -1,0 +1,19 @@
+[package]
+name = "sf-engine"
+description = "Support Fins geometry engine (port of web/*.js, web/prop, web/fins)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+libm.workspace = true
+indexmap.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+parity = { path = "../../parity" }
+
+[lints]
+workspace = true

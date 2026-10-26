@@ -1,0 +1,17 @@
+[package]
+name = "sf-io"
+description = "Support Fins file formats (port of web/stl.js, obj.js, zip.js, threemf.js, ...)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+sf-engine.workspace = true
+
+[dev-dependencies]
+parity = { path = "../../parity" }
+
+[lints]
+workspace = true

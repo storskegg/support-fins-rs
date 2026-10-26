@@ -1,0 +1,1 @@
+parity/corpus/**/*.zst filter=lfs diff=lfs merge=lfs -text

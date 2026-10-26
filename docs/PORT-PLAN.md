@@ -203,14 +203,15 @@ The app is then built on a finished, tested engine instead of a moving one.
 - **B:** `sf-engine::three` (the Euler, Quaternion and Matrix3 routines the engine and tests use),
   with the same values recorded from V8; `sitePose` from `tests/_scene.js`.
 - **C:** Parity system v1: the oracle runner, capture-by-rename, corpus format, Rust replay
-  harness, `just oracle` and `just parity`. First module recorded: `overhangs.js`.
+  harness, `just oracle` and `just parity`. The first recorders are `jsnum` and `three` (shared
+  with A and B), then `overhangs.js` (`buildTopology` and `analyze`), ready for M1 to replay.
 - **D:** Test-port harness: the Rust equivalents of `tests/_util.js`, `_scene.js`, `_bore.js`,
   `_circular.js` and `_occt.js` (fixture loading, `siteOpts`, synthetic solids), plus a
   `deno test` runner at the pin, so every ported test can be checked against the JS original.
   The minimal STL reader needed to load fixtures moves forward from M1.
 
-**Exit:** `just check` runs fmt, clippy, unit tests and parity, all green, with `overhangs.js`
-recorded and replayed end to end.
+**Exit:** `just check` runs fmt, clippy, unit tests and parity, all green. `jsnum` and `three` match
+V8 bit for bit through the parity replay. The `overhangs.js` cases are recorded.
 
 ### M1 — Engine layers L0–L1 and file formats
 - **A:** geometry: topology and weld (`buildTopology`), `analyze`, gridsize, inside
@@ -220,9 +221,11 @@ recorded and replayed end to end.
 - **C:** judge, `prop/downhill`, `fins/field`, `prop/curved`, drawarc; then `sf-io`: STL (binary and
   ASCII), OBJ, zip, 3MF read and write (geometry, then sessions), exportname, paintcode, scale.
   Exports must byte-compare with JS for identical input.
-- **D:** ports the JS test files the M1 modules gate, from §4a: `stl`, `obj`, `threemf`,
-  `session`, `islands`, `scale`, `exportname`, `nozzle`, `tunables`, `kiss`, `trace`, `nearface`,
-  … Writing tests in their own track keeps a test from being bent to fit the code it checks.
+- **D:** tests and parity for M1. D ports the JS test files `docs/TEST-MAP.md` assigns to M1
+  (`weld`, `stl`, `obj`, `scale`, `nearface`, `surface_lowest`, `trace`) and writes the oracle
+  recorders for every module A, B and C port. Writing tests in their own track keeps a test from
+  being bent to fit the code it checks. Most JS test files go through `buildFins`, so they gate M3
+  (see TEST-MAP).
 
 **Exit:** the ported tests for every L0–L1 module pass, and parity is green for those modules.
 
@@ -230,8 +233,9 @@ recorded and replayed end to end.
 - **A, B, C** split L2 and L3: sweep, clearance, bridge, arc, circular, pins, rim, bridgerace,
   coverage, tracks, tines, attached, squat, raster, lattice. Then `prop.js` (`buildProps`,
   `buildShortWalls`).
-- **D:** ports the tests those modules gate: `tines*`, `rows`, `rim`, `arc`, `circular`,
-  `bridge_dir`, `raster`, `lattice`, `squat`, `pins`, `ties`, `trace`, `curved`, …
+- **D:** ports the M2 rows of TEST-MAP (`must_class`, `neck`), and writes the oracle recorders
+  and capture-mode cases for the L2 and L3 modules, so `buildProps`' internals replay from real
+  builds.
 
 **Exit:** `buildProps` matches the oracle on the full corpus, and its ported tests pass.
 
@@ -239,8 +243,9 @@ recorded and replayed end to end.
 - **A, B, C:** `fins/*` (rows, pad, wedges, tall, shortwalls, downhill, fill), `sway`, `draw` and
   `drawarc`, `fins.js`, `orient.js` (suggest, layerVerdict, strength pose). Then **sf-cli** with
   the same flags (generated from `options.json`), JSON output, and 3MF out.
-- **D:** the remaining tests, `golden`, `stability`, `integration`, and the CLI's
-  `project.test.js`.
+- **All four** port the ~60 M3 rows of TEST-MAP as soon as their modules land. That includes
+  `golden`, `stability` and `integration`, and the CLI's tests. No agent ports the tests for a
+  module it ported itself.
 - **Exit:** all 82 test files are ported and pass. The golden scenes match within the
   tolerance. CLI output matches the JS CLI on the corpus.
 - **Report:** a serial-Rust vs JS timing table. **Demo:** the CLI on your own parts.
