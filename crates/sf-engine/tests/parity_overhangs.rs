@@ -107,18 +107,13 @@ fn analysis_fields(a: &Analysis) -> Vec<(&'static str, Value)> {
     ]
 }
 
-/// `aliased`: the direct recorder kept each result's `over/kept/onBed` as the topo's shared
-/// scratch arrays and encoded them only at the end, so every case of a model carries the flags
-/// of that model's LAST analyze. (This is the aliasing `Analysis` documents.) Those three keys
-/// are then checked against the last result computed for the model.
-fn replay_analyze(file: &str, aliased: bool) -> usize {
+fn replay_analyze(file: &str) -> usize {
     let mut topos: HashMap<String, Topology> = HashMap::new();
     for c in load_cases("overhangs", "buildTopology") {
         topos.insert(c.id.clone(), build_topology(pos_of(&c.args[0])));
     }
     let cases = load_cases("overhangs", file);
     assert!(!cases.is_empty());
-    let mut last: HashMap<String, Analysis> = HashMap::new();
     for c in &cases {
         let model = c.args[0].str();
         let topo = topos
@@ -129,22 +124,7 @@ fn replay_analyze(file: &str, aliased: bool) -> usize {
         let result = analyze(topo, c.args[1].num(), &rot);
         let expected = c.out.as_ref().unwrap();
         for (key, actual) in analysis_fields(&result) {
-            if aliased && matches!(key, "over" | "kept" | "onBed") {
-                continue;
-            }
             check(&c.id, key, &actual, expected.get(key));
-        }
-        last.insert(model.to_string(), result);
-    }
-    if aliased {
-        for c in &cases {
-            let result = &last[c.args[0].str()];
-            let expected = c.out.as_ref().unwrap();
-            for (key, actual) in analysis_fields(result) {
-                if matches!(key, "over" | "kept" | "onBed") {
-                    check(&c.id, key, &actual, expected.get(key));
-                }
-            }
         }
     }
     cases.len()
@@ -152,10 +132,10 @@ fn replay_analyze(file: &str, aliased: bool) -> usize {
 
 #[test]
 fn analyze_direct() {
-    assert_eq!(replay_analyze("analyze", true), 29 * 3 * 8);
+    assert_eq!(replay_analyze("analyze"), 29 * 3 * 8);
 }
 
 #[test]
 fn analyze_captured() {
-    assert_eq!(replay_analyze("analyze.captured", false), 54);
+    assert_eq!(replay_analyze("analyze.captured"), 54);
 }
