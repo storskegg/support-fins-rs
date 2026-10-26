@@ -82,8 +82,10 @@ These are where a faithful-looking port quietly gives different numbers:
    order (`a*b+c` ≠ `mul_add`, and reassociating a sum changes bits). The `jsnum` module provides
    JS-identical helpers, and agents must use them:
    - `Math.round` rounds .5 up, toward +∞. `f64::round` rounds it away from zero.
-   - `Math.sin/cos/atan2/pow/exp/log` use V8's fdlibm. Use the **`libm`** crate, not the
-     platform functions.
+   - V8 15.0.245's `Math.sin/cos/tan/asin/acos/atan/atan2/exp/log*/cbrt` are **LLVM libc**
+     (with FMA), ported bit-exact into `jsnum::llvm` (#2). `Math.pow` is V8's wrapper around the
+     **platform** `pow`, so `jsnum::pow` is bit-exact on macOS arm64 only. That's a recorded platform
+     dependency, and fine for this project's single target.
    - `|0`, `>>>`, `Math.imul`, `Math.trunc`, `Math.sign(-0)`, `Math.min/max` with NaN and -0,
      and `toFixed` for 3MF/STL text.
 4. **Order.** `Map`/`Set` iterate in insertion order, so use `IndexMap`/`IndexSet`.
