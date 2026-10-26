@@ -7,6 +7,7 @@ check:
     cargo fmt --all --check
     cargo clippy --workspace --all-targets -- -D warnings
     cargo test --workspace
+    deno test --allow-read --allow-write --allow-run=git,zstd --allow-env parity/oracle/lib/
 
 # Rust parity replay only.
 parity:
