@@ -11,8 +11,6 @@ publish.workspace = true
 sf-engine.workspace = true
 sf-io.workspace = true
 indexmap.workspace = true
-
-[dev-dependencies]
 parity = { path = "../../parity" }
 
 [lints]

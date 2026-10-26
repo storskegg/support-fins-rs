@@ -159,6 +159,12 @@ fn decode(raw: &Raw) -> Value {
                             }),
                             _ => panic!("corpus: $n payload is not a string"),
                         },
+                        // Standard references (docs/PARITY.md): kept as a one-key Obj for
+                        // sf_testkit::parity to resolve. (A plain JS key `$topo` is stored as
+                        // `$$topo`, which also decodes to `$topo`; no JS object has such a key.)
+                        "$topo" | "$analysis" | "$seated" | "$config" => {
+                            Value::Obj(vec![(k.clone(), decode(v))])
+                        }
                         "$u" => Value::Undefined,
                         "$f64" => Value::F64(typed(v, k, f64::from_le_bytes)),
                         "$f32" => Value::F32(typed(v, k, f32::from_le_bytes)),

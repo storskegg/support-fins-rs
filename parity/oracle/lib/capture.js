@@ -4,7 +4,7 @@
 // `export const foo = __record('foo', __foo)` appended. Every other module of the copy that
 // imports it gets the wrapped function.
 import { UPSTREAM_ROOT } from "./pin.js";
-import { encode, writeCases } from "./encode.js";
+import { encode, Ref, writeCases } from "./encode.js";
 
 let nextId = 0;
 
@@ -39,36 +39,112 @@ export function upstreamStatus() {
 
 /**
  * Copies upstream `web/` to a temp dir, wraps `fns` of `relPath` (relative to web/, e.g.
- * 'overhangs.js'), and imports the copy.
+ * 'overhangs.js'), and imports the copy. Single-module form of captureModules.
  *
- * opts.cap    per-function cap on flushed cases (default 200)
- * opts.copy   extra upstream paths (files or dirs, relative to the checkout root, e.g.
- *             'tests/_scene.js', 'prototype/stress/models/') copied into the temp tree at the same
- *             relative layout, so their `../web/` imports resolve to the captured copy
- * opts.args   {fnName: (args, sink) => args'} maps a call's arguments before they are encoded,
- *             for arguments the format cannot carry (a function, a scratch-laden object)
- *
- * Returns {module, url, sink, root, rootUrl, cap, cleanup}. `url` is the captured file's
- * `file://` URL, `rootUrl` the temp tree's (to import e.g. rootUrl + 'tests/_scene.js'), and
- * `cleanup()` deletes the temp tree.
+ * Returns {module, ...captureModules' result}.
  */
 export async function captureModule(relPath, fns, opts = {}) {
+  const cap = await captureModules([{ rel: relPath, fns }], opts);
+  return { module: cap.modules[relPath], url: cap.urls[relPath], ...cap };
+}
+
+const REF_FNS = new Set(["buildTopology", "analyze", "seatedPartTris"]);
+
+/**
+ * Wraps several modules in ONE temp tree, so the wrapped functions of one module are the ones the
+ * others import. `specs` is [{rel, fns}] with `rel` relative to web/.
+ *
+ * opts.cap     per-function cap on flushed cases (default 200)
+ * opts.copy    extra upstream paths (files or dirs, relative to the checkout root, e.g.
+ *              'tests/_scene.js', 'prototype/stress/models/') copied into the temp tree at the same
+ *              relative layout, so their `../web/` imports resolve to the captured copy
+ * opts.args    {fnName: (args, sink) => args'} maps a call's arguments before they are encoded,
+ *              for arguments the format cannot carry (a function, a scratch-laden object)
+ * opts.refs    true: standard references. buildTopology, analyze and seatedPartTris (when wrapped)
+ *              register what they return, and any argument, however deeply nested in plain
+ *              objects and arrays, that IS a registered object is recorded as
+ *              {"$topo": id} / {"$analysis": {...}} / {"$seated": {...}} instead of in full.
+ *              The model id is `sink.model`, which the driver sets before each scene.
+ *              (opts.args runs first, on the raw arguments.)
+ * opts.config  {fnName: [name, ...]}: the call's arguments get one trailing {"$config": {name: ...}}
+ *              holding a snapshot of those config objects, taken at call time. Needs opts.configs.
+ * opts.configs {name: () => object}: where to read a config object from (it lives in the imported
+ *              tree, so the driver passes thunks), e.g. {PROP: () => propModule.PROP}
+ *
+ * Returns {modules, urls, sink, root, rootUrl, cap, cleanup}, `modules`/`urls` keyed by `rel`. `rootUrl`
+ * is the temp tree's `file://` URL (to import e.g. rootUrl + 'tests/_scene.js'); `cleanup()`
+ * deletes the temp tree.
+ */
+export async function captureModules(specs, opts = {}) {
   const cap = opts.cap ?? 200;
   const dir = Deno.makeTempDirSync({ prefix: "sf-capture-" });
   copyTree(`${UPSTREAM_ROOT}/web`, `${dir}/web`);
   for (const rel of opts.copy ?? []) copyRel(rel, dir);
 
-  const sink = { cap, tag: "", counts: {}, calls: Object.fromEntries(fns.map((f) => [f, []])) };
+  const fns = specs.flatMap((s) => s.fns);
+  const sink = { cap, tag: "", model: "", counts: {}, calls: Object.fromEntries(fns.map((f) => [f, []])) };
+  const refs = new WeakMap(); // object -> Ref
   const key = `__sfCapture${nextId++}`;
+
+  // Replaces registered objects by their references, walking plain objects and arrays.
+  const seen = new Set();
+  const substitute = (v) => {
+    if (v === null || typeof v !== "object") return v;
+    const r = refs.get(v);
+    if (r) return r;
+    if (ArrayBuffer.isView(v) || v instanceof Map || v instanceof Set || seen.has(v)) return v;
+    const proto = Object.getPrototypeOf(v);
+    if (!Array.isArray(v) && proto !== Object.prototype && proto !== null) return v;
+    seen.add(v);
+    try {
+      if (Array.isArray(v)) return v.map(substitute);
+      return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, substitute(x)]));
+    } finally {
+      seen.delete(v);
+    }
+  };
+  const num9 = (rot) => Array.from(rot);
+
+  // What a returned object is a reference for, given the call that made it.
+  const register = (name, args, result) => {
+    if (result === null || typeof result !== "object") return;
+    if (name === "buildTopology") {
+      refs.set(result, new Ref({ $topo: sink.model }));
+    } else if (name === "analyze") {
+      const t = refs.get(args[0]);
+      if (t) {
+        refs.set(result, new Ref({ $analysis: { model: t.payload.$topo, threshold: encode(args[1]), rot: encode(num9(args[2])) } }));
+      }
+    } else if (name === "seatedPartTris") {
+      const t = refs.get(args[0]);
+      if (t) {
+        refs.set(result, new Ref({ $seated: { model: t.payload.$topo, rot: encode(num9(args[1])), offset: encode(args[2]) } }));
+      }
+    }
+  };
+
   globalThis[key] = {
     call(name, fn, self, args) {
       const idx = sink.counts[name] = (sink.counts[name] ?? 0) + 1;
-      const shown = opts.args?.[name] ? opts.args[name](args, sink) : args;
+      let shown = opts.args?.[name] ? opts.args[name](args, sink) : args;
+      if (opts.refs) shown = shown.map(substitute);
+      shown = shown.map(encode);
+      // a config snapshot is taken now, with the arguments: the call may change it
+      if (opts.config?.[name]) {
+        const snap = {};
+        for (const c of opts.config[name]) {
+          const get = opts.configs?.[c];
+          if (!get) throw new Error(`capture: no opts.configs.${c} for ${name}`);
+          snap[c] = encode(get());
+        }
+        shown.push({ $config: snap });
+      }
       // args are encoded BEFORE the call: functions sometimes mutate them
-      const entry = { scene: sink.tag, n: idx - 1, args: shown.map(encode) };
+      const entry = { scene: sink.tag, n: idx - 1, args: shown };
       try {
         const result = fn.apply(self, args);
         entry.out = encode(result);
+        if (opts.refs && REF_FNS.has(name)) register(name, args, result);
         return result;
       } catch (e) {
         entry.throws = String(e?.message ?? e);
@@ -79,24 +155,29 @@ export async function captureModule(relPath, fns, opts = {}) {
     },
   };
 
-  const file = `${dir}/web/${relPath}`;
-  let src = Deno.readTextFileSync(file);
-  for (const f of fns) {
-    const re = new RegExp(`^export function ${f}\\(`, "gm");
-    if ((src.match(re) ?? []).length !== 1) {
-      throw new Error(`capture: expected exactly one 'export function ${f}(' in ${relPath}`);
+  for (const { rel, fns: list } of specs) {
+    const file = `${dir}/web/${rel}`;
+    let src = Deno.readTextFileSync(file);
+    for (const f of list) {
+      const re = new RegExp(`^export function ${f}\\(`, "gm");
+      if ((src.match(re) ?? []).length !== 1) {
+        throw new Error(`capture: expected exactly one 'export function ${f}(' in ${rel}`);
+      }
+      src = src.replace(re, `function __${f}(`);
     }
-    src = src.replace(re, `function __${f}(`);
+    const head = `const __record = (name, fn) => function (...args) { return globalThis.${key}.call(name, fn, this, args); };\n`;
+    const tail = list.map((f) => `\nexport const ${f} = __record('${f}', __${f});`).join("");
+    Deno.writeTextFileSync(file, head + src + tail + "\n");
   }
-  const head = `const __record = (name, fn) => function (...args) { return globalThis.${key}.call(name, fn, this, args); };\n`;
-  const tail = fns.map((f) => `\nexport const ${f} = __record('${f}', __${f});`).join("");
-  Deno.writeTextFileSync(file, head + src + tail + "\n");
 
   const rootUrl = new URL(`file://${dir}/`).href;
-  const url = new URL(`web/${relPath}`, rootUrl).href;
-  const module = await import(url);
+  const urls = {}, modules = {};
+  for (const { rel } of specs) {
+    urls[rel] = new URL(`web/${rel}`, rootUrl).href;
+    modules[rel] = await import(urls[rel]);
+  }
   return {
-    module, url, sink, root: dir, rootUrl, cap,
+    modules, urls, sink, root: dir, rootUrl, cap,
     cleanup: () => Deno.removeSync(dir, { recursive: true }),
   };
 }

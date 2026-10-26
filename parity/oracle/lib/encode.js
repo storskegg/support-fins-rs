@@ -19,8 +19,20 @@ function typedBytes(v) {
   return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
 }
 
+/**
+ * A standard reference (docs/PARITY.md, "Standard references in captured args"): `payload` is an
+ * already-encoded JSON tree such as `{"$topo": "cube"}`. encode() writes it as-is, since its
+ * `$topo` key must not be escaped to `$$topo` like a plain object's `$` key.
+ */
+export class Ref {
+  constructor(payload) {
+    this.payload = payload;
+  }
+}
+
 /** Encodes a JS value to a JSON-safe tree. */
 export function encode(value) {
+  if (value instanceof Ref) return value.payload;
   // Row: string, boolean, null -> JSON as-is
   if (value === null || typeof value === "string" || typeof value === "boolean") {
     return value;

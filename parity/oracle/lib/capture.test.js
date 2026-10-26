@@ -1,6 +1,6 @@
 // Run with: deno test --allow-read --allow-write --allow-run=git,zstd --allow-env parity/oracle/lib/
 import { assertPinned, UPSTREAM_ROOT } from "./pin.js";
-import { captureModule, flush, setScene, thin, upstreamStatus } from "./capture.js";
+import { captureModule, captureModules, flush, setScene, thin, upstreamStatus } from "./capture.js";
 import { encode, writeCases } from "./encode.js";
 
 const eq = (a, b, m) => {
@@ -63,4 +63,58 @@ Deno.test("writeCases: duplicate ids throw; over 5 MB writes .jsonl.zst and drop
   } finally {
     Deno.removeSync(new URL("_zst_probe/", CORPUS), { recursive: true });
   }
+});
+
+Deno.test("standard references: topo, analysis and seated soup args, nested, plus a config snapshot", async () => {
+  assertPinned();
+  const before = upstreamStatus();
+  const cap = await captureModules(
+    [
+      { rel: "overhangs.js", fns: ["buildTopology", "analyze"] },
+      { rel: "fins/seating.js", fns: ["seatedPartTris"] },
+      { rel: "prop/nearface.js", fns: ["nearestFaces"] },
+      { rel: "prop/surface.js", fns: ["surfaceZAt"] },
+    ],
+    {
+      refs: true,
+      args: { buildTopology: ([g]) => [g.getAttribute("position").array] },
+      config: { surfaceZAt: ["PROP"] },
+      configs: { PROP: () => ({ gap: 0.1, nan: NaN }) },
+    },
+  );
+  try {
+    const m = cap.modules;
+    const pos = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0]);
+    cap.sink.model = "unit";
+    setScene(cap.sink, "s");
+    const topo = m["overhangs.js"].buildTopology({ getAttribute: () => ({ array: pos }) });
+    const rot = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const res = m["overhangs.js"].analyze(topo, 45, rot);
+    const off = res.offset;
+    const soup = m["fins/seating.js"].seatedPartTris(topo, rot, off);
+    m["prop/nearface.js"].nearestFaces(topo, rot, off, 0, 0, 0);
+    m["prop/surface.js"].surfaceZAt(soup, 0.1, 0.1);
+    const c = cap.sink.calls;
+    eq(c.analyze[0].args[0], { $topo: "unit" });
+    eq(c.seatedPartTris[0].args[0], { $topo: "unit" });
+    eq(c.nearestFaces[0].args[0], { $topo: "unit" });
+    const seated = c.surfaceZAt[0].args[0].$seated;
+    eq(seated.model, "unit");
+    eq(seated.rot, rot);
+    eq(seated.offset, encode(off));
+    eq(c.surfaceZAt[0].args.slice(1, 3), [0.1, 0.1]);
+    eq(c.surfaceZAt[0].args[3], { $config: { PROP: { gap: 0.1, nan: { $n: "NaN" } } } });
+    // an analysis and a topo nested in plain objects and arrays are references too
+    try {
+      m["prop/nearface.js"].nearestFaces({ list: [topo], res }, rot, off, 0, 0, 0);
+    } catch (_) { /* the call is recorded before it runs; what it does is not under test */ }
+    const nested = c.nearestFaces[1].args[0];
+    eq(nested.list, [{ $topo: "unit" }]);
+    eq(nested.res.$analysis, { model: "unit", threshold: 45, rot });
+    // an unregistered object is encoded in full
+    eq(c.analyze.length, 1);
+  } finally {
+    cap.cleanup();
+  }
+  eq(upstreamStatus(), before);
 });
