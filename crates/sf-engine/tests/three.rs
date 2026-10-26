@@ -83,7 +83,9 @@ fn site_pose_of_nothing_is_identity() {
 #[test]
 fn eps_on_an_unturned_pose_turns_about_x() {
     for eps in [1e-9, -1e-9] {
-        let q = Quaternion::from_axis_angle([1.0, 0.0, 0.0], eps);
+        // JS premultiplies the turn onto a fresh identity quaternion (which can carry -0s)
+        let mut q = Quaternion::IDENTITY;
+        q.premultiply(Quaternion::from_axis_angle([1.0, 0.0, 0.0], eps));
         let want = matrix3_from_matrix4(&matrix4_from_quaternion(q));
         let got = site_pose([0.0, 0.0, 0.0], eps);
         assert_eq!(bits(&got), bits(&want));
