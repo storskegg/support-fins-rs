@@ -1,7 +1,7 @@
 //! Replay of `parity/corpus/testkit/*.jsonl` (recorded by `parity/oracle/testkit.js` from the
 //! upstream helpers) through the Rust helpers, bit for bit (`Tol::Exact`).
 
-use parity::{Case, Tol, Value, compare, load_cases};
+use ::parity::{Case, Tol, Value, compare, load_cases};
 use sf_testkit::*;
 
 fn check(c: &Case, actual: Value) {

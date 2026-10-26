@@ -13,6 +13,8 @@ mod bore;
 mod circular;
 mod util;
 
+pub mod parity;
+
 pub use bore::{CircularBore, circular_bore};
 pub use circular::{RecessedBody, recessed_body};
 pub use util::*;
