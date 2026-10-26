@@ -123,7 +123,7 @@ fn read_ascii_stl(text: &str) -> Result<Vec<f64>, StlError> {
     if out.is_empty() {
         return Err(StlError("STL has no triangles".into()));
     }
-    if out.len() % 9 != 0 {
+    if !out.len().is_multiple_of(9) {
         return Err(StlError(
             "ASCII STL has a facet without three vertices (truncated file?)".into(),
         ));

@@ -158,7 +158,7 @@ fn ascii_bad_vertex() {
 fn ascii_truncated_mid_facet() {
     let cut = ASCII.find("   vertex 0 1 0").unwrap();
     assert_eq!(
-        err(ASCII[..cut].as_bytes()),
+        err(&ASCII.as_bytes()[..cut]),
         "ASCII STL has a facet without three vertices (truncated file?)"
     );
 }

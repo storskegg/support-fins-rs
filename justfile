@@ -24,3 +24,22 @@ oracle module="":
     else
         for f in parity/oracle/*.js; do deno run $flags "$f"; done
     fi
+
+# Run the original JS tests at the pinned commit: `just js-test [file.test.js]`; refuses unless the checkout is at UPSTREAM.
+js-test file="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root="$(sed -n 's/^checkout=//p' UPSTREAM)"
+    root="${root/#\~/$HOME}"
+    want="$(sed -n 's/^commit=//p' UPSTREAM)"
+    have="$(git -C "$root" rev-parse HEAD)"
+    if [ "$have" != "$want" ]; then
+        echo "js-test: $root is at $have but UPSTREAM pins $want; refusing to run." >&2
+        exit 1
+    fi
+    cd "$root"
+    if [ -n "{{file}}" ]; then
+        deno test -A "tests/{{file}}"
+    else
+        deno test -A tests/
+    fi
