@@ -1,6 +1,6 @@
 // Run with: deno test --allow-read --allow-write --allow-run=git,zstd --allow-env parity/oracle/lib/
 import { assertPinned, UPSTREAM_ROOT } from "./pin.js";
-import { captureModule, captureModules, flush, setScene, thin, upstreamStatus } from "./capture.js";
+import { captureModule, captureModules, flush, Sampler, setScene, upstreamStatus } from "./capture.js";
 import { encode, writeCases } from "./encode.js";
 
 const eq = (a, b, m) => {
@@ -8,14 +8,24 @@ const eq = (a, b, m) => {
 };
 const CORPUS = new URL("../../corpus/", import.meta.url);
 
-Deno.test("thin keeps the first cap/2, then every k-th, at most cap", () => {
-  const calls = Array.from({ length: 1000 }, (_, i) => i);
-  const out = thin(calls, 200);
-  eq(out.slice(0, 100), calls.slice(0, 100));
-  if (out.length > 200) throw new Error("over cap");
-  eq(out[100], 100);
-  eq(out[101] - out[100], Math.ceil(900 / 100));
-  eq(thin(calls.slice(0, 150), 200).length, 150);
+Deno.test("sampler keeps the first cap/2, then every k-th (k a power of two), at most cap", () => {
+  for (const [n, cap] of [[5, 200], [200, 200], [1000, 200], [12345, 200], [7, 2], [9, 1]]) {
+    const s = new Sampler(cap);
+    for (let i = 0; i < n; i++) {
+      if (s.wants()) s.add(i); else s.skip();
+    }
+    const out = s.entries();
+    const head = Math.floor(cap / 2);
+    if (out.length > cap) throw new Error(`over cap: ${out.length}`);
+    eq(out.slice(0, Math.min(head, n)), Array.from({ length: Math.min(head, n) }, (_, i) => i));
+    const rest = out.slice(head);
+    for (let j = 0; j < rest.length; j++) eq(rest[j], head + j * s.k, "rest is every k-th");
+    if (n <= cap) eq(out.length, n);
+    // nothing past the last kept stride is missing: the next multiple of k is beyond the run
+    if (rest.length) {
+      if (head + rest.length * s.k < n && n > cap) throw new Error(`missing a call: n=${n} k=${s.k}`);
+    }
+  }
 });
 
 Deno.test("capture wraps, records before the call, and leaves the checkout untouched", async () => {
@@ -30,9 +40,8 @@ Deno.test("capture wraps, records before the call, and leaves the checkout untou
     const g = { getAttribute: () => ({ array: pos }) };
     setScene(cap.sink, "s");
     for (let i = 0; i < 5; i++) cap.module.buildTopology(g);
-    eq(cap.sink.calls.buildTopology.length, 5);
-    eq(cap.sink.calls.buildTopology[4].n, 4);
-    eq(cap.sink.calls.buildTopology[0].args[0], encode(pos));
+    eq(cap.sink.calls.buildTopology.total, 5);
+    eq(cap.sink.calls.buildTopology.entries()[0].args[0], encode(pos));
     flush("_capture_probe", cap.sink);
     const text = Deno.readTextFileSync(new URL("_capture_probe/buildTopology.captured.jsonl", CORPUS));
     eq(text.trim().split("\n").map((l) => JSON.parse(l).id), ["s#0", "s#1"]);
@@ -94,7 +103,7 @@ Deno.test("standard references: topo, analysis and seated soup args, nested, plu
     const soup = m["fins/seating.js"].seatedPartTris(topo, rot, off);
     m["prop/nearface.js"].nearestFaces(topo, rot, off, 0, 0, 0);
     m["prop/surface.js"].surfaceZAt(soup, 0.1, 0.1);
-    const c = cap.sink.calls;
+    const c = Object.fromEntries(Object.entries(cap.sink.calls).map(([k, v]) => [k, v.entries()]));
     eq(c.analyze[0].args[0], { $topo: "unit" });
     eq(c.seatedPartTris[0].args[0], { $topo: "unit" });
     eq(c.nearestFaces[0].args[0], { $topo: "unit" });
@@ -108,11 +117,11 @@ Deno.test("standard references: topo, analysis and seated soup args, nested, plu
     try {
       m["prop/nearface.js"].nearestFaces({ list: [topo], res }, rot, off, 0, 0, 0);
     } catch (_) { /* the call is recorded before it runs; what it does is not under test */ }
-    const nested = c.nearestFaces[1].args[0];
+    const nested = cap.sink.calls.nearestFaces.entries()[1].args[0];
     eq(nested.list, [{ $topo: "unit" }]);
     eq(nested.res.$analysis, { model: "unit", threshold: 45, rot });
     // an unregistered object is encoded in full
-    eq(c.analyze.length, 1);
+    eq(cap.sink.calls.analyze.entries().length, 1);
   } finally {
     cap.cleanup();
   }

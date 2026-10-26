@@ -8,6 +8,42 @@ import { encode, Ref, writeCases } from "./encode.js";
 
 let nextId = 0;
 
+/**
+ * Streaming deterministic sampler: keeps the first floor(cap/2) calls, then every k-th of the rest,
+ * k a power of two that doubles (dropping every other kept call) whenever the rest outgrows
+ * cap - head. A function a build calls millions of times is never buffered.
+ */
+export class Sampler {
+  constructor(cap) {
+    this.head = Math.floor(cap / 2);
+    this.limit = cap - this.head;
+    this.k = 1;
+    this.total = 0;
+    this.first = [];
+    this.rest = [];
+  }
+  /** Whether the next call (index `total`) would be kept now; call `add` with it if so. */
+  wants() {
+    const i = this.total;
+    return i < this.head || (i - this.head) % this.k === 0;
+  }
+  skip() {
+    this.total++;
+  }
+  add(entry) {
+    const i = this.total++;
+    if (i < this.head) return void this.first.push(entry);
+    this.rest.push(entry);
+    if (this.rest.length > this.limit) {
+      this.rest = this.rest.filter((_, j) => j % 2 === 0);
+      this.k *= 2;
+    }
+  }
+  entries() {
+    return this.first.concat(this.rest);
+  }
+}
+
 function copyTree(from, to) {
   Deno.mkdirSync(to, { recursive: true });
   for (const e of Deno.readDirSync(from)) {
@@ -66,6 +102,7 @@ const REF_FNS = new Set(["buildTopology", "analyze", "seatedPartTris"]);
  *              {"$topo": id} / {"$analysis": {...}} / {"$seated": {...}} instead of in full.
  *              The model id is `sink.model`, which the driver sets before each scene.
  *              (opts.args runs first, on the raw arguments.)
+ * opts.quiet   [fnName, ...]: wrapped only so refs can register what they return; calls are not recorded
  * opts.config  {fnName: [name, ...]}: the call's arguments get one trailing {"$config": {name: ...}}
  *              holding a snapshot of those config objects, taken at call time. Needs opts.configs.
  * opts.configs {name: () => object}: where to read a config object from (it lives in the imported
@@ -82,7 +119,7 @@ export async function captureModules(specs, opts = {}) {
   for (const rel of opts.copy ?? []) copyRel(rel, dir);
 
   const fns = specs.flatMap((s) => s.fns);
-  const sink = { cap, tag: "", model: "", counts: {}, calls: Object.fromEntries(fns.map((f) => [f, []])) };
+  const sink = { cap, tag: "", model: "", counts: {}, calls: Object.fromEntries(fns.map((f) => [f, new Sampler(cap)])) };
   const refs = new WeakMap(); // object -> Ref
   const key = `__sfCapture${nextId++}`;
 
@@ -125,7 +162,19 @@ export async function captureModules(specs, opts = {}) {
 
   globalThis[key] = {
     call(name, fn, self, args) {
+      if (opts.quiet?.includes(name)) {
+        const result = fn.apply(self, args);
+        if (opts.refs && REF_FNS.has(name)) register(name, args, result);
+        return result;
+      }
       const idx = sink.counts[name] = (sink.counts[name] ?? 0) + 1;
+      const sampler = sink.calls[name];
+      if (!sampler.wants()) {
+        sampler.skip();
+        const result = fn.apply(self, args);
+        if (opts.refs && REF_FNS.has(name)) register(name, args, result);
+        return result;
+      }
       let shown = opts.args?.[name] ? opts.args[name](args, sink) : args;
       if (opts.refs) shown = shown.map(substitute);
       shown = shown.map(encode);
@@ -150,7 +199,7 @@ export async function captureModules(specs, opts = {}) {
         entry.throws = String(e?.message ?? e);
         throw e;
       } finally {
-        sink.calls[name].push(entry);
+        sampler.add(entry);
       }
     },
   };
@@ -188,26 +237,15 @@ export function setScene(sink, tag) {
   sink.counts = {};
 }
 
-/** Thins `calls` to at most `cap`: the first cap/2, then every k-th of the rest, k fixed after the run. */
-export function thin(calls, cap) {
-  if (calls.length <= cap) return calls;
-  const head = Math.floor(cap / 2);
-  const rest = calls.slice(head);
-  const k = Math.ceil(rest.length / (cap - head));
-  const out = calls.slice(0, head);
-  for (let i = 0; i < rest.length; i += k) out.push(rest[i]);
-  return out;
-}
-
 /**
  * Writes the captured cases of every wrapped function to
- * parity/corpus/<module>/<fn>.captured.jsonl[.zst]. `sceneTag` names calls recorded before any
- * setScene (default 'run'). Encoded values are already encoded, so they are written raw.
+ * parity/corpus/<module>/<fn>.captured.jsonl[.zst] (only the functions in `only`, when given). `sceneTag`
+ * names calls recorded before any setScene (default 'run'). Encoded values are already encoded, so they are written raw.
  */
-export function flush(module, sink, sceneTag = "run") {
-  const { cap } = sink;
+export function flush(module, sink, sceneTag = "run", only = null) {
   for (const [fn, calls] of Object.entries(sink.calls)) {
-    const cases = thin(calls, cap).map((c) => {
+    if (only && !only.includes(fn)) continue;
+    const cases = calls.entries().map((c) => {
       const id = `${c.scene || sceneTag}#${c.n}`;
       return c.throws !== undefined
         ? { id, args: c.args, throws: c.throws }
