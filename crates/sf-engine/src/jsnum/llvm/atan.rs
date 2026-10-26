@@ -1,6 +1,6 @@
 //! Ports of LLVM libc `math::atan` and `math::atan2` (src/__support/math/{atan,atan2}.h) and
 //! `atan_utils.h` (`atan_eval`), revision 9309c117, as V8 15.0.245 calls them from
-//! `v8::base::ieee754::{atan,atan2}` (src/base/ieee754.cc:136-137). FMA, accurate pass.
+//! `v8::base::ieee754::{atan,atan2}` (src/base/ieee754.cc:164-165). FMA, accurate pass.
 //! Unlike the logarithms these have no 128-bit fallback.
 
 use super::fputil::*;

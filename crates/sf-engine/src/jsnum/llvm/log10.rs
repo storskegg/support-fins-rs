@@ -1,5 +1,5 @@
 //! Port of LLVM libc `math::log10` (src/__support/math/log10.h, revision 9309c117), as V8 15.0.245
-//! calls it from `v8::base::ieee754::log10` (src/base/ieee754.cc:169). FMA, accurate pass.
+//! calls it from `v8::base::ieee754::log10` (src/base/ieee754.cc:229). FMA, accurate pass.
 
 use super::fputil::*;
 use super::log_rr::{LogRR, log_range_reduction};
@@ -55,6 +55,12 @@ fn log10_accurate(e_x: i32, index: usize, m_x: f64) -> f64 {
 
 /// `log10(x)`
 pub(crate) fn log10(x: f64) -> f64 {
+    log10_impl::<0>(x)
+}
+
+/// `log10` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn log10_impl<const FORCE: u8>(x: f64) -> f64 {
     let mut x_u = x.to_bits();
     let mut x_e: i32 = -1023;
 
@@ -117,7 +123,7 @@ pub(crate) fn log10(x: f64) -> f64 {
     let right = r2.hi + (r2.lo + err);
 
     // Ziv's test if fast pass is accurate enough.
-    if left == right {
+    if FORCE == 0 && left == right {
         return left;
     }
 

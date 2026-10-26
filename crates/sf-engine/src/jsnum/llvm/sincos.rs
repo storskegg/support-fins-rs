@@ -1,8 +1,8 @@
 //! Ports of LLVM libc `math::sin`, `math::cos` and `math::tan` (src/__support/math/{sin,cos,tan}.h,
 //! revision 9309c117) with their shared range reduction (range_reduction_double_{common,fma}.h)
 //! and `sincos_eval.h`. V8 15.0.245 reaches `sin` and `cos` through
-//! `v8::base::ieee754::{fdlibm_sin,fdlibm_cos}` (src/base/ieee754.cc:139,158) and `tan` through
-//! `ieee754::tan` (ieee754.cc:178). FMA, accurate pass, full tables.
+//! `v8::base::ieee754::{fdlibm_sin,fdlibm_cos}` (src/base/ieee754.cc:236-238, 168-170) and `tan` through
+//! `ieee754::tan` (ieee754.cc:243). FMA, accurate pass, full tables.
 
 use super::fputil::*;
 use super::tables_sincos::{
@@ -195,6 +195,12 @@ fn nan_result(x: f64) -> f64 {
 
 /// `sin(x)`
 pub(crate) fn sin(x: f64) -> f64 {
+    sin_impl::<0>(x)
+}
+
+/// `sin` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn sin_impl<const FORCE: u8>(x: f64) -> f64 {
     let x_e = biased_exponent(x);
 
     let mut y = DD::default();
@@ -241,7 +247,7 @@ pub(crate) fn sin(x: f64) -> f64 {
     let r_upper = rr.hi + rlp; // (rr.lo + ERR);
     let r_lower = rr.hi + rlm; // (rr.lo - ERR);
 
-    if r_upper == r_lower {
+    if FORCE == 0 && r_upper == r_lower {
         return r_upper;
     }
 
@@ -265,6 +271,12 @@ pub(crate) fn sin(x: f64) -> f64 {
 
 /// `cos(x)`
 pub(crate) fn cos(x: f64) -> f64 {
+    cos_impl::<0>(x)
+}
+
+/// `cos` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn cos_impl<const FORCE: u8>(x: f64) -> f64 {
     let x_e = biased_exponent(x);
 
     let mut y = DD::default();
@@ -312,7 +324,7 @@ pub(crate) fn cos(x: f64) -> f64 {
     let r_upper = rr.hi + rlp; // (rr.lo + ERR);
     let r_lower = rr.hi + rlm; // (rr.lo - ERR);
 
-    if r_upper == r_lower {
+    if FORCE == 0 && r_upper == r_lower {
         return r_upper;
     }
 
@@ -367,6 +379,12 @@ fn newton_raphson_div(a: F128, mut b: F128, q: f64) -> F128 {
 
 /// `tan(x)`
 pub(crate) fn tan(x: f64) -> f64 {
+    tan_impl::<0>(x)
+}
+
+/// `tan` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn tan_impl<const FORCE: u8>(x: f64) -> f64 {
     let x_e = biased_exponent(x);
 
     let mut y = DD::default();
@@ -421,7 +439,7 @@ pub(crate) fn tan(x: f64) -> f64 {
     let tan_upper = tan_x.hi + err_higher;
     let tan_lower = tan_x.hi + err_lower;
 
-    if tan_upper == tan_lower {
+    if FORCE == 0 && tan_upper == tan_lower {
         return tan_upper;
     }
 

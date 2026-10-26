@@ -1,6 +1,6 @@
 //! Ports of LLVM libc `math::asin` and `math::acos` (src/__support/math/{asin,acos}.h) and
 //! `asin_utils.h`, revision 9309c117, as V8 15.0.245 calls them from
-//! `v8::base::ieee754::{asin,acos}` (src/base/ieee754.cc:134,128). FMA, accurate pass.
+//! `v8::base::ieee754::{asin,acos}` (src/base/ieee754.cc:122, 80). FMA, accurate pass.
 
 use super::fputil::*;
 use super::tables_trig::{ASIN_COEFFS, ASIN_COEFFS_F128};
@@ -51,6 +51,12 @@ fn asin_eval_f128(u: F128, idx: usize) -> F128 {
 
 /// `asin(x)`
 pub(crate) fn asin(x: f64) -> f64 {
+    asin_impl::<0>(x)
+}
+
+/// `asin` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn asin_impl<const FORCE: u8>(x: f64) -> f64 {
     let bits = x.to_bits();
     let x_exp: i32 = ((bits >> 52) & 0x7ff) as i32;
     let x_is_neg = (bits >> 63) != 0;
@@ -71,7 +77,7 @@ pub(crate) fn asin(x: f64) -> f64 {
         let r_upper = r0.hi + (r_lo + err);
         let r_lower = r0.hi + (r_lo - err);
 
-        if r_upper == r_lower {
+        if FORCE == 0 && r_upper == r_lower {
             return r_upper;
         }
 
@@ -127,7 +133,7 @@ pub(crate) fn asin(x: f64) -> f64 {
     let r_upper = fma(r.hi, x_sign, fma(r_lo, x_sign, err));
     let r_lower = fma(r.hi, x_sign, fma(r_lo, x_sign, -err));
 
-    if r_upper == r_lower {
+    if FORCE == 0 && r_upper == r_lower {
         return r_upper;
     }
 
@@ -159,6 +165,12 @@ pub(crate) fn asin(x: f64) -> f64 {
 
 /// `acos(x)`
 pub(crate) fn acos(x: f64) -> f64 {
+    acos_impl::<0>(x)
+}
+
+/// `acos` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn acos_impl<const FORCE: u8>(x: f64) -> f64 {
     let bits = x.to_bits();
     let x_exp: i32 = ((bits >> 52) & 0x7ff) as i32;
     let x_is_neg = (bits >> 63) != 0;
@@ -181,7 +193,7 @@ pub(crate) fn acos(x: f64) -> f64 {
         let r_upper = r_hi + (r_lo + err);
         let r_lower = r_hi + (r_lo - err);
 
-        if r_upper == r_lower {
+        if FORCE == 0 && r_upper == r_lower {
             return r_upper;
         }
 
@@ -247,7 +259,7 @@ pub(crate) fn acos(x: f64) -> f64 {
     let r_upper = r_hi + (r_lo + err);
     let r_lower = r_hi + (r_lo - err);
 
-    if r_upper == r_lower {
+    if FORCE == 0 && r_upper == r_lower {
         return r_upper;
     }
 

@@ -1,6 +1,6 @@
 //! Port of LLVM libc `math::exp` (src/__support/math/exp.h, revision 9309c117) together with
 //! `exp_utils.h` (`ziv_test_denorm`), as V8 15.0.245 calls it from
-//! `v8::base::ieee754::exp` (src/base/ieee754.cc:152). Built with FMA and the accurate pass.
+//! `v8::base::ieee754::exp` (src/base/ieee754.cc:175). Built with FMA and the accurate pass.
 
 use super::fputil::*;
 use super::tables_exp::{EXP2_MID1, EXP2_MID2};
@@ -136,6 +136,12 @@ fn set_exceptional(x: f64) -> f64 {
 
 /// `exp(x)`
 pub(crate) fn exp(x: f64) -> f64 {
+    exp_impl::<0>(x)
+}
+
+/// `exp` with the Ziv stages forced: `FORCE` = 1 skips the double pass, 2 skips the double-double
+/// pass too (only the tests use anything but 0, to exercise the 128-bit code).
+pub(crate) fn exp_impl<const FORCE: u8>(x: f64) -> f64 {
     let x_u = x.to_bits();
     if x_u >= 0xc0874910d52d3052
         || (x_u < 0xbca0000000000000 && x_u >= 0x40862e42fefa39f0)
@@ -166,28 +172,32 @@ pub(crate) fn exp(x: f64) -> f64 {
         let exp_hi: i64 = (hi as i64) * (1i64 << 52);
         f64::from_bits(exp_hi.wrapping_add(bits_val.to_bits() as i64) as u64)
     };
-    if denorm {
-        if let Some(r) = ziv_test_denorm(hi, exp_mid.hi, lo, EXP_ERR_D) {
-            return r;
-        }
-    } else {
-        let upper = exp_mid.hi + (lo + EXP_ERR_D);
-        let lower = exp_mid.hi + (lo - EXP_ERR_D);
-        if upper == lower {
-            return scale(upper);
+    if FORCE == 0 {
+        if denorm {
+            if let Some(r) = ziv_test_denorm(hi, exp_mid.hi, lo, EXP_ERR_D) {
+                return r;
+            }
+        } else {
+            let upper = exp_mid.hi + (lo + EXP_ERR_D);
+            let lower = exp_mid.hi + (lo - EXP_ERR_D);
+            if upper == lower {
+                return scale(upper);
+            }
         }
     }
     // Use double-double
     let r_dd = exp_double_double(x, kd, exp_mid);
-    if denorm {
-        if let Some(r) = ziv_test_denorm(hi, r_dd.hi, r_dd.lo, EXP_ERR_DD) {
-            return r;
-        }
-    } else {
-        let upper_dd = r_dd.hi + (r_dd.lo + EXP_ERR_DD);
-        let lower_dd = r_dd.hi + (r_dd.lo - EXP_ERR_DD);
-        if upper_dd == lower_dd {
-            return scale(upper_dd);
+    if FORCE < 2 {
+        if denorm {
+            if let Some(r) = ziv_test_denorm(hi, r_dd.hi, r_dd.lo, EXP_ERR_DD) {
+                return r;
+            }
+        } else {
+            let upper_dd = r_dd.hi + (r_dd.lo + EXP_ERR_DD);
+            let lower_dd = r_dd.hi + (r_dd.lo - EXP_ERR_DD);
+            if upper_dd == lower_dd {
+                return scale(upper_dd);
+            }
         }
     }
     // Use 128-bit precision

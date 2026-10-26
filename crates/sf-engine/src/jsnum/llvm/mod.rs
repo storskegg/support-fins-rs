@@ -21,6 +21,8 @@ mod log;
 mod log10;
 mod log2;
 mod log_rr;
+#[cfg(test)]
+mod selfcheck;
 mod sincos;
 mod tables_common;
 mod tables_exp;
@@ -31,10 +33,24 @@ mod tables_sincos;
 mod tables_trig;
 
 pub(crate) use asin::{acos, asin};
+#[cfg(test)]
+use asin::{acos_impl, asin_impl};
 pub(crate) use atan::{atan, atan2};
 pub(crate) use cbrt::cbrt;
+#[cfg(test)]
+use cbrt::cbrt_impl;
 pub(crate) use exp::exp;
+#[cfg(test)]
+use exp::exp_impl;
 pub(crate) use log::log;
+#[cfg(test)]
+use log::log_impl;
 pub(crate) use log2::log2;
+#[cfg(test)]
+use log2::log2_impl;
 pub(crate) use log10::log10;
+#[cfg(test)]
+use log10::log10_impl;
 pub(crate) use sincos::{cos, sin, tan};
+#[cfg(test)]
+use sincos::{cos_impl, sin_impl, tan_impl};

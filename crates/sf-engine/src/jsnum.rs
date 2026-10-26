@@ -22,6 +22,8 @@ use v8pow::v8_pow;
 
 /// `Math.round(x)`: rounds half toward +∞ (`Math.round(-2.5) == -2`), keeps -0
 /// for inputs in [-0.5, -0], returns NaN/±∞ unchanged. NOT `f64::round`.
+///
+/// V8 origin: `Float64Round` (CodeStubAssembler), reached from `MathRound` (src/builtins/math.tq:89).
 pub fn round(x: f64) -> f64 {
     // Float64Round (CodeStubAssembler): round up to the next integer, then step back down
     // one when that overshoots by more than half.
@@ -30,21 +32,29 @@ pub fn round(x: f64) -> f64 {
 }
 
 /// `Math.trunc(x)`.
+///
+/// V8 origin: `Float64Trunc`, `MathTrunc` (src/builtins/math.tq:102).
 pub fn trunc(x: f64) -> f64 {
     x.trunc()
 }
 
 /// `Math.floor(x)`.
+///
+/// V8 origin: `Float64Floor`, `MathFloor` (src/builtins/math.tq:76).
 pub fn floor(x: f64) -> f64 {
     x.floor()
 }
 
 /// `Math.ceil(x)`.
+///
+/// V8 origin: `Float64Ceil`, `MathCeil` (src/builtins/math.tq:63).
 pub fn ceil(x: f64) -> f64 {
     x.ceil()
 }
 
 /// `Math.sign(x)`: returns -0 for -0, NaN for NaN.
+///
+/// V8 origin: `MathSign` (src/builtins/math.tq:347).
 pub fn sign(x: f64) -> f64 {
     if x > 0.0 {
         1.0
@@ -56,6 +66,8 @@ pub fn sign(x: f64) -> f64 {
 }
 
 /// `Math.abs(x)`.
+///
+/// V8 origin: `Float64Abs` (clears the sign bit), `MathAbs` (src/builtins/math.tq:35).
 pub fn abs(x: f64) -> f64 {
     f64::from_bits(x.to_bits() & 0x7fff_ffff_ffff_ffff)
 }
@@ -63,6 +75,8 @@ pub fn abs(x: f64) -> f64 {
 // ------------------------------------------------------------- min / max
 
 /// `Math.min(a, b)`: NaN if either is NaN, and -0 is less than +0.
+///
+/// V8 origin: `Float64Min` as used by `MathMin` (src/builtins/math.tq:147).
 pub fn min(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         return f64::NAN;
@@ -75,6 +89,8 @@ pub fn min(a: f64, b: f64) -> f64 {
 }
 
 /// `Math.max(a, b)`: NaN if either is NaN, and +0 is greater than -0.
+///
+/// V8 origin: `Float64Max` as used by `MathMax` (src/builtins/math.tq:134).
 pub fn max(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         return f64::NAN;
@@ -87,6 +103,8 @@ pub fn max(a: f64, b: f64) -> f64 {
 }
 
 /// `Math.min(...xs)`. `+∞` for an empty slice.
+///
+/// V8 origin: `MathMin` (src/builtins/math.tq:147): a left fold of `Float64Min` from +inf.
 pub fn min_of(xs: &[f64]) -> f64 {
     let mut result = f64::INFINITY;
     for &v in xs {
@@ -96,6 +114,8 @@ pub fn min_of(xs: &[f64]) -> f64 {
 }
 
 /// `Math.max(...xs)`. `-∞` for an empty slice.
+///
+/// V8 origin: `MathMax` (src/builtins/math.tq:134): a left fold of `Float64Max` from -inf.
 pub fn max_of(xs: &[f64]) -> f64 {
     let mut result = f64::NEG_INFINITY;
     for &v in xs {
@@ -107,6 +127,8 @@ pub fn max_of(xs: &[f64]) -> f64 {
 // ------------------------------------------------------- transcendental
 
 /// `Math.sqrt(x)` (IEEE correctly rounded, so `f64::sqrt` is acceptable underneath).
+///
+/// V8 origin: `Float64Sqrt`.
 pub fn sqrt(x: f64) -> f64 {
     x.sqrt()
 }
@@ -114,6 +136,8 @@ pub fn sqrt(x: f64) -> f64 {
 /// `Math.hypot(...xs)`. V8 does NOT compute `sqrt(sum of squares)` naively: it
 /// scales by the largest magnitude and sums with compensation. Port V8's
 /// algorithm exactly (see the brief), including ±∞ beating NaN and `hypot() == 0`.
+///
+/// V8 origin: `FastMathHypot` (src/builtins/math.tq:398-460) for up to 3 arguments, `MathHypot` (math.tq:465-515) otherwise.
 pub fn hypot(xs: &[f64]) -> f64 {
     let length = xs.len();
     if length <= 3 {
@@ -193,68 +217,94 @@ pub fn hypot(xs: &[f64]) -> f64 {
     sum.sqrt() * max
 }
 
-/// `Math.sin(x)` (V8: fdlibm port, `src/base/ieee754.cc`).
+/// `Math.sin(x)`.
+///
+/// V8 origin: `ieee754::fdlibm_sin` = LLVM libc `math::sin` (src/base/ieee754.cc:236-238), ported in `jsnum/llvm/sincos.rs`.
 pub fn sin(x: f64) -> f64 {
     llvm::sin(x)
 }
 
 /// `Math.cos(x)`.
+///
+/// V8 origin: `ieee754::fdlibm_cos` = LLVM libc `math::cos` (src/base/ieee754.cc:168-170), ported in `jsnum/llvm/sincos.rs`.
 pub fn cos(x: f64) -> f64 {
     llvm::cos(x)
 }
 
 /// `Math.tan(x)`.
+///
+/// V8 origin: `ieee754::tan` = LLVM libc `math::tan` (src/base/ieee754.cc:243), ported in `jsnum/llvm/sincos.rs`.
 pub fn tan(x: f64) -> f64 {
     llvm::tan(x)
 }
 
 /// `Math.asin(x)`.
+///
+/// V8 origin: `ieee754::asin` = LLVM libc `math::asin` (src/base/ieee754.cc:122), ported in `jsnum/llvm/asin.rs`.
 pub fn asin(x: f64) -> f64 {
     llvm::asin(x)
 }
 
 /// `Math.acos(x)`.
+///
+/// V8 origin: `ieee754::acos` = LLVM libc `math::acos` (src/base/ieee754.cc:80), ported in `jsnum/llvm/asin.rs`.
 pub fn acos(x: f64) -> f64 {
     llvm::acos(x)
 }
 
 /// `Math.atan(x)`.
+///
+/// V8 origin: `ieee754::atan` = LLVM libc `math::atan` (src/base/ieee754.cc:164), ported in `jsnum/llvm/atan.rs`.
 pub fn atan(x: f64) -> f64 {
     llvm::atan(x)
 }
 
 /// `Math.atan2(y, x)`.
+///
+/// V8 origin: `ieee754::atan2` = LLVM libc `math::atan2` (src/base/ieee754.cc:165), ported in `jsnum/llvm/atan.rs`.
 pub fn atan2(y: f64, x: f64) -> f64 {
     llvm::atan2(y, x)
 }
 
 /// `Math.exp(x)`.
+///
+/// V8 origin: `ieee754::exp` = LLVM libc `math::exp` (src/base/ieee754.cc:175), ported in `jsnum/llvm/exp.rs`.
 pub fn exp(x: f64) -> f64 {
     llvm::exp(x)
 }
 
 /// `Math.log(x)`.
+///
+/// V8 origin: `ieee754::log` = LLVM libc `math::log` (src/base/ieee754.cc:226), ported in `jsnum/llvm/log.rs`.
 pub fn log(x: f64) -> f64 {
     llvm::log(x)
 }
 
 /// `Math.log2(x)`.
+///
+/// V8 origin: `ieee754::log2` = LLVM libc `math::log2` (src/base/ieee754.cc:228), ported in `jsnum/llvm/log2.rs`.
 pub fn log2(x: f64) -> f64 {
     llvm::log2(x)
 }
 
 /// `Math.log10(x)`.
+///
+/// V8 origin: `ieee754::log10` = LLVM libc `math::log10` (src/base/ieee754.cc:229), ported in `jsnum/llvm/log10.rs`.
 pub fn log10(x: f64) -> f64 {
     llvm::log10(x)
 }
 
 /// `Math.cbrt(x)`.
+///
+/// V8 origin: `ieee754::cbrt` = LLVM libc `math::cbrt` (src/base/ieee754.cc:233), ported in `jsnum/llvm/cbrt.rs`.
 pub fn cbrt(x: f64) -> f64 {
     llvm::cbrt(x)
 }
 
 /// `Math.pow(x, y)` and `x ** y`. JS differs from C `pow` in special cases
 /// (`pow(1, NaN)` is NaN in JS, 1 in C; `pow(-1, ±∞)` is NaN in JS).
+///
+/// V8 origin: `v8::internal::math::pow` (src/numbers/ieee754.cc:15), ported in `jsnum/v8pow.rs`. Its last step is the platform C `pow` (`--use-std-math-pow`), so the result is bit-exact on macOS only.
 pub fn pow(x: f64, y: f64) -> f64 {
     v8_pow(x, y)
 }
@@ -262,11 +312,15 @@ pub fn pow(x: f64, y: f64) -> f64 {
 // ------------------------------------------------------ integer coercion
 
 /// ECMAScript ToInt32, i.e. `x | 0`: NaN/±∞ → 0, truncate, wrap modulo 2^32.
+///
+/// V8 origin: ECMAScript ToInt32 (ES2024 7.1.6), V8 `DoubleToInt32` (src/numbers/conversions-inl.h).
 pub fn to_int32(x: f64) -> i32 {
     to_uint32(x) as i32
 }
 
 /// ECMAScript ToUint32, i.e. `x >>> 0`.
+///
+/// V8 origin: ECMAScript ToUint32 (ES2024 7.1.7).
 pub fn to_uint32(x: f64) -> u32 {
     if !x.is_finite() {
         return 0;
@@ -278,11 +332,15 @@ pub fn to_uint32(x: f64) -> u32 {
 }
 
 /// `Math.imul(a, b)` on numbers (each argument goes through ToInt32 first).
+///
+/// V8 origin: `Math.imul` (ES2024 21.3.2.19): `ToInt32(a) * ToInt32(b)` wrapped to 32 bits.
 pub fn imul(a: f64, b: f64) -> i32 {
     to_int32(a).wrapping_mul(to_int32(b))
 }
 
 /// `a >>> b` on numbers: ToUint32(a) shifted right by `ToUint32(b) & 31`, as a number.
+///
+/// V8 origin: ECMAScript `>>>` (ES2024 13.9.3).
 pub fn ushr(a: f64, b: f64) -> f64 {
     let shift = to_uint32(b) & 31;
     (to_uint32(a) >> shift) as f64
@@ -292,12 +350,16 @@ pub fn ushr(a: f64, b: f64) -> f64 {
 
 /// `String(x)` / `x.toString()` / template-literal `${x}` for a number: the shortest
 /// round-trip digits, with JS's exponent rules (`1e21`, `1e-7`, `-0` → `"0"`, `NaN`, `Infinity`).
+///
+/// V8 origin: `DoubleToCString` (src/numbers/conversions.cc), ES2024 Number::toString. See `jsnum/text.rs`.
 pub fn to_js_string(x: f64) -> String {
     number_to_string(x)
 }
 
 /// `x.toFixed(digits)` for `digits` in 0..=100. JS rounds the exact binary value
 /// half up (`(1.005).toFixed(2) == "1.00"`), and `|x| >= 1e21` falls back to `to_js_string`.
+///
+/// V8 origin: `DoubleToFixedCString` (src/numbers/conversions.cc), ES2024 Number.prototype.toFixed. See `jsnum/text.rs`.
 pub fn to_fixed(x: f64, digits: u32) -> String {
     number_to_fixed(x, digits)
 }
@@ -305,12 +367,16 @@ pub fn to_fixed(x: f64, digits: u32) -> String {
 /// `Number(s)` on a string (ECMAScript StringToNumber): trims whitespace, the whole
 /// string must be a numeric literal (`0x`/`0o`/`0b`, `Infinity`, empty → 0), else NaN.
 /// `web/stl.js`'s ASCII reader uses this, not `parseFloat`.
+///
+/// V8 origin: `StringToDouble` (src/numbers/conversions.cc), ES2024 StringToNumber. See `jsnum/text.rs`.
 pub fn string_to_number(s: &str) -> f64 {
     string_to_number_impl(s)
 }
 
 /// `parseFloat(s)` as JS parses it (leading whitespace, longest valid prefix, `Infinity`).
 /// Returns NaN where JS does.
+///
+/// V8 origin: `StringToDouble` with trailing junk allowed, ES2024 `parseFloat`. See `jsnum/text.rs`.
 pub fn parse_float(s: &str) -> f64 {
     parse_float_impl(s)
 }

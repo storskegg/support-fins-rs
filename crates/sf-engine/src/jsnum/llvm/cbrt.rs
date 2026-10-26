@@ -1,5 +1,5 @@
 //! Port of LLVM libc `math::cbrt` (src/__support/math/cbrt.h, revision 9309c117), as V8 15.0.245
-//! calls it from `v8::base::ieee754::cbrt` (src/base/ieee754.cc:164). FMA, accurate pass.
+//! calls it from `v8::base::ieee754::cbrt` (src/base/ieee754.cc:233). FMA, accurate pass.
 
 use super::fputil::*;
 
@@ -38,7 +38,13 @@ fn get_error(x_3: DD, a_sq: DD) -> f64 {
 }
 
 /// `cbrt(x)`
-pub(crate) fn cbrt(mut x: f64) -> f64 {
+pub(crate) fn cbrt(x: f64) -> f64 {
+    cbrt_impl::<0>(x)
+}
+
+/// `cbrt` with the Ziv tests skipped when `FORCE` is not 0, so the tests can reach the
+/// 128-bit accurate pass (a skipped test behaves as a failed one).
+pub(crate) fn cbrt_impl<const FORCE: u8>(mut x: f64) -> f64 {
     let x_abs = x.to_bits() & 0x7fff_ffff_ffff_ffff;
 
     let mut exp_bias_correction: u32 = 682; // 1023 * 2/3
@@ -99,7 +105,7 @@ pub(crate) fn cbrt(mut x: f64) -> f64 {
     let r1_lower = r1.hi + r1.lo;
     let r1_upper = r1.hi + fma(x0_h0, 2.0 * REL_ERROR * a, r1.lo);
 
-    if r1_upper == r1_lower {
+    if FORCE == 0 && r1_upper == r1_lower {
         return update_exponent(r1_lower);
     }
 
@@ -116,7 +122,7 @@ pub(crate) fn cbrt(mut x: f64) -> f64 {
     let r2_upper = r2.hi + fma(a, 1.9721522630525295e-31, r2.lo);
     let r2_lower = r2.hi + fma(a, -1.9721522630525295e-31, r2.lo);
 
-    if r2_upper == r2_lower {
+    if FORCE < 2 && r2_upper == r2_lower {
         return update_exponent(r2_upper);
     }
 
