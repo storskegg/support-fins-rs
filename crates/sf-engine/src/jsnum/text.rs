@@ -25,7 +25,8 @@ pub(super) fn number_to_string(x: f64) -> String {
     let sci = format!("{:e}", x.abs());
     let (mantissa, exp) = sci.split_once('e').expect("{:e} always has an exponent");
     let exp: i32 = exp.parse().expect("{:e} exponent is an integer");
-    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let mut digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    break_tie_to_even(x.abs(), &mut digits);
     let k = digits.len() as i32;
     let n = exp + 1; // the decimal point sits after n digits
     if k <= n && n <= 21 {
@@ -55,6 +56,56 @@ pub(super) fn number_to_string(x: f64) -> String {
         out.push_str(&e.abs().to_string());
     }
     out
+}
+
+/// When `x` lies exactly halfway between two `digits.len()`-digit decimals, both of them
+/// round-trip and the spec (and V8) pick the one with the even last digit, while Rust's
+/// shortest formatting rounds the tie up. Such a tie needs the exact decimal expansion of `x`
+/// to be one digit longer than `digits`, which only happens for a few fractional bits.
+fn break_tie_to_even(x: f64, digits: &mut String) {
+    let bits = x.to_bits();
+    let exp_field = ((bits >> 52) & 0x7ff) as i32;
+    let frac = bits & ((1u64 << 52) - 1);
+    let (mut m, mut e) = if exp_field == 0 {
+        (frac, -1074)
+    } else {
+        (frac | (1u64 << 52), exp_field - 1075)
+    };
+    let tz = m.trailing_zeros() as i32;
+    m >>= tz;
+    e += tz;
+    // |x| = m * 2^e with m odd; for e < 0 the exact digits are those of m * 5^-e
+    if e >= 0 || e < -27 {
+        return;
+    }
+    let exact = (m as u128 * 5u128.pow((-e) as u32)).to_string();
+    let k = digits.len();
+    if exact.len() != k + 1 {
+        return;
+    }
+    let down = &exact[..k];
+    let mut up: Vec<u8> = down.bytes().collect();
+    let mut i = k;
+    loop {
+        if i == 0 {
+            return; // carried out of the top digit: not a case of two k-digit candidates
+        }
+        i -= 1;
+        if up[i] == b'9' {
+            up[i] = b'0';
+        } else {
+            up[i] += 1;
+            break;
+        }
+    }
+    let up = String::from_utf8(up).unwrap();
+    if up.ends_with('0') {
+        return; // a shorter representation exists; the shortest search already handled it
+    }
+    let even = |d: &str| (d.as_bytes()[k - 1] - b'0').is_multiple_of(2);
+    if *digits == up || digits == down {
+        *digits = if even(down) { down.to_string() } else { up };
+    }
 }
 
 // ------------------------------------------------------------ toFixed
@@ -125,7 +176,7 @@ impl Big {
         }
     }
 
-    fn to_decimal(mut self) -> String {
+    fn into_decimal(mut self) -> String {
         if self.0.is_empty() {
             return "0".to_string();
         }
@@ -177,7 +228,7 @@ pub(super) fn number_to_fixed(x: f64, digits: u32) -> String {
         for _ in 0..digits {
             big.mul_small(10);
         }
-        big.to_decimal()
+        big.into_decimal()
     } else {
         // n = floor((m * 10^f + 2^(k-1)) / 2^k): round half up
         let k = (-e) as usize;
@@ -187,7 +238,7 @@ pub(super) fn number_to_fixed(x: f64, digits: u32) -> String {
         }
         big.add_pow2(k - 1);
         big.shr(k);
-        big.to_decimal()
+        big.into_decimal()
     };
     let f = digits as usize;
     let mut out = String::new();
@@ -225,13 +276,14 @@ fn is_js_whitespace(c: char) -> bool {
             | '\u{20}'
             | '\u{a0}'
             | '\u{1680}'
-            | '\u{2000}'..='\u{200a}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202f}'
-            | '\u{205f}'
-            | '\u{3000}'
-            | '\u{feff}'
+            | '\u{2000}'
+            ..='\u{200a}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202f}'
+                | '\u{205f}'
+                | '\u{3000}'
+                | '\u{feff}'
     )
 }
 
@@ -346,7 +398,11 @@ pub(super) fn string_to_number_impl(s: &str) -> f64 {
         _ => (false, t),
     };
     if body == "Infinity" {
-        return if negative { f64::NEG_INFINITY } else { f64::INFINITY };
+        return if negative {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
     }
     match scan_decimal(body.as_bytes()) {
         Some(n) if n == body.len() => parse_decimal(t),
@@ -363,7 +419,11 @@ pub(super) fn parse_float_impl(s: &str) -> f64 {
         _ => (false, t, 0),
     };
     if body.starts_with("Infinity") {
-        return if negative { f64::NEG_INFINITY } else { f64::INFINITY };
+        return if negative {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
     }
     match scan_decimal(body.as_bytes()) {
         Some(n) => parse_decimal(&t[..sign_len + n]),

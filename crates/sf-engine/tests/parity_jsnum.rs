@@ -16,7 +16,10 @@ fn replay(name: &str, f: impl Fn(&[Value]) -> Value) {
             .unwrap_or_else(|| panic!("jsnum/{name} case {} has no out", c.id));
         let actual = f(&c.args);
         if let Err(m) = compare(&actual, expected, &Tol::Exact) {
-            bad.push(format!("  {} ({}): got {} want {}", c.id, m.path, m.actual, m.expected));
+            bad.push(format!(
+                "  {} ({}): got {} want {}",
+                c.id, m.path, m.actual, m.expected
+            ));
         }
     }
     assert!(
@@ -50,7 +53,8 @@ macro_rules! binary_tests {
 }
 
 unary_tests!(
-    round, trunc, floor, ceil, sign, abs, sqrt, sin, cos, tan, asin, acos, atan, exp, log, log2, log10, cbrt
+    round, trunc, floor, ceil, sign, abs, sqrt, sin, cos, tan, asin, acos, atan, exp, log, log2,
+    log10, cbrt
 );
 binary_tests!(min, max, atan2, pow, ushr);
 
@@ -68,29 +72,43 @@ fn hypot() {
 }
 #[test]
 fn to_int32() {
-    replay("to_int32", |a| Value::from(jsnum::to_int32(a[0].num()) as f64));
+    replay("to_int32", |a| {
+        Value::from(jsnum::to_int32(a[0].num()) as f64)
+    });
 }
 #[test]
 fn to_uint32() {
-    replay("to_uint32", |a| Value::from(jsnum::to_uint32(a[0].num()) as f64));
+    replay("to_uint32", |a| {
+        Value::from(jsnum::to_uint32(a[0].num()) as f64)
+    });
 }
 #[test]
 fn imul() {
-    replay("imul", |a| Value::from(jsnum::imul(a[0].num(), a[1].num()) as f64));
+    replay("imul", |a| {
+        Value::from(jsnum::imul(a[0].num(), a[1].num()) as f64)
+    });
 }
 #[test]
 fn to_js_string() {
-    replay("to_js_string", |a| Value::from(jsnum::to_js_string(a[0].num())));
+    replay("to_js_string", |a| {
+        Value::from(jsnum::to_js_string(a[0].num()))
+    });
 }
 #[test]
 fn to_fixed() {
-    replay("to_fixed", |a| Value::from(jsnum::to_fixed(a[0].num(), a[1].num() as u32)));
+    replay("to_fixed", |a| {
+        Value::from(jsnum::to_fixed(a[0].num(), a[1].num() as u32))
+    });
 }
 #[test]
 fn string_to_number() {
-    replay("string_to_number", |a| Value::from(jsnum::string_to_number(a[0].str())));
+    replay("string_to_number", |a| {
+        Value::from(jsnum::string_to_number(a[0].str()))
+    });
 }
 #[test]
 fn parse_float() {
-    replay("parse_float", |a| Value::from(jsnum::parse_float(a[0].str())));
+    replay("parse_float", |a| {
+        Value::from(jsnum::parse_float(a[0].str()))
+    });
 }

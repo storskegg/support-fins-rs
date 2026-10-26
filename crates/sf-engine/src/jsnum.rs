@@ -12,8 +12,11 @@
 //! by bits (`to_bits`), except that all NaNs are treated as equal. The tests in
 //! `tests/jsnum.rs` check this against the values recorded from V8 in `parity/corpus/jsnum/`.
 
+mod llvm;
 mod text;
+mod v8pow;
 use text::{number_to_fixed, number_to_string, parse_float_impl, string_to_number_impl};
+use v8pow::v8_pow;
 
 // ---------------------------------------------------------------- rounding
 
@@ -192,68 +195,68 @@ pub fn hypot(xs: &[f64]) -> f64 {
 
 /// `Math.sin(x)` (V8: fdlibm port, `src/base/ieee754.cc`).
 pub fn sin(x: f64) -> f64 {
-    libm::sin(x)
+    llvm::sin(x)
 }
 
 /// `Math.cos(x)`.
 pub fn cos(x: f64) -> f64 {
-    libm::cos(x)
+    llvm::cos(x)
 }
 
 /// `Math.tan(x)`.
 pub fn tan(x: f64) -> f64 {
-    libm::tan(x)
+    llvm::tan(x)
 }
 
 /// `Math.asin(x)`.
 pub fn asin(x: f64) -> f64 {
-    libm::asin(x)
+    llvm::asin(x)
 }
 
 /// `Math.acos(x)`.
 pub fn acos(x: f64) -> f64 {
-    libm::acos(x)
+    llvm::acos(x)
 }
 
 /// `Math.atan(x)`.
 pub fn atan(x: f64) -> f64 {
-    libm::atan(x)
+    llvm::atan(x)
 }
 
 /// `Math.atan2(y, x)`.
 pub fn atan2(y: f64, x: f64) -> f64 {
-    libm::atan2(y, x)
+    llvm::atan2(y, x)
 }
 
 /// `Math.exp(x)`.
 pub fn exp(x: f64) -> f64 {
-    libm::exp(x)
+    llvm::exp(x)
 }
 
 /// `Math.log(x)`.
 pub fn log(x: f64) -> f64 {
-    libm::log(x)
+    llvm::log(x)
 }
 
 /// `Math.log2(x)`.
 pub fn log2(x: f64) -> f64 {
-    libm::log2(x)
+    llvm::log2(x)
 }
 
 /// `Math.log10(x)`.
 pub fn log10(x: f64) -> f64 {
-    libm::log10(x)
+    llvm::log10(x)
 }
 
 /// `Math.cbrt(x)`.
 pub fn cbrt(x: f64) -> f64 {
-    libm::cbrt(x)
+    llvm::cbrt(x)
 }
 
 /// `Math.pow(x, y)` and `x ** y`. JS differs from C `pow` in special cases
 /// (`pow(1, NaN)` is NaN in JS, 1 in C; `pow(-1, ±∞)` is NaN in JS).
 pub fn pow(x: f64, y: f64) -> f64 {
-    libm::pow(x, y)
+    v8_pow(x, y)
 }
 
 // ------------------------------------------------------ integer coercion
