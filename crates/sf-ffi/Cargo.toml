@@ -1,0 +1,27 @@
+[package]
+name = "sf-ffi"
+description = "The Swift <-> Rust interface (UniFFI), docs/FFI.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["staticlib", "lib"]
+
+# The binding generator, run by `just swift-bindings` (`cargo run -p sf-ffi --bin uniffi-bindgen`).
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+
+[dependencies]
+sf-engine.workspace = true
+sf-io.workspace = true
+uniffi = { workspace = true, features = ["cli"] }
+
+[dev-dependencies]
+sf-testkit.workspace = true
+
+[lints]
+workspace = true

@@ -4,3 +4,7 @@
 
 # Private test models: never pushed (see private-fixtures/NOTES.md locally)
 /private-fixtures/
+
+# Built by `just swift-bindings`
+/app/SupportFinsCore/sf_ffiFFI.xcframework/
+/app/SupportFinsCore/.build/

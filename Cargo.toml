@@ -21,6 +21,7 @@ serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 base64 = "0.22"
 miniz_oxide = "0.9"
 proptest = "1.12"
+uniffi = "0.32"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
