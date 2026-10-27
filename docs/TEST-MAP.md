@@ -43,8 +43,8 @@ Web-only rows:
 | `free_edge.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `glfail.test.js` | 1 | inside, overhangs, stl, ui/glfail | — | dropped (web-only) |
 | `glguard.test.js` | 2 | inside, overhangs, stl, ui/glguard | — | dropped (web-only) |
-| `golden.test.js` | 2 | draw, fins | M3 | not ported |
-| `integration.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `golden.test.js` | 2 | draw, fins | M3 | green |
+| `integration.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green |
 | `interface.test.js` | 9 | cutout, draw, fins, inside, overhangs, prop, prop/crest, stl, threemf | M3 | not ported |
 | `islands.test.js` | 11 | fins, fins/fill, inside, islands, overhangs, prop, stl | M3 | not ported |
 | `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | green |
@@ -78,7 +78,7 @@ Web-only rows:
 | `small_holes_i18n.test.js` | 1 |  | M3 | not ported |
 | `small_tubes.test.js` | 3 | fins, inside, overhangs, prop, prop/raster, stl | M3 | not ported |
 | `squat.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | not ported |
+| `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | green |
 | `step.test.js` | 6 | fins, inside, overhangs, prop, step, stl | M6 | not ported |
 | `stl.test.js` | 6 | inside, overhangs, stl | M1 | green |
 | `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | not ported |
