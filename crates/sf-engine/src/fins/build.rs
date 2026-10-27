@@ -1130,7 +1130,7 @@ fn build_fins_core(
                 match &q.members {
                     Some(m) => curved.extend(m.iter().copied()),
                     None => {
-                        curved.insert(q.region);
+                        curved.extend(q.region);
                     }
                 }
             }

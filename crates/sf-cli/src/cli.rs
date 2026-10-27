@@ -7,6 +7,7 @@
 //! a site setting is a plugin dialog control.
 
 use sf_engine::jsnum;
+use sf_engine::types::Xyz;
 use sf_io::json::Json;
 use sf_io::obj::read_obj;
 use sf_io::stl::{read_stl, write_binary_stl};
@@ -418,8 +419,13 @@ pub fn rotation_matrix(rot: [f64; 3]) -> [f64; 9] {
 /// Port of `pose` (cli.js:183-194): pose a soup in float64 (Orca poses in double; float32 can
 /// flip a borderline tine).
 pub fn pose(pos: &[f64], rot: Option<[f64; 3]>) -> Vec<f64> {
-    let Some(rot) = rot else { return pos.to_vec() };
-    let m = rotation_matrix(rot);
+    pose_matrix(pos, rot.map(rotation_matrix))
+}
+
+/// `pose` for a rotation already as a column-major matrix (what the app holds); `None` leaves the
+/// soup as it is, bit for bit.
+pub fn pose_matrix(pos: &[f64], m: Option<[f64; 9]>) -> Vec<f64> {
+    let Some(m) = m else { return pos.to_vec() };
     let mut out = vec![0.0; pos.len()];
     let mut i = 0;
     while i < pos.len() {
@@ -713,19 +719,6 @@ pub fn fin_file(
         let report = format!("{}; no fins, nothing written", report_line(&r.stats));
         return Ok(file_result(input, None, report, &r.stats));
     }
-    // The fins come back in the engine's seated frame. --fins-only maps them back onto the part as
-    // it is in the file (fin - offset); otherwise the part moves to them.
-    let tri64: Vec<f64> = r.triangles.iter().map(|&v| v as f64).collect();
-    let off = r.offset;
-    let fins = triples(
-        &tri64,
-        if args.fins_only {
-            [-off.x, -off.y, -off.z]
-        } else {
-            [0.0, 0.0, 0.0]
-        },
-    );
-    let at = [off.x, off.y, off.z];
     // an STL is the cut part: the modifiers and blockers can't go in it -- said, not dropped
     // quietly
     let rest = read.slicer.as_ref().map_or(0, |(_, ex)| {
@@ -741,19 +734,57 @@ pub fn fin_file(
             }
         ));
     }
-    let part = triples(&posed, at);
-    let blob: Vec<u8> = if args.fins_only {
-        write_binary_stl(&fins, &format!("{name} fins"))
-    } else if out_lower.ends_with(".3mf") {
-        three_mf(&part, &fins, &name, read.slicer.as_ref(), args.rot, at)
-    } else {
-        let mut both = part;
-        both.extend(fins);
-        write_binary_stl(&both, &name)
-    };
+    let blob = output_bytes(
+        &name,
+        &posed,
+        &r.triangles,
+        r.offset,
+        args.fins_only,
+        out_lower.ends_with(".3mf"),
+        read.slicer.as_ref(),
+        args.rot.map(rotation_matrix),
+    );
     io.write(&output, &blob)?;
     let report = report_line(&r.stats);
     Ok(file_result(input, Some(output), report, &r.stats))
+}
+
+/// The bytes `finFile` writes (cli.js:263-293): the part as the engine sees it (posed, then moved by
+/// the seating `off`set) with its fins in the engine's seated frame. `--fins-only` maps the fins back
+/// onto the part as it is in the file (fin - offset); otherwise the part moves to them. `tris` is the
+/// fin soup then the pad, `f32` as `computeFins` returns it. Shared with the app's export (`sf-ffi`),
+/// so a file written there is the file the CLI writes.
+#[allow(clippy::too_many_arguments)]
+pub fn output_bytes(
+    name: &str,
+    posed: &[f64],
+    tris: &[f32],
+    off: Xyz,
+    fins_only: bool,
+    three_mf_out: bool,
+    slicer: Option<&(Vec<f64>, Vec<sf_io::threemf::ReadExtra>)>,
+    rot: Option<[f64; 9]>,
+) -> Vec<u8> {
+    let tri64: Vec<f64> = tris.iter().map(|&v| v as f64).collect();
+    let fins = triples(
+        &tri64,
+        if fins_only {
+            [-off.x, -off.y, -off.z]
+        } else {
+            [0.0, 0.0, 0.0]
+        },
+    );
+    let at = [off.x, off.y, off.z];
+    let part = triples(posed, at);
+    if fins_only {
+        write_binary_stl(&fins, &format!("{name} fins"))
+    } else if three_mf_out {
+        three_mf(&part, &fins, name, slicer, rot, at)
+    } else {
+        let mut both = part;
+        both.extend(fins);
+        write_binary_stl(&both, name)
+    }
 }
 
 /// The `{ input, output, stats, report }` of a plain run.
@@ -789,13 +820,13 @@ fn three_mf(
     fins: &[[f64; 3]],
     name: &str,
     slicer: Option<&(Vec<f64>, Vec<sf_io::threemf::ReadExtra>)>,
-    rot: Option<[f64; 3]>,
+    rot: Option<[f64; 9]>,
     at: [f64; 3],
 ) -> Vec<u8> {
     let Some((positions, extras)) = slicer else {
         return write_three_mf(part, fins, name, &ThreeMfOpts::default());
     };
-    let placed = |flat: &[f64]| triples(&pose(flat, rot), at);
+    let placed = |flat: &[f64]| triples(&pose_matrix(flat, rot), at);
     write_three_mf(
         &placed(positions),
         fins,

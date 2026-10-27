@@ -28,7 +28,7 @@ fn run(opts: &BuildOpts) -> PropsPass {
 }
 
 fn regions_of(p: &PropsPass) -> IndexSet<usize> {
-    p.props.iter().map(|w| w.region).collect()
+    p.props.iter().filter_map(|w| w.region).collect()
 }
 
 #[test]

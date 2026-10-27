@@ -125,7 +125,10 @@ fn replay(file: &str) -> (usize, usize) {
                         .iter()
                         .map(|q| {
                             Value::Obj(vec![
-                                ("region".into(), Value::Num(q.region as f64)),
+                                (
+                                    "region".into(),
+                                    q.region.map_or(Value::Null, |r| Value::Num(r as f64)),
+                                ),
                                 ("id".into(), Value::Num(q.id as f64)),
                                 ("tines".into(), Value::Num(q.tines as f64)),
                                 ("span".into(), Value::Num(q.span)),

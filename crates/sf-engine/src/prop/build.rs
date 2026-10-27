@@ -122,8 +122,8 @@ impl Skipped {
 /// push writes it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PropRecord {
-    /// `region` (all pushes).
-    pub region: usize,
+    /// `region` (all pushes); `None` on a fill-pass wall, which has no region in JS (#23).
+    pub region: Option<usize>,
     /// `tines` (all pushes): tines emitted for this wall.
     pub tines: usize,
     /// `caps`: the wall's slice of the tests' tine capture, `undefined` when it is off.
@@ -522,7 +522,7 @@ fn run_squat(
             line: sq.line.clone(),
             tri_range: Some(sq.tri_range),
             area: patch.area,
-            region: patch.region,
+            region: Some(patch.region),
             tines: n_t,
             caps: c0.map(|c| [c, env.ctx.cap_len().unwrap()]),
             grip: Some(grip),
@@ -1199,7 +1199,7 @@ fn place_line(
                 in_bore: Some(p.in_bore),
                 line: p.line.clone(),
                 area: patch.area,
-                region: patch.region,
+                region: Some(patch.region),
                 tines: n_t,
                 caps: c0.map(|c| [c, ctx.cap_len().unwrap()]),
                 grip: Some(grip),
@@ -1458,7 +1458,7 @@ fn place_line(
         };
         acc.tally.tines += n_t;
         acc.props.push(PropRecord {
-            region: patch.region,
+            region: Some(patch.region),
             tines: n_t,
             caps: c0.map(|c| [c, ctx.cap_len().unwrap()]),
             grip: Some(grip),
@@ -1601,7 +1601,7 @@ pub fn build_props(
         .props
         .iter()
         .filter(|q| q.circular == Some(true))
-        .map(|q| q.region)
+        .filter_map(|q| q.region)
         .collect();
     let base = if opts.rim_walls == Some(false) || opts.raster == Some(false) {
         circ

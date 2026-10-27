@@ -13,6 +13,7 @@ publish = false
 sf-engine = { path = "crates/sf-engine" }
 sf-io = { path = "crates/sf-io" }
 sf-cut = { path = "crates/sf-cut" }
+sf-cli = { path = "crates/sf-cli" }
 sf-testkit = { path = "crates/sf-testkit" }
 libm = "0.2.16"
 indexmap = "2.14"

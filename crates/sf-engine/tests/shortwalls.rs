@@ -69,6 +69,6 @@ fn nothing_bare_means_no_short_wall_and_support_everywhere_means_none_survive() 
         bare.props.iter().map(|p| p.tines).sum::<usize>()
     );
     for r in &bare.served {
-        assert!(bare.props.iter().any(|p| p.region == *r));
+        assert!(bare.props.iter().any(|p| p.region == Some(*r)));
     }
 }

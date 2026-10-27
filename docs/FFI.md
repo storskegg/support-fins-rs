@@ -52,3 +52,28 @@ fn export(path: String, parts: Vec<Arc<Part>>, builds: Vec<Arc<BuildResult>>, op
 
 `opts_json` and `options_json` take exactly the CLI's / plugin options (`options.json` keys), parsed
 by the same code the CLI uses. The page's settings form and the CLI flags therefore can't drift apart.
+
+### M4b as implemented
+
+- **`opts_json`** is a JSON object of `options.json` keys (`{}` = the engine defaults). It goes through
+  `optionsFromDialog` and `computeFins` (`sf_cli::entry::compute_fins_detail`), the CLI's own path, with no
+  second parser. The `rot` is the pose as nine column-major numbers; the identity pose is left unposed, as the
+  CLI leaves a file with no `--rot`. A bad option or pose arrives through `failed` as `FfiError::Engine`.
+- **Generations** start at 1. A job that is no longer the latest when it starts or when it finishes is dropped:
+  `done`/`failed` are only called for the newest generation, on the builder's worker thread.
+- **`BuildResult.fins()` / `pad()`** are `GpuBuffer`s of the same interleaved layout as `Part.mesh()` (position
+  xyz + the triangle's unit normal xyz, `f32`, stride 24, three vertices per triangle) in print space, the
+  seated frame the page draws. `fins()` holds walls, wedges and sway braces; `pad()` the bed pad.
+- **`summary_json()`**: `{ stats, report, offset, mode, volume, tines, braceCount, propCount, unserved,
+  sagRisk, smallHoleRegions, patchCount, patchStats, skipped, rejected, servedRegions, bare, floating, sway,
+  tallRibs }`. `stats` and `report` are the CLI's `--json` stats and one-line report; **`patchStats` and
+  `skipped` carry only the counters that counted anything** (JS leaves the others absent, #23).
+- **`records_json()`**: `{ fins: [...], props: [...] }`. A `fins` entry is `{ id, kind (prop|wedge|sway), height,
+  length, tines, rows, stilt, lean, bearing, span, short, fill, joined, braces?, ribs?, triRanges, line }`;
+  `triRanges` are `[from, to)` **vertex** ranges into the `fins()` buffer (what per-fin removal cuts out). A
+  `props` entry is `{ id, region?, tines, span, height, fill, squat, rimWall }`: **a fill-pass wall has no
+  `region`** (`PropRecord.region` is an `Option`, #23).
+- **`export`** writes exactly the bytes `finFile` writes (`sf_cli::cli::output_bytes`, shared with the CLI):
+  the path's extension picks STL or 3MF; `options_json` is `{}` or `{ "finsOnly": true }` (an STL of the fins
+  mapped back onto the part; like `--fins-only` it refuses a posed build). One part and its build per file; a
+  list of several is an `Engine` error until the app has a plate layout to put them on.

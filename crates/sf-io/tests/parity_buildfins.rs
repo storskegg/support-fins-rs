@@ -90,7 +90,7 @@ fn prop_value(q: &PropRecord) -> Value {
     let f = q.fill;
     let nf = |v: Value| if f { Value::Null } else { v };
     Value::Obj(vec![
-        ("region".into(), nf(u(q.region))),
+        ("region".into(), q.region.map_or(Value::Null, u)),
         ("id".into(), nf(u(q.id))),
         ("tines".into(), u(q.tines)),
         ("caps".into(), q.caps.map_or(Value::Null, pair)),

@@ -19,6 +19,7 @@ path = "uniffi-bindgen.rs"
 sf-engine.workspace = true
 sf-io.workspace = true
 sf-cut.workspace = true
+sf-cli.workspace = true
 uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]
