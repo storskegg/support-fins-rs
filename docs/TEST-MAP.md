@@ -30,11 +30,11 @@ Web-only rows:
 | `coverage.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
 | `curved.test.js` | 5 | fins, fins/downhill, inside, overhangs, prop, prop/curved, stl | M3 | green |
 | `cut.test.js` | 13 | cut, fins, inside, overhangs, prop, stl, threemf | M6 | not ported |
-| `cutout.test.js` | 14 | cutout, draw, fins, inside, overhangs, prop, stl | M3 | not ported |
+| `cutout.test.js` | 14 | cutout, draw, fins, inside, overhangs, prop, stl | M3 | green |
 | `downhill.test.js` | 4 | fins, inside, overhangs, prop, prop/downhill, stl | M3 | green |
 | `draw.test.js` | 18 | draw, fins, inside, overhangs, prop, stl | M3 | green |
 | `drawarc.test.js` | 7 | draw, drawarc, fins, inside, overhangs, prop, stl | M3 | green |
-| `exportname.test.js` | 3 | exportname, fins, inside, overhangs, prop, stl | M3 | not ported |
+| `exportname.test.js` | 3 | exportname, fins, inside, overhangs, prop, stl | M3 | green |
 | `fill.test.js` | 14 | draw, fins, fins/coverage, fins/fill, fins/seating, inside, overhangs, prop, stl | M3 | green |
 | `finkeys.test.js` | 6 | fins, inside, overhangs, prop, stl, ui/finkeys | M4 | not ported |
 | `fins.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green |
@@ -45,7 +45,7 @@ Web-only rows:
 | `glguard.test.js` | 2 | inside, overhangs, stl, ui/glguard | — | dropped (web-only) |
 | `golden.test.js` | 2 | draw, fins | M3 | green |
 | `integration.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green |
-| `interface.test.js` | 9 | cutout, draw, fins, inside, overhangs, prop, prop/crest, stl, threemf | M3 | not ported |
+| `interface.test.js` | 9 | cutout, draw, fins, inside, overhangs, prop, prop/crest, stl, threemf | M3 | green |
 | `islands.test.js` | 11 | fins, fins/fill, inside, islands, overhangs, prop, stl | M3 | green; the "no vertex ids" half is not portable (Rust `Topology` always has `vid`) |
 | `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | green |
 | `lattice.test.js` | 2 | fins, inside, overhangs, prop, prop/lattice, stl | M3 | green |
@@ -59,7 +59,7 @@ Web-only rows:
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
 | `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | green |
 | `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | green (js_pad.rs: the `buildPad` ones; js_pad_fins.rs: the rest) |
-| `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | not ported |
+| `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | green |
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | green (js_perp_hole.rs) |
 | `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | not ported |
@@ -72,7 +72,7 @@ Web-only rows:
 | `rows.test.js` | 7 | fins, fins/field, fins/rows, inside, overhangs, prop, stl | M3 | green |
 | `scale.test.js` | 3 | inside, overhangs, scale, stl | M1 | green |
 | `separate_walls.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `session.test.js` | 3 | draw, inside, overhangs, stl, threemf, zip | M3 | not ported |
+| `session.test.js` | 3 | draw, inside, overhangs, stl, threemf, zip | M3 | green |
 | `short_walls.test.js` | 4 | fins, inside, overhangs, prop, prop/clearance, stl | M3 | green |
 | `small_holes.test.js` | 10 | fins, fins/coverage, inside, overhangs, planes, prop, stl | M3 | not ported |
 | `small_holes_i18n.test.js` | 1 |  | M3 | not ported |
@@ -91,7 +91,7 @@ Web-only rows:
 | `tails.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tall.test.js` | 4 | draw, fins, fins/tall, inside, overhangs, prop, stl | M3 | green |
 | `tap.test.js` | 4 | inside, overhangs, stl, ui/tap | — | dropped (web-only) |
-| `threemf.test.js` | 63 | fins, inside, overhangs, paintcode, prop, stl, threemf, zip | M3 | not ported |
+| `threemf.test.js` | 63 | fins, inside, overhangs, paintcode, prop, stl, threemf, zip | M3 | green |
 | `ties.test.js` | 4 | fins, inside, overhangs, prop, prop/ties, stl | M3 | green |
 | `tine_density.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tine_shape.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | green |
