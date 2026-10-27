@@ -61,7 +61,7 @@ fn suggest_worker_ranks_exactly_as_the_page_did_torus_gap_0_35() {
     );
 }
 
-// suggest_worker.test.js:37
+// suggest_worker.test.js:39
 #[test]
 fn the_changed_gap_changes_the_torus_ranking_so_the_tests_above_test_the_tunables() {
     let default = format!("{:?}", ranked(None).0);
