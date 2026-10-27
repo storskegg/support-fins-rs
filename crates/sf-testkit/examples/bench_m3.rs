@@ -16,12 +16,6 @@ use sf_testkit::{models_dir, site_opts};
 
 const RUNS: usize = 5;
 
-fn num(v: &Json, k: &str) -> f64 {
-    match v.get(k) {
-        Some(Json::Num(n)) => *n,
-        _ => panic!("no number {k}"),
-    }
-}
 fn text(v: &Json, k: &str) -> String {
     match v.get(k) {
         Some(Json::Str(s)) => s.clone(),
@@ -39,6 +33,89 @@ struct Once {
     build: f64,
     triangles: usize,
     out: usize,
+}
+
+/// The private file when JS could not load it, so there is no object list: load the whole file (read +
+/// unzip + scan, median of `RUNS`), then time weld and build per object at the pose it has in the file.
+/// A failure is recorded exactly (`rustError`), never aborts the run.
+fn whole_private(
+    path: &std::path::Path,
+    rot: &[f64; 9],
+    opts: &sf_engine::fins::build::FinsOpts,
+    cfg: &Config,
+) -> Json {
+    let fail = |e: String| {
+        println!("private: Rust failed: {e}");
+        Json::Obj(vec![
+            ("objects".into(), Json::Arr(vec![])),
+            ("rustError".into(), Json::Str(e)),
+        ])
+    };
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => return fail(e.to_string()),
+    };
+    let model_xml_mb = match sf_io::zip::unzip(&bytes) {
+        Ok(m) => m.values().map(Vec::len).max().unwrap_or(0) as f64 / 1e6,
+        Err(e) => return fail(e),
+    };
+    let mut loads = vec![];
+    let mut parsed = None;
+    for _ in 0..RUNS {
+        let t = Instant::now();
+        match sf_io::threemf::read_three_mf(&bytes) {
+            Ok(m) => parsed = Some(m),
+            Err(e) => return fail(e),
+        }
+        loads.push(t.elapsed().as_secs_f64() * 1e3);
+    }
+    let load_ms = median(loads);
+    let model = parsed.unwrap();
+    println!(
+        "private: load {load_ms:.0} ms, {} objects, model XML {model_xml_mb:.0} MB",
+        model.objects.len()
+    );
+    let mut objects = vec![];
+    for (index, o) in model.objects.iter().enumerate() {
+        let once = || {
+            let t = Instant::now();
+            let triangles = o.positions.len() / 9;
+            let topo = Arc::new(build_topology(o.positions.clone()));
+            let res = analyze(&topo, 45.0, rot);
+            let weld = t.elapsed().as_secs_f64() * 1e3;
+            let t = Instant::now();
+            let built = build_fins(&topo, &res, rot, opts, cfg);
+            (
+                weld,
+                t.elapsed().as_secs_f64() * 1e3,
+                triangles,
+                built.triangles.len(),
+            )
+        };
+        let _ = once(); // warm-up, discarded
+        let r: Vec<_> = (0..RUNS).map(|_| once()).collect();
+        let build = median(r.iter().map(|x| x.1).collect());
+        println!(
+            "private object {}: {} tris, build {build:.1} ms",
+            index + 1,
+            r[0].2
+        );
+        objects.push(Json::Obj(vec![
+            ("index".into(), Json::Num(index as f64)),
+            ("triangles".into(), Json::Num(r[0].2 as f64)),
+            ("outVerts".into(), Json::Num(r[0].3 as f64)),
+            (
+                "weld".into(),
+                Json::Num(median(r.iter().map(|x| x.0).collect())),
+            ),
+            ("build".into(), Json::Num(build)),
+        ]));
+    }
+    Json::Obj(vec![
+        ("loadMs".into(), Json::Num(load_ms)),
+        ("modelXmlMB".into(), Json::Num(model_xml_mb)),
+        ("objects".into(), Json::Arr(objects)),
+    ])
 }
 
 fn main() {
@@ -66,7 +143,14 @@ fn main() {
             }),
             _ => panic!("no rot"),
         };
-        let object = c.get("object").map(|_| num(c, "object") as usize);
+        let object = match c.get("object") {
+            Some(Json::Num(n)) => Some(*n as usize),
+            _ => None,
+        };
+        if group == "private" && object.is_none() {
+            rows.push(whole_private(&private, &rot, &opts, &cfg));
+            continue;
+        }
         let once = || -> Once {
             let t = Instant::now();
             let pos = if group == "private" {

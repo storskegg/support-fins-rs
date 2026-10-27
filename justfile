@@ -51,6 +51,10 @@ cli-parity filter="":
 
 # M3 timing, JS engine (Deno) vs single-threaded Rust engine (release), written to docs/PERF-M3.md. Skips private-fixtures/ cases when the file is absent.
 bench-m3:
+    #!/usr/bin/env bash
+    set -euo pipefail
     deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js run
-    cargo run --release -q -p sf-testkit --example bench_m3
+    cargo build --release -q -p sf-testkit --example bench_m3
+    # peak memory of the Rust process (the private coin file dominates it when present)
+    /usr/bin/time -l target/release/examples/bench_m3 2> target/bench-m3/rust-time.txt
     deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js report
