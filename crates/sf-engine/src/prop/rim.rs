@@ -46,7 +46,7 @@ use crate::types::Rot3;
 /// built on it says `rimWall: true`); every track `rim_tracks` returns is one.
 pub type Track = Vec<[f64; 3]>;
 
-/// Port of `rimTracks` (web/prop/rim.js:48-70): the rim tracks for a region (`faces`, its seated
+/// Port of `rimTracks` (web/prop/rim.js:47-69): the rim tracks for a region (`faces`, its seated
 /// triangles `region_tris`), or empty when it has no free edge. `step` is JS's default
 /// `PROP.stationStep`, passed explicitly.
 ///
@@ -103,7 +103,7 @@ fn piece_gap(step: f64, cfg: &Config) -> usize {
     jsnum::max(1.0, jsnum::round(cfg.rim.piece_gap / step)) as usize
 }
 
-/// Port of `clipToRim` (web/prop/rim.js:77-100): `rows` with every station within a wall and its
+/// Port of `clipToRim` (web/prop/rim.js:76-100): `rows` with every station within a wall and its
 /// side clearance of the rim dropped (a row is then split into its runs): a row stops short of the
 /// rim instead of fusing into it, and a flush end row along a straight rim goes.
 pub fn clip_to_rim(rows: &[Track], rim: &[Track], cfg: &Config) -> Vec<Track> {
@@ -208,7 +208,7 @@ fn chain_key(p: &[f64; 3]) -> String {
     )
 }
 
-/// Port of `chains` (web/prop/rim.js:125-155): segments joined end to end into polylines (a
+/// Port of `chains` (web/prop/rim.js:125-152): segments joined end to end into polylines (a
 /// closed loop comes back closed).
 fn chains(segs: &[[[f64; 3]; 2]]) -> Vec<Track> {
     let mut at: HashMap<String, Vec<usize>> = HashMap::new();
@@ -251,7 +251,7 @@ fn chains(segs: &[[[f64; 3]; 2]]) -> Vec<Track> {
     out
 }
 
-/// Port of `resample` (web/prop/rim.js:158-171): stations every `step` along a polyline (its
+/// Port of `resample` (web/prop/rim.js:155-170): stations every `step` along a polyline (its
 /// own vertices' z, linearly).
 fn resample(line: &[[f64; 3]], step: f64) -> Track {
     let mut out = vec![line[0]];
@@ -274,7 +274,7 @@ fn resample(line: &[[f64; 3]], step: f64) -> Track {
     out
 }
 
-/// Port of `inset` (web/prop/rim.js:175-189): each station moved `PROP.edgeInset` in, toward the
+/// Port of `inset` (web/prop/rim.js:174-188): each station moved `PROP.edgeInset` in, toward the
 /// region's underside, z its surface there; `None` where the surface isn't under it.
 fn inset(line: &[[f64; 3]], region_tris: &Tris, cfg: &Config) -> Vec<Option<[f64; 3]>> {
     let e = cfg.prop.edge_inset;
@@ -303,7 +303,7 @@ fn inset(line: &[[f64; 3]], region_tris: &Tris, cfg: &Config) -> Vec<Option<[f64
         .collect()
 }
 
-/// Port of `runs` (web/prop/rim.js:192-199): the runs of stations between nulls.
+/// Port of `runs` (web/prop/rim.js:191-199): the runs of stations between nulls.
 fn runs(line: &[Option<[f64; 3]>]) -> Vec<Track> {
     let mut out = Vec::new();
     let mut cur: Track = Vec::new();

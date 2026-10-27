@@ -36,10 +36,10 @@ use crate::prop::curved::line_bend;
 use crate::prop::surface::surface_z_at;
 use crate::tris::Tris;
 
-/// `TAU` (web/prop/arc.js:34).
+/// `TAU` (web/prop/arc.js:35).
 const TAU: f64 = 2.0 * std::f64::consts::PI;
 
-/// Port of `fitCircle` (web/prop/arc.js:37-49): least-squares circle through the points' plan
+/// Port of `fitCircle` (web/prop/arc.js:38-51): least-squares circle through the points' plan
 /// positions (Kasa), or `None` (JS `null`) when they are collinear.
 fn fit_circle(pts: &[[f64; 3]]) -> Option<[f64; 2]> {
     let o = pts[0];
@@ -71,7 +71,7 @@ fn fit_circle(pts: &[[f64; 3]]) -> Option<[f64; 2]> {
     ])
 }
 
-/// Port of `arcLine` (web/prop/arc.js:56-109): the centre line of a level strip that curves in
+/// Port of `arcLine` (web/prop/arc.js:57-109): the centre line of a level strip that curves in
 /// plan, as one track (`Some(vec![line])`, in tubeLine's shape -- `[x, y, z]` stations ~`step`
 /// apart, z the region's surface), or `None` (JS `null`) when the region isn't one. `step` is
 /// JS's default `PROP.stationStep`, passed explicitly.
