@@ -36,34 +36,28 @@ fn pairs(v: Vec<[f64; 2]>) -> Value {
 }
 
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn surface_z_at_direct() {
     replay("surfaceZAt", |t, x, y| z(surface_z_at(t, x, y)));
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn surface_hits_at_direct() {
     replay("surfaceHitsAt", |t, x, y| pairs(surface_hits_at(t, x, y)));
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn surface_zs_at_direct() {
     replay("surfaceZsAt", |t, x, y| Value::from(surface_zs_at(t, x, y)));
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn surface_z_at_captured() {
     replay("surfaceZAt.captured", |t, x, y| z(surface_z_at(t, x, y)));
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn surface_hits_at_captured() {
     replay("surfaceHitsAt.captured", |t, x, y| {
         pairs(surface_hits_at(t, x, y))
     });
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn surface_zs_at_captured() {
     replay("surfaceZsAt.captured", |t, x, y| {
         Value::from(surface_zs_at(t, x, y))

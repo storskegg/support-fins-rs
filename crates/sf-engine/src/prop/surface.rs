@@ -384,7 +384,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn an_empty_soup_has_no_surface() {
         let _ = NEEDS_A;
         let t = Tris::new(vec![]);
@@ -394,7 +393,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn height_interpolates_inside_and_misses_outside() {
         // plane z = x + 2y over the triangle
         let t = tris(&[0.0, 0.0, 0.0, 4.0, 0.0, 4.0, 0.0, 4.0, 8.0]);
@@ -409,7 +407,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn the_grid_edge_has_a_1e_minus_9_margin() {
         let t = tris(&flat(1.0));
         // 4 + 1e-9 is still on the grid and inside the barycentric slack; 4 + 2e-9 is off the grid.
@@ -419,7 +416,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn the_lowest_of_several_stacked_surfaces_wins() {
         let mut v = flat(5.0);
         v.extend(flat(2.0));
@@ -431,7 +427,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn hits_carry_the_unit_normal_z_in_index_order() {
         let mut v = flat(5.0); // faces up: nz = +1
         v.extend([0.0, 0.0, 2.0, 0.0, 4.0, 2.0, 4.0, 0.0, 2.0]); // wound the other way: nz = -1
@@ -446,7 +441,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn a_degenerate_triangle_never_answers() {
         // zero area (collinear), and a NaN corner: neither is a surface
         let mut v = vec![0.0, 0.0, 1.0, 2.0, 0.0, 1.0, 4.0, 0.0, 1.0];
@@ -459,7 +453,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs gridsize::grid_dims (M1 track A)"]
     fn a_grid_asked_often_enough_sorts_its_cells_without_changing_an_answer() {
         // 30 stacked layers; the floor-ordered lists stop early, the plain scan reads every one
         let mut v = Vec::new();
