@@ -116,32 +116,26 @@ fn floors(a: &[Resolved]) -> Value {
 }
 
 #[test]
-#[ignore = "needs sweep::profile_half (M2 track B, todo!() until it lands)"]
 fn station_is_clear_direct() {
     station_replay("stationIsClear", false);
 }
 #[test]
-#[ignore = "needs sweep::profile_half (M2 track B, todo!() until it lands)"]
 fn station_is_clear_captured() {
     station_replay("stationIsClear.captured", false);
 }
 #[test]
-#[ignore = "needs sweep::profile_half (M2 track B, todo!() until it lands)"]
 fn station_certified_direct() {
     station_replay("stationCertified", true);
 }
 #[test]
-#[ignore = "needs sweep::profile_half (M2 track B, todo!() until it lands)"]
 fn station_certified_captured() {
     station_replay("stationCertified.captured", true);
 }
 #[test]
-#[ignore = "needs sweep::profile_half (M2 track B, todo!() until it lands)"]
 fn path_to_plate_is_clear_direct() {
     path_replay("pathToPlateIsClear");
 }
 #[test]
-#[ignore = "needs sweep::profile_half (M2 track B, todo!() until it lands)"]
 fn path_to_plate_is_clear_captured() {
     path_replay("pathToPlateIsClear.captured");
 }
