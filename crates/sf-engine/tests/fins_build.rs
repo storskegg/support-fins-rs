@@ -259,3 +259,42 @@ fn a_part_seated_on_a_point_gets_no_walls_unless_the_pad_seats_it() {
         "nothing standing on the plate can hold a part that never touches it"
     );
 }
+
+#[test]
+fn build_fins_capturing_returns_the_tine_seeds_of_the_same_build() {
+    use sf_testkit::tilted_block_topo;
+    // a block whose underside leans: tines have a face to bite
+    let t = Arc::new(tilted_block_topo(-15.0, 15.0, -20.0, 20.0, 0.0, 30.0, 40.0));
+    let cfg = Config::default();
+    let res = analyze(&t, 45.0, &IDENTITY3);
+    let opts = FinsOpts {
+        tines: Some(true),
+        ..mode("auto")
+    };
+    let plain = build_fins(&t, &res, &IDENTITY3, &opts, &cfg);
+    let (built, seeds) = build_fins_capturing(&t, &res, &IDENTITY3, &opts, &cfg);
+    assert_eq!(
+        built.triangles, plain.triangles,
+        "capturing does not change the build"
+    );
+    assert_eq!(built.tines, plain.tines);
+    assert!(
+        plain.tines > 0 && !seeds.is_empty(),
+        "tines {} seeds {}",
+        plain.tines,
+        seeds.len()
+    );
+    assert!(seeds.iter().all(|s| s.x.is_finite() && s.z.is_finite()));
+    // no tines, no seeds
+    let (_, none) = build_fins_capturing(
+        &t,
+        &res,
+        &IDENTITY3,
+        &FinsOpts {
+            tines: Some(false),
+            ..mode("auto")
+        },
+        &cfg,
+    );
+    assert!(none.is_empty());
+}

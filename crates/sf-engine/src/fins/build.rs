@@ -272,7 +272,7 @@ use crate::planes::find_wall_patches;
 use crate::prop::build::{BuildOpts, PropsPass, RasterVeto, build_props, no_props};
 use crate::prop::config::Iface;
 use crate::prop::crest::{Crest, crest_on};
-use crate::prop::ctx::BuildCtx;
+use crate::prop::ctx::{BuildCtx, TineSeed};
 use crate::prop::curved::bends;
 use crate::sway::{Avoid, SwayOpts, build_sway_braces};
 use crate::types::Rot3;
@@ -426,6 +426,31 @@ pub fn build_fins(
     opts: &FinsOpts,
     cfg: &Config,
 ) -> FinsBuilt {
+    build_fins_inner(topo, result, rot, opts, cfg, false).0
+}
+
+/// `buildFins` run the way the JS tests run it with `globalThis.__TINECAP = []` set around the
+/// call (web/prop/tines.js, web/prop.js:141): the build's tine capture is seeded with an outer,
+/// empty capture, and the seeds it holds afterwards come back with the build. A downhill judge
+/// inside the build leaves the capture holding the returned build's tines only (fins/downhill.js).
+pub fn build_fins_capturing(
+    topo: &Arc<Topology>,
+    result: &Analysis,
+    rot: &Rot3,
+    opts: &FinsOpts,
+    cfg: &Config,
+) -> (FinsBuilt, Vec<TineSeed>) {
+    build_fins_inner(topo, result, rot, opts, cfg, true)
+}
+
+fn build_fins_inner(
+    topo: &Arc<Topology>,
+    result: &Analysis,
+    rot: &Rot3,
+    opts: &FinsOpts,
+    cfg: &Config,
+    capture: bool,
+) -> (FinsBuilt, Vec<TineSeed>) {
     let targets = if opts.mode.as_deref() != Some("draw") {
         Some(automatic_targets(topo, result, rot))
     } else {
@@ -438,6 +463,9 @@ pub fn build_fins(
     let mut cfg = cfg.clone();
     apply_tunables(&mut cfg, opts.tunables.as_ref()); // buildFinsAndBraces
     let mut ctx = BuildCtx::new(&cfg, Crest::new(None, 0.0, &cfg));
+    if capture {
+        *ctx.tine_cap.borrow_mut() = Some(Vec::new());
+    }
     let mut built = build_fins_and_braces(topo, res, rot, opts, &mut ctx);
     built.small_hole_regions = targets.as_ref().map_or(0, |t| t.small_hole_regions);
     // Face indices stay in the caller's input order. Reuse the generation's mask for
@@ -483,7 +511,8 @@ pub fn build_fins(
             coverage,
         });
     }
-    built
+    let seeds = ctx.tine_cap.borrow_mut().take().unwrap_or_default();
+    (built, seeds)
 }
 
 /// The `FillOpts` view of `opts` (fill.js reads `coverage`, `longWalls`, `fillRegions`, `islands`,
