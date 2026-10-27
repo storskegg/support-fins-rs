@@ -51,7 +51,6 @@ fn wrong_variant_panics_clearly() {
 
 // These need track A's `build_topology` / `analyze` (todo!() until M1/A merges): un-ignore then.
 #[test]
-#[ignore = "build_topology/analyze have landed (M1/A); still needs fins::seating::seated_part_tris (M1 track C)"]
 fn references_rebuild_through_the_engine() {
     let rot = Value::from(vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
     let args = vec![
