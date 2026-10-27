@@ -7,7 +7,12 @@
 // `just cli-parity` builds the release binary and runs this. Not compared, by design:
 //   - the message of a file that cannot be read (the runtime's own: Deno's vs Rust's), only that both
 //     fail the same way (exit code, stdout, and the `support-fins: <file>:` prefix);
-//   - a 3MF with a slicer's negative parts: the cut is Manifold (`sf-cut`, a later milestone).
+//
+// EXPECTED GAPS (GAPS below): 3MF files with a slicer's negative parts. The JS CLI cuts them with
+// Manifold (web/cut.js); the Rust one says "negative parts not cut: the cutter did not load" until
+// `sf-cut` lands (#72). They are run and reported, and do NOT fail the run while they differ; the
+// moment one is identical the run fails ("now identical: move it out of GAPS"), so the list can
+// only shrink. Track A flips them to required in #72.
 import { assertPinned, UPSTREAM_ROOT } from "../oracle/lib/pin.js";
 
 assertPinned();
@@ -25,6 +30,7 @@ Deno.mkdirSync(inputs);
 const models = [...Deno.readDirSync(MODELS)].filter((e) => e.name.endsWith(".stl")).map((e) => e.name).sort();
 for (const m of models) Deno.copyFileSync(`${MODELS}/${m}`, `${inputs}/${m}`);
 for (const f of ["bowl.stl", "dome_ceiling.stl", "torus_flat.stl"]) Deno.copyFileSync(`${FIXTURES}/${f}`, `${inputs}/${f}`);
+for (const f of ["orca.3mf", "bambu.3mf", "prusaslicer3.3mf"]) Deno.copyFileSync(`${FIXTURES}/negative-parts/${f}`, `${inputs}/neg-${f}`);
 {
   const { readSTL } = await import(`${UPSTREAM_ROOT}/web/stl.js`);
   const { writeThreeMF, writePlate3MF } = await import(`${UPSTREAM_ROOT}/web/threemf.js`);
@@ -107,6 +113,14 @@ for (const [id, args] of [
   ["dashdash", ["--", "lbracket.stl", "-o", "o.stl"]],
   ["not-a-mesh", ["notamesh.txt"]], ["empty-stl", ["empty.stl"]], ["fin-the-fins", ["lbracket.stl", "--rot", "40,0,0", "-o", "fin.3mf", "+", "fin.3mf"]],
 ]) add(`err-${id}`, args);
+// EXPECTED GAPS: a slicer's negative parts (the cut is `sf-cut`, #72)
+const GAPS = new Set();
+for (const f of ["orca", "bambu", "prusaslicer3"]) {
+  for (const [tag, out] of [["3mf", "o.3mf"], ["stl", "o.stl"]]) {
+    GAPS.add(`gap-${f}-${tag}`);
+    add(`gap-${f}-${tag}`, [`neg-${f}.3mf`, "-o", out]);
+  }
+}
 // a missing file: only the prefix of the runtime's message is compared
 add("err-missing-file", ["nope.stl", "--rot", "40,0,0"]);
 
@@ -123,7 +137,7 @@ function filesOf(dir) {
 }
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-let failed = 0, ran = 0;
+let failed = 0, ran = 0, gaps = 0;
 for (const c of cases) {
   if (only && !c.id.includes(only)) continue;
   // "fin-the-fins": the second run reads the first's output
@@ -155,10 +169,13 @@ for (const c of cases) {
     else if (!rf.has(name)) problems.push(`file ${name}: only js wrote it`);
     else if (!same(jf.get(name), rf.get(name))) problems.push(`file ${name}: bytes differ (${jf.get(name).length} vs ${rf.get(name).length})`);
   }
-  if (problems.length) { failed++; console.log(`FAIL ${c.id} [${c.args.join(" ")}]\n  ${problems.join("\n  ")}`); }
+  if (GAPS.has(c.id)) {
+    if (problems.length) { gaps++; console.log(`GAP  ${c.id} (expected until sf-cut, #72): ${problems[0].split("\n")[0]}`); }
+    else { failed++; console.log(`FAIL ${c.id}: now identical: move it out of GAPS`); }
+  } else if (problems.length) { failed++; console.log(`FAIL ${c.id} [${c.args.join(" ")}]\n  ${problems.join("\n  ")}`); }
   Deno.removeSync(dirs.js, { recursive: true });
   Deno.removeSync(dirs.rs, { recursive: true });
 }
 Deno.removeSync(root, { recursive: true });
-console.log(`cli-parity: ${ran} cases, ${failed} failed`);
+console.log(`cli-parity: ${ran} cases, ${failed} failed, ${gaps} expected gaps`);
 Deno.exit(failed ? 1 : 0);
