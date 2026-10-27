@@ -57,7 +57,7 @@ Web-only rows:
 | `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | green |
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | not ported |
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
-| `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | not ported |
+| `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | partial: 11 of 13 ported (js_orient.rs); the two suggestOrientations cases follow with build_fins |
 | `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | not ported |
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | not ported |
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
