@@ -6,22 +6,22 @@ use crate::jsnum;
 use crate::overhangs::Topology;
 use crate::types::{Rot3, Xyz};
 
-/// `MAX_LEAN_DEG` (web/planes.js:59): how far from vertical a face may lean and still take a fin.
+/// `MAX_LEAN_DEG` (web/planes.js:41): how far from vertical a face may lean and still take a fin.
 pub const MAX_LEAN_DEG: f64 = 45.0;
-/// `NORMAL_AGREE_DEG` (web/planes.js:71): how far a face's normal may swing from its seed's.
+/// `NORMAL_AGREE_DEG` (web/planes.js:54): how far a face's normal may swing from its seed's.
 pub const NORMAL_AGREE_DEG: f64 = 35.0;
-/// `FLAT_TOL_IN` (web/planes.js:92): how far the surface may recede from the fitted plane, in mm.
+/// `FLAT_TOL_IN` (web/planes.js:76): how far the surface may recede from the fitted plane, in mm.
 pub const FLAT_TOL_IN: f64 = 1.20;
-/// `GROW_SLACK` (web/planes.js:93): outward slack while growing, before the supporting plane is known.
+/// `GROW_SLACK` (web/planes.js:77): outward slack while growing, before the supporting plane is known.
 pub const GROW_SLACK: f64 = 0.35;
-/// `MIN_PATCH_H` (web/planes.js:96): mm, measured up the face.
+/// `MIN_PATCH_H` (web/planes.js:80): mm, measured up the face.
 pub const MIN_PATCH_H: f64 = 4.0;
-/// `MIN_PATCH_W` (web/planes.js:97): mm, measured across it.
+/// `MIN_PATCH_W` (web/planes.js:81): mm, measured across it.
 pub const MIN_PATCH_W: f64 = 4.0;
-/// `MIN_PATCH_AREA` (web/planes.js:98): mm^2.
+/// `MIN_PATCH_AREA` (web/planes.js:82): mm^2.
 pub const MIN_PATCH_AREA: f64 = 25.0;
 
-/// `topo._adjStart` / `topo._adjNbr` (web/planes.js:195-208), cached per topology: neighbour
+/// `topo._adjStart` / `topo._adjNbr` (web/planes.js:195-211), cached per topology: neighbour
 /// lists in CSR form.
 #[derive(Debug)]
 pub struct FaceAdjacency {
@@ -36,7 +36,7 @@ pub struct Xy {
     pub y: f64,
 }
 
-/// One wall patch: the object `fitPatch` returns (web/planes.js:336-347).
+/// One wall patch: the object `fitPatch` returns (web/planes.js:325-336).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Patch {
     pub faces: Vec<usize>,
@@ -75,7 +75,7 @@ pub struct PatchStats {
 /// part seated by `offset`; largest area first.
 ///
 /// `findWallPatches(topo, rot, offset, stats = null, excludedFaces = null)`
-/// (web/planes.js:109-193). `excluded_faces` is the JS `Uint8Array` (truthy = skip).
+/// (web/planes.js:95-193). `excluded_faces` is the JS `Uint8Array` (truthy = skip).
 pub fn find_wall_patches(
     topo: &Topology,
     rot: &Rot3,
@@ -215,7 +215,7 @@ fn cmp_diff(diff: f64) -> std::cmp::Ordering {
 
 /// Neighbour lists in CSR form, cached on the topology (it is rotation-invariant).
 ///
-/// `faceAdjacency(topo)` (web/planes.js:195-212).
+/// `faceAdjacency(topo)` (web/planes.js:195-211).
 pub fn face_adjacency(topo: &Topology) -> &FaceAdjacency {
     topo.cache.face_adjacency.get_or_init(|| {
         let n_faces = topo.n_faces;
@@ -241,7 +241,7 @@ pub fn face_adjacency(topo: &Topology) -> &FaceAdjacency {
     })
 }
 
-/// `worldVertex(pos, o, rot, offset, out)` (web/planes.js:215-221): rotate + seat one raw
+/// `worldVertex(pos, o, rot, offset, out)` (web/planes.js:213-219): rotate + seat one raw
 /// vertex into print space.
 fn world_vertex(pos: &[f64], o: usize, rot: &Rot3, offset: &Xyz, out: &mut [f64; 3]) {
     let (x, y, z) = (pos[o], pos[o + 1], pos[o + 2]);
@@ -250,7 +250,7 @@ fn world_vertex(pos: &[f64], o: usize, rot: &Rot3, offset: &Xyz, out: &mut [f64;
     out[2] = rot[2] * x + rot[5] * y + rot[8] * z + offset.z;
 }
 
-/// `fitPatch(topo, g, rn, rot, offset, stats)` (web/planes.js:235-348): fit a plane to one
+/// `fitPatch(topo, g, rn, rot, offset, stats)` (web/planes.js:235-337): fit a plane to one
 /// face group (`g = { faces, area }`) and measure it, or `None` if it is not a usable fin site.
 fn fit_patch(
     topo: &Topology,
@@ -407,7 +407,7 @@ fn fit_patch(
     })
 }
 
-/// Is (u, t) inside the patch? `patchCovers(patch, u, t)` (web/planes.js:356-358).
+/// Is (u, t) inside the patch? `patchCovers(patch, u, t)` (web/planes.js:340-342).
 pub fn patch_covers(patch: &Patch, u: f64, t: f64) -> bool {
     patch_probe(patch, u, t).is_some()
 }
@@ -415,7 +415,7 @@ pub fn patch_covers(patch: &Patch, u: f64, t: f64) -> bool {
 /// Where the real surface sits at (u, t), as a signed distance from the patch's fitted plane
 /// (negative = receded away from the fin), or `None` if the patch does not cover the point.
 ///
-/// `patchProbe(patch, u, t)` (web/planes.js:369-390).
+/// `patchProbe(patch, u, t)` (web/planes.js:353-374).
 pub fn patch_probe(patch: &Patch, u: f64, t: f64) -> Option<f64> {
     let tri = &patch.tris;
     let mut i = 0;
@@ -446,7 +446,7 @@ pub fn patch_probe(patch: &Patch, u: f64, t: f64) -> Option<f64> {
 
 /// World point at patch-frame coordinates: `w` out of the face, `u` across, `t` up.
 ///
-/// `patchPoint(p, w, u, t)` (web/planes.js:392-399).
+/// `patchPoint(p, w, u, t)` (web/planes.js:377-384).
 pub fn patch_point(p: &Patch, w: f64, u: f64, t: f64) -> [f64; 3] {
     let dw = p.d + w;
     [
@@ -458,14 +458,14 @@ pub fn patch_point(p: &Patch, w: f64, u: f64, t: f64) -> [f64; 3] {
 
 /// The `t` at which the plane offset by `w` crosses world z = `z`.
 ///
-/// `tAtZ(p, w, z)` (web/planes.js:402).
+/// `tAtZ(p, w, z)` (web/planes.js:387).
 pub fn t_at_z(p: &Patch, w: f64, z: f64) -> f64 {
     (z - p.n.z * (p.d + w)) / p.t.z
 }
 
 /// World z of a patch-frame point. `u` never contributes: u is horizontal.
 ///
-/// `zAt(p, w, t)` (web/planes.js:405).
+/// `zAt(p, w, t)` (web/planes.js:390).
 pub fn z_at(p: &Patch, w: f64, t: f64) -> f64 {
     p.n.z * (p.d + w) + p.t.z * t
 }

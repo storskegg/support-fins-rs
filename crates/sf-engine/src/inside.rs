@@ -7,13 +7,13 @@ use crate::jsnum;
 use crate::overhangs::Topology;
 use crate::types::{Rot3, Xyz};
 
-/// `EPS` (web/inside.js:30).
+/// `EPS` (web/inside.js:27).
 const EPS: f64 = 1e-9;
-/// `COARSE_CELLS` (web/inside.js:32): solidClearance switches to the coarse grid past this many
+/// `COARSE_CELLS` (web/inside.js:29): solidClearance switches to the coarse grid past this many
 /// fine cells a box.
 const COARSE_CELLS: f64 = 64.0;
 
-/// One YZ bucket grid in CSR form: the object `bucketYZ` returns (web/inside.js:98-129).
+/// One YZ bucket grid in CSR form: the object `bucketYZ` returns (web/inside.js:64-97).
 #[derive(Debug)]
 pub(crate) struct Bucket {
     start: Vec<i32>,
@@ -26,7 +26,7 @@ pub(crate) struct Bucket {
     nz: usize,
 }
 
-/// `buildGrid`'s result (web/inside.js:39-95), cached per topology: the fine grid and, when it
+/// `buildGrid`'s result (web/inside.js:40-62), cached per topology: the fine grid and, when it
 /// is not already 64 x 64, the coarse 64 x 64 one (`grid.coarse`; `None` stands for JS's
 /// `grid.coarse === grid`).
 #[derive(Debug)]
@@ -53,7 +53,7 @@ fn clamp_idx(v: f64, n: usize) -> usize {
     jsnum::min((n - 1) as f64, jsnum::max(0.0, v)) as usize
 }
 
-/// `buildGrid(topo)` (web/inside.js:39-62).
+/// `buildGrid(topo)` (web/inside.js:40-62).
 fn build_grid(topo: &Topology) -> &InsideGrid {
     topo.cache.inside_grid.get_or_init(|| {
         let pos = &topo.pos;
@@ -89,7 +89,7 @@ fn build_grid(topo: &Topology) -> &InsideGrid {
     })
 }
 
-/// `bucketYZ` (web/inside.js:66-129): NY x NZ cells over [minY, maxY] x [minZ, maxZ], as CSR,
+/// `bucketYZ` (web/inside.js:64-97): NY x NZ cells over [minY, maxY] x [minZ, maxZ], as CSR,
 /// each cell's faces ascending.
 #[allow(clippy::too_many_arguments)]
 fn bucket_yz(
@@ -154,7 +154,7 @@ fn bucket_yz(
     }
 }
 
-/// `triClosest(pos, f, px, py, pz)` (web/inside.js:132-176): closest point on triangle `f`,
+/// `triClosest(pos, f, px, py, pz)` (web/inside.js:99-143): closest point on triangle `f`,
 /// all in the mesh's own frame.
 fn tri_closest(pos: &[f64], f: usize, px: f64, py: f64, pz: f64) -> [f64; 3] {
     let o = f * 9;
@@ -324,7 +324,7 @@ fn seg_seg_closest(p0: [f64; 3], p1: [f64; 3], q0: [f64; 3], q1: [f64; 3]) -> ([
     )
 }
 
-/// `triVerts(pos, f)` (web/inside.js:234-240).
+/// `triVerts(pos, f)` (web/inside.js:230-235).
 fn tri_verts(pos: &[f64], f: usize) -> [[f64; 3]; 3] {
     let o = f * 9;
     [
@@ -334,7 +334,7 @@ fn tri_verts(pos: &[f64], f: usize) -> [[f64; 3]; 3] {
     ]
 }
 
-/// `dist2(p, q)` (web/inside.js:242-245).
+/// `dist2(p, q)` (web/inside.js:237-240).
 fn dist2(p: [f64; 3], q: [f64; 3]) -> f64 {
     let dx = p[0] - q[0];
     let dy = p[1] - q[1];
