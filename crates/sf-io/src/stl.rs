@@ -1,8 +1,8 @@
 //! STL read/write, ported from `web/stl.js`.
 //!
-//! M0 needs only `read_stl` (the tests load their fixtures through it). The
-//! `writeBinarySTL` port is M1.
+//! `read_stl` (M0) and `write_binary_stl` (M1).
 
+use crate::text::{decode, is_js_space};
 use sf_engine::jsnum;
 
 /// `HEADER` (web/stl.js:14).
@@ -13,28 +13,6 @@ const PER_TRI: usize = 50;
 /// Errors `readSTL` throws in JS, as a value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StlError(pub String);
-
-/// JS `\s` (no `u` flag): `[\t\n\v\f\r    -     　﻿]`.
-fn is_js_space(c: char) -> bool {
-    matches!(
-        c,
-        '\t' | '\n' | '\u{0b}' | '\u{0c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
-            ..='\u{200a}'
-                | '\u{2028}'
-                | '\u{2029}'
-                | '\u{202f}'
-                | '\u{205f}'
-                | '\u{3000}'
-                | '\u{feff}'
-    )
-}
-
-/// `new TextDecoder().decode(bytes)`: UTF-8 with replacement, and (ignoreBOM is false) one
-/// leading U+FEFF byte-order mark is dropped.
-fn decode(bytes: &[u8]) -> String {
-    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-    String::from_utf8_lossy(bytes).into_owned()
-}
 
 /// `/^﻿?\s*solid/i.test(head)`.
 fn starts_with_solid(head: &str) -> bool {
@@ -166,4 +144,72 @@ fn scan_vertex(text: &str, i: usize) -> Option<(usize, [&str; 3])> {
         p += len;
     }
     Some((p, toks))
+}
+
+/// Port of `writeBinarySTL` (web/stl.js:22-63): binary STL bytes (JS returns a `Blob` of them).
+/// `tris` is the flat vertex list, three per triangle; a trailing partial triangle is dropped
+/// (`count = Math.floor(tris.length / 3)`). `name` is the JS parameter with its default
+/// `'Support Fins'` made explicit: callers pass that string where JS omits it.
+///
+/// Layout: 80-byte header, uint32 count, then per triangle 12 little-endian float32 (normal,
+/// then three vertices) and a uint16 attribute word.
+pub fn write_binary_stl(tris: &[[f64; 3]], name: &str) -> Vec<u8> {
+    let count = tris.len() / 3;
+    let mut buf = vec![0u8; HEADER + 4 + count * PER_TRI];
+
+    // Plain hyphen, not an em dash: the & 0x7f mask below turns an em dash into
+    // control byte 0x14 rather than dropping it.
+    // `.slice(0, 79)` and `charCodeAt` work on UTF-16 code units.
+    let header = format!("{name} - support-fins");
+    for (i, u) in header.encode_utf16().take(79).enumerate() {
+        buf[i] = (u & 0x7f) as u8;
+    }
+
+    buf[HEADER..HEADER + 4].copy_from_slice(&(count as u32).to_le_bytes());
+
+    let mut o = HEADER + 4;
+    for t in 0..count {
+        let a = tris[t * 3];
+        let b = tris[t * 3 + 1];
+        let c = tris[t * 3 + 2];
+
+        // Facet normal from the winding. Some slicers ignore it, some do not; an
+        // inconsistent normal is the kind of thing that shows up as a flipped face
+        // in one program and not another.
+        let ux = b[0] - a[0];
+        let uy = b[1] - a[1];
+        let uz = b[2] - a[2];
+        let vx = c[0] - a[0];
+        let vy = c[1] - a[1];
+        let vz = c[2] - a[2];
+        let mut nx = uy * vz - uz * vy;
+        let mut ny = uz * vx - ux * vz;
+        let mut nz = ux * vy - uy * vx;
+        let len = jsnum::hypot(&[nx, ny, nz]);
+        if len > 1e-12 {
+            nx /= len;
+            ny /= len;
+            nz /= len;
+        } else {
+            nx = 0.0;
+            ny = 0.0;
+            nz = 0.0;
+        }
+
+        let f32le = |buf: &mut [u8], at: usize, v: f64| {
+            buf[at..at + 4].copy_from_slice(&(v as f32).to_le_bytes());
+        };
+        f32le(&mut buf, o, nx);
+        f32le(&mut buf, o + 4, ny);
+        f32le(&mut buf, o + 8, nz);
+        for (i, p) in [a, b, c].iter().enumerate() {
+            f32le(&mut buf, o + 12 + i * 12, p[0]);
+            f32le(&mut buf, o + 16 + i * 12, p[1]);
+            f32le(&mut buf, o + 20 + i * 12, p[2]);
+        }
+        // setUint16(o + 48, 0): already zero
+        o += PER_TRI;
+    }
+
+    buf
 }
