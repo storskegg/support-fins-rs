@@ -46,7 +46,7 @@ fn open() -> Tris {
     Tris::new(block(-200.0, -190.0, -200.0, -190.0, 0.0, 1.0))
 }
 
-fn volume(tris: &[V3]) -> f64 {
+fn volume(tris: &[[f64; 4]]) -> f64 {
     tris.chunks(3)
         .map(|t| {
             let (a, b, c) = (t[0], t[1], t[2]);

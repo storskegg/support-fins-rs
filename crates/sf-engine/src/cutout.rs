@@ -11,6 +11,7 @@
 use crate::config::Config;
 use crate::jsnum;
 use crate::solids::{box_extrude, ribbon};
+use crate::types::V4;
 
 // Issue #34: a wall only has to carry the part along its TOP and stand on its
 // FOOT, so the middle of a tall wall can be opened up to save filament. The
@@ -795,7 +796,7 @@ impl From<&crate::prop::config::PropConfig> for Wall {
 pub fn cut_wall(
     st: &[Station],
     full: &[Vec<V3>],
-    out: &mut Vec<V3>,
+    out: &mut Vec<V4>,
     wall: &Wall,
     cfg: &Config,
 ) -> bool {

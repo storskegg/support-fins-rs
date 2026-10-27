@@ -35,6 +35,7 @@ use crate::prop::config::PropConfig;
 use crate::prop::surface::surface_zs_at;
 use crate::solids::box_extrude;
 use crate::tris::Tris;
+use crate::types::V4;
 
 /// `BRACE` (web/prop/brace.js:35). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
 #[derive(Clone, Debug, PartialEq)]
@@ -123,7 +124,7 @@ fn rib(
     reach: f64,
     th: f64,
     cfg: &Config,
-) -> Option<Vec<[f64; 3]>> {
+) -> Option<Vec<V4>> {
     let prop = &cfg.prop;
     let u0 = -th / 2.0; // starts inside the stem: overlapping solids
     let fw = prop.foot_min + (th - prop.th) / 2.0; // keep the flange's margin past the body
@@ -221,7 +222,7 @@ pub struct CrossRib {
 /// JS defaults: `clear = () => true`, `rise = BRACE.rise`, `th = PROP.th`; callers pass them.
 #[allow(clippy::too_many_arguments)]
 pub fn brace_cross_rib(
-    out: &mut Vec<[f64; 3]>,
+    out: &mut Vec<V4>,
     tris: &Tris,
     o: [f64; 2],
     d: [f64; 2],
@@ -229,7 +230,7 @@ pub fn brace_cross_rib(
     height: f64,
     max_reach: f64,
     lean: [f64; 2],
-    clear: impl Fn(&[[f64; 3]]) -> bool,
+    clear: impl Fn(&[V4]) -> bool,
     rise: f64,
     th: f64,
     cfg: &Config,
@@ -252,11 +253,12 @@ pub fn brace_cross_rib(
     let mut reach = reach0;
     while reach >= brace.min_reach {
         if let Some(r) = rib(&local, o, d, z_bed, stem, reach, th, cfg) {
-            let world: Vec<[f64; 3]> = r
+            // `[v[0] + lean[0] * z, v[1] + lean[1] * z, v[2]]`: a fresh, untagged vertex
+            let world: Vec<V4> = r
                 .iter()
                 .map(|v| {
                     let z = v[2] - z_bed;
-                    [v[0] + lean[0] * z, v[1] + lean[1] * z, v[2]]
+                    [v[0] + lean[0] * z, v[1] + lean[1] * z, v[2], 0.0]
                 })
                 .collect();
             if clear(&world) {
@@ -288,8 +290,8 @@ pub fn brace_wall(
     floor_z: impl Fn(usize) -> f64,
     tris: &Tris,
     z_bed: f64,
-    out: &mut Vec<[f64; 3]>,
-    clear: impl Fn(&[[f64; 3]]) -> bool,
+    out: &mut Vec<V4>,
+    clear: impl Fn(&[V4]) -> bool,
     kinds: BraceKinds,
     cfg: &Config,
 ) -> usize {

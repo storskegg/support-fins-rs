@@ -5,10 +5,12 @@
 //! and pushes outward-wound triangles, as vertex triples, onto `out`.
 //!
 //! A JS vertex `[x, y, z]` is `[f64; 3]` and a 2D point `[f64; 2]`. A *section* (a ring of
-//! vertices) is a `Vec<[f64; 3]>`; the triangle list `out` is a flat `Vec<[f64; 3]>`, three
-//! vertices per triangle.
+//! vertices) is a `Vec<[f64; 3]>` (anything `Pt3`); the triangle list `out` is a flat
+//! `Vec<V4>` (`[x, y, z, tag]`, tag `0.0` for what these emitters push), three vertices per
+//! triangle.
 
 use crate::jsnum;
+use crate::types::{Pt3, V4};
 
 /// The `radius` argument of `roundedPolygon`: a number for every corner, or one per corner
 /// (`Array.isArray(radius) ? radius[i] : radius`).
@@ -82,7 +84,7 @@ pub fn rounded_polygon(poly: &[[f64; 2]], radius: Radius, steps: f64) -> Vec<[f6
 
 /// Port of `roundedFlange` (web/solids.js:34-87): round only the ends of a swept flange,
 /// keeping the intervening contour. Each section is a ring of at least 4 vertices.
-pub fn rounded_flange(sections: &[Vec<[f64; 3]>], out: &mut Vec<[f64; 3]>) {
+pub fn rounded_flange(sections: &[Vec<[f64; 3]>], out: &mut Vec<V4>) {
     let mut secs: Vec<Vec<[f64; 3]>> = Vec::new();
     for sec in sections {
         secs.push(sec.clone());
@@ -209,25 +211,25 @@ pub fn rounded_flange(sections: &[Vec<[f64; 3]>], out: &mut Vec<[f64; 3]>) {
 /// volume came out NEGATIVE, so every normal faced into the solid. M3's own check
 /// only asked whether the mesh was watertight, which it was, so this survived
 /// being called validated. A slicer would read it as a hole rather than a wall.
-pub fn ribbon(secs: &[Vec<[f64; 3]>], out: &mut Vec<[f64; 3]>) {
+pub fn ribbon<P: Pt3>(secs: &[Vec<P>], out: &mut Vec<V4>) {
     let k = secs[0].len();
-    let mut tri = |a: [f64; 3], b: [f64; 3], c: [f64; 3]| {
-        out.push(a);
-        out.push(c);
-        out.push(b);
+    let mut tri = |a: &P, b: &P, c: &P| {
+        out.push(a.v4());
+        out.push(c.v4());
+        out.push(b.v4());
     };
     for i in 0..secs.len() - 1 {
         for j in 0..k {
             let j2 = (j + 1) % k;
-            tri(secs[i][j], secs[i][j2], secs[i + 1][j2]);
-            tri(secs[i][j], secs[i + 1][j2], secs[i + 1][j]);
+            tri(&secs[i][j], &secs[i][j2], &secs[i + 1][j2]);
+            tri(&secs[i][j], &secs[i + 1][j2], &secs[i + 1][j]);
         }
     }
     // end caps
     for j in 1..k.saturating_sub(1) {
-        tri(secs[0][0], secs[0][j + 1], secs[0][j]);
+        tri(&secs[0][0], &secs[0][j + 1], &secs[0][j]);
         let e = &secs[secs.len() - 1];
-        tri(e[0], e[j], e[j + 1]);
+        tri(&e[0], &e[j], &e[j + 1]);
     }
 }
 
@@ -241,11 +243,11 @@ pub fn box_extrude(
     lo: f64,
     hi: f64,
     p: impl Fn(f64, f64, f64) -> [f64; 3],
-    out: &mut Vec<[f64; 3]>,
+    out: &mut Vec<V4>,
 ) {
     let n = poly.len();
-    let vlo: Vec<[f64; 3]> = poly.iter().map(|&[a, b]| p(a, b, lo)).collect();
-    let vhi: Vec<[f64; 3]> = poly.iter().map(|&[a, b]| p(a, b, hi)).collect();
+    let vlo: Vec<V4> = poly.iter().map(|&[a, b]| p(a, b, lo).v4()).collect();
+    let vhi: Vec<V4> = poly.iter().map(|&[a, b]| p(a, b, hi).v4()).collect();
     for i in 0..n {
         let j = (i + 1) % n;
         out.extend([vlo[i], vlo[j], vhi[j]]);
@@ -266,11 +268,11 @@ pub fn loft_extrude(
     lo: f64,
     hi: f64,
     p: impl Fn(f64, f64, f64) -> [f64; 3],
-    out: &mut Vec<[f64; 3]>,
+    out: &mut Vec<V4>,
 ) {
     let n = poly_lo.len();
-    let vlo: Vec<[f64; 3]> = poly_lo.iter().map(|&[a, b]| p(a, b, lo)).collect();
-    let vhi: Vec<[f64; 3]> = poly_hi.iter().map(|&[a, b]| p(a, b, hi)).collect();
+    let vlo: Vec<V4> = poly_lo.iter().map(|&[a, b]| p(a, b, lo).v4()).collect();
+    let vhi: Vec<V4> = poly_hi.iter().map(|&[a, b]| p(a, b, hi).v4()).collect();
     for i in 0..n {
         let j = (i + 1) % n;
         out.extend([vlo[i], vlo[j], vhi[j]]);
@@ -289,13 +291,13 @@ pub fn stack_extrude(
     polys: &[Vec<[f64; 2]>],
     zs: &[f64],
     p: impl Fn(f64, f64, f64) -> [f64; 3],
-    out: &mut Vec<[f64; 3]>,
+    out: &mut Vec<V4>,
 ) {
     let n = polys[0].len();
-    let rings: Vec<Vec<[f64; 3]>> = polys
+    let rings: Vec<Vec<V4>> = polys
         .iter()
         .enumerate()
-        .map(|(r, poly)| poly.iter().map(|&[a, b]| p(a, b, zs[r])).collect())
+        .map(|(r, poly)| poly.iter().map(|&[a, b]| p(a, b, zs[r]).v4()).collect())
         .collect();
     for r in 0..rings.len().saturating_sub(1) {
         let (vlo, vhi) = (&rings[r], &rings[r + 1]);

@@ -19,7 +19,7 @@ fn feet(l: f64, n: usize) -> Vec<Foot> {
         .collect()
 }
 
-fn run(l: f64, n: usize, cfg: &Config) -> (bool, Vec<[f64; 3]>) {
+fn run(l: f64, n: usize, cfg: &Config) -> (bool, Vec<[f64; 4]>) {
     let mut out = Vec::new();
     let ret = windowed_flange(&feet(l, n), &mut out, cfg);
     (ret, out)

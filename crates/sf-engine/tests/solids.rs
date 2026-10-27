@@ -9,7 +9,7 @@ use sf_engine::solids::{
 type V3 = [f64; 3];
 
 /// Signed volume of a triangle soup (positive when wound outward).
-fn volume(tris: &[V3]) -> f64 {
+fn volume(tris: &[[f64; 4]]) -> f64 {
     tris.chunks(3)
         .map(|t| {
             let (a, b, c) = (t[0], t[1], t[2]);
@@ -22,9 +22,9 @@ fn volume(tris: &[V3]) -> f64 {
 }
 
 /// Every undirected edge must be shared by exactly two triangles, in opposite directions.
-fn is_closed(tris: &[V3]) -> bool {
+fn is_closed(tris: &[[f64; 4]]) -> bool {
     use std::collections::HashMap;
-    let key = |v: V3| (v[0].to_bits(), v[1].to_bits(), v[2].to_bits());
+    let key = |v: [f64; 4]| (v[0].to_bits(), v[1].to_bits(), v[2].to_bits());
     let mut e: HashMap<_, i32> = HashMap::new();
     for t in tris.chunks(3) {
         for i in 0..3 {

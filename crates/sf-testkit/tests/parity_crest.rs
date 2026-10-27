@@ -7,10 +7,11 @@ use std::sync::Arc;
 use parity::{Case, Tol, Value, compare, load_cases};
 use sf_engine::config::Config;
 use sf_engine::prop::crest::{
-    Crest, CrestKind, IfaceTags, crest_cut, crest_h, crest_kinds, crest_on, drop_collapsed,
-    emit_crest, flat_crest_ring, flat_cut, mark_interface, split_interface,
+    Crest, CrestKind, crest_cut, crest_h, crest_kinds, crest_on, drop_collapsed, emit_crest,
+    flat_crest_ring, flat_cut, mark_interface, split_interface,
 };
 use sf_engine::tris::Tris;
+use sf_engine::types::V4;
 use sf_testkit::parity_config::config;
 
 fn nums(v: &Value) -> Vec<f64> {
@@ -20,12 +21,18 @@ fn nums(v: &Value) -> Vec<f64> {
     }
 }
 
-fn verts(v: &Value) -> Vec<[f64; 3]> {
-    nums(v).chunks(3).map(|c| [c[0], c[1], c[2]]).collect()
+/// A recorded Float64Array of xyz triples as untagged soup vertices.
+fn verts(v: &Value) -> Vec<V4> {
+    nums(v).chunks(3).map(|c| [c[0], c[1], c[2], 0.0]).collect()
 }
 
-fn flat(v: &[[f64; 3]]) -> Value {
-    Value::F64(v.iter().flatten().copied().collect())
+/// The vertices' xyz, as recorded (the tag is compared separately, as bools).
+fn flat(v: &[V4]) -> Value {
+    Value::F64(v.iter().flat_map(|v| [v[0], v[1], v[2]]).collect())
+}
+
+fn tagged(v: &[V4]) -> Value {
+    Value::Arr(v.iter().map(|v| Value::Bool(v[3] == 1.0)).collect())
 }
 
 fn p(o: f64, z: f64) -> [f64; 3] {
@@ -67,10 +74,6 @@ fn replay(function: &str, min: usize, mut f: impl FnMut(&Case) -> Value) {
             );
         }
     }
-}
-
-fn bools(tags: &IfaceTags, n: usize) -> Value {
-    Value::Arr((0..n).map(|i| Value::Bool(tags.is_tagged(i))).collect())
 }
 
 #[test]
@@ -187,11 +190,11 @@ fn emit_crest_replays() {
                 ),
             })
             .collect();
-        let (mut out, mut tags) = (Vec::new(), IfaceTags::default());
-        emit_crest(&secs, &mut out, &mut tags);
+        let mut out = Vec::new();
+        emit_crest(&secs, &mut out);
         Value::Obj(vec![
             ("tris".into(), flat(&out)),
-            ("tagged".into(), bools(&tags, out.len())),
+            ("tagged".into(), tagged(&out)),
         ])
     });
 }
@@ -199,10 +202,9 @@ fn emit_crest_replays() {
 #[test]
 fn mark_interface_replays() {
     replay("mark_interface", 20, |c| {
-        let tris = verts(&c.args[0]);
-        let mut tags = IfaceTags::default();
-        mark_interface(&tris, c.args[1].num() as usize, &mut tags);
-        bools(&tags, tris.len())
+        let mut tris = verts(&c.args[0]);
+        mark_interface(&mut tris, c.args[1].num() as usize);
+        tagged(&tris)
     });
 }
 
@@ -218,14 +220,13 @@ fn drop_collapsed_replays() {
 #[test]
 fn split_interface_replays() {
     replay("split_interface", 20, |c| {
-        let tris = verts(&c.args[0]);
-        let mut tags = IfaceTags::default();
-        for (i, t) in c.args[1].arr().iter().enumerate() {
+        let mut tris = verts(&c.args[0]);
+        for (v, t) in tris.iter_mut().zip(c.args[1].arr()) {
             if matches!(t, Value::Bool(true)) {
-                tags.mark(i, i + 1);
+                v[3] = 1.0;
             }
         }
-        let (body, iface) = split_interface(&tris, &tags);
+        let (body, iface) = split_interface(&tris);
         Value::Obj(vec![
             ("body".into(), flat(&body)),
             ("iface".into(), flat(&iface)),

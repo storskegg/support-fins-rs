@@ -39,7 +39,7 @@ fn p2(v: &Value) -> [f64; 2] {
 }
 
 /// `clear` as a spec: `{mode: 'always' | 'never' | 'maxX' | 'rejectFirst'}`.
-fn clear_fn(spec: &Value) -> impl Fn(&[[f64; 3]]) -> bool {
+fn clear_fn(spec: &Value) -> impl Fn(&[[f64; 4]]) -> bool {
     let mode = spec.get("mode").str().to_string();
     let x = match spec {
         Value::Obj(o) if o.iter().any(|(k, _)| k == "x") => spec.get("x").num(),
@@ -50,7 +50,7 @@ fn clear_fn(spec: &Value) -> impl Fn(&[[f64; 3]]) -> bool {
         _ => 0.0,
     };
     let calls = Cell::new(0.0);
-    move |r: &[[f64; 3]]| match mode.as_str() {
+    move |r: &[[f64; 4]]| match mode.as_str() {
         "always" => true,
         "never" => false,
         "maxX" => r.iter().all(|v| v[0] <= x),
@@ -71,8 +71,13 @@ fn check(function: &str, c: &Case, got: Value) {
     }
 }
 
-fn flat(out: &[[f64; 3]]) -> Value {
-    Value::F64(out.iter().flatten().copied().collect())
+/// The vertices' xyz as the recorded Float64Array; every vertex these emitters push is untagged.
+fn flat3(out: &[[f64; 4]]) -> Value {
+    assert!(
+        out.iter().all(|v| v[3] == 0.0),
+        "an untagged emitter pushed a tagged vertex"
+    );
+    Value::F64(out.iter().flat_map(|v| [v[0], v[1], v[2]]).collect())
 }
 
 #[test]
@@ -107,7 +112,7 @@ fn brace_wall_replays() {
             c,
             Value::Obj(vec![
                 ("built".into(), (built as f64).into()),
-                ("tris".into(), flat(&out)),
+                ("tris".into(), flat3(&out)),
             ]),
         );
     }
@@ -153,7 +158,7 @@ fn brace_cross_rib_replays() {
         check(
             "brace_cross_rib",
             c,
-            Value::Obj(vec![("ret".into(), ret), ("tris".into(), flat(&out))]),
+            Value::Obj(vec![("ret".into(), ret), ("tris".into(), flat3(&out))]),
         );
     }
     assert!(built > 30, "only {built} cross ribs built");
@@ -184,7 +189,7 @@ fn tie_walls_replays() {
             c,
             Value::Obj(vec![
                 ("n".into(), (n as f64).into()),
-                ("tris".into(), flat(&out)),
+                ("tris".into(), flat3(&out)),
             ]),
         );
     }

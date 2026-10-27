@@ -30,15 +30,13 @@
 //! solids are tagged, and their vertices are their own arrays, never shared with an
 //! untagged solid. The export splits on it (splitInterface).
 //!
-//! **Rust representation of the tag (divergence, see the PR):** `out` stays
-//! `Vec<[f64; 3]>`, and the tag is [`IfaceTags`], index ranges of `out` that the caller keeps
-//! beside it. JS only ever tags with `markInterface(out, from)`, the tail of `out`.
+//! **Rust representation of the tag:** a soup vertex is a [`V4`], `[x, y, z, tag]`, with the tag
+//! `1.0` exactly where JS has `v[3] === 1` and `0.0` where JS has `undefined`.
 //!
 //! Off (the default) nothing here runs and every wall is what it was.
 //!
 //! Split out of prop.js, which re-exports the public names.
 
-use std::ops::Range;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -47,6 +45,7 @@ use crate::prop::config::Iface;
 use crate::prop::surface::surface_hits_at;
 use crate::solids::ribbon;
 use crate::tris::Tris;
+use crate::types::V4;
 
 type V3 = [f64; 3];
 
@@ -163,56 +162,18 @@ pub fn crest_kinds(crest: &Crest, pts: &[V3], cfg: &Config) -> Option<Vec<Option
     )
 }
 
-/// The interface tag (`v[3] === 1`) of the vertices of an `out` array, as index ranges.
-/// Kept by the caller beside `out`; see the module docs.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct IfaceTags {
-    /// Disjoint, ascending, non-adjacent ranges of tagged vertex indices.
-    ranges: Vec<Range<usize>>,
-}
-
-impl IfaceTags {
-    /// Tags `out[from..out_len]`.
-    pub fn mark(&mut self, from: usize, out_len: usize) {
-        if from >= out_len {
-            return;
-        }
-        // keep the ranges ascending and merged
-        let mut merged = from..out_len;
-        self.ranges.retain(|r| {
-            if r.end < merged.start || r.start > merged.end {
-                true
-            } else {
-                merged = merged.start.min(r.start)..merged.end.max(r.end);
-                false
-            }
-        });
-        let at = self.ranges.partition_point(|r| r.start < merged.start);
-        self.ranges.insert(at, merged);
-    }
-
-    /// `out[i][3] === 1`.
-    pub fn is_tagged(&self, i: usize) -> bool {
-        let at = self.ranges.partition_point(|r| r.end <= i);
-        self.ranges.get(at).is_some_and(|r| r.start <= i)
-    }
-
-    /// The tagged ranges, ascending.
-    pub fn ranges(&self) -> &[Range<usize>] {
-        &self.ranges
-    }
-}
-
 /// Port of `markInterface` (web/prop/crest.js:80-82): tag `out[from..]` as interface. JS's
 /// default `from = 0` is passed explicitly.
-pub fn mark_interface(out: &[V3], from: usize, tags: &mut IfaceTags) {
-    tags.mark(from, out.len());
+pub fn mark_interface(out: &mut [V4], from: usize) {
+    for v in out.iter_mut().skip(from) {
+        v[3] = 1.0;
+    }
 }
 
 /// Port of `emitCrest` (web/prop/crest.js:89-98): a wall's crest sections, one per station
 /// (`None` where it has none), as tagged closed solids: one per run of consecutive crest
 /// stations.
-pub fn emit_crest(sections: &[Option<Vec<V3>>], out: &mut Vec<V3>, tags: &mut IfaceTags) {
+pub fn emit_crest(sections: &[Option<Vec<V3>>], out: &mut Vec<V4>) {
     let from = out.len();
     let mut i = 0;
     while i < sections.len() {
@@ -226,16 +187,15 @@ pub fn emit_crest(sections: &[Option<Vec<V3>>], out: &mut Vec<V3>, tags: &mut If
         }
         i = j + 1;
     }
-    mark_interface(out, from, tags);
+    mark_interface(out, from);
 }
 
 /// Port of `dropCollapsed` (web/prop/crest.js:106-116): drop `out[from..]`'s triangles with two
 /// corners on one point. A flat crest's body section repeats a corner (its straight side meets
 /// the cut at full width), so its ribbon makes zero-area triangles there; dropping them leaves
 /// the solid closed (a zero-length edge pairs off the two others), unlike a collinear corner's.
-/// Run before the crest is tagged: the tags of `out[from..]` are not shifted.
-pub fn drop_collapsed(out: &mut Vec<V3>, from: usize) {
-    let same = |a: V3, b: V3| a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+pub fn drop_collapsed(out: &mut Vec<V4>, from: usize) {
+    let same = |a: V4, b: V4| a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
     let mut w = from;
     let mut i = from;
     while i + 2 < out.len() {
@@ -254,11 +214,11 @@ pub fn drop_collapsed(out: &mut Vec<V3>, from: usize) {
 
 /// Port of `splitInterface` (web/prop/crest.js:119-125): split a triangle list into its body and
 /// interface triangles (a triangle is interface when its first vertex is tagged).
-pub fn split_interface(tris: &[V3], tags: &IfaceTags) -> (Vec<V3>, Vec<V3>) {
+pub fn split_interface(tris: &[V4]) -> (Vec<V4>, Vec<V4>) {
     let (mut body, mut iface) = (Vec::new(), Vec::new());
     let mut i = 0;
     while i + 2 < tris.len() {
-        let dst = if tags.is_tagged(i) {
+        let dst = if tris[i][3] == 1.0 {
             &mut iface
         } else {
             &mut body

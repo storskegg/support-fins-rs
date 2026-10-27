@@ -24,6 +24,7 @@ use crate::jsnum;
 use crate::prop::surface::surface_zs_at;
 use crate::solids::box_extrude;
 use crate::tris::Tris;
+use crate::types::V4;
 
 /// `TIE` (web/prop/ties.js:25). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
 #[derive(Clone, Debug, PartialEq)]
@@ -128,7 +129,7 @@ pub fn tie_walls(
     z_max: f64,
     tris: &Tris,
     z_bed: f64,
-    out: &mut Vec<[f64; 3]>,
+    out: &mut Vec<V4>,
     cfg: &Config,
 ) -> usize {
     let tie = &cfg.tie;

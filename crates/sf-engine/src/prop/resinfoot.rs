@@ -19,6 +19,7 @@
 use crate::config::Config;
 use crate::jsnum;
 use crate::solids::ribbon;
+use crate::types::V4;
 
 /// `RESIN_FOOT` (web/prop/resinfoot.js:20). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
 #[derive(Clone, Debug, PartialEq)]
@@ -62,7 +63,7 @@ pub struct Foot {
 
 /// Port of `windowedFlange` (web/prop/resinfoot.js:33-55): emits the windowed flange into
 /// `out`. Returns false (nothing emitted) when the flange is too short to window.
-pub fn windowed_flange(feet: &[Foot], out: &mut Vec<[f64; 3]>, cfg: &Config) -> bool {
+pub fn windowed_flange(feet: &[Foot], out: &mut Vec<V4>, cfg: &Config) -> bool {
     let mut s = vec![0.0];
     for i in 1..feet.len() {
         s.push(

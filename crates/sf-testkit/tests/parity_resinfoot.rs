@@ -35,10 +35,7 @@ fn windowed_flange_replays() {
         }
         let got = Value::Obj(vec![
             ("ret".into(), Value::Bool(ret)),
-            (
-                "tris".into(),
-                Value::F64(out.iter().flatten().copied().collect()),
-            ),
+            ("tris".into(), flat3(&out)),
         ]);
         if let Err(m) = compare(&got, c.out.as_ref().unwrap(), &Tol::Exact) {
             panic!(
@@ -51,4 +48,13 @@ fn windowed_flange_replays() {
         windowed > 10 && solid > 0,
         "{windowed} windowed, {solid} solid"
     );
+}
+
+/// The vertices' xyz as the recorded Float64Array; every vertex these emitters push is untagged.
+fn flat3(out: &[[f64; 4]]) -> Value {
+    assert!(
+        out.iter().all(|v| v[3] == 0.0),
+        "an untagged emitter pushed a tagged vertex"
+    );
+    Value::F64(out.iter().flat_map(|v| [v[0], v[1], v[2]]).collect())
 }

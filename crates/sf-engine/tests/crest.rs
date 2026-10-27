@@ -7,8 +7,8 @@ use std::sync::Arc;
 use sf_engine::config::Config;
 use sf_engine::prop::config::Iface;
 use sf_engine::prop::crest::{
-    Crest, CrestKind, IfaceTags, crest_cut, crest_h, crest_kinds, crest_on, drop_collapsed,
-    emit_crest, flat_crest_ring, flat_cut, mark_interface, split_interface,
+    Crest, CrestKind, crest_cut, crest_h, crest_kinds, crest_on, drop_collapsed, emit_crest,
+    flat_crest_ring, flat_cut, mark_interface, split_interface,
 };
 use sf_engine::tris::Tris;
 
@@ -22,22 +22,6 @@ fn on(iface: Iface) -> Config {
 
 fn p(o: f64, z: f64) -> V3 {
     [o, 0.0, z]
-}
-
-#[test]
-#[allow(clippy::single_range_in_vec_init)]
-fn tags_merge_and_look_up() {
-    let mut t = IfaceTags::default();
-    t.mark(2, 5);
-    t.mark(8, 9);
-    t.mark(5, 8); // joins both
-    assert_eq!(t.ranges(), &[2..9]);
-    assert!(!t.is_tagged(1) && t.is_tagged(2) && t.is_tagged(8) && !t.is_tagged(9));
-    t.mark(4, 4); // empty: nothing
-    t.mark(7, 3);
-    assert_eq!(t.ranges(), &[2..9]);
-    t.mark(0, 1);
-    assert_eq!(t.ranges(), &[0..1, 2..9]);
 }
 
 #[test]
@@ -170,10 +154,10 @@ fn ring(z: f64) -> Vec<V3> {
 }
 
 #[test]
-#[allow(clippy::single_range_in_vec_init)]
-fn emit_crest_makes_one_solid_per_run_and_skips_lone_stations() {
+fn emit_crest_makes_one_tagged_solid_per_run_and_skips_lone_stations() {
     let mut out = Vec::new();
-    let mut tags = IfaceTags::default();
+    // an untagged solid already in `out` stays untagged
+    out.push([9.0, 9.0, 9.0, 0.0]);
     emit_crest(
         &[
             Some(ring(0.0)),
@@ -185,35 +169,50 @@ fn emit_crest_makes_one_solid_per_run_and_skips_lone_stations() {
             Some(ring(4.0)),
         ],
         &mut out,
-        &mut tags,
     );
     // two runs of two rings: 2 * (4 quads = 8 triangles + 2 caps * 2) = 24 triangles
-    assert_eq!(out.len(), 3 * 24);
-    assert_eq!(tags.ranges(), &[0..out.len()]);
+    assert_eq!(out.len(), 1 + 3 * 24);
+    assert_eq!(out[0][3], 0.0);
+    assert!(out[1..].iter().all(|v| v[3] == 1.0));
     let mut none = Vec::new();
-    emit_crest(
-        &[None, Some(ring(0.0)), None],
-        &mut none,
-        &mut IfaceTags::default(),
-    );
+    emit_crest(&[None, Some(ring(0.0)), None], &mut none);
     assert!(none.is_empty());
 }
 
 #[test]
 fn mark_drop_and_split() {
-    let a = [0.0, 0.0, 0.0];
-    let b = [1.0, 0.0, 0.0];
-    let c = [0.0, 1.0, 0.0];
+    let v = |x: f64, y: f64, t: f64| [x, y, 0.0, t];
+    let (a, b, c) = (v(0.0, 0.0, 0.0), v(1.0, 0.0, 0.0), v(0.0, 1.0, 0.0));
     let mut tris = vec![a, b, c, a, a, c, b, c, c, c, b, a];
     drop_collapsed(&mut tris, 3);
     assert_eq!(tris, vec![a, b, c, c, b, a]);
-    let mut tags = IfaceTags::default();
-    mark_interface(&tris, 3, &mut tags);
-    let (body, iface) = split_interface(&tris, &tags);
+    mark_interface(&mut tris, 3);
+    let tagged = |p: [f64; 4]| [p[0], p[1], p[2], 1.0];
+    assert_eq!(tris, vec![a, b, c, tagged(c), tagged(b), tagged(a)]);
+    let (body, iface) = split_interface(&tris);
     assert_eq!(body, vec![a, b, c]);
-    assert_eq!(iface, vec![c, b, a]);
+    assert_eq!(iface, vec![tagged(c), tagged(b), tagged(a)]);
     // drop_collapsed from past the end leaves the list alone
     let mut same = tris.clone();
     drop_collapsed(&mut same, 99);
     assert_eq!(same, tris);
+    // compaction carries the tag with its vertex: a collapsed triangle between tagged ones
+    let mut t = vec![
+        tagged(a),
+        tagged(b),
+        tagged(c),
+        tagged(a),
+        tagged(a),
+        tagged(c),
+        tagged(c),
+        tagged(b),
+        tagged(a),
+    ];
+    drop_collapsed(&mut t, 0);
+    assert_eq!(t.len(), 6);
+    assert!(t.iter().all(|p| p[3] == 1.0));
+    // split tests the FIRST vertex of each triangle
+    let mixed = vec![tagged(a), b, c, a, tagged(b), c];
+    let (body, iface) = split_interface(&mixed);
+    assert_eq!((body.len(), iface.len()), (3, 3));
 }
