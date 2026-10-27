@@ -7,9 +7,6 @@
 //!   - "Brace grip from" keeps tines below that height off;
 //!   - a short part gets none, and says why;
 //!   - Draw's one-click brace works on an upright side and refuses a roof.
-//!
-//! Three cases build through `buildFins` (track D): "off by default", "carry fin records" and
-//! "a part too short to brace builds without throwing"; they are ported with it.
 
 use sf_engine::config::Config;
 use sf_engine::inside::inside_part;
@@ -760,4 +757,87 @@ fn sway_an_anchor_brace_never_overhangs_past_45_degrees_cross_ribs_included() {
             );
         }
     }
+}
+
+fn fins_opts(sway: bool) -> sf_engine::fins::build::FinsOpts {
+    sf_engine::fins::build::FinsOpts {
+        mode: Some("auto".into()),
+        bed_pad: Some(true),
+        tines: Some(true),
+        layer_height: Some(LAYER),
+        sway: sway.then(|| sf_engine::fins::build::SwayRequest {
+            on: true,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn build_post(h: f64, sway: bool) -> sf_engine::fins::build::FinsBuilt {
+    let topo = std::sync::Arc::new(block_topo(-20.0, 20.0, -15.0, 15.0, 0.0, h));
+    let res = analyze(&topo, 45.0, &ID);
+    sf_engine::fins::build::build_fins(&topo, &res, &ID, &fins_opts(sway), &Config::default())
+}
+
+// sway.test.js:129
+#[test]
+fn sway_off_by_default_build_fins_without_the_option_adds_none() {
+    let plain = build_post(150.0, false);
+    assert!(
+        plain.sway.is_none(),
+        "buildFins reported sway braces nobody asked for"
+    );
+    let with_sway = build_post(150.0, true);
+    assert!(
+        with_sway.sway.as_ref().is_some_and(|s| s.count >= 2),
+        "sway: {{ on: true }} placed no braces"
+    );
+    assert!(
+        with_sway.triangles.len() > plain.triangles.len(),
+        "sway braces were not added to the output"
+    );
+}
+
+// sway.test.js:176
+#[test]
+fn sway_auto_braces_carry_fin_records_so_the_per_fin_filter_keeps_them() {
+    // The Auto view draws and exports only triangles some built.fins record claims (per-fin
+    // removal). A brace appended without a record vanished from both.
+    let b = build_post(150.0, true);
+    let recs = b
+        .fins
+        .iter()
+        .filter(|f| f.kind == sf_engine::fins::build::FinKind::Sway)
+        .count();
+    let count = b.sway.as_ref().unwrap().count;
+    assert!(
+        recs == count && recs > 0,
+        "{recs} sway records for {count} braces"
+    );
+    let mut claimed = std::collections::HashSet::new();
+    for f in &b.fins {
+        for [lo, hi] in &f.tri_ranges {
+            for t in *lo..*hi {
+                claimed.insert(t);
+            }
+        }
+    }
+    assert!(
+        claimed.len() == b.triangles.len(),
+        "{} vertices claimed by no fin",
+        b.triangles.len() - claimed.len()
+    );
+    let ids: std::collections::HashSet<usize> = b.fins.iter().map(|f| f.id).collect();
+    assert!(ids.len() == b.fins.len(), "fin ids collide");
+}
+
+// sway.test.js:190
+#[test]
+fn sway_a_part_too_short_to_brace_builds_without_throwing() {
+    // buildSwayBraces returns early here, and the caller maps over `ribs` to make its per-fin
+    // records -- so an early return with no `ribs` threw instead of quietly placing nothing.
+    let built = build_post(20.0, true);
+    let s = built.sway.as_ref().expect("a sway report");
+    assert!(s.count == 0, "a 20mm part got {} braces", s.count);
+    assert!(s.reason.is_some(), "no reason given");
 }

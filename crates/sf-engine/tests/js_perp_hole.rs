@@ -4,11 +4,11 @@
 //! bore, so a drawn/auto fin lands as two fins FLANKING it. `perpColumns` is pinned directly on a
 //! synthetic patch, where the (u,t) coverage and the hole are exact.
 //!
-//! The third case (END-TO-END, `buildFins` on a tilted holed plate) needs `buildFins` (track D) and
-//! is ported with it.
 
 use sf_engine::config::Config;
+use sf_engine::fins::build::{FinsOpts, build_fins};
 use sf_engine::fins::wedges::perp_columns;
+use sf_engine::overhangs::analyze;
 use sf_engine::planes::{Patch, Xy};
 use sf_engine::types::Xyz;
 
@@ -106,5 +106,49 @@ fn perp_columns_a_bore_splits_the_row_into_two_fins_flanking_it() {
     assert!(
         cols.iter().any(|&u| u <= -8.0) && cols.iter().any(|&u| u >= 8.0),
         "not flanked on both sides: {cols:?}"
+    );
+}
+
+// perp_hole.test.js:52
+#[test]
+fn end_to_end_a_tilted_plate_with_a_bore_gets_flanking_fins_none_through_the_bore() {
+    // The whole pipeline (analyze -> findWallPatches -> buildPerpFins), not just the column picker: a
+    // broad plate with a central bore, tilted 45deg. The old code dropped one fin column straight
+    // through the bore; the fix flanks it.
+    let topo = std::sync::Arc::new(sf_testkit::holed_plate_topo(40.0, 30.0, 4.0, 9.0, 9.0));
+    let rot = sf_testkit::rot_x(45.0);
+    let res = analyze(&topo, 45.0, &rot);
+    let b = build_fins(
+        &topo,
+        &res,
+        &rot,
+        &FinsOpts {
+            mode: Some("auto".into()),
+            bed_pad: Some(true),
+            tines: Some(true),
+            ..Default::default()
+        },
+        &Config::default(),
+    );
+    assert!(
+        b.fins.len() >= 2,
+        "bore should yield >=2 flanking fins, got {}",
+        b.fins.len()
+    );
+    let tris: Vec<[f64; 3]> = b.triangles.iter().map(|v| [v[0], v[1], v[2]]).collect();
+    assert!(
+        sf_testkit::is_closed(&tris),
+        "flanking fins are not watertight"
+    );
+    // NO fin material in the bore's x-band (|x| < 7): nothing was stood in the bore.
+    let in_bore = b.triangles.iter().filter(|v| v[0].abs() < 7.0).count();
+    assert!(
+        in_bore == 0,
+        "{in_bore} fin verts landed inside the bore band (a fin was dropped through the hole)"
+    );
+    // and material exists on BOTH sides, so it really is flanked
+    assert!(
+        b.triangles.iter().any(|v| v[0] < -9.0) && b.triangles.iter().any(|v| v[0] > 9.0),
+        "fins are not on both sides of the bore"
     );
 }
