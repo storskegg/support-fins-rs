@@ -117,3 +117,59 @@ pub fn seated_region(topo: &Topology, res: &Analysis, rot: &Rot3, gi: usize) -> 
     }
     out
 }
+
+/// A welded "net": a plate on an `n` x `n` grid of `cell`-mm cells, the `solid(i, j)` cells
+/// forming bars; `bottom(i, j)` is the underside height at a grid vertex; a foot clear of the net
+/// sets the plate. (The generator `parity/oracle/lattice.js` uses.)
+pub fn net(
+    n: usize,
+    cell: f64,
+    solid: &dyn Fn(usize, usize) -> bool,
+    bottom: &dyn Fn(usize, usize) -> f64,
+    top: f64,
+) -> Vec<f64> {
+    let mut t: Vec<[f64; 3]> = Vec::new();
+    let b = |i: usize, j: usize| [i as f64 * cell, j as f64 * cell, bottom(i, j)];
+    let u = |i: usize, j: usize| [i as f64 * cell, j as f64 * cell, top];
+    let on = |i: i64, j: i64| {
+        i >= 0 && j >= 0 && (i as usize) < n && (j as usize) < n && solid(i as usize, j as usize)
+    };
+    for j in 0..n {
+        for i in 0..n {
+            if !on(i as i64, j as i64) {
+                continue;
+            }
+            t.extend(quad(b(i, j), b(i, j + 1), b(i + 1, j + 1), b(i + 1, j)));
+            t.extend(quad(u(i, j), u(i + 1, j), u(i + 1, j + 1), u(i, j + 1)));
+            let (ii, jj) = (i as i64, j as i64);
+            if !on(ii - 1, jj) {
+                t.extend(quad(b(i, j), u(i, j), u(i, j + 1), b(i, j + 1)));
+            }
+            if !on(ii + 1, jj) {
+                t.extend(quad(
+                    b(i + 1, j),
+                    b(i + 1, j + 1),
+                    u(i + 1, j + 1),
+                    u(i + 1, j),
+                ));
+            }
+            if !on(ii, jj - 1) {
+                t.extend(quad(b(i, j), b(i + 1, j), u(i + 1, j), u(i, j)));
+            }
+            if !on(ii, jj + 1) {
+                t.extend(quad(
+                    b(i + 1, j + 1),
+                    b(i, j + 1),
+                    u(i, j + 1),
+                    u(i + 1, j + 1),
+                ));
+            }
+        }
+    }
+    t.extend(block(-8.0, -5.0, -8.0, -5.0, 0.0, 22.0));
+    t.iter().flatten().map(|&v| v as f32 as f64).collect()
+}
+
+pub fn flat_bottom(_: usize, _: usize) -> f64 {
+    20.0
+}

@@ -9,7 +9,7 @@ use sf_engine::config::Config;
 use sf_engine::overhangs::{analyze, build_topology};
 use sf_engine::prop::circular::*;
 use sf_engine::tris::Tris;
-use sf_testkit::parity::{Resolved, resolve_args};
+use sf_testkit::parity::resolve_args;
 
 fn pair(p: [f64; 2]) -> Value {
     Value::Arr(vec![p[0].into(), p[1].into()])
