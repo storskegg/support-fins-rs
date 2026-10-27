@@ -127,8 +127,9 @@ pub struct PropRecord {
     pub tines: usize,
     /// `caps`: the wall's slice of the tests' tine capture, `undefined` when it is off.
     pub caps: Option<[usize; 2]>,
-    /// `grip`: the lowest tine bottom (`Infinity`: no tines).
-    pub grip: f64,
+    /// `grip`: the lowest tine bottom (`Infinity`: no tines); `None` is the key absent
+    /// (`q.grip ?? Infinity`).
+    pub grip: Option<f64>,
     /// `span` (plate walls, `pa.prop`, `sq`).
     pub span: f64,
     /// `height` (plate walls, `pa.prop`, `sq`).
