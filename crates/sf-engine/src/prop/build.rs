@@ -204,7 +204,8 @@ pub fn no_props() -> PropsPass {
 }
 
 /// A track: the stations of one wall's centreline, with the properties JS hangs on the array
-/// (`line.rim`, `piece.from`).
+/// (`line.rim`, `piece.from`). `buildPass`'s internal shape: built from `tracks::Tracks` /
+/// `rim::rim_tracks` output at its call sites, where JS's tag loss on array copies is reproduced.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Line {
     pub pts: Vec<[f64; 3]>,
@@ -215,7 +216,7 @@ pub struct Line {
     pub from: Option<usize>,
 }
 
-/// A set of tracks: the `lines` array with the properties JS hangs on it.
+/// A set of tracks (`buildPass`'s internal shape, built from `tracks::Tracks`): the `lines` array with the properties JS hangs on it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Lines {
     pub lines: Vec<Line>,
@@ -226,7 +227,8 @@ pub struct Lines {
     pub turned: Option<[f64; 2]>,
 }
 
-/// One unit of placement, an element of `buildPass`'s `patches` queue (web/prop.js:301-409): a
+/// One unit of placement (`buildPass`'s internal shape, built from `tracks::Region` and the other
+/// producers' output), an element of `buildPass`'s `patches` queue (web/prop.js:301-409): a
 /// region (tube, arc, raster, downhill), a locally straight sub-patch of one (`splitRegion`), a
 /// lattice strut, or a twin queued by a race.
 #[derive(Clone, Debug, Default)]
