@@ -11,7 +11,8 @@ let package = Package(
     ],
     targets: [
         .binaryTarget(name: "sf_ffiFFI", path: "sf_ffiFFI.xcframework"),
-        .target(name: "SupportFinsCore", dependencies: ["sf_ffiFFI"]),
+        // sf-cut is Manifold, C++: the static library needs the C++ runtime
+        .target(name: "SupportFinsCore", dependencies: ["sf_ffiFFI"], linkerSettings: [.linkedLibrary("c++")]),
         .testTarget(name: "SupportFinsCoreTests", dependencies: ["SupportFinsCore"]),
     ],
     swiftLanguageModes: [.v6]

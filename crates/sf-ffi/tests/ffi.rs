@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use sf_engine::overhangs::{analyze, build_topology};
 use sf_ffi::{FfiError, GpuBuffer, Part, engine_version, load_parts};
-use sf_io::threemf::{ThreeMfOpts, write_three_mf};
+use sf_io::threemf::{ExtraPart, PartKind, PartSettings, ThreeMfOpts, write_three_mf};
 use sf_testkit::{block, models_dir, rot_x};
 
 fn tmp(name: &str) -> PathBuf {
@@ -72,7 +72,7 @@ fn load_parts_reads_an_stl_as_one_part_named_after_the_file() {
     assert_eq!(i.name, "cube");
     assert_eq!(i.triangles, 12);
     assert_eq!(i.size.len(), 3);
-    assert!(i.watertight);
+    assert!(i.notes.is_empty());
     assert!(i.size.iter().all(|&s| s > 0.0));
 }
 
@@ -88,7 +88,6 @@ fn load_parts_reads_an_obj_with_several_objects() {
     assert_eq!(parts.len(), 2);
     assert_eq!(parts[0].info().name, "a");
     assert_eq!(parts[1].info().triangles, 1);
-    assert!(!parts[0].info().watertight, "one triangle is open");
 }
 
 #[test]
@@ -114,7 +113,7 @@ fn load_parts_gives_a_3mf_one_part_per_object() {
     for p in &parts {
         let i = p.info();
         assert_eq!(i.triangles, 12);
-        assert!(i.watertight);
+        assert!(i.notes.is_empty());
         assert!(
             i.size.iter().all(|&s| (s - 10.0).abs() < 1e-3),
             "{:?}",
@@ -232,4 +231,119 @@ fn analyze_and_face_flags_reject_a_bad_pose_or_threshold() {
     assert!(p.face_flags(45.0, vec![f64::NAN; 9]).is_err());
     assert!(p.analyze(f64::NAN, id.clone()).is_err());
     assert!(p.face_flags(f64::INFINITY, id).is_err());
+}
+
+fn tris(flat: Vec<f64>) -> Vec<[f64; 3]> {
+    flat.as_chunks::<3>().0.to_vec()
+}
+
+fn with_negative(part: Vec<f64>, negative: Vec<f64>, kind: PartKind, name: &str) -> String {
+    let extra = ExtraPart {
+        kind,
+        name: "cutter".into(),
+        settings: PartSettings {
+            bambu: None,
+            prusa3: None,
+            prusa2: None,
+        },
+        tris: tris(negative),
+    };
+    let bytes = write_three_mf(
+        &tris(part),
+        &[],
+        "part",
+        &ThreeMfOpts {
+            separate: true,
+            extras: vec![extra],
+            ..Default::default()
+        },
+    );
+    let path = tmp(name);
+    std::fs::write(&path, bytes).unwrap();
+    path.to_string_lossy().into_owned()
+}
+
+#[test]
+fn load_parts_cuts_a_3mfs_negative_parts_and_says_so_as_the_page_does() {
+    let cube = block(0.0, 40.0, 0.0, 40.0, 0.0, 40.0);
+    // a notch through one corner, with the cutter reaching outside the part
+    let path = with_negative(
+        cube,
+        block(30.0, 50.0, 30.0, 50.0, -5.0, 45.0),
+        PartKind::Negative,
+        "notch.3mf",
+    );
+    let parts = load_parts(path).unwrap();
+    assert_eq!(parts.len(), 1);
+    let i = parts[0].info();
+    assert!(i.triangles > 12, "the notch adds faces: {}", i.triangles);
+    assert_eq!(
+        i.notes,
+        vec![
+            "cut out 1 negative part".to_string(),
+            "in your slicer, walls inside a negative part show once you slice".to_string(),
+        ]
+    );
+    // the cut part is what the Part holds: the corner is gone
+    let max_corner = parts[0]
+        .topology()
+        .pos
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .filter(|v| v[0] > 35.0 && v[1] > 35.0 && v[2] > 35.0)
+        .count();
+    assert_eq!(max_corner, 0, "the cut corner is still there");
+}
+
+#[test]
+fn load_parts_says_when_negative_parts_would_remove_the_whole_part() {
+    let cube = block(0.0, 40.0, 0.0, 40.0, 0.0, 40.0);
+    let path = with_negative(
+        cube,
+        block(-5.0, 45.0, -5.0, 45.0, -5.0, 45.0),
+        PartKind::Negative,
+        "whole.3mf",
+    );
+    let parts = load_parts(path).unwrap();
+    let i = parts[0].info();
+    assert_eq!(i.triangles, 12, "not cut: the uncut shape stays");
+    assert_eq!(
+        i.notes,
+        vec!["negative parts not cut: they would remove the whole part".to_string()]
+    );
+}
+
+#[test]
+fn load_parts_says_when_the_part_is_not_a_closed_solid() {
+    let mut open = block(0.0, 40.0, 0.0, 40.0, 0.0, 40.0);
+    open.truncate(open.len() - 9); // one face missing
+    let path = with_negative(
+        open,
+        block(30.0, 50.0, 30.0, 50.0, -5.0, 45.0),
+        PartKind::Negative,
+        "open.3mf",
+    );
+    let i = load_parts(path).unwrap()[0].info();
+    assert_eq!(
+        i.notes,
+        vec!["negative parts not cut: the part is not a closed solid, so its fins are for the uncut shape".to_string()]
+    );
+}
+
+#[test]
+fn load_parts_keeps_modifiers_for_the_export_and_cuts_nothing_for_them() {
+    let cube = block(0.0, 40.0, 0.0, 40.0, 0.0, 40.0);
+    let path = with_negative(
+        cube,
+        block(10.0, 20.0, 10.0, 20.0, 10.0, 20.0),
+        PartKind::Modifier,
+        "mod.3mf",
+    );
+    let i = load_parts(path).unwrap()[0].info();
+    assert_eq!(i.triangles, 12);
+    assert_eq!(
+        i.notes,
+        vec!["kept 1 modifier/support blocker for the 3MF export".to_string()]
+    );
 }

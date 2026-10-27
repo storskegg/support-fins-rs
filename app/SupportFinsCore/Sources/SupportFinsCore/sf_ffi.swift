@@ -513,30 +513,6 @@ fileprivate struct FfiConverterDouble: FfiConverterPrimitive {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterBool : FfiConverter {
-    typealias FfiType = Int8
-    typealias SwiftType = Bool
-
-    public static func lift(_ value: Int8) throws -> Bool {
-        return value != 0
-    }
-
-    public static func lower(_ value: Bool) -> Int8 {
-        return value ? 1 : 0
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
-        return try lift(readInt(&buf))
-    }
-
-    public static func write(_ value: Bool, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -1028,9 +1004,10 @@ public struct PartInfo: Equatable, Hashable {
      */
     public var size: [Double]
     /**
-     * Every edge is shared by exactly two faces (after the engine's 1 micron weld).
+     * What import did, in the page's words (`web/ui/io.js` `renderImportNote`): the negative parts cut
+     * out of it, and why any were not. Empty for a part without negative parts.
      */
-    public var watertight: Bool
+    public var notes: [String]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1039,12 +1016,13 @@ public struct PartInfo: Equatable, Hashable {
          * Bounding-box size x, y, z in mm, in the model frame.
          */size: [Double], 
         /**
-         * Every edge is shared by exactly two faces (after the engine's 1 micron weld).
-         */watertight: Bool) {
+         * What import did, in the page's words (`web/ui/io.js` `renderImportNote`): the negative parts cut
+         * out of it, and why any were not. Empty for a part without negative parts.
+         */notes: [String]) {
         self.name = name
         self.triangles = triangles
         self.size = size
-        self.watertight = watertight
+        self.notes = notes
     }
 
     
@@ -1066,7 +1044,7 @@ public struct FfiConverterTypePartInfo: FfiConverterRustBuffer {
                 name: FfiConverterString.read(from: &buf), 
                 triangles: FfiConverterUInt64.read(from: &buf), 
                 size: FfiConverterSequenceDouble.read(from: &buf), 
-                watertight: FfiConverterBool.read(from: &buf)
+                notes: FfiConverterSequenceString.read(from: &buf)
         )
     }
 
@@ -1074,7 +1052,7 @@ public struct FfiConverterTypePartInfo: FfiConverterRustBuffer {
         FfiConverterString.write(value.name, into: &buf)
         FfiConverterUInt64.write(value.triangles, into: &buf)
         FfiConverterSequenceDouble.write(value.size, into: &buf)
-        FfiConverterBool.write(value.watertight, into: &buf)
+        FfiConverterSequenceString.write(value.notes, into: &buf)
     }
 }
 
@@ -1237,6 +1215,31 @@ fileprivate struct FfiConverterSequenceDouble: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
+    typealias SwiftType = [String]
+
+    public static func write(_ value: [String], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterString.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [String]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypePart: FfiConverterRustBuffer {
     typealias SwiftType = [Part]
 
@@ -1270,7 +1273,8 @@ public func engineVersion() -> String  {
 }
 /**
  * STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
- * the CLI's `readPart` gets it). Negative parts are not cut here (the viewer shows the file's solids).
+ * the CLI's `readPart` gets it). A 3MF object's negative parts are cut out at import, as the page does
+ * (`web/ui/io.js`), through `sf-cut`; `PartInfo.notes` says what was cut and why anything was not.
  */
 public func loadParts(path: String)throws  -> [Part]  {
     return try  FfiConverterSequenceTypePart.lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
@@ -1299,7 +1303,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_func_engine_version() != 38314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sf_ffi_checksum_func_load_parts() != 61532) {
+    if (uniffi_sf_ffi_checksum_func_load_parts() != 14593) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_gpubuffer_address() != 23806) {

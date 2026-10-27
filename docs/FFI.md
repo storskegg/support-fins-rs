@@ -30,9 +30,9 @@ sources and a thin hand-written Swift layer. The app depends on that package.
 #[derive(uniffi::Object)] struct GpuBuffer;                  // Rust-owned, page-aligned
 impl GpuBuffer { fn address(&self) -> u64; fn len_bytes(&self) -> u64; fn stride(&self) -> u32; fn count(&self) -> u32; }
 
-#[derive(uniffi::Record)] struct PartInfo { name: String, triangles: u64, size: [f64; 3] /* as Vec<f64> */, watertight: bool }
+#[derive(uniffi::Record)] struct PartInfo { name: String, triangles: u64, size: [f64; 3] /* as Vec<f64> */, notes: Vec<String> /* import notes, ui/io.js */ }
 #[derive(uniffi::Object)] struct Part;                       // Arc<Topology> + source soup
-fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF (one Part per object); STEP in M6
+fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF (one Part per object, negative parts cut out as ui/io.js does); STEP in M6
 impl Part {
   fn info(&self) -> PartInfo;
   fn mesh(&self) -> Arc<GpuBuffer>;                          // interleaved position+normal, f32, model frame
