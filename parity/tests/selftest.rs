@@ -120,3 +120,51 @@ fn containers_decode() {
 fn missing_corpus_file_panics_with_path() {
     load_cases("nope", "missing");
 }
+
+#[test]
+fn arrays_with_own_properties_decode_with_their_properties() {
+    let v = case("array-props");
+    let Value::ArrProps(items, props) = &v else {
+        panic!("array-props: {v:?}")
+    };
+    assert_eq!(items.len(), 3);
+    assert_eq!(v.arr().len(), 3); // `arr()` reads the items
+    assert_eq!(items[1].arr()[0].num(), 2.0);
+    assert!(matches!(&items[2], Value::F32(a) if a == &[3.0]));
+    let keys: Vec<&str> = props.iter().map(|(k, _)| k.as_str()).collect();
+    assert_eq!(keys, ["spacing", "turned", "nested"]);
+    assert_eq!(v.prop("spacing").num(), 1.5);
+    assert!(matches!(v.prop("turned"), Value::Bool(false)));
+    // an array inside the properties carries its own
+    let nested = v.prop("nested");
+    assert_eq!(nested.arr()[0].num(), 4.0);
+    assert!(matches!(nested.prop("rim"), Value::Bool(true)));
+
+    // empty items, one property
+    assert!(
+        matches!(case("array-props-empty"), Value::ArrProps(i, p) if i.is_empty() && p.len() == 1)
+    );
+    // `$` keys come back unescaped, in order
+    let d = case("array-props-dollar-key");
+    let Value::ArrProps(_, p) = &d else { panic!() };
+    assert_eq!(
+        p.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(),
+        ["$x", "$$y"]
+    );
+    // inside a plain object
+    let o = case("array-props-in-object");
+    assert!(matches!(&o.get("tracks").arr()[0], Value::ArrProps(..)));
+    assert!(matches!(&o.get("tracks").arr()[1], Value::Arr(_)));
+    // -0, NaN and undefined survive as property values
+    let z = case("array-props-neg-zero");
+    assert_eq!(z.arr()[0].num().to_bits(), (-0.0f64).to_bits());
+    assert_eq!(z.prop("z").num().to_bits(), (-0.0f64).to_bits());
+    assert!(z.prop("n").num().is_nan());
+    assert!(matches!(z.prop("u"), Value::Undefined));
+}
+
+#[test]
+#[should_panic(expected = "no property 'nope'")]
+fn a_missing_array_property_panics_with_the_names() {
+    case("array-props").prop("nope");
+}

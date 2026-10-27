@@ -10,6 +10,15 @@ use sf_testkit::parity::resolve_args;
 fn tracks_value(t: &[Vec<[f64; 3]>]) -> Value {
     Value::Arr(t.iter().map(|l| pts_value(l)).collect())
 }
+/// `rimTracks` tags every track `rim: true`.
+fn rim_tracks_value(t: &[Vec<[f64; 3]>]) -> Value {
+    let tag = [("rim".to_owned(), Value::Bool(true))];
+    Value::Arr(
+        t.iter()
+            .map(|l| with_props(pts_value(l), Some(&tag)))
+            .collect(),
+    )
+}
 fn tracks(v: &Value) -> Vec<Vec<[f64; 3]>> {
     v.arr().iter().map(pts3).collect()
 }
@@ -37,7 +46,7 @@ fn rim_replay(file: &str) {
             step,
             &cfg,
         );
-        check(file, c, &tracks_value(&out), &Tol::Exact);
+        check(file, c, &rim_tracks_value(&out), &Tol::Exact);
     }
 }
 

@@ -52,6 +52,7 @@ Plain JSON can't carry every JS number (`JSON.stringify(-0)` is `"0"`, and NaN a
 | string, boolean, null | JSON as-is |
 | `undefined` | `{"$u": 1}` |
 | Array | JSON array of encoded values |
+| Array with own enumerable non-index properties (a track's `spacing` / `turned`, a rim track's `rim`) | `{"$arr": [<encoded items>], "$props": {<encoded properties>}}`. The properties keep insertion order and a key starting with `$` is escaped as `$$`, as in a plain object. An array without such properties is a plain JSON array, so existing corpora are unchanged |
 | plain object | JSON object of encoded values. Key order is preserved, and a key starting with `$` is escaped as `$$` |
 | `Map` | `{"$map": [[k, v], ...]}` in insertion order |
 | `Set` | `{"$set": [v, ...]}` in insertion order |

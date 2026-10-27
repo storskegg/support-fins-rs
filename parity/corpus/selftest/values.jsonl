@@ -22,6 +22,11 @@
 {"id":"undefined","args":[{"$u":1}],"out":{"$u":1}}
 {"id":"array","args":[[1,"a",null,{"$u":1},{"$n":"-0"},[{"$n":"NaN"}]]],"out":[1,"a",null,{"$u":1},{"$n":"-0"},[{"$n":"NaN"}]]}
 {"id":"array-empty","args":[[]],"out":[]}
+{"id":"array-props","args":[{"$arr":[1,[2],{"$f32":"AABAQA=="}],"$props":{"spacing":1.5,"turned":false,"nested":{"$arr":[4],"$props":{"rim":true}}}}],"out":{"$arr":[1,[2],{"$f32":"AABAQA=="}],"$props":{"spacing":1.5,"turned":false,"nested":{"$arr":[4],"$props":{"rim":true}}}}}
+{"id":"array-props-empty","args":[{"$arr":[],"$props":{"rim":true}}],"out":{"$arr":[],"$props":{"rim":true}}}
+{"id":"array-props-dollar-key","args":[{"$arr":[0],"$props":{"$$x":1,"$$$y":[2]}}],"out":{"$arr":[0],"$props":{"$$x":1,"$$$y":[2]}}}
+{"id":"array-props-in-object","args":[{"tracks":[{"$arr":[[0,0,1]],"$props":{"rim":true}},[[1,1,1]]]}],"out":{"tracks":[{"$arr":[[0,0,1]],"$props":{"rim":true}},[[1,1,1]]]}}
+{"id":"array-props-neg-zero","args":[{"$arr":[{"$n":"-0"}],"$props":{"z":{"$n":"-0"},"n":{"$n":"NaN"},"u":{"$u":1}}}],"out":{"$arr":[{"$n":"-0"}],"$props":{"z":{"$n":"-0"},"n":{"$n":"NaN"},"u":{"$u":1}}}}
 {"id":"object","args":[{"b":1,"a":[2],"c":{"d":null}}],"out":{"b":1,"a":[2],"c":{"d":null}}}
 {"id":"object-empty","args":[{}],"out":{}}
 {"id":"object-dollar-key","args":[{"$$n":1,"$$$x":2,"$$":3,"a":4}],"out":{"$$n":1,"$$$x":2,"$$":3,"a":4}}

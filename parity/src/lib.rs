@@ -15,6 +15,9 @@ pub enum Value {
     Null,
     Undefined,
     Arr(Vec<Value>),
+    /// An array that also carries own non-index properties (`{"$arr": [...], "$props": {...}}`):
+    /// the items, then the properties in insertion order. [`Value::arr`] reads the items.
+    ArrProps(Vec<Value>, Vec<(String, Value)>),
     Obj(Vec<(String, Value)>),
     F64(Vec<f64>),
     F32(Vec<f32>),
@@ -133,6 +136,14 @@ fn typed<T, const N: usize>(raw: &Raw, tag: &str, from: fn([u8; N]) -> T) -> Vec
     bytes.as_chunks::<N>().0.iter().map(|c| from(*c)).collect()
 }
 
+/// A plain object's key: a leading `$$` is an escaped `$`.
+fn unescape_key(k: &str) -> String {
+    match k.strip_prefix('$') {
+        Some(rest) if k.starts_with("$$") => rest.to_owned(),
+        _ => k.to_owned(),
+    }
+}
+
 fn decode(raw: &Raw) -> Value {
     match raw {
         Raw::Null => Value::Null,
@@ -141,6 +152,19 @@ fn decode(raw: &Raw) -> Value {
         Raw::Str(s) => Value::Str(s.clone()),
         Raw::Arr(a) => Value::Arr(a.iter().map(decode).collect()),
         Raw::Obj(o) => {
+            // An array with own properties: exactly the keys `$arr` and `$props`, in that order.
+            if let [(ka, Raw::Arr(items)), (kp, Raw::Obj(props))] = o.as_slice()
+                && ka == "$arr"
+                && kp == "$props"
+            {
+                return Value::ArrProps(
+                    items.iter().map(decode).collect(),
+                    props
+                        .iter()
+                        .map(|(k, v)| (unescape_key(k), decode(v)))
+                        .collect(),
+                );
+            }
             // A tagged value is an object with exactly one key starting with a single `$`
             // (a plain object's `$`-keys are escaped as `$$`).
             if let [(k, v)] = o.as_slice()
@@ -199,10 +223,7 @@ fn decode(raw: &Raw) -> Value {
             }
             Value::Obj(
                 o.iter()
-                    .map(|(k, v)| {
-                        let key = k.strip_prefix('$').filter(|_| k.starts_with("$$"));
-                        (key.unwrap_or(k).to_owned(), decode(v))
-                    })
+                    .map(|(k, v)| (unescape_key(k), decode(v)))
                     .collect(),
             )
         }
@@ -305,6 +326,7 @@ impl Value {
             Value::Null => "Null",
             Value::Undefined => "Undefined",
             Value::Arr(_) => "Arr",
+            Value::ArrProps(..) => "ArrProps",
             Value::Obj(_) => "Obj",
             Value::F64(_) => "F64",
             Value::F32(_) => "F32",
@@ -335,8 +357,29 @@ impl Value {
     /// The elements. Panics if this is not an `Arr`.
     pub fn arr(&self) -> &[Value] {
         match self {
-            Value::Arr(a) => a,
+            Value::Arr(a) | Value::ArrProps(a, _) => a,
             v => panic!("expected Arr, got {}", v.kind()),
+        }
+    }
+
+    /// The own non-index property `key` of an array that carries some. Panics if this is not an
+    /// `ArrProps` or has no such property.
+    pub fn prop(&self, key: &str) -> &Value {
+        match self {
+            Value::ArrProps(_, p) => p
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, v)| v)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "no property '{key}' on the array (properties: {:?})",
+                        p.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>()
+                    )
+                }),
+            v => panic!(
+                "expected ArrProps to read property '{key}', got {}",
+                v.kind()
+            ),
         }
     }
 
@@ -412,6 +455,7 @@ fn summary(v: &Value) -> String {
         Value::Null => "Null".into(),
         Value::Undefined => "Undefined".into(),
         Value::Arr(a) => format!("Arr(len {})", a.len()),
+        Value::ArrProps(a, p) => format!("ArrProps(len {}, {})", a.len(), key_list(p)),
         Value::Obj(o) => format!("Obj({})", key_list(o)),
         Value::F64(a) => format!("F64(len {})", a.len()),
         Value::F32(a) => format!("F32(len {})", a.len()),
@@ -485,6 +529,28 @@ fn compare_at(path: &str, a: &Value, e: &Value, tol: &Tol) -> Result<(), Mismatc
             }
             for (i, (p, q)) in x.iter().zip(y).enumerate() {
                 compare_at(&format!("{path}[{i}]"), p, q, tol)?;
+            }
+            Ok(())
+        }
+        (Value::ArrProps(x, px), Value::ArrProps(y, py)) => {
+            if x.len() != y.len() {
+                return mm(
+                    &child(path, "length"),
+                    x.len().to_string(),
+                    y.len().to_string(),
+                );
+            }
+            for (i, (p, q)) in x.iter().zip(y).enumerate() {
+                compare_at(&format!("{path}[{i}]"), p, q, tol)?;
+            }
+            let props = child(path, "$props");
+            let same_keys =
+                px.len() == py.len() && px.iter().zip(py).all(|((k, _), (l, _))| k == l);
+            if !same_keys {
+                return mm(&props, key_list(px), key_list(py));
+            }
+            for ((k, p), (_, q)) in px.iter().zip(py) {
+                compare_at(&child(&props, k), p, q, tol)?;
             }
             Ok(())
         }

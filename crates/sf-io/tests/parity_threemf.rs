@@ -451,6 +451,18 @@ fn mesh_xml_matches_js() {
 #[test]
 fn merge_colors_matches_js() {
     for c in all("mergeColors") {
+        let mut c = c;
+        // JS stores a fractional index (`paint[base + k]` with a non-integer `base`) as an own
+        // property of the array, not an element: the recording now shows it as `$props`. The
+        // port has no such property (nothing reads it: every consumer indexes the array), so the
+        // comparison is of the elements.
+        if let Some(Value::Obj(kv)) = &mut c.out {
+            for (_, v) in kv.iter_mut() {
+                if let Value::ArrProps(items, _) = v {
+                    *v = Value::Arr(std::mem::take(items));
+                }
+            }
+        }
         check(&c, run_merge(&c));
     }
 }

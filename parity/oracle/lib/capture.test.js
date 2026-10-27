@@ -127,3 +127,38 @@ Deno.test("standard references: topo, analysis and seated soup args, nested, plu
   }
   eq(upstreamStatus(), before);
 });
+
+Deno.test("encode: an array with own non-index properties is {$arr, $props}; a plain array is unchanged", () => {
+  eq(encode([1, 2]), [1, 2]);
+  eq(encode(Object.assign([1, [2]], { spacing: 1.5, turned: false })), { $arr: [1, [2]], $props: { spacing: 1.5, turned: false } });
+  eq(encode(Object.assign([], { rim: true })), { $arr: [], $props: { rim: true } });
+  // escaping and encoding of the properties follow the plain-object rules
+  eq(encode(Object.assign([0], { $x: 1, n: NaN, z: -0, u: undefined })), { $arr: [0], $props: { $$x: 1, n: { $n: "NaN" }, z: { $n: "-0" }, u: { $u: 1 } } });
+  // nested: in an object, in an array, in a property
+  eq(encode({ t: [Object.assign([1], { rim: true }), [2]] }), { t: [{ $arr: [1], $props: { rim: true } }, [2]] });
+  eq(encode(Object.assign([1], { inner: Object.assign([2], { a: 1 }) })), { $arr: [1], $props: { inner: { $arr: [2], $props: { a: 1 } } } });
+  // sparse holes and length are not properties
+  const sparse = []; sparse[3] = 1;
+  eq(encode(sparse), [{ $u: 1 }, { $u: 1 }, { $u: 1 }, 1]);
+  // a numeric-looking non-index key ('-1', '01', '4294967295') is a property
+  const odd = Object.assign([5], { "-1": 1, "01": 2, "4294967295": 3 });
+  eq(Object.keys(encode(odd).$props), ["-1", "01", "4294967295"]);
+  // a typed array is not an array with properties
+  eq(Object.keys(encode(Object.assign(new Float64Array(1), { x: 1 }))), ["$f64"]);
+});
+
+Deno.test("capture with refs keeps an argument array's own properties", async () => {
+  assertPinned();
+  const cap = await captureModules(
+    [{ rel: "overhangs.js", fns: ["buildTopology"] }, { rel: "prop/surface.js", fns: ["surfaceZAt"] }],
+    { refs: true, args: { buildTopology: ([g]) => [g.getAttribute("position").array] } },
+  );
+  try {
+    const tracks = Object.assign([[1, 2, 3]], { spacing: 1.5 });
+    try { cap.modules["prop/surface.js"].surfaceZAt({ tracks }, 0, 0); } catch (_) { /* recorded before it runs */ }
+    const a = cap.sink.calls.surfaceZAt.entries()[0].args[0];
+    eq(a, { tracks: { $arr: [[1, 2, 3]], $props: { spacing: 1.5 } } });
+  } finally {
+    cap.cleanup();
+  }
+});

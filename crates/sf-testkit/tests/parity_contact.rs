@@ -53,7 +53,13 @@ fn editor_replay(file: &str, run: impl Fn(&mut [[f64; 3]], &[Resolved])) {
         let a = resolve_args(&c.args);
         let mut line = pts3(a[0].plain());
         run(&mut line, &a);
-        check(file, c, &pts_value(&line), &Tol::Exact);
+        // the editors change the line in place: the same array comes back, with its properties
+        check(
+            file,
+            c,
+            &with_props(pts_value(&line), props_of(a[0].plain())),
+            &Tol::Exact,
+        );
     }
 }
 

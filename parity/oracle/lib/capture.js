@@ -134,7 +134,12 @@ export async function captureModules(specs, opts = {}) {
     if (!Array.isArray(v) && proto !== Object.prototype && proto !== null) return v;
     seen.add(v);
     try {
-      if (Array.isArray(v)) return v.map(substitute);
+      if (Array.isArray(v)) {
+        const copy = v.map(substitute);
+        // own non-index properties (a track's `spacing`, a rim track's `rim`) belong to the value
+        for (const k of Object.keys(v)) if (!/^(0|[1-9][0-9]*)$/.test(k)) copy[k] = substitute(v[k]);
+        return copy;
+      }
       return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, substitute(x)]));
     } finally {
       seen.delete(v);

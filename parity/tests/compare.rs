@@ -223,3 +223,76 @@ fn map_and_set_mismatches() {
     );
     assert_eq!(path(&s1, &Value::Set(vec![num(1.0)]), Tol::Exact), "length");
 }
+
+fn tagged(items: Vec<Value>, props: Vec<(&str, Value)>) -> Value {
+    Value::ArrProps(
+        items,
+        props.into_iter().map(|(k, v)| (k.to_owned(), v)).collect(),
+    )
+}
+
+#[test]
+fn arrays_with_properties_compare_items_then_properties() {
+    let a = tagged(
+        vec![num(1.0), num(2.0)],
+        vec![("spacing", num(1.5)), ("rim", true.into())],
+    );
+    assert!(compare(&a, &a.clone(), &Tol::Exact).is_ok());
+    // an item differs: the usual path
+    let b = tagged(
+        vec![num(1.0), num(3.0)],
+        vec![("spacing", num(1.5)), ("rim", true.into())],
+    );
+    assert_eq!(path(&a, &b, Tol::Exact), "[1]");
+    // a length difference
+    let c = tagged(
+        vec![num(1.0)],
+        vec![("spacing", num(1.5)), ("rim", true.into())],
+    );
+    assert_eq!(path(&a, &c, Tol::Exact), "length");
+    // a property value differs: reported under $props
+    let d = tagged(
+        vec![num(1.0), num(2.0)],
+        vec![("spacing", num(2.5)), ("rim", true.into())],
+    );
+    let m = compare(&a, &d, &Tol::Exact).unwrap_err();
+    assert_eq!(
+        (m.path.as_str(), m.actual.as_str(), m.expected.as_str()),
+        ("$props.spacing", "1.5", "2.5")
+    );
+    // nested under an object, the path continues
+    let wrap = |v: Value| obj(vec![("t", arr(vec![v]))]);
+    assert_eq!(
+        path(&wrap(a.clone()), &wrap(d), Tol::Exact),
+        "t[0].$props.spacing"
+    );
+    // the property names and their order are part of the value
+    let e = tagged(
+        vec![num(1.0), num(2.0)],
+        vec![("rim", true.into()), ("spacing", num(1.5))],
+    );
+    let m = compare(&a, &e, &Tol::Exact).unwrap_err();
+    assert_eq!(m.path, "$props");
+    assert_eq!(m.actual, "keys [\"spacing\", \"rim\"]");
+    let f = tagged(vec![num(1.0), num(2.0)], vec![("spacing", num(1.5))]);
+    assert_eq!(path(&a, &f, Tol::Exact), "$props");
+    // tolerance applies to numeric properties like any other number
+    let g = tagged(
+        vec![num(1.0), num(2.0)],
+        vec![("spacing", num(1.5 + 1e-9)), ("rim", true.into())],
+    );
+    assert!(compare(&a, &g, &Tol::Abs(1e-6)).is_ok());
+    assert!(compare(&a, &g, &Tol::Exact).is_err());
+}
+
+#[test]
+fn an_array_with_properties_is_not_a_plain_array() {
+    let plain = arr(vec![num(1.0)]);
+    let props = tagged(vec![num(1.0)], vec![("rim", true.into())]);
+    let m = compare(&plain, &props, &Tol::Exact).unwrap_err();
+    assert_eq!(
+        (m.actual.as_str(), m.expected.as_str()),
+        ("Arr(len 1)", "ArrProps(len 1, keys [\"rim\"])")
+    );
+    assert_eq!(path(&props, &plain, Tol::Exact), "");
+}

@@ -117,3 +117,21 @@ pub fn analysis_full(r: &Resolved) -> (Analysis, Option<Vec<u8>>) {
         o => panic!("analysis argument: {o:?}"),
     }
 }
+
+/// The own non-index properties of an array argument (`None` for a plain array): an in-place
+/// editor (`lowerSag`, `contourTop`, `insertFloorStations`) returns the same array, properties
+/// and all, so its replay gives the output the input's properties.
+pub fn props_of(input: &Value) -> Option<&[(String, Value)]> {
+    match input {
+        Value::ArrProps(_, p) => Some(p),
+        _ => None,
+    }
+}
+
+/// `items` (an `Arr`) with `props`, when there are any: the shape `{"$arr", "$props"}` decodes to.
+pub fn with_props(items: Value, props: Option<&[(String, Value)]>) -> Value {
+    match (items, props) {
+        (Value::Arr(a), Some(p)) => Value::ArrProps(a, p.to_vec()),
+        (v, _) => v,
+    }
+}
