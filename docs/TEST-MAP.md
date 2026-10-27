@@ -47,7 +47,7 @@ Web-only rows:
 | `integration.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `interface.test.js` | 9 | cutout, draw, fins, inside, overhangs, prop, prop/crest, stl, threemf | M3 | not ported |
 | `islands.test.js` | 11 | fins, fins/fill, inside, islands, overhangs, prop, stl | M3 | not ported |
-| `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | not ported |
+| `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | partial: 3 of 4 ported (js_kiss.rs); the wedge case needs buildPerpFins |
 | `lattice.test.js` | 2 | fins, inside, overhangs, prop, prop/lattice, stl | M3 | not ported |
 | `layout_pins.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `low_edge.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
@@ -92,9 +92,9 @@ Web-only rows:
 | `tall.test.js` | 4 | draw, fins, fins/tall, inside, overhangs, prop, stl | M3 | not ported |
 | `tap.test.js` | 4 | inside, overhangs, stl, ui/tap | — | dropped (web-only) |
 | `threemf.test.js` | 63 | fins, inside, overhangs, paintcode, prop, stl, threemf, zip | M3 | not ported |
-| `ties.test.js` | 4 | fins, inside, overhangs, prop, prop/ties, stl | M3 | not ported |
+| `ties.test.js` | 4 | fins, inside, overhangs, prop, prop/ties, stl | M3 | green |
 | `tine_density.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `tine_shape.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `tine_shape.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | green |
 | `tines.test.js` | 9 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tines_realparts.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `trace.test.js` | 1 | inside, overhangs, prop/config, prop/downhill, prop/trace, stl | M1 | green |
