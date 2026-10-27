@@ -58,3 +58,24 @@ bench-m3:
     # peak memory of the Rust process (the private coin file dominates it when present)
     /usr/bin/time -l target/release/examples/bench_m3 2> target/bench-m3/rust-time.txt
     deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js report
+
+# Build sf-ffi and generate the SupportFinsCore Swift package: the UniFFI Swift source (committed) and the
+# XCFramework around the static library (gitignored, rebuilt here).
+swift-bindings:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --release -p sf-ffi --target aarch64-apple-darwin
+    lib=target/aarch64-apple-darwin/release/libsf_ffi.a
+    pkg=app/SupportFinsCore
+    gen=target/swift-gen
+    rm -rf "$gen" && mkdir -p "$gen/headers"
+    cargo run --release -q -p sf-ffi --bin uniffi-bindgen -- generate --library "$lib" --language swift --out-dir "$gen"
+    cp "$gen/sf_ffi.swift" "$pkg/Sources/SupportFinsCore/sf_ffi.swift"
+    cp "$gen/sf_ffiFFI.h" "$gen/headers/"
+    cp "$gen/sf_ffiFFI.modulemap" "$gen/headers/module.modulemap"
+    rm -rf "$pkg/sf_ffiFFI.xcframework"
+    xcodebuild -create-xcframework -library "$lib" -headers "$gen/headers" -output "$pkg/sf_ffiFFI.xcframework"
+
+# Regenerate the Swift package and run its tests.
+app-core: swift-bindings
+    cd app/SupportFinsCore && swift test
