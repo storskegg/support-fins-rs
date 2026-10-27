@@ -86,6 +86,7 @@ fn wall(height: f64, line: Vec<[f64; 3]>) -> FinRecord {
         fill: false,
         joined: false,
         braces: None,
+        ribs: None,
     }
 }
 
@@ -103,12 +104,12 @@ fn nothing_tall_means_zero_ribs_and_an_untouched_build() {
     }); // not a prop
     b.fins.push(FinRecord {
         braces: Some(3),
+        ribs: None,
         ..wall(500.0, vec![[0.0, 0.0, 500.0], [10.0, 0.0, 500.0]])
     }); // already braced by the fill pass
     b.fins.push(wall(500.0, vec![[0.0, 0.0, 500.0]])); // a one-point line
     let before = b.clone();
-    let ribs = brace_tall_walls(&topo, &res, &IDENTITY3, &mut b, &cfg);
-    assert!(ribs.is_empty());
+    brace_tall_walls(&topo, &res, &IDENTITY3, &mut b, &cfg);
     assert_eq!(b.tall_ribs, Some(0));
     b.tall_ribs = None;
     assert_eq!(b, before);
@@ -126,10 +127,9 @@ fn a_tall_wall_on_the_plate_gets_ribs_that_extend_its_ranges() {
     let mut f = wall(120.0, line);
     f.tri_ranges = vec![[0, 0]];
     b.fins.push(f);
-    let ribs = brace_tall_walls(&topo, &res, &IDENTITY3, &mut b, &cfg);
-    assert_eq!(ribs.len(), 1);
-    let (k, n) = ribs[0];
-    assert_eq!((k, b.tall_ribs), (0, Some(n)));
+    brace_tall_walls(&topo, &res, &IDENTITY3, &mut b, &cfg);
+    let n = b.fins[0].ribs.expect("the wall was braced") as usize;
+    assert_eq!(b.tall_ribs, Some(n));
     assert!(n >= 1 && !b.triangles.is_empty());
     assert_eq!(b.fins[0].tri_ranges.len(), 2);
     assert_eq!(b.fins[0].tri_ranges[1], [0, b.triangles.len()]);

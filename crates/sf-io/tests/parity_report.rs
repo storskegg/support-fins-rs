@@ -136,6 +136,7 @@ fn report_coverage_replays() {
                 fill: false,
                 joined: false,
                 braces: None,
+                ribs: None,
             })
             .collect();
         built.brace_count = opt_num(b.get("braceCount")).map(|n| n as usize);

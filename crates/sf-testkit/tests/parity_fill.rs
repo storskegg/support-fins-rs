@@ -67,6 +67,7 @@ fn fin_records(v: &Value) -> Vec<FinRecord> {
             fill: false,
             joined: false,
             braces: None,
+            ribs: None,
         })
         .collect()
 }

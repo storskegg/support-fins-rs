@@ -224,15 +224,14 @@ fn floor_at(tris: &Tris, p: V3, z_bed: f64) -> f64 {
 /// seated frame, bed at z 0) in place: triangles appended, each braced fin's `tri_ranges` grown,
 /// `built.tall_ribs` the count.
 ///
-/// JS also writes `f.ribs = n` on each braced fin; `FinRecord` has no such field, so the pairs
-/// `(fin index, ribs)` come back as the return value.
+/// Like JS (`f.ribs = n`), each braced fin's `ribs` is set in place.
 pub fn brace_tall_walls(
     topo: &Topology,
     result: &Analysis,
     rot: &Rot3,
     built: &mut FinsBuilt,
     cfg: &Config,
-) -> Vec<(usize, usize)> {
+) {
     let (brace, prop) = (&cfg.brace, &cfg.prop);
     let tall: Vec<usize> = built
         .fins
@@ -247,9 +246,8 @@ pub fn brace_tall_walls(
         .map(|(i, _)| i)
         .collect();
     built.tall_ribs = Some(0);
-    let mut ribbed = Vec::new();
     if tall.is_empty() {
-        return ribbed;
+        return;
     }
     let tris = seated_part_tris(topo, rot, &result.offset);
     // Only what a rib could meet goes in: under the tallest rib (a tall wall's tines, and
@@ -309,10 +307,9 @@ pub fn brace_tall_walls(
         triangles.extend(out);
         let f = &mut built.fins[k];
         f.tri_ranges.push([at, triangles.len()]);
-        ribbed.push((k, n));
+        f.ribs = Some(n as f64);
         total += n;
     }
     built.tall_ribs = Some(total);
     built.triangles = triangles;
-    ribbed
 }

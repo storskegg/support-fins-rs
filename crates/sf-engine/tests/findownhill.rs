@@ -43,6 +43,7 @@ fn fin(kind: FinKind) -> FinRecord {
         fill: false,
         joined: false,
         braces: None,
+        ribs: None,
     }
 }
 

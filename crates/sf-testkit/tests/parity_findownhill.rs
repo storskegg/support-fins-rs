@@ -70,6 +70,7 @@ fn replay(file: &str) -> (usize, usize) {
                 fill: false,
                 joined: false,
                 braces: None,
+                ribs: None,
             })
             .collect();
         let held = held_area(
