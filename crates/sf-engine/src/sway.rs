@@ -1,8 +1,6 @@
 //! Port of `web/sway.js (config only until M3)`. Read `docs/AGENTS.md` before changing anything here.
 
-/// `MAX_LEAN_DEG` (web/planes.js:41). `planes.rs` belongs to another track; this copy only
-/// feeds `SwayConfig::default().max_back_lean_deg` (`SWAY.maxBackLeanDeg`, web/sway.js:47).
-const MAX_LEAN_DEG: f64 = 45.0;
+use crate::planes::MAX_LEAN_DEG;
 
 /// `SWAY` (web/sway.js:40). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
 #[derive(Clone, Debug, PartialEq)]
