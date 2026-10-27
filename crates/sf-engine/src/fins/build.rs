@@ -52,6 +52,8 @@ pub struct FinRecord {
     pub joined: bool,
     /// `braces` (fins.js:254): the ribs built on a fill wall; `braceTallWalls` skips these.
     pub braces: Option<usize>,
+    /// `ribs` (web/fins/tall.js:131): the face ribs `braceTallWalls` built on this wall.
+    pub ribs: Option<f64>,
 }
 
 /// `built.pad`, the stats object `buildPad` returns (web/fins/pad.js:249, 520): the sure-hold

@@ -121,6 +121,7 @@ fn built_of(v: &Value) -> FinsBuilt {
             fill: matches!(get(f, "fill"), Some(Value::Bool(true))),
             joined: false,
             braces: get(f, "braces").and_then(usize_of),
+            ribs: None,
         })
         .collect();
     b
@@ -146,7 +147,7 @@ fn replay(file: &str) -> (usize, usize) {
             offset: xyz(a[1].plain().get("offset")),
             size: Xyz::default(),
         };
-        let ribs = brace_tall_walls(a[0].topo(), &result, &rot3(a[2].plain()), &mut built, &cfg);
+        brace_tall_walls(a[0].topo(), &result, &rot3(a[2].plain()), &mut built, &cfg);
         ran += 1;
         if built.tall_ribs.unwrap_or(0) > 0 {
             ribbed += 1;
@@ -154,8 +155,7 @@ fn replay(file: &str) -> (usize, usize) {
         let fins: Vec<Value> = built
             .fins
             .iter()
-            .enumerate()
-            .map(|(i, f)| {
+            .map(|f| {
                 let mut o = vec![(
                     "triRanges".to_string(),
                     Value::Arr(
@@ -165,8 +165,8 @@ fn replay(file: &str) -> (usize, usize) {
                             .collect(),
                     ),
                 )];
-                if let Some((_, n)) = ribs.iter().find(|(k, _)| *k == i) {
-                    o.push(("ribs".to_string(), Value::Num(*n as f64)));
+                if let Some(n) = f.ribs {
+                    o.push(("ribs".to_string(), Value::Num(n)));
                 }
                 Value::Obj(o)
             })
