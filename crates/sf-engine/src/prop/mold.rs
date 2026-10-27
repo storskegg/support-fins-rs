@@ -36,6 +36,7 @@ pub struct MoldLine {
 /// `margin` (default 1.0) keeps the overhang's OWN face from being read as its floor: only
 /// surfaces at least `margin` below the contact line count. `mold` (default false) also
 /// reads along the wall.
+#[allow(clippy::neg_cmp_op_on_partial_ord)] // `!(g > 0)` is true for NaN, as in JS
 pub fn floor_line(
     top_line: &[[f64; 3]],
     tris: &Tris,
@@ -210,6 +211,7 @@ const MOLD_MIN: f64 = 0.1;
 /// apart (a sheer drop stops there). The new stations sit on the straight line between their
 /// neighbours, top included, so only the bottom changes. Welded (footGap 0), the floor is
 /// returned as `floor_line` reads it.
+#[allow(clippy::neg_cmp_op_on_partial_ord)] // `!(footGap > 0)` is true for NaN, as in JS
 pub fn mold_line(top: &[[f64; 3]], tris: &Tris, cfg: &Config) -> MoldLine {
     let mut top = top.to_vec();
     if !(cfg.prop.foot_gap > 0.0) {
@@ -258,4 +260,92 @@ pub fn mold_line(top: &[[f64; 3]], tris: &Tris, cfg: &Config) -> MoldLine {
         floor = floor_line(&top, tris, 1.0, true, cfg);
     }
     MoldLine { top, floor }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn plate(z: f64) -> Tris {
+        Tris::new(vec![
+            -20.0, -20.0, z, 20.0, -20.0, z, 20.0, 20.0, z, //
+            -20.0, -20.0, z, 20.0, 20.0, z, -20.0, 20.0, z,
+        ])
+    }
+
+    fn welded() -> Config {
+        let mut c = Config::default();
+        c.prop.foot_gap = 0.0;
+        c
+    }
+
+    #[test]
+    fn the_floor_is_the_highest_surface_below_the_overhang_or_the_plate() {
+        let cfg = welded();
+        let top = [[-3.0, 0.0, 8.0], [3.0, 0.0, 8.0]];
+        // a floor at 2, with the overhang 6 above: stands on it
+        let f = floor_line(&top, &plate(2.0), 1.0, false, &cfg);
+        assert_eq!(f.iter().map(|p| p.z).collect::<Vec<_>>(), vec![2.0, 2.0]);
+        assert!(f.iter().all(|p| p.sides.is_none())); // welded: no side floors
+        // a surface within `margin` of the line is the overhang's own face, not a floor
+        let f = floor_line(&top, &plate(7.5), 1.0, false, &cfg);
+        assert_eq!(f[0].z, 0.0);
+        let f = floor_line(&top, &plate(7.5), 0.25, false, &cfg);
+        assert_eq!(f[0].z, 7.5);
+        // nothing there: the plate
+        let off = [[100.0, 0.0, 8.0]];
+        assert_eq!(floor_line(&off, &plate(2.0), 1.0, false, &cfg)[0].z, 0.0);
+        assert!(floor_line(&[], &plate(2.0), 1.0, false, &cfg).is_empty());
+    }
+
+    #[test]
+    fn a_lifted_bottom_gets_a_floor_under_each_side() {
+        let cfg = Config::default(); // footGap 0.2
+        let top = [[-3.0, 0.0, 8.0], [0.0, 0.0, 8.0], [3.0, 0.0, 8.0]];
+        let f = floor_line(&top, &plate(2.0), 1.0, true, &cfg);
+        for p in &f {
+            assert_eq!((p.z, p.sides), (2.0, Some([2.0, 2.0])));
+        }
+    }
+
+    #[test]
+    fn a_floor_far_below_one_side_stays_level() {
+        // z = 2 floor under the +y half only; the -y side is open to the plate, 2 + > MAX_DROP + MAX_HANG
+        // would be needed to reach: side floors fall back to level at the highest floor
+        let t = Tris::new(vec![
+            -20.0, 0.0, 6.0, 20.0, 0.0, 6.0, 20.0, 20.0, 6.0, -20.0, 0.0, 6.0, 20.0, 20.0, 6.0,
+            -20.0, 20.0, 6.0,
+        ]);
+        let cfg = Config::default();
+        let top = [[-3.0, 0.0, 12.0], [3.0, 0.0, 12.0]];
+        let f = floor_line(&top, &t, 1.0, true, &cfg);
+        let [zn, zp] = f[0].sides.unwrap();
+        assert!(zn <= f[0].z && zp <= f[0].z);
+        assert!((f[0].z - 6.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn mold_line_welded_is_the_plain_floor_and_lifted_adds_stations_at_a_step() {
+        let top = [[-5.0, 0.0, 9.0], [5.0, 0.0, 9.0]];
+        let flat = plate(2.0);
+        let m = mold_line(&top, &flat, &welded());
+        assert_eq!(m.top, top.to_vec());
+        assert_eq!(m.floor, floor_line(&top, &flat, 1.0, false, &welded()));
+        // lifted over a flat floor: the floor never steps, no stations are added
+        let m = mold_line(&top, &flat, &Config::default());
+        assert_eq!(m.top.len(), 2);
+        // lifted over a ledge: the floor steps between the stations, which are split down to
+        // MOLD_MIN (0.1) apart
+        let ledge = Tris::new(vec![
+            0.0, -20.0, 3.0, 20.0, -20.0, 3.0, 20.0, 20.0, 3.0, 0.0, -20.0, 3.0, 20.0, 20.0, 3.0,
+            0.0, 20.0, 3.0,
+        ]);
+        let m = mold_line(&top, &ledge, &Config::default());
+        assert!(m.top.len() > 2 && m.floor.len() == m.top.len());
+        for w in m.top.windows(2) {
+            assert!(w[1][0] > w[0][0]); // still in order
+        }
+        // the new stations lie on the straight line between their neighbours, top included
+        assert!(m.top.iter().all(|p| p[1] == 0.0 && p[2] == 9.0));
+    }
 }

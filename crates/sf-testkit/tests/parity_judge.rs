@@ -87,10 +87,12 @@ fn attached_replay(file: &str) {
 }
 
 #[test]
+#[ignore = "needs inside::inside_part (M1 track A PR 2, #19)"]
 fn part_anchors_direct() {
     part_anchors_replay("partAnchors");
 }
 #[test]
+#[ignore = "needs inside::inside_part (M1 track A PR 2, #19)"]
 fn part_anchors_captured() {
     part_anchors_replay("partAnchors.captured");
 }
@@ -103,10 +105,12 @@ fn face_samples_captured() {
     face_samples_replay("faceSamples.captured");
 }
 #[test]
+#[ignore = "needs inside::inside_part (M1 track A PR 2, #19)"]
 fn attached_direct() {
     attached_replay("attached");
 }
 #[test]
+#[ignore = "needs inside::inside_part (M1 track A PR 2, #19)"]
 fn attached_captured() {
     attached_replay("attached.captured");
 }
@@ -138,6 +142,7 @@ fn scorer_direct() {
 }
 
 #[test]
+#[ignore = "needs inside::inside_part (M1 track A PR 2, #19)"]
 fn judge_ruler_direct() {
     let cases = load_cases("judge", "judgeRuler");
     assert!(!cases.is_empty());

@@ -46,7 +46,7 @@ fn contact_line_replay(file: &str) {
     }
 }
 
-fn editor_replay(file: &str, run: impl Fn(&mut Vec<[f64; 3]>, &[Resolved])) {
+fn editor_replay(file: &str, run: impl Fn(&mut [[f64; 3]], &[Resolved])) {
     let cases = load_cases("contact", file);
     assert!(!cases.is_empty());
     for c in &cases {
@@ -57,10 +57,10 @@ fn editor_replay(file: &str, run: impl Fn(&mut Vec<[f64; 3]>, &[Resolved])) {
     }
 }
 
-fn lower_sag_run(line: &mut Vec<[f64; 3]>, a: &[Resolved]) {
+fn lower_sag_run(line: &mut [[f64; 3]], a: &[Resolved]) {
     lower_sag(line, &tris_of(&a[1]), opt(a, 2, false, f64::INFINITY));
 }
-fn contour_top_run(line: &mut Vec<[f64; 3]>, a: &[Resolved]) {
+fn contour_top_run(line: &mut [[f64; 3]], a: &[Resolved]) {
     contour_top(
         line,
         &tris_of(&a[1]),
@@ -68,7 +68,7 @@ fn contour_top_run(line: &mut Vec<[f64; 3]>, a: &[Resolved]) {
         &cfg_of(a),
     );
 }
-fn settle_top_run(line: &mut Vec<[f64; 3]>, a: &[Resolved]) {
+fn settle_top_run(line: &mut [[f64; 3]], a: &[Resolved]) {
     let (step, band) = (opt(a, 2, true, 0.25), opt(a, 3, true, f64::INFINITY));
     settle_top(line, &tris_of(&a[1]), step, band, &cfg_of(a));
 }

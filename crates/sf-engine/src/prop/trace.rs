@@ -264,3 +264,161 @@ pub fn trace_groups(
     }
     TraceGroups { leader_of, groups }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fins::seating::tests::topo_of;
+    use crate::overhangs::Region;
+    use crate::types::IDENTITY3;
+
+    /// Two adjacent down-facing triangles of a ceiling at z = 10 (faces 0 and 1), plus a third
+    /// down-facing triangle `gap` mm further along x (face 2); face 2 touches face 1.
+    fn ceiling(gap: f64) -> Topology {
+        let mut t = topo_of(vec![
+            0.0,
+            0.0,
+            10.0,
+            0.0,
+            2.0,
+            10.0,
+            2.0,
+            0.0,
+            10.0, //
+            2.0,
+            0.0,
+            10.0,
+            0.0,
+            2.0,
+            10.0,
+            2.0,
+            2.0,
+            10.0, //
+            2.0 + gap,
+            0.0,
+            10.0,
+            2.0 + gap,
+            2.0,
+            10.0,
+            4.0 + gap,
+            0.0,
+            10.0,
+        ]);
+        t.nrm = vec![0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0];
+        t.adj_a = vec![0, 1];
+        t.adj_b = vec![1, 2];
+        t
+    }
+
+    fn analysis(regions: &[&[usize]], over: &[u8]) -> Analysis {
+        Analysis {
+            over: over.to_vec(),
+            kept: over.to_vec(),
+            on_bed: vec![0; over.len()],
+            regions: regions
+                .iter()
+                .map(|f| Region {
+                    faces: f.to_vec(),
+                    area: 2.0,
+                })
+                .collect(),
+            raw_region_count: regions.len(),
+            over_area: 0.0,
+            bed_area: 0.0,
+            over_face_count: 0,
+            offset: Xyz::default(),
+            size: Xyz::default(),
+        }
+    }
+
+    fn run(
+        topo: &Topology,
+        res: &Analysis,
+        excl: Option<&[u8]>,
+        tried: &[usize],
+        cfg: &Config,
+    ) -> TraceGroups {
+        let tried: IndexSet<usize> = tried.iter().copied().collect();
+        trace_groups(topo, res, excl, &IDENTITY3, &Xyz::default(), &tried, cfg)
+    }
+
+    #[test]
+    fn a_region_grows_across_the_down_facing_faces_next_to_it() {
+        let cfg = Config::default();
+        let g = run(
+            &ceiling(0.5),
+            &analysis(&[&[0]], &[1, 0, 0]),
+            None,
+            &[0],
+            &cfg,
+        );
+        let grp = &g.groups[&0];
+        // faces 1 and 2 are within `bridge` (6 mm) in plan of the red it grew from: face 0's centroid
+        assert_eq!(grp.tris.len(), 27);
+        assert_eq!(grp.pts.len(), 12); // three vertices + a centroid per face
+        assert_eq!(grp.red.len(), 1); // only face 0 is overhang red
+        assert_eq!(g.leader_of[&0], 0);
+        assert_eq!(grp.members, vec![0]);
+    }
+
+    #[test]
+    fn growth_stops_at_bridge_excluded_faces_the_bed_and_walls() {
+        let cfg = Config::default();
+        let res = analysis(&[&[0]], &[1, 0, 0]);
+        // face 2 is 20 mm out: past `bridge`
+        let g = run(&ceiling(20.0), &res, None, &[0], &cfg);
+        assert_eq!(g.groups[&0].tris.len(), 18); // faces 0 and 1 only
+        // an excluded face is never grown into (and blocks what lies behind it)
+        let g = run(&ceiling(0.5), &res, Some(&[0, 1, 0]), &[0], &cfg);
+        assert_eq!(g.groups[&0].tris.len(), 9);
+        // on the bed: not grown
+        let mut bed = analysis(&[&[0]], &[1, 0, 0]);
+        bed.on_bed[1] = 1;
+        assert_eq!(
+            run(&ceiling(0.5), &bed, None, &[0], &cfg).groups[&0]
+                .tris
+                .len(),
+            9
+        );
+        // a steep strip (normal not down past `grow`) is a wall's side: not grown
+        let mut wall = ceiling(0.5);
+        wall.nrm[5] = -0.1;
+        assert_eq!(run(&wall, &res, None, &[0], &cfg).groups[&0].tris.len(), 9);
+    }
+
+    #[test]
+    fn regions_whose_growth_meets_become_one_group() {
+        let cfg = Config::default();
+        let res = analysis(&[&[0], &[2]], &[1, 0, 1]);
+        let g = run(&ceiling(0.5), &res, None, &[1, 0], &cfg);
+        // face 1, between them, goes to whichever reaches it first; both end in one group led by region 0
+        assert_eq!(g.leader_of[&0], 0);
+        assert_eq!(g.leader_of[&1], 0);
+        assert_eq!(g.groups.len(), 1);
+        assert_eq!(g.groups[&0].members, vec![0, 1]);
+        assert_eq!(g.groups[&0].red.len(), 2);
+        // `leader_of` keeps the order regions were tried in
+        assert_eq!(g.leader_of.keys().copied().collect::<Vec<_>>(), vec![1, 0]);
+        // not adjacent at all (face 2 shares no edge): two groups
+        let mut apart = ceiling(40.0);
+        apart.adj_a = vec![0];
+        apart.adj_b = vec![1];
+        let g = run(&apart, &res, None, &[0, 1], &cfg);
+        assert_eq!(g.groups.len(), 2);
+        // adjacent labelled faces join however far apart their centroids are
+        let g = run(&ceiling(40.0), &res, None, &[0, 1], &cfg);
+        assert_eq!(g.groups.len(), 1);
+    }
+
+    #[test]
+    fn nothing_tried_traces_nothing() {
+        let g = run(
+            &ceiling(0.5),
+            &analysis(&[&[0]], &[1, 0, 0]),
+            None,
+            &[],
+            &Config::default(),
+        );
+        assert!(g.groups.is_empty() && g.leader_of.is_empty());
+    }
+}

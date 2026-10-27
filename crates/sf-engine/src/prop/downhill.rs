@@ -396,3 +396,116 @@ pub fn downhill_lines(
     }
     if lines.is_empty() { None } else { Some(lines) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A 20 x 20 plane z = slope * x as two triangles, with its corner points.
+    fn ramp(slope: f64) -> (Vec<[f64; 3]>, Tris) {
+        let c = |x: f64, y: f64| [x, y, slope * x];
+        let (a, b, d, e) = (c(0.0, 0.0), c(20.0, 0.0), c(20.0, 20.0), c(0.0, 20.0));
+        let tris = Tris::new([a, b, d, a, d, e].concat());
+        (vec![a, b, d, e], tris)
+    }
+
+    #[test]
+    fn a_level_or_empty_region_has_no_downhill() {
+        let cfg = Config::default();
+        let (pts, tris) = ramp(0.0);
+        let o = DownhillOpts::default();
+        assert!(downhill_lines(&pts, &tris, 1.0, 12.0, &o, &cfg).is_none());
+        // |grad z| = 0.04 is under minSlope (0.05): level
+        let (pts, tris) = ramp(0.04);
+        assert!(downhill_lines(&pts, &tris, 1.0, 12.0, &o, &cfg).is_none());
+        assert!(downhill_lines(&[], &Tris::new(vec![]), 1.0, 12.0, &o, &cfg).is_none());
+    }
+
+    #[test]
+    fn a_ramp_gets_lines_running_down_it_every_pitch() {
+        let cfg = Config::default();
+        let (pts, tris) = ramp(0.5);
+        let lines = downhill_lines(&pts, &tris, 1.0, 12.0, &DownhillOpts::default(), &cfg).unwrap();
+        assert!(
+            lines.len() >= 2,
+            "the top edge's two ends, and one per pitch between"
+        );
+        for l in &lines {
+            assert!(l.len() as f64 >= cfg.prop.min_stations);
+            for w in l.windows(2) {
+                assert!(w[1][0] < w[0][0], "downhill is -x");
+                assert!((w[1][2] - 0.5 * w[1][0]).abs() < 1e-9); // z is the surface's
+            }
+        }
+        // lines stand apart across the slope by at least `join` (3 mm), else they would have merged
+        let ys: Vec<f64> = lines.iter().map(|l| l[0][1]).collect();
+        for (i, a) in ys.iter().enumerate() {
+            for b in &ys[i + 1..] {
+                assert!((a - b).abs() >= 3.0 - 1e-9);
+            }
+        }
+    }
+
+    #[test]
+    fn cover_trims_each_line_to_the_red_and_seeds_lines_for_uncovered_red() {
+        let cfg = Config::default();
+        let (pts, tris) = ramp(0.5);
+        // red only near the foot of the ramp: lines are cut to within `reach` of it
+        let red = [[2.0, 10.0, 1.0], [3.0, 10.5, 1.5]];
+        let o = DownhillOpts {
+            h: None,
+            cover: Some(&red),
+            reach: Some(2.0),
+        };
+        let lines = downhill_lines(&pts, &tris, 1.0, 12.0, &o, &cfg).unwrap();
+        for l in &lines {
+            assert!(
+                l.iter().all(|p| p[0] <= 5.0 + 1e-9),
+                "nothing far past the red"
+            );
+        }
+        // red the seeds miss (a far corner) starts a line of its own
+        let far = [[18.0, 1.0, 9.0]];
+        let o = DownhillOpts {
+            cover: Some(&far),
+            reach: Some(3.0),
+            ..Default::default()
+        };
+        let lines = downhill_lines(&pts, &tris, 1.0, 12.0, &o, &cfg).unwrap();
+        // every kept station is within `reach` of the red
+        assert!(
+            lines
+                .iter()
+                .flatten()
+                .all(|p| ((p[0] - 18.0).powi(2) + (p[1] - 1.0).powi(2)).sqrt() <= 3.0)
+        );
+        // maxLines caps the coverage seeds
+        let many: Vec<[f64; 3]> = (0..4).map(|i| [12.0, 1.0 + 6.0 * i as f64, 6.0]).collect();
+        let o = DownhillOpts {
+            cover: Some(&many),
+            reach: Some(3.0),
+            ..Default::default()
+        };
+        let uncapped = downhill_lines(&pts, &tris, 1.0, 12.0, &o, &cfg).unwrap();
+        let mut capped = Config::default();
+        capped.downhill.max_lines = 1.0;
+        let few = downhill_lines(&pts, &tris, 1.0, 12.0, &o, &capped).unwrap();
+        assert!(
+            few.len() < uncapped.len(),
+            "{} vs {}",
+            few.len(),
+            uncapped.len()
+        );
+    }
+
+    #[test]
+    fn grad_falls_back_to_one_sided_differences_at_the_edge() {
+        let (_, tris) = ramp(0.5);
+        let h = 0.5;
+        let g = grad(&tris, 20.0, 10.0, h).unwrap(); // x + h is off the region
+        assert!((g[0] - 0.5).abs() < 1e-12 && g[1].abs() < 1e-12 && (g[2] - 10.0).abs() < 1e-12);
+        let g = grad(&tris, 0.0, 10.0, h).unwrap(); // x - h is off the region
+        assert!((g[0] - 0.5).abs() < 1e-12);
+        assert!(grad(&tris, 30.0, 10.0, h).is_none());
+    }
+}

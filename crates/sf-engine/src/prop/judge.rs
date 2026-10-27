@@ -411,3 +411,87 @@ pub fn other_vertex(pos: &[f64], n: usize, shared: &[usize; 2]) -> usize {
     }
     0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn wall(x: f64) -> Vec<Vec<[f64; 3]>> {
+        vec![vec![[x, 0.0, 0.0]]]
+    }
+
+    #[test]
+    fn a_scorer_tells_near_bridged_cant_and_bare() {
+        let cfg = Config::default();
+        let span = cfg.prop.max_unsupported_span;
+        let cant_max = cfg.judge.cantilever + cfg.prop.th / 2.0;
+        let bridge_max = span + cfg.prop.th;
+        assert!(
+            cant_max < span / 2.0,
+            "the default numbers leave a 'cant' band"
+        );
+        // near: an anchor within cantilever past a wall's face
+        let s = scorer(&wall(0.0), &[], &cfg);
+        assert_eq!(s.score(1.0, 0.0, 0.5), Hold::Near);
+        // cant: one side only, past the cantilever but within half a span
+        let d = (cant_max + span / 2.0) / 2.0;
+        assert_eq!(s.score(d, 0.0, 0.5), Hold::Cant);
+        // bare: past half a span, with or without an anchor in reach
+        assert_eq!(s.score(span / 2.0 + 0.5, 0.0, 0.5), Hold::Bare);
+        assert_eq!(s.score(bridge_max + 5.0, 0.0, 0.5), Hold::Bare);
+        // bridged: anchors on opposite sides whose distances add up to a span (plus a wall)
+        let a = bridge_max / 2.0 - 0.01;
+        assert!(a > cant_max);
+        let two = vec![vec![[-a, 0.0, 0.0]], vec![[a, 0.0, 0.0]]];
+        let s = scorer(&two, &[], &cfg);
+        assert_eq!(s.score(0.0, 0.0, 0.5), Hold::Bridged);
+        // the same pair too far apart is not a bridge
+        let wide = vec![vec![[-a - 0.5, 0.0, 0.0]], vec![[a + 0.5, 0.0, 0.0]]];
+        assert_eq!(scorer(&wide, &[], &cfg).score(0.0, 0.0, 0.5), Hold::Bare);
+        // two anchors on the SAME side never bridge
+        let same = vec![vec![[a, 0.0, 0.0]], vec![[a, 0.5, 0.0]]];
+        assert_ne!(scorer(&same, &[], &cfg).score(0.0, 0.0, 0.5), Hold::Bridged);
+    }
+
+    #[test]
+    fn only_anchors_0_to_1_5_mm_under_the_point_count() {
+        let cfg = Config::default();
+        let s = scorer(&wall(0.0), &[], &cfg);
+        assert_eq!(s.score(0.5, 0.0, 1.5), Hold::Near); // 1.5 under: still an anchor
+        assert_ne!(s.score(0.5, 0.0, 1.6), Hold::Near); // further under: not
+        assert_eq!(s.score(0.5, 0.0, -0.05), Hold::Near); // 0.05 above is allowed
+        assert_ne!(s.score(0.5, 0.0, -0.06), Hold::Near);
+    }
+
+    #[test]
+    fn part_points_are_anchors_too() {
+        let cfg = Config::default();
+        let s = scorer(&[], &[[0.0, 0.0, 0.0]], &cfg);
+        assert_eq!(s.score(1.0, 0.0, 0.5), Hold::Near);
+    }
+
+    #[test]
+    fn densify_adds_a_point_every_step_between_neighbours() {
+        let mut out = Vec::new();
+        densify(&[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], 0.5, &mut out);
+        assert_eq!(out, vec![[0.0, 0.0, 0.0], [0.5, 0.0, 0.0], [1.0, 0.0, 0.0]]);
+        let mut out = Vec::new();
+        densify(&[[0.0, 0.0, 0.0], [0.4, 0.0, 0.0]], 0.5, &mut out); // closer than a step: just the ends
+        assert_eq!(out.len(), 2);
+        let mut out = Vec::new();
+        densify(&[], 0.5, &mut out);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn shared_edge_needs_exactly_two_shared_vertices() {
+        let tri = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        let mut pos = tri.to_vec();
+        pos.extend([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]); // shares (0,0,0) and (1,0,0)
+        assert_eq!(shared_edge(&pos, 0, 1), Some([0, 3]));
+        assert_eq!(other_vertex(&pos, 1, &[0, 3]), 2);
+        let mut one = tri.to_vec();
+        one.extend([0.0, 0.0, 0.0, 5.0, 5.0, 5.0, 6.0, 5.0, 5.0]); // one shared vertex
+        assert_eq!(shared_edge(&one, 0, 1), None);
+    }
+}

@@ -296,3 +296,127 @@ pub fn settle_top(line: &mut [[f64; 3]], tris: &Tris, step: f64, band: f64, cfg:
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn plate(z: f64) -> Tris {
+        // a 40 x 40 plate at height z (two triangles, facing up)
+        Tris::new(vec![
+            -20.0, -20.0, z, 20.0, -20.0, z, 20.0, 20.0, z, //
+            -20.0, -20.0, z, 20.0, 20.0, z, -20.0, 20.0, z,
+        ])
+    }
+
+    #[test]
+    fn straightness_reads_a_gate_not_a_score() {
+        assert_eq!(straightness(&[]), f64::INFINITY);
+        assert_eq!(
+            straightness(&[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+            f64::INFINITY
+        );
+        let line: Vec<[f64; 3]> = (0..10).map(|i| [i as f64, 2.0 * i as f64, 5.0]).collect();
+        assert!(straightness(&line) < 1e-9); // dead straight, whatever its heading
+        // every station at one XY: no chord at all
+        assert_eq!(
+            straightness(&[[1.0, 1.0, 0.0], [1.0, 1.0, 1.0], [1.0, 1.0, 2.0]]),
+            f64::INFINITY
+        );
+        let ring: Vec<[f64; 3]> = (0..24)
+            .map(|i| {
+                let a = i as f64 / 24.0 * std::f64::consts::TAU;
+                [10.0 * a.cos(), 10.0 * a.sin(), 0.0]
+            })
+            .collect();
+        assert!(straightness(&ring) > 0.10, "a ring fails the 0.10 gate");
+    }
+
+    #[test]
+    fn contact_line_needs_three_points_and_a_spread() {
+        let cfg = Config::default();
+        let t = plate(5.0);
+        assert!(contact_line(&[[0.0, 0.0, 5.0], [1.0, 0.0, 5.0]], &t, 8, &cfg).is_none());
+        let dot = [[1.0, 1.0, 5.0]; 4];
+        assert!(contact_line(&dot, &t, 8, &cfg).is_none()); // hi - lo < 1e-6
+        // 2 buckets only -> fewer than 3 stations
+        let few = [[0.0, 0.0, 5.0], [10.0, 0.0, 5.0], [10.1, 0.0, 5.0]];
+        assert!(contact_line(&few, &t, 2, &cfg).is_none());
+    }
+
+    #[test]
+    fn contact_line_follows_the_surface_height_under_each_station() {
+        let cfg = Config::default();
+        let t = plate(5.0);
+        // points at the wrong height: every station is re-fitted to the surface above it,
+        // then lowered to leave `gap` (0.2) under it
+        let pts: Vec<[f64; 3]> = (0..30)
+            .map(|i| [i as f64 - 15.0, 0.0, 9.0 + (i % 3) as f64])
+            .collect();
+        let line = contact_line(&pts, &t, 10, &cfg).unwrap();
+        assert_eq!(line.len(), 10);
+        for p in &line {
+            assert_eq!(p[2], 5.0);
+        }
+    }
+
+    #[test]
+    fn lower_sag_pulls_a_proud_span_down_to_the_surface() {
+        let t = plate(0.0);
+        let mut line = vec![[-5.0, 0.0, 1.0], [5.0, 0.0, 1.0]];
+        lower_sag(&mut line, &t, f64::INFINITY);
+        assert_eq!(line, vec![[-5.0, 0.0, 0.0], [5.0, 0.0, 0.0]]);
+        // a surface further below than `band` is the floor, not the overhang: left alone
+        let mut far = vec![[-5.0, 0.0, 9.0], [5.0, 0.0, 9.0]];
+        lower_sag(&mut far, &t, 2.0);
+        assert_eq!(far[0][2], 9.0);
+        // off the surface entirely: untouched; and an empty / one-station line is fine
+        let mut off = vec![[100.0, 0.0, 9.0], [110.0, 0.0, 9.0]];
+        lower_sag(&mut off, &t, f64::INFINITY);
+        assert_eq!(off[0][2], 9.0);
+        lower_sag(&mut [], &t, f64::INFINITY);
+        lower_sag(&mut [[0.0, 0.0, 1.0]], &t, f64::INFINITY);
+    }
+
+    #[test]
+    fn contour_top_takes_the_lowest_of_the_tip_corners() {
+        let cfg = Config::default();
+        // a step: z = 0 for y < 0, z = 3 for y > 0, so a wall along x at y = 0.1 has its -y corner over the low side
+        let t = Tris::new(vec![
+            -20.0, -20.0, 0.0, 20.0, -20.0, 0.0, 20.0, 0.0, 0.0, //
+            -20.0, -20.0, 0.0, 20.0, 0.0, 0.0, -20.0, 0.0, 0.0, //
+            -20.0, 0.0, 3.0, 20.0, 0.0, 3.0, 20.0, 20.0, 3.0, //
+            -20.0, 0.0, 3.0, 20.0, 20.0, 3.0, -20.0, 20.0, 3.0,
+        ]);
+        let mut line = vec![[-5.0, 0.1, 9.0], [0.0, 0.1, 9.0], [5.0, 0.1, 9.0]];
+        contour_top(&mut line, &t, f64::INFINITY, &cfg);
+        // across = (ry, -rx)/rn = (0, -1): o = -half is at y = 0.1 + 0.3 (over z=3), o = +half at y = -0.2 (over z=0)
+        assert!(line.iter().all(|p| p[2] == 0.0));
+        // `band` keeps a surface far below from settling the top
+        let mut banded = vec![[-5.0, 0.1, 9.0], [0.0, 0.1, 9.0], [5.0, 0.1, 9.0]];
+        contour_top(&mut banded, &t, 1.0, &cfg);
+        assert!(banded.iter().all(|p| p[2] == 9.0));
+        // coincident neighbours (rn < 1e-9) are skipped
+        let mut same = vec![[1.0, 1.0, 9.0], [1.0, 1.0, 9.0]];
+        contour_top(&mut same, &t, f64::INFINITY, &cfg);
+        assert_eq!(same[0][2], 9.0);
+    }
+
+    #[test]
+    fn settle_top_lowers_only_and_leaves_gap_under_the_overhang() {
+        let cfg = Config::default();
+        // the part's underside at z = 10; a wall's top edge sits `gap` (0.2) under its line, and must
+        // clear the surface by at least `gap`
+        let t = plate(10.0);
+        let mut line = vec![[-5.0, 0.0, 10.1], [5.0, 0.0, 10.1]];
+        settle_top(&mut line, &t, 0.25, f64::INFINITY, &cfg);
+        assert!((line[0][2] - 10.0).abs() < 1e-12 && (line[1][2] - 10.0).abs() < 1e-12);
+        let mut clear = vec![[-5.0, 0.0, 9.9], [5.0, 0.0, 9.9]];
+        settle_top(&mut clear, &t, 0.25, f64::INFINITY, &cfg);
+        assert_eq!(clear[0][2], 9.9); // lower only, never raised
+        // a surface further above than `band` is not the overhang
+        let mut floor = vec![[-5.0, 0.0, 10.1], [5.0, 0.0, 10.1]];
+        settle_top(&mut floor, &t, 0.25, -1.0, &cfg);
+        assert_eq!(floor[0][2], 10.1);
+    }
+}

@@ -89,6 +89,7 @@ pub fn heading_field(
     let cut = 9.0 * s * s;
     let snap = cfg.field.snap * std::f64::consts::PI / 180.0;
     let min_ratio = cfg.field.min_ratio;
+    #[allow(clippy::neg_cmp_op_on_partial_ord)] // `!(w > 0)` is true for NaN, as in JS
     move |qx: f64, qy: f64| {
         let (mut w, mut mx, mut my, mut xx, mut xy, mut yy) =
             (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
@@ -130,5 +131,96 @@ pub fn heading_field(
             }
         }
         Some(th)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fins::seating::tests::topo_of;
+    use crate::overhangs::Analysis;
+    use crate::types::{IDENTITY3, Xyz};
+
+    fn res() -> Analysis {
+        Analysis {
+            over: vec![],
+            kept: vec![],
+            on_bed: vec![],
+            regions: vec![],
+            raw_region_count: 0,
+            over_area: 0.0,
+            bed_area: 0.0,
+            over_face_count: 0,
+            offset: Xyz::default(),
+            size: Xyz::default(),
+        }
+    }
+
+    /// A flat rectangle `[x0,x1] x [y0,y1]` at z = 0 as `n x n` sub-rectangles (two faces each), so
+    /// the plan grid has many cells.
+    fn rect(x0: f64, x1: f64, y0: f64, y1: f64, n: usize) -> Vec<f64> {
+        let mut v = Vec::new();
+        for i in 0..n {
+            for j in 0..n {
+                let (a, b) = (
+                    x0 + (x1 - x0) * i as f64 / n as f64,
+                    x0 + (x1 - x0) * (i + 1) as f64 / n as f64,
+                );
+                let (c, d) = (
+                    y0 + (y1 - y0) * j as f64 / n as f64,
+                    y0 + (y1 - y0) * (j + 1) as f64 / n as f64,
+                );
+                v.extend([
+                    a, c, 0.0, b, c, 0.0, b, d, 0.0, a, c, 0.0, b, d, 0.0, a, d, 0.0,
+                ]);
+            }
+        }
+        v
+    }
+
+    #[test]
+    fn a_long_part_has_a_heading_along_its_length() {
+        let cfg = Config::default();
+        let along_x = topo_of(rect(0.0, 60.0, 0.0, 10.0, 12));
+        let f = heading_field(&along_x, &res(), &IDENTITY3, &cfg);
+        assert_eq!(f(30.0, 5.0), Some(0.0)); // snapped to x
+        let along_y = topo_of(rect(0.0, 10.0, 0.0, 60.0, 12));
+        let f = heading_field(&along_y, &res(), &IDENTITY3, &cfg);
+        let th = f(5.0, 30.0).unwrap();
+        assert!(
+            (th - std::f64::consts::FRAC_PI_2).abs() < 1e-12,
+            "snapped to y: {th}"
+        );
+    }
+
+    #[test]
+    fn a_diagonal_part_keeps_its_heading_in_0_to_pi() {
+        let cfg = Config::default();
+        // 45 degrees: rotate the strip with the pose
+        let strip = topo_of(rect(0.0, 60.0, 0.0, 10.0, 12));
+        let c = std::f64::consts::FRAC_1_SQRT_2;
+        let rot = [c, c, 0.0, -c, c, 0.0, 0.0, 0.0, 1.0];
+        let f = heading_field(&strip, &res(), &rot, &cfg);
+        let th = f(21.0, 21.0).unwrap();
+        assert!((th - std::f64::consts::FRAC_PI_4).abs() < 0.05, "{th}");
+        assert!((0.0..std::f64::consts::PI).contains(&th));
+    }
+
+    #[test]
+    fn a_squarish_or_distant_or_empty_part_has_no_heading() {
+        let cfg = Config::default();
+        let sq = topo_of(rect(0.0, 20.0, 0.0, 20.0, 10));
+        assert_eq!(
+            heading_field(&sq, &res(), &IDENTITY3, &cfg)(10.0, 10.0),
+            None
+        );
+        let strip = topo_of(rect(0.0, 60.0, 0.0, 10.0, 12));
+        let f = heading_field(&strip, &res(), &IDENTITY3, &cfg);
+        assert_eq!(f(1e4, 1e4), None); // beyond 3 sigma: no weight
+        let none = topo_of(vec![]);
+        assert_eq!(
+            heading_field(&none, &res(), &IDENTITY3, &cfg)(0.0, 0.0),
+            None
+        );
     }
 }
