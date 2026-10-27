@@ -28,7 +28,7 @@ fn across(line: &[[f64; 3]], k: usize) -> Option<(f64, f64)> {
     Some((ry / rn, -rx / rn))
 }
 
-/// Port of `stationIsClear` (web/prop/clearance.js:20-69): can a wall under `line` actually reach
+/// Port of `stationIsClear` (web/prop/clearance.js:21-71): can a wall under `line` actually reach
 /// the plate, or is the part in the way?
 ///
 /// The prop attaches to the BED and nothing else -- that is what makes it one clean thing to
@@ -83,7 +83,7 @@ pub fn station_is_clear(
     true
 }
 
-/// Port of `stationCertified` (web/prop/clearance.js:92-124): certify a SETTLED station by
+/// Port of `stationCertified` (web/prop/clearance.js:94-124): certify a SETTLED station by
 /// measuring, the way the checker will.
 ///
 /// `settleTop` puts the top exactly on spec against the region's own triangles -- but the
@@ -134,7 +134,7 @@ pub fn station_certified(
     true
 }
 
-/// Port of `welds` (web/prop/clearance.js:139-141): would a wall this close to the part weld to
+/// Port of `welds` (web/prop/clearance.js:137-139): would a wall this close to the part weld to
 /// it? `hit` is a nearest-part measurement (`{ d, cosUp }`). From ABOVE it is the breakaway
 /// interface: the top stands `gap` below the part VERTICALLY, so the nearest distance on a slope
 /// is only ~gap x cos(slope). The floor is a fraction of the gap (0.675 x gap: the same 0.135 at
@@ -148,7 +148,7 @@ pub fn welds(hit: &Nearest, cfg: &Config) -> bool {
     }
 }
 
-/// Port of `pathToPlateIsClear` (web/prop/clearance.js:144-149): true when EVERY station can
+/// Port of `pathToPlateIsClear` (web/prop/clearance.js:142-147): true when EVERY station can
 /// reach the plate.
 pub fn path_to_plate_is_clear(
     line: &[[f64; 3]],
@@ -165,7 +165,7 @@ pub fn path_to_plate_is_clear(
     true
 }
 
-/// Port of `longestRun` (web/prop/clearance.js:166-176): the longest contiguous run of stations
+/// Port of `longestRun` (web/prop/clearance.js:166-177): the longest contiguous run of stations
 /// that can carry a wall, as `[a, b)`; `None` is JS `null`. A tie keeps the earlier run.
 ///
 /// THIS IS THE `t0/t1` TRIM: `breakaway_wall(bm, contact, t0, t1, ...)` takes the span as an
@@ -188,7 +188,7 @@ pub fn longest_run(usable: &[bool]) -> Option<[usize; 2]> {
     best
 }
 
-/// Port of `withLowTails` (web/prop/clearance.js:190-199): the stations a plate wall may occupy:
+/// Port of `withLowTails` (web/prop/clearance.js:192-201): the stations a plate wall may occupy:
 /// the longest run of TALL stations (`tall[k]`, >= minHeight) extended at each end through the
 /// contiguous LOW ones (`low[k]`, >= minHeightSquat) -- the wall's tail running on down the
 /// slope. A run with no tall station is never a wall (that band is the squat pass's).
@@ -209,7 +209,7 @@ pub fn with_low_tails(tall: &[bool], low: &[bool]) -> Vec<bool> {
     mask
 }
 
-/// Port of `bodyMask` (web/prop/clearance.js:208-210): which stations of a run are its
+/// Port of `bodyMask` (web/prop/clearance.js:210-212): which stations of a run are its
 /// full-height BODY (top >= minHeight), as a mask. Taken BEFORE settleTop: settling legitimately
 /// lowers the station next to a new low tail by a hair, so body membership is decided once.
 pub fn body_mask(pts: &[[f64; 3]], cfg: &Config) -> Vec<bool> {
@@ -218,7 +218,7 @@ pub fn body_mask(pts: &[[f64; 3]], cfg: &Config) -> Vec<bool> {
         .collect()
 }
 
-/// Port of `tallBody` (web/prop/clearance.js:213-216): `[first, last]` body station of `mask`,
+/// Port of `tallBody` (web/prop/clearance.js:215-218): `[first, last]` body station of `mask`,
 /// or `None` when the body is < 2 stations.
 pub fn tall_body(mask: &[bool]) -> Option<[usize; 2]> {
     let a = mask.iter().position(|&m| m)?;
@@ -226,7 +226,7 @@ pub fn tall_body(mask: &[bool]) -> Option<[usize; 2]> {
     if b <= a { None } else { Some([a, b]) }
 }
 
-/// Port of `tallSpan` (web/prop/clearance.js:223-226): XY span of a run's BODY, first to last
+/// Port of `tallSpan` (web/prop/clearance.js:225-228): XY span of a run's BODY, first to last
 /// body station. The minSpan gate measures this, not the whole run: a low tail extends a wall
 /// that already earned its place, it must not promote a stub into one.
 pub fn tall_span(pts: &[[f64; 3]], mask: &[bool]) -> f64 {
@@ -236,7 +236,7 @@ pub fn tall_span(pts: &[[f64; 3]], mask: &[bool]) -> f64 {
     }
 }
 
-/// Port of `minSpanFor` (web/prop/clearance.js:235-241): the least body span (`tall_span`) a run
+/// Port of `minSpanFor` (web/prop/clearance.js:237-244): the least body span (`tall_span`) a run
 /// needs to be a wall: minSpan, or minSpanTube for a small tube (`small_tube`, JS default
 /// `false`). With `short` (default `false`; the last-resort pass, see web/fins/shortwalls.js) it
 /// relaxes down to minSpanShort for a LOW wall: height (tallest body top, less the gap, over a
@@ -265,7 +265,7 @@ pub fn min_span_for(
     )
 }
 
-/// Port of `insertFloorStations` (web/prop/clearance.js:253-272): where a line's END dips under
+/// Port of `insertFloorStations` (web/prop/clearance.js:254-272): where a line's END dips under
 /// the squat floor, insert one station exactly AT the floor (top = minHeightSquat), linearly
 /// between the first station above it and the last below (an edge row's track can run past the
 /// knife edge, so several end stations may sit under the floor). Stations are 1mm apart, so
