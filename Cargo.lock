@@ -398,6 +398,7 @@ dependencies = [
  "libm",
  "parity",
  "proptest",
+ "sf-testkit",
 ]
 
 [[package]]
