@@ -1,7 +1,7 @@
 //! Replay of `parity/corpus/tracks/*` (recorded by `parity/oracle/tracks.js` from web/prop/tracks.js).
 //! Exact: every output is arithmetic on the inputs plus `surfaceZAt` / `insidePart` answers.
 //! The direct and soup `patchTracks` cases record the JS array's `spacing` and `turned` properties as
-//! `{lines, spacing, turned}`; captured cases carry only the bare array of tracks.
+//! `{lines, spacing, turned}`; captured cases carry them as the array's own properties.
 mod common;
 use ::parity::{Case, Tol, Value, load_cases};
 use common::*;
@@ -285,12 +285,27 @@ fn patch_tracks_captured() {
     let cases = load_cases("tracks", "patchTracks.captured");
     assert!(cases.len() >= 100);
     for c in &cases {
-        // the capture carries only the bare array of tracks
         let t = pt_run(&resolve_args(&c.args));
+        let Value::Obj(mut props) = tracks_value(&t) else {
+            unreachable!()
+        };
+        props.remove(0); // `lines`: the array's items
+        // `turned` is `undefined` on the empty-footprint return and `null` otherwise
+        if let Some(Value::ArrProps(_, want)) = &c.out
+            && let Some((_, wv)) = want.iter().find(|(k, _)| k == "turned")
+            && matches!(wv, Value::Undefined)
+            && let Some((_, gv)) = props.iter_mut().find(|(k, _)| k == "turned")
+            && matches!(gv, Value::Null)
+        {
+            *gv = Value::Undefined;
+        }
+        let Value::Arr(items) = lines_value(&t.lines) else {
+            unreachable!()
+        };
         check(
             "patchTracks.captured",
             c,
-            &lines_value(&t.lines),
+            &Value::ArrProps(items, props),
             &Tol::Exact,
         );
     }

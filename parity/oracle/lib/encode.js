@@ -30,6 +30,11 @@ export class Ref {
   }
 }
 
+/** Is `k` an array index (a canonical unsigned integer below 2^32 - 1)? */
+function isIndex(k) {
+  return /^(0|[1-9][0-9]*)$/.test(k) && Number(k) < 4294967295;
+}
+
 /** Encodes a JS value to a JSON-safe tree. */
 export function encode(value) {
   if (value instanceof Ref) return value.payload;
@@ -54,11 +59,16 @@ export function encode(value) {
   if (value instanceof Int32Array) return { $i32: b64(typedBytes(value)) };
   if (value instanceof Uint32Array) return { $u32: b64(typedBytes(value)) };
   if (value instanceof Uint8Array) return { $u8: b64(typedBytes(value)) };
-  // Row: Array -> JSON array of encoded values
+  // Rows: Array -> JSON array of encoded values; an array with own enumerable non-index properties
+  // (a track's `spacing`/`turned`, a rim track's `rim`) -> {"$arr": [...], "$props": {...}}
   if (Array.isArray(value)) {
     const out = new Array(value.length);
     for (let i = 0; i < value.length; i++) out[i] = encode(value[i]);
-    return out;
+    const extra = Object.keys(value).filter((k) => !isIndex(k));
+    if (extra.length === 0) return out;
+    const props = {};
+    for (const k of extra) props[k.startsWith("$") ? "$" + k : k] = encode(value[k]);
+    return { $arr: out, $props: props };
   }
   // Row: Map -> {"$map": [[k, v], ...]} in insertion order
   if (value instanceof Map) {

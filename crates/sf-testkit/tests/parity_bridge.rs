@@ -62,7 +62,20 @@ fn flat_run_axis_captured() {
     assert!(cases.len() >= 10);
     for c in &cases {
         let r = run(&resolve_args(&c.args));
-        check("flatRunAxis.captured", c, &axis_value(&r), &Tol::Exact);
+        // the returned axis array carries `turned` and `old` as own properties
+        let got = Value::ArrProps(
+            vec![r.axis[0].into(), r.axis[1].into()],
+            vec![
+                ("turned".into(), Value::Bool(r.turned)),
+                (
+                    "old".into(),
+                    r.old.map_or(Value::Undefined, |o| {
+                        Value::Arr(vec![o[0].into(), o[1].into()])
+                    }),
+                ),
+            ],
+        );
+        check("flatRunAxis.captured", c, &got, &Tol::Exact);
     }
 }
 

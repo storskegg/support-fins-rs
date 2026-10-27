@@ -112,7 +112,8 @@ fn min_span(a: &[Resolved]) -> Value {
 fn floors(a: &[Resolved]) -> Value {
     let mut line = pts3(a[0].plain());
     insert_floor_stations(&mut line, &cfg_of(a));
-    pts_value(&line)
+    // edited in place: the same array comes back, with its properties
+    with_props(pts_value(&line), props_of(a[0].plain()))
 }
 
 #[test]
