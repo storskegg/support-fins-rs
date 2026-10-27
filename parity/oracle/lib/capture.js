@@ -102,6 +102,10 @@ const REF_FNS = new Set(["buildTopology", "analyze", "seatedPartTris"]);
  *              {"$topo": id} / {"$analysis": {...}} / {"$seated": {...}} instead of in full.
  *              The model id is `sink.model`, which the driver sets before each scene.
  *              (opts.args runs first, on the raw arguments.)
+ * opts.pushes {fnName: argIndex}: the function pushes vertices (`[x, y, z, tag?]`) onto the array at
+ *              `argIndex` (an `out` parameter). That argument is recorded as `[]`, and the recorded
+ *              `out` becomes `{ret, tris}`: the return value, and a Float64Array of 4 numbers per
+ *              pushed vertex (x, y, z, 1 where `v[3] === 1`, else 0).
  * opts.quiet   [fnName, ...]: wrapped only so refs can register what they return; calls are not recorded
  * opts.config  {fnName: [name, ...]}: the call's arguments get one trailing {"$config": {name: ...}}
  *              holding a snapshot of those config objects, taken at call time. Needs opts.configs.
@@ -177,7 +181,10 @@ export async function captureModules(specs, opts = {}) {
       }
       let shown = opts.args?.[name] ? opts.args[name](args, sink) : args;
       if (opts.refs) shown = shown.map(substitute);
-      shown = shown.map(encode);
+      const pushIdx = opts.pushes?.[name];
+      const pushed = pushIdx === undefined ? null : args[pushIdx];
+      const pushedFrom = pushed?.length;
+      shown = shown.map((a, i) => (i === pushIdx ? encode([]) : encode(a)));
       // a config snapshot is taken now, with the arguments: the call may change it
       if (opts.config?.[name]) {
         const snap = {};
@@ -189,10 +196,12 @@ export async function captureModules(specs, opts = {}) {
         shown.push({ $config: snap });
       }
       // args are encoded BEFORE the call: functions sometimes mutate them
-      const entry = { scene: sink.tag, n: idx - 1, args: shown };
+      const entry = { scene: sink.tag, n: idx - 1, args: shown, cp: sink.counts.crestPart ?? 0 };
       try {
         const result = fn.apply(self, args);
-        entry.out = encode(result);
+        entry.out = pushed
+          ? { ret: encode(result), tris: encode(Float64Array.from(pushed.slice(pushedFrom).flatMap((v) => [v[0], v[1], v[2], v[3] === 1 ? 1 : 0]))) }
+          : encode(result);
         if (opts.refs && REF_FNS.has(name)) register(name, args, result);
         return result;
       } catch (e) {
