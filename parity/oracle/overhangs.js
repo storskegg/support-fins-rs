@@ -49,7 +49,8 @@ for (const [name, path] of models) {
   for (const th of THRESHOLDS) {
     for (const deg of POSES) {
       const rot = sitePose(deg);
-      analyzeCases.push({ id: `${name}|t${th}|r${deg.join(",")}`, args: [name, th, rot], out: analyze(topo, th, rot) });
+      // snapshot: analyze() returns the topo's scratch arrays, which the next call overwrites
+      analyzeCases.push({ id: `${name}|t${th}|r${deg.join(",")}`, args: [name, th, rot], out: structuredClone(analyze(topo, th, rot)) });
     }
   }
 }
