@@ -1,3 +1,6 @@
 /target
 .DS_Store
 .idea/
+
+# Private test models: never pushed (see private-fixtures/NOTES.md locally)
+/private-fixtures/
