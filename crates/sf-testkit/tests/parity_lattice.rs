@@ -184,10 +184,13 @@ fn lattice_struts_captured() {
         let a = resolve_args(&c.args);
         let faces: Vec<usize> = nums(a[1].plain()).iter().map(|&f| f as usize).collect();
         let seated = recorded_seated(&faces, a[2].plain());
-        // the capture records the bare array of groups (not its `lost` property)
+        // the groups array carries its `lost` property ($arr/$props, PARITY.md)
         match lattice_struts(a[0].topo(), &faces, &seated, &cfg) {
             None => Value::Null,
-            Some(s) => Value::Arr(s.groups.iter().map(|g| faces_value(g)).collect()),
+            Some(s) => Value::ArrProps(
+                s.groups.iter().map(|g| faces_value(g)).collect(),
+                vec![("lost".to_string(), (s.lost as f64).into())],
+            ),
         }
     });
 }

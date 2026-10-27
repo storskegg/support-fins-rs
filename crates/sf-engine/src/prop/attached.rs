@@ -13,10 +13,11 @@
 
 use indexmap::IndexMap;
 
-use crate::inside::inside_part;
+use crate::config::Config;
+use crate::inside::{inside_part, nearest_part};
 use crate::jsnum;
 use crate::overhangs::Topology;
-use crate::prop::clearance::longest_run;
+use crate::prop::clearance::{longest_run, welds};
 use crate::prop::contact::{contour_top, lower_sag, settle_top};
 use crate::prop::ctx::BuildCtx;
 use crate::prop::mold::{FloorPt, floor_line, mold_line};
@@ -104,11 +105,14 @@ fn enclosed_column(
     walled >= BORE_WALLED_MIN
 }
 
-/// Port of `clearBetween` (web/prop/attached.js:75-94): can a PART-ATTACHED wall at station `k`
+/// Port of `clearBetween` (web/prop/attached.js:80-101): can a PART-ATTACHED wall at station `k`
 /// stand between its floor and the overhang without piercing a side wall? Mirror of
 /// stationIsClear, but bounded to the (floor, top) span the wall actually occupies -- it probes
 /// STRICTLY between the ends, since the bottom is meant to weld to the floor and the top to
 /// break away under the overhang, and probing those would read the intended contacts as welds.
+///
+/// Since upstream `1e8558d` (#119) the outline is also measured, as `station_certified` measures a
+/// plate wall's: `nearestPart` at the wall's centre and both faces, refused when it `welds`.
 #[allow(clippy::too_many_arguments)]
 fn clear_between(
     top: &[[f64; 3]],
@@ -120,6 +124,7 @@ fn clear_between(
     th: f64,
     side_clear: f64,
     gap: f64,
+    cfg: &Config,
 ) -> bool {
     let p = top[k];
     let a = top[jsnum::max(0.0, k as f64 - 1.0) as usize];
@@ -144,6 +149,14 @@ fn clear_between(
                 return false;
             }
             if inside_part(topo, rot, offset, p[0] - sx * w, p[1] - sy * w, z) {
+                return false;
+            }
+        }
+        for o in [0.0, th / 2.0, -th / 2.0] {
+            if let Some(hit) =
+                nearest_part(topo, rot, offset, p[0] + sx * o, p[1] + sy * o, z, 0.45)
+                && welds(&hit, cfg)
+            {
                 return false;
             }
         }
@@ -211,7 +224,7 @@ fn floor_vec(f: &FloorPt) -> Vec<f64> {
     v
 }
 
-/// Port of `buildPartAttached` (web/prop/attached.js:117-183): try to stand a PART-ATTACHED wall
+/// Port of `buildPartAttached` (web/prop/attached.js:126-192): try to stand a PART-ATTACHED wall
 /// under `line` (the overhang contact polyline, seated), pushing its triangles onto `out`.
 ///
 /// This is the auto-placer's version of what draw.js does by hand: settle a BANDED top so the
@@ -275,6 +288,7 @@ pub fn build_part_attached(
                 cfg.prop.th,
                 cfg.prop.side_clear,
                 gap,
+                cfg,
             ) {
                 return true;
             }

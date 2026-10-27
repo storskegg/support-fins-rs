@@ -52,8 +52,17 @@ fn raster_rest_matches_js() {
                         .collect(),
                 )
             } else {
-                // the capture carries the bare array of pieces
-                lines_value(&rest)
+                // each piece carries its `from` property ($arr/$props, PARITY.md)
+                Value::Arr(
+                    rest.iter()
+                        .map(|p| {
+                            Value::ArrProps(
+                                pts_value(&p.pts).arr().to_vec(),
+                                vec![("from".into(), Value::from(p.from.unwrap() as f64))],
+                            )
+                        })
+                        .collect(),
+                )
             };
             check(file, c, &got, &Tol::Exact);
         }
@@ -110,12 +119,27 @@ fn raster_tracks_captured() {
     assert!(!cases.is_empty());
     for c in &cases {
         let l = run_tracks(&resolve_args(&c.args));
-        check(
-            "rasterTracks.captured",
-            c,
-            &lines_value(&l.lines),
-            &Tol::Exact,
-        );
+        check("rasterTracks.captured", c, &tracks_value(&l), &Tol::Exact);
+    }
+}
+
+/// The `lines` array with the properties JS hangs on it (`spacing`, `turned`).
+fn tracks_value(l: &sf_engine::prop::build::Lines) -> Value {
+    let mut props = Vec::new();
+    if let Some(s) = l.spacing {
+        props.push(("spacing".to_string(), Value::from(s)));
+    }
+    if let Some(t) = l.turned {
+        props.push((
+            "turned".to_string(),
+            Value::Arr(vec![Value::from(t[0]), Value::from(t[1])]),
+        ));
+    }
+    let items = lines_value(&l.lines).arr().to_vec();
+    if props.is_empty() {
+        Value::Arr(items)
+    } else {
+        Value::ArrProps(items, props)
     }
 }
 
