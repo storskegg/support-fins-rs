@@ -227,6 +227,7 @@ try {
   const picked = ['cube-x40-auto', 'lbracket-x35-auto', 'stress-ramp-x40', 'stress-wedge-up', 'stress-tshape-x40', 'stress-portal-x40'];
   const extra = [['flat', { iface: 'flat' }], ['all', { iface: 'all' }], ['lattice', { cutout: 'lattice' }], ['pins', { tineDir: 'vertical' }]];
   for (const scene of scenes.filter((s) => !s.draw && !s.set?.sway && picked.some((p) => s.name.startsWith(p)))) {
+    cap.sink.model = scene.model; // the topology's reference is the model id current when it is built
     const rot = sitePose(scene.rot);
     const topo = util.loadModel(scene.model);
     const res = util.analyze(topo, 45, rot);
