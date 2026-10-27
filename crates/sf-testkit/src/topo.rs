@@ -16,6 +16,11 @@ pub fn load_model(name: &str) -> Topology {
     build_topology(load_model_soup(name))
 }
 
+/// The topology of a `tests/fixtures` STL (see [`load_fixture_soup`]).
+pub fn load_fixture_topo(name: &str) -> Topology {
+    build_topology(crate::load_fixture_soup(name))
+}
+
 /// `blockTopo(...args)` (tests/_util.js:44-47): the topology of `block(..)`.
 pub fn block_topo(x0: f64, x1: f64, y0: f64, y1: f64, z0: f64, z1: f64) -> Topology {
     build_topology(block(x0, x1, y0, y1, z0, z1))

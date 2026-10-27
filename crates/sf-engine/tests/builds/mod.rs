@@ -100,3 +100,8 @@ pub fn seg_dist([a, b]: [[f64; 2]; 2], [c, d]: [[f64; 2]; 2]) -> f64 {
         .min(pt(c, [a, b]))
         .min(pt(d, [a, b]))
 }
+
+/// `tests/fixtures/<name>.stl` of the upstream checkout as a topology (raster.test.js `example`).
+pub fn fixture_topo(name: &str) -> Arc<Topology> {
+    Arc::new(sf_testkit::load_fixture_topo(name))
+}
