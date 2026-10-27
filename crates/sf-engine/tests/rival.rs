@@ -6,6 +6,7 @@ use sf_engine::config::Config;
 use sf_engine::overhangs::{Analysis, Region, Topology, build_topology};
 use sf_engine::prop::build::{Acc, Patch, PropRecord};
 use sf_engine::prop::rival::{restore, snapshot, tube_rivalry};
+use sf_engine::tris::Tris;
 use sf_engine::types::Xyz;
 
 /// One overhang face at z = 10 around the origin, as a one-region analysis.
@@ -34,7 +35,9 @@ fn patch(area: f64) -> Patch {
     Patch {
         region: 7,
         area,
-        tris: Arc::new(vec![-5.0, -5.0, 9.0, 5.0, 5.0, 9.0, 0.0, 0.0, 9.0]),
+        tris: Arc::new(Tris::new(vec![
+            -5.0, -5.0, 9.0, 5.0, 5.0, 9.0, 0.0, 0.0, 9.0,
+        ])),
         ..Default::default()
     }
 }
@@ -184,12 +187,12 @@ fn a_lattice_struts_reach_bounds_the_held_area_not_its_net() {
     let mut a = Acc::default();
     let mut rv = tube_rivalry(&topo, &res, &soup, &Config::default());
     let mut tube = patch(30.0);
-    tube.tris = Arc::new(vec![
+    tube.tris = Arc::new(Tris::new(vec![
         500.0, 500.0, 9.0, 501.0, 500.0, 9.0, 500.0, 501.0, 9.0,
-    ]);
-    tube.reach = Some(Arc::new(vec![
-        -1.0, -1.0, 9.0, 1.0, -1.0, 9.0, 0.0, 1.0, 9.0,
     ]));
+    tube.reach = Some(Arc::new(Tris::new(vec![
+        -1.0, -1.0, 9.0, 1.0, -1.0, 9.0, 0.0, 1.0, 9.0,
+    ])));
     tube.small_tube = Some(vec![patch(20.0)]);
     let mut patches = vec![tube];
     let mark = rv.begin(&mut a, &patches[0]).unwrap();

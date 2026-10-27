@@ -33,6 +33,7 @@ use crate::jsnum;
 use crate::prop::build::{Acc, Lines, Patch};
 use crate::prop::ctx::BuildCtx;
 use crate::prop::rival::{Mark, restore as restore_acc, snapshot as snapshot_acc};
+use crate::tris::Tris;
 use crate::types::V4;
 
 /// `RACE_REL` (web/prop/bridgerace.js:35): the old walls win only by this much more held area:
@@ -53,7 +54,7 @@ struct BMark {
 /// `pending`: `{ patch, twin, start, mid }`.
 struct Pending {
     region: usize,
-    tris: Arc<Vec<f64>>,
+    tris: Arc<Tris>,
     start: BMark,
     mid: Option<BMark>,
 }
@@ -159,8 +160,8 @@ impl BridgeRace {
         } = self.pending.take().unwrap();
         let mid = mid.unwrap();
         let span = ctx.cfg.prop.max_unsupported_span;
-        let turned = held_pieces(&tris, &acc.out, start.m.out, mid.m.out, span);
-        let old = held_pieces(&tris, &acc.out, mid.m.out, acc.out.len(), span);
+        let turned = held_pieces(&tris.v, &acc.out, start.m.out, mid.m.out, span);
+        let old = held_pieces(&tris.v, &acc.out, mid.m.out, acc.out.len(), span);
         if old > turned + jsnum::max(RACE_ABS, RACE_REL * turned) {
             self.keep_tail(acc, &start, &mid, region, ctx);
         } else {

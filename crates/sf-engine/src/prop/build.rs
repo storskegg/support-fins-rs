@@ -11,6 +11,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::config::Config;
 use crate::jsnum;
+use crate::tris::Tris;
 use crate::types::V4;
 
 /// `COVER_SPARSE_SPAN` (web/prop.js:112): mm row pitch at the sparsest coverage (0). This is
@@ -232,8 +233,9 @@ pub struct Patch {
     pub faces: Vec<usize>,
     pub area: f64,
     pub region: usize,
-    /// The REGION's seated triangles (flat, 9 per face), shared by all its patches.
-    pub tris: Arc<Vec<f64>>,
+    /// The REGION's seated triangles (flat, 9 per face), shared by all its patches. A `Tris`, so the
+    /// surface grid cached on the array (`surface_z_at`) is shared too.
+    pub tris: Arc<Tris>,
     /// `patch.lines`: the tube's, arc's, raster's or downhill's tracks (a patch-path patch has
     /// none: `patchTracks` makes its tracks).
     pub lines: Option<Lines>,
@@ -249,7 +251,7 @@ pub struct Patch {
     pub strut: bool,
     /// `patch.reach`: a lattice strut's own triangles, instead of `tris`, for the rival's
     /// held-area bounds.
-    pub reach: Option<Arc<Vec<f64>>>,
+    pub reach: Option<Arc<Tris>>,
     /// `patch.bridgeTwin`.
     pub bridge_twin: bool,
     /// `patch.rival`: an index into the rivalry's arena (prop/rival.js).

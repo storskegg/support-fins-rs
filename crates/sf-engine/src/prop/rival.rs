@@ -31,6 +31,7 @@ use crate::config::Config;
 use crate::jsnum;
 use crate::overhangs::{Analysis, MIN_REGION_AREA, Topology};
 use crate::prop::build::{Acc, Patch, PropRecord, Skipped};
+use crate::tris::Tris;
 use crate::types::V4;
 
 /// `snapshot()`'s result: `{ out, props, tines, skipped, sagRisk, served }`.
@@ -83,8 +84,8 @@ struct Tube {
 #[derive(Clone, Debug)]
 struct Rival {
     tube: Tube,
-    tris: Arc<Vec<f64>>,
-    reach: Option<Arc<Vec<f64>>>,
+    tris: Arc<Tris>,
+    reach: Option<Arc<Tris>>,
     slivers: usize,
     region: usize,
     start: Option<Mark>,
@@ -228,7 +229,7 @@ impl TubeRivalry<'_> {
         let own = r.reach.clone().unwrap_or_else(|| r.tris.clone());
         // an arc (prop/arc.js) keeps a tie: it stands under the strip's whole length,
         // the straight tracks only reach it
-        let rival = self.held_area(&own, &acc.out, r.start.as_ref().unwrap().out);
+        let rival = self.held_area(&own.v, &acc.out, r.start.as_ref().unwrap().out);
         let keep = if r.arc {
             r.tube.held >= rival - 1e-6
         } else {
@@ -263,7 +264,7 @@ impl TubeRivalry<'_> {
     pub fn tube_done(&mut self, acc: &mut Acc, i: usize, mark: Mark, patches: &mut Vec<Patch>) {
         let patch = patches[i].clone();
         let own = patch.reach.clone().unwrap_or_else(|| patch.tris.clone());
-        let held = self.held_area(&own, &acc.out, mark.out);
+        let held = self.held_area(&own.v, &acc.out, mark.out);
         let tube = Tube {
             end: snapshot(acc),
             tris: acc.out[mark.out..].to_vec(),

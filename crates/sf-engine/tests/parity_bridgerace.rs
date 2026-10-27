@@ -4,6 +4,8 @@
 
 use std::sync::Arc;
 
+use sf_engine::tris::Tris;
+
 use parity::{Tol, Value, compare, load_cases};
 use sf_engine::config::Config;
 use sf_engine::prop::bridgerace::bridge_race;
@@ -60,10 +62,10 @@ fn bridge_race_matches_the_oracle() {
             });
             let patch = Patch {
                 region: p.get("region").num() as usize,
-                tris: Arc::new(match p.get("tris") {
+                tris: Arc::new(Tris::new(match p.get("tris") {
                     Value::F64(a) => a.clone(),
                     o => panic!("{o:?}"),
-                }),
+                })),
                 axis: opt(p, "axis").map(|t| {
                     let a = nums(t);
                     [a[0], a[1]]

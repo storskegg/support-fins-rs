@@ -10,6 +10,7 @@ use sf_engine::config::Config;
 use sf_engine::overhangs::{Analysis, Region, build_topology};
 use sf_engine::prop::build::{Acc, Patch, PropRecord};
 use sf_engine::prop::rival::tube_rivalry;
+use sf_engine::tris::Tris;
 use sf_engine::types::Xyz;
 
 fn f64s(v: &Value) -> Vec<f64> {
@@ -33,7 +34,7 @@ struct Spec {
 }
 
 fn spec_of(v: &Value) -> Spec {
-    let tris = Arc::new(f64s(v.get("tris")));
+    let tris = Arc::new(Tris::new(f64s(v.get("tris"))));
     let small: Vec<Spec> = opt(v, "smallTube")
         .map(|s| s.arr().iter().map(spec_of).collect())
         .unwrap_or_default();
@@ -41,7 +42,7 @@ fn spec_of(v: &Value) -> Spec {
         region: v.get("region").num() as usize,
         area: v.get("area").num(),
         tris,
-        reach: opt(v, "reach").map(|r| Arc::new(f64s(r))),
+        reach: opt(v, "reach").map(|r| Arc::new(Tris::new(f64s(r)))),
         arc: matches!(opt(v, "arc"), Some(Value::Bool(true))),
         ..Default::default()
     };

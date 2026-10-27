@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use sf_engine::tris::Tris;
+
 use sf_engine::config::Config;
 use sf_engine::prop::bridgerace::{RACE_ABS, RACE_REL, bridge_race};
 use sf_engine::prop::build::{Acc, Lines, Patch, PropRecord};
@@ -13,10 +15,10 @@ fn patch() -> Patch {
     Patch {
         region: 3,
         area: 200.0,
-        tris: Arc::new(vec![
+        tris: Arc::new(Tris::new(vec![
             0.0, 0.0, 10.0, 20.0, 0.0, 10.0, 0.0, 20.0, 10.0, 20.0, 0.0, 10.0, 20.0, 20.0, 10.0,
             0.0, 20.0, 10.0,
-        ]),
+        ])),
         ..Default::default()
     }
 }
