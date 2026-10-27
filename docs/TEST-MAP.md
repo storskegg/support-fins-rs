@@ -51,10 +51,10 @@ Web-only rows:
 | `lattice.test.js` | 2 | fins, inside, overhangs, prop, prop/lattice, stl | M3 | not ported |
 | `layout_pins.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `low_edge.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `must_class.test.js` | 4 | fins/coverage, inside, overhangs, stl | M2 | not ported |
+| `must_class.test.js` | 4 | fins/coverage, inside, overhangs, stl | M2 | green |
 | `navpresets.test.js` | 5 | inside, overhangs, stl, ui/navpresets | M4 | not ported |
 | `nearface.test.js` | 2 | inside, overhangs, prop/nearface, stl | M1 | green |
-| `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | not ported |
+| `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | green |
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | not ported |
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
 | `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | not ported |
