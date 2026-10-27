@@ -1,14 +1,8 @@
 //! Port of plugins/cli/tests/project.test.js. The Bambu-style project fixture, the in-memory and
 //! on-disk command lines are in `project_common`.
 //!
-//! Awaiting sf-cut (#72), not ported: every test whose fixture needs a cutter to *succeed* --
-//! "project negatives: {auto,full}, mirror {false,true} cuts all occurrences ...", "N mm cut-created
-//! bore retains {auto,full} small-hole policy", "plate sequence overrides project sequence in both
-//! directions", "{open body,open cutter,partial cut,missing cutter,empty cutter,whole body} never
-//! falls back", "native-support override affects only selected original object", "negatives resume:
-//! interruption/final-write failure reuse completed subtractions" and "negatives resume: source and
-//! generation settings invalidate successful cut results". `cut.rs` reports the Manifold engine as
-//! not loadable, so they would fail for the wrong reason (see TEST-MAP).
+//! Divergence (negatives resume): JS also breaks the cutter's WASM to prove a compatible checkpoint
+//! bypasses it; the hit/save lists carry the same fact here.
 mod project_common;
 
 use project_common::*;
@@ -2283,8 +2277,8 @@ fn cavity() -> Cutter {
 
 #[test]
 fn negatives_resume_partially_cut_objects_are_retried_never_checkpointed() {
-    // Today the cutter engine is not loadable (#72), so object 1 is skipped as unsubtractable;
-    // the property under test -- a skipped object is never checkpointed -- is the same.
+    // Object 1 has an open cutter, so it is skipped as not fully subtracted: a skipped object is
+    // never checkpointed.
     let open = Cutter {
         positions: Some(block(2.0, 18.0, -1.0, 21.0, 2.0, 12.0)[..72].to_vec()),
         ..Default::default()
@@ -2469,4 +2463,593 @@ fn negatives_strict_adapter_rejects_exceptions_incomplete_and_invalid_results() 
     let r = subtract_project_negatives(&plain_model, 0, &|_, _| panic!("must bypass")).unwrap();
     assert_eq!(r, positions, "non-negative geometry changed");
     let _ = jsnum::to_js_string(0.0);
+}
+
+// ---- negatives that need the cutter to succeed (sf-cut, #72) ------------------------------------
+
+/// `nodeText(xml, id, inResources)`: the source text of the `<object id>` element.
+fn node_text(xml: &str, id: &str, in_resources: bool) -> String {
+    let root = xml_tree(xml).unwrap();
+    let parent = if in_resources {
+        child(&root, "resources").unwrap()
+    } else {
+        &root
+    };
+    let node = children(parent, "object")
+        .into_iter()
+        .find(|o| at(o, "id") == id)
+        .unwrap();
+    xml[node.start..node.end].to_string()
+}
+
+fn has_support(o: &Json) -> bool {
+    matches!(o.get("supportObject"), Some(Json::Str(s)) if !s.is_empty())
+}
+
+fn open_cavity() -> Cutter {
+    Cutter {
+        positions: Some(cavity().positions.unwrap()[..72].to_vec()),
+        ..Default::default()
+    }
+}
+
+fn dialog(mode: &str) -> sf_cli::entry::EngineOptions {
+    options_from_dialog(&[
+        ("mode".to_string(), Json::Str(mode.to_string())),
+        ("layerHeight".to_string(), Json::Num(0.16)),
+        ("nozzle".to_string(), Json::Num(0.4)),
+    ])
+    .unwrap()
+}
+
+// project.test.js:912
+fn negatives_cut_all_occurrences(mode: &str, mirror: bool) {
+    let source = fixture(&Fx {
+        upright: true,
+        mirror,
+        cutters: vec![
+            cavity(),
+            Cutter {
+                positions: Some(block(0.0, 2.0, 0.0, 4.0, 0.0, 4.0)),
+                transform: Some("-1 0 0 0 1 0 0 0 1 20 8 3".into()),
+                repeat: Some(2),
+            },
+        ],
+        ..plain()
+    });
+    let r = cli(&source, &["--object", "1", "--mode", mode]);
+    assert!(
+        r.code == 0 && jn(&objs(&r)[0], "triangles") > 0.0,
+        "{}",
+        r.err_text()
+    );
+    let original = ProjectZip::new(&source).unwrap();
+    let saved = out_zip(&r);
+    // ZIP headers and compressed mesh payloads, not merely equivalent decoded meshes.
+    for name in [
+        "3D/Objects/a.model",
+        "3D/Objects/b.model",
+        "3D/Objects/cutter0.model",
+        "3D/Objects/cutter1.model",
+        SETTINGS,
+        "Auxiliaries/私有.bin",
+    ] {
+        assert!(
+            same_entry(&original, &saved, name),
+            "changed original {name}"
+        );
+    }
+    for name in [CONFIG, ROOT] {
+        for id in ["10", "20"] {
+            assert!(
+                node_text(&text(&original, name), id, name == ROOT)
+                    == node_text(&text(&saved, name), id, name == ROOT),
+                "changed body/cutter metadata or unselected object: {name} {id}"
+            );
+        }
+    }
+    let body = read_three_mf_parts(
+        &members(&original),
+        &ReadOpts {
+            build_index: Some(0),
+            double_precision: true,
+            outward_winding: true,
+        },
+    )
+    .unwrap()
+    .objects
+    .remove(0);
+    let cut = sf_cli::cut::cut_negatives(&body.positions, &body.extras);
+    assert!(
+        cut.cut == 3 && cut.uncut == 0 && cut.why.is_none(),
+        "fixture did not apply every cutter occurrence"
+    );
+    let opts = dialog(mode);
+    assert!(
+        compute_fins(&body.positions, &opts)
+            .unwrap()
+            .triangles
+            .is_empty(),
+        "solid body should need no fins"
+    );
+    let direct = compute_fins(&cut.positions, &opts).unwrap();
+    let objects = read_three_mf(&saved.bytes).unwrap().objects;
+    assert!(
+        objects.len() == 3 && objects[0].extras.len() == 3,
+        "cutters lost or fins attached to body"
+    );
+    equal(
+        &objects[0]
+            .positions
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<_>>(),
+        &read_three_mf(&source).unwrap().objects[0]
+            .positions
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect::<Vec<_>>(),
+        "body replaced by boolean result",
+    );
+    let fin = read_three_mf_parts(
+        &members(&saved),
+        &ReadOpts {
+            build_index: Some(2),
+            double_precision: true,
+            outward_winding: true,
+        },
+    )
+    .unwrap()
+    .objects
+    .remove(0)
+    .positions;
+    let off = [direct.offset.x, direct.offset.y, direct.offset.z];
+    assert!(
+        fin.len() == direct.triangles.len(),
+        "did not generate from cut shape"
+    );
+    for (k, v) in fin.iter().enumerate() {
+        assert_close(
+            *v,
+            direct.triangles[k] as f64 - off[k % 3],
+            4e-5,
+            &format!("fin vertex {k}"),
+        );
+    }
+    let root = xml_tree(&text(&saved, ROOT)).unwrap();
+    let items = &child(&root, "build").unwrap().children;
+    assert!(
+        at(&items[0], "transform") == at(&items[2], "transform"),
+        "support pose changed"
+    );
+    let cfg = xml_tree(&text(&saved, CONFIG)).unwrap();
+    let support_id = js(&objs(&r)[0], "supportObject");
+    assert!(
+        children(child(&cfg, "plate").unwrap(), "model_instance")
+            .into_iter()
+            .any(|i| mget(i, "object_id").as_deref() == Some(support_id.as_str())),
+        "wrong support plate"
+    );
+    let support = children(&cfg, "object")
+        .into_iter()
+        .find(|o| at(o, "id") == support_id)
+        .unwrap();
+    assert!(
+        mget(support, "enable_support").as_deref() == Some("0"),
+        "support object has native supports"
+    );
+    assert!(
+        ores(&r).len() == 1 && js(&ores(&r)[0], "status") == "processed",
+        "unexpected report"
+    );
+}
+
+#[test]
+fn negatives_auto_mirror_false_cuts_all_occurrences_and_preserves_editable_source() {
+    negatives_cut_all_occurrences("auto", false);
+}
+
+#[test]
+fn negatives_auto_mirror_true_cuts_all_occurrences_and_preserves_editable_source() {
+    negatives_cut_all_occurrences("auto", true);
+}
+
+#[test]
+fn negatives_full_mirror_false_cuts_all_occurrences_and_preserves_editable_source() {
+    negatives_cut_all_occurrences("full", false);
+}
+
+#[test]
+fn negatives_full_mirror_true_cuts_all_occurrences_and_preserves_editable_source() {
+    negatives_cut_all_occurrences("full", true);
+}
+
+/// Closed cylinder along X, cutting a genuine circular bore through the cube.
+fn cylinder(diameter: f64) -> Vec<f64> {
+    let segments = 96.0;
+    let ring = |x: f64, i: f64| {
+        [
+            x,
+            10.0 + diameter / 2.0 * (i * 2.0 * std::f64::consts::PI / segments).cos(),
+            10.0 + diameter / 2.0 * (i * 2.0 * std::f64::consts::PI / segments).sin(),
+        ]
+    };
+    let mut points = Vec::new();
+    for i in 0..96 {
+        let i = i as f64;
+        let (a, b, c, d) = (
+            ring(-1.0, i),
+            ring(-1.0, i + 1.0),
+            ring(21.0, i + 1.0),
+            ring(21.0, i),
+        );
+        for p in [
+            a,
+            b,
+            c,
+            a,
+            c,
+            d,
+            a,
+            [-1.0, 10.0, 10.0],
+            b,
+            d,
+            c,
+            [21.0, 10.0, 10.0],
+        ] {
+            points.extend(p);
+        }
+    }
+    points
+}
+
+// project.test.js:963
+fn cut_created_bore(diameter: f64, mode: &str) {
+    let r = cli(
+        &fixture(&Fx {
+            upright: true,
+            cutters: vec![Cutter {
+                positions: Some(cylinder(diameter)),
+                ..Default::default()
+            }],
+            ..plain()
+        }),
+        &["--object", "1", "--mode", mode],
+    );
+    assert!(r.code == 0, "{}", r.err_text());
+    let o = &objs(&r)[0];
+    let small = if diameter == 5.0 { 1.0 } else { 0.0 };
+    assert!(
+        jn(j(o, "stats"), "smallHoleRegions") == small,
+        "cut-created bore misclassified"
+    );
+    assert!(
+        (jn(o, "triangles") == 0.0) == (diameter == 5.0),
+        "small bore filled or larger cavity lost supports"
+    );
+}
+
+#[test]
+fn negatives_5_mm_cut_created_bore_retains_auto_small_hole_policy() {
+    cut_created_bore(5.0, "auto");
+}
+
+#[test]
+fn negatives_5_mm_cut_created_bore_retains_full_small_hole_policy() {
+    cut_created_bore(5.0, "full");
+}
+
+#[test]
+fn negatives_10_mm_cut_created_bore_retains_auto_small_hole_policy() {
+    cut_created_bore(10.0, "auto");
+}
+
+#[test]
+fn negatives_10_mm_cut_created_bore_retains_full_small_hole_policy() {
+    cut_created_bore(10.0, "full");
+}
+
+// project.test.js:972
+#[test]
+fn negatives_plate_sequence_overrides_project_sequence_in_both_directions() {
+    let allowed = fixture(&Fx {
+        cutters: vec![cavity()],
+        sequence: "by object".into(),
+        plate_sequence: Some("by layer".into()),
+        ..plain()
+    });
+    let r = cli(&allowed, &[]);
+    assert!(
+        r.code == 0
+            && objs(&r).len() == 2
+            && has_support(&objs(&r)[0])
+            && !has_support(&objs(&r)[1]),
+        "{}",
+        r.err_text()
+    );
+    let zip = out_zip(&r);
+    equal(
+        &zip.read(SETTINGS).unwrap(),
+        &ProjectZip::new(&allowed).unwrap().read(SETTINGS).unwrap(),
+        "saved sequence changed",
+    );
+    assert!(
+        mget(
+            child(&xml_tree(&text(&zip, CONFIG)).unwrap(), "plate").unwrap(),
+            "print_sequence"
+        )
+        .as_deref()
+            == Some("by layer"),
+        "plate override changed"
+    );
+    for (sequence, plate_sequence) in [("by layer", Some("by object")), ("by object", None)] {
+        let source = fixture(&Fx {
+            cutters: vec![cavity()],
+            sequence: sequence.into(),
+            plate_sequence: plate_sequence.map(str::to_string),
+            ..plain()
+        });
+        let check = cli(&source, &["--check"]);
+        let batch = cli(&source, &[]);
+        let explicit = cli(&source, &["--object", "1"]);
+        assert!(
+            check.code == 1 && js(&ores(&check)[0], "reason").contains("print-by-layer"),
+            "check accepted by-object negative"
+        );
+        assert!(
+            batch.code == 0 && js(&ores(&batch)[0], "status") == "skipped",
+            "batch did not skip"
+        );
+        assert!(
+            explicit.code == 1 && explicit.fs.len() == 1,
+            "explicit unsupported selection published output"
+        );
+    }
+}
+
+// project.test.js:996
+#[test]
+fn negatives_that_cannot_be_fully_subtracted_never_fall_back() {
+    let cases: Vec<(&str, Fx, &str)> = vec![
+        (
+            "open body",
+            Fx {
+                positions: Some(block(0.0, 20.0, 0.0, 20.0, 0.0, 20.0)[..90].to_vec()),
+                cutters: vec![cavity()],
+                ..plain()
+            },
+            "closed solid",
+        ),
+        (
+            "open cutter",
+            Fx {
+                cutters: vec![open_cavity()],
+                ..plain()
+            },
+            "fully subtracted",
+        ),
+        (
+            "partial cut",
+            Fx {
+                cutters: vec![cavity(), open_cavity()],
+                ..plain()
+            },
+            "fully subtracted",
+        ),
+        (
+            "missing cutter",
+            Fx {
+                cutters: vec![Cutter {
+                    positions: None,
+                    ..Default::default()
+                }],
+                ..plain()
+            },
+            "missing",
+        ),
+        (
+            "empty cutter",
+            Fx {
+                cutters: vec![Cutter {
+                    positions: Some(vec![]),
+                    ..Default::default()
+                }],
+                ..plain()
+            },
+            "cutter",
+        ),
+        (
+            "whole body",
+            Fx {
+                cutters: vec![Cutter {
+                    positions: Some(block(-1.0, 21.0, -1.0, 21.0, -1.0, 21.0)),
+                    ..Default::default()
+                }],
+                ..plain()
+            },
+            "entire printable mesh",
+        ),
+    ];
+    for (label, options, reason) in cases {
+        let source = fixture(&Fx {
+            upright: true,
+            ..options
+        });
+        let checked = cli(&source, &["--check"]);
+        assert!(
+            checked.code == 1
+                && checked.fs.len() == 1
+                && js(&ores(&checked)[0], "status") == "incompatible"
+                && js(&ores(&checked)[0], "reason").contains(reason),
+            "{label}: {}",
+            checked.out.join("\n")
+        );
+        assert!(
+            js(&ores(&checked)[1], "status") == "compatible",
+            "{label}: check did not continue"
+        );
+        let batch = cli(&source, &[]);
+        assert!(
+            batch.code == 0
+                && js(&ores(&batch)[0], "status") == "skipped"
+                && numbers(&batch) == "2",
+            "{label}: {}",
+            batch.err_text()
+        );
+        let output = ProjectZip::new(&batch.fs[&js(batch.r(), "output")]).unwrap();
+        let original = ProjectZip::new(&source).unwrap();
+        for name in [ROOT, CONFIG] {
+            assert!(
+                node_text(&text(&output, name), "10", name == ROOT)
+                    == node_text(&text(&original, name), "10", name == ROOT),
+                "{label}: skipped object changed"
+            );
+        }
+        for flags in [["--object", "1"], ["--plate", "1"]] {
+            let r = cli(&source, &flags);
+            assert!(
+                r.code == 1
+                    && r.fs.len() == 1
+                    && !r.result.as_ref().is_some_and(|x| jb(x, "outputWritten")),
+                "{label}: failed selection published: {flags:?}"
+            );
+        }
+        for flag in ["--list-objects", "--list-plates"] {
+            let listing = cli(&source, &[flag]);
+            assert!(
+                listing.code == 0 && listing.fs.len() == 1,
+                "{label}: listing attempted geometry validation"
+            );
+        }
+    }
+}
+
+// project.test.js:1040
+#[test]
+fn negatives_native_support_override_affects_only_selected_original_object() {
+    let source = fixture(&Fx {
+        cutters: vec![cavity()],
+        ..plain()
+    });
+    let r = cli(&source, &["--object", "1", "--disable-native-supports"]);
+    assert!(r.code == 0, "{}", r.err_text());
+    let saved = out_zip(&r);
+    let cfg = xml_tree(&text(&saved, CONFIG)).unwrap();
+    let selected = children(&cfg, "object")
+        .into_iter()
+        .find(|o| at(o, "id") == "10")
+        .unwrap();
+    assert!(
+        mget(selected, "enable_support").as_deref() == Some("0"),
+        "selected native supports not disabled"
+    );
+    assert!(
+        node_text(
+            &text(&ProjectZip::new(&source).unwrap(), CONFIG),
+            "20",
+            false
+        ) == node_text(&text(&saved, CONFIG), "20", false),
+        "unselected native supports changed"
+    );
+    assert!(
+        children(selected, "part")
+            .into_iter()
+            .any(|p| p.attr_exact("subtype") == Some("negative_part")),
+        "cutter metadata lost"
+    );
+}
+
+// project.test.js:1052
+#[test]
+fn negatives_resume_interruption_final_write_failure_reuse_completed_subtractions_output_equals_fresh()
+ {
+    let d = disk_project(&Fx {
+        cutters: vec![cavity()],
+        upright: true,
+        ..plain()
+    });
+    let interrupted = d.call(&["--resume"], hooks_load(2), None);
+    assert!(
+        interrupted.code == 1 && csv(&interrupted.saved) == "1",
+        "negative object not checkpointed"
+    );
+    // (JS also breaks the WASM here to prove a compatible checkpoint bypasses the cutter; the hit
+    // list below -- object 1 loaded, never saved again -- is the same fact)
+    let write_failed = d.call(
+        &["--resume"],
+        CacheHooks::default(),
+        Some("output unavailable"),
+    );
+    assert!(
+        write_failed.code == 1 && csv(&write_failed.hits) == "1" && csv(&write_failed.saved) == "2",
+        "subtraction was repeated"
+    );
+    let resumed = d.call(
+        &["--resume", "-o", &d.path("resumed.3mf")],
+        CacheHooks::default(),
+        None,
+    );
+    assert!(
+        resumed.code == 0 && csv(&resumed.hits) == "1,2" && resumed.saved.is_empty(),
+        "{}",
+        resumed.err_text()
+    );
+    let fresh = d.call(&["-o", &d.path("fresh.3mf")], CacheHooks::default(), None);
+    assert!(fresh.code == 0, "{}", fresh.err_text());
+    let a = ProjectZip::new(&std::fs::read(d.path("resumed.3mf")).unwrap()).unwrap();
+    let b = ProjectZip::new(&std::fs::read(d.path("fresh.3mf")).unwrap()).unwrap();
+    for name in a.entries.keys() {
+        let (x, y) = (a.read(name).unwrap(), b.read(name).unwrap());
+        if name == ROOT || name == SUPPORTS {
+            assert!(
+                norm(&String::from_utf8(x).unwrap()) == norm(&String::from_utf8(y).unwrap()),
+                "resume changed {name}"
+            );
+        } else {
+            assert!(x == y, "resume changed {name}");
+        }
+    }
+}
+
+// project.test.js:1095
+#[test]
+fn negatives_resume_source_and_generation_settings_invalidate_successful_cut_results() {
+    for change in ["source", "settings"] {
+        let d = disk_project(&Fx {
+            cutters: vec![cavity()],
+            upright: true,
+            ..plain()
+        });
+        let first = d.call(
+            &["--resume"],
+            CacheHooks::default(),
+            Some("output unavailable"),
+        );
+        assert!(
+            first.code == 1 && csv(&first.saved) == "1,2",
+            "setup failed"
+        );
+        if change == "source" {
+            let name = "3D/Objects/cutter0.model";
+            let zip = ProjectZip::new(&d.source).unwrap();
+            let moved = zip.text(name).unwrap().replace("z=\"12\"", "z=\"14\"");
+            let patched = zip
+                .patch(&[(
+                    name.to_string(),
+                    Some(sf_io::zip::ZipData::Bytes(moved.into_bytes())),
+                )])
+                .unwrap();
+            std::fs::write(&d.input, patched).unwrap();
+        }
+        let flags: Vec<&str> = if change == "settings" {
+            vec!["--resume", "--mode", "full"]
+        } else {
+            vec!["--resume"]
+        };
+        let r = d.call(&flags, CacheHooks::default(), None);
+        assert!(
+            r.code == 0 && r.hits.is_empty() && csv(&r.saved) == "1,2",
+            "{change}: reused stale subtraction"
+        );
+    }
 }

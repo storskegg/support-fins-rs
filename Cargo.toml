@@ -1,8 +1,6 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "parity"]
-# sf-cut has only the vendored Manifold submodule until #72 adds its Cargo.toml; track A removes this exclude then.
-exclude = ["crates/sf-cut"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,6 +12,7 @@ publish = false
 [workspace.dependencies]
 sf-engine = { path = "crates/sf-engine" }
 sf-io = { path = "crates/sf-io" }
+sf-cut = { path = "crates/sf-cut" }
 sf-testkit = { path = "crates/sf-testkit" }
 libm = "0.2.16"
 indexmap = "2.14"

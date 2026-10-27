@@ -29,7 +29,7 @@ Web-only rows:
 | `circular.test.js` | 9 | fins, fins/downhill, inside, overhangs, prop, prop/circular, stl | M3 | green |
 | `coverage.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
 | `curved.test.js` | 5 | fins, fins/downhill, inside, overhangs, prop, prop/curved, stl | M3 | green |
-| `cut.test.js` | 13 | cut, fins, inside, overhangs, prop, stl, threemf | M6 | not ported |
+| `cut.test.js` | 13 | cut, fins, inside, overhangs, prop, stl, threemf | M3 | green (sf-cut/tests/js_cut.rs: 16 of the 17 Rust cases; the "cutter that will not load" case has no counterpart, Manifold is linked in) |
 | `cutout.test.js` | 14 | cutout, draw, fins, inside, overhangs, prop, stl | M3 | green |
 | `downhill.test.js` | 4 | fins, inside, overhangs, prop, prop/downhill, stl | M3 | green |
 | `draw.test.js` | 18 | draw, fins, inside, overhangs, prop, stl | M3 | green |
@@ -105,7 +105,7 @@ Web-only rows:
 | `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
 | `part_wall_ends.test.js` | 1 | prop/attached | M3 (catch-up to 299ef49) | green |
 | `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | 3 of 4 ported (sf-io/tests/js_report.rs); the locale case is the page's i18n (M7) |
-| `plugins/cli/tests/cli.test.js` | 17 | plugins/cli, plugins/shared/engine | M3 | 16 of 17 ported (sf-cli/tests/cli.rs); the negative-part cut (#104) needs Manifold (`sf-cut`), pinned meanwhile by its "not cut" warning |
-| `plugins/cli/tests/project.test.js` | 68 | plugins/cli/project* | M3 | partial: 50 of 68 ported (sf-cli/tests/project.rs). The other 18 need a cutter to *succeed* and wait for sf-cut (#72): negatives {auto,full} x mirror (4), cut-created bore (4), {open body, open cutter, partial cut, missing cutter, empty cutter, whole body} (6), plate sequence overrides, native-support override, and two resume cases. The killed-subprocess case polls the real binary for its first checkpoint instead of stopping it at a hook |
+| `plugins/cli/tests/cli.test.js` | 17 | plugins/cli, plugins/shared/engine | M3 | 17 of 17 ported (sf-cli/tests/cli.rs); the negative-part cut (#104) is `sf-cut` |
+| `plugins/cli/tests/project.test.js` | 68 | plugins/cli/project* | M3 | 68 of 68 ported (sf-cli/tests/project.rs); the six "never falls back" cases are one test, and the killed-subprocess case polls the real binary for its first checkpoint instead of stopping it at a hook |
 | `plugins/cli/tests/project_cache.test.js` | 8 | plugins/cli/project-cache | M3 | 8 of 8 ported (sf-cli/tests/project_cache.rs); the build-identity case checks the binary hash is stable (JS hashes its sources, so an edit changes it) |
 | `plugins/cli/tests/project_nozzle.test.js` | 2 | plugins/cli/project-nozzle | M3 | 2 of 2 ported (sf-cli/tests/project_cache.rs) |
