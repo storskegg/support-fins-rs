@@ -26,12 +26,12 @@ Web-only rows:
 | `brace.test.js` | 5 | fins, inside, overhangs, prop, prop/brace, stl | M3 | green |
 | `bridge_dir.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | green |
 | `calibrate.test.js` | 3 | inside, overhangs, stl, ui/calibrate | M4 | not ported |
-| `circular.test.js` | 9 | fins, fins/downhill, inside, overhangs, prop, prop/circular, stl | M3 | not ported |
+| `circular.test.js` | 9 | fins, fins/downhill, inside, overhangs, prop, prop/circular, stl | M3 | green |
 | `coverage.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
-| `curved.test.js` | 5 | fins, fins/downhill, inside, overhangs, prop, prop/curved, stl | M3 | not ported |
+| `curved.test.js` | 5 | fins, fins/downhill, inside, overhangs, prop, prop/curved, stl | M3 | green |
 | `cut.test.js` | 13 | cut, fins, inside, overhangs, prop, stl, threemf | M6 | not ported |
 | `cutout.test.js` | 14 | cutout, draw, fins, inside, overhangs, prop, stl | M3 | not ported |
-| `downhill.test.js` | 4 | fins, inside, overhangs, prop, prop/downhill, stl | M3 | not ported |
+| `downhill.test.js` | 4 | fins, inside, overhangs, prop, prop/downhill, stl | M3 | green |
 | `draw.test.js` | 18 | draw, fins, inside, overhangs, prop, stl | M3 | green |
 | `drawarc.test.js` | 7 | draw, drawarc, fins, inside, overhangs, prop, stl | M3 | green |
 | `exportname.test.js` | 3 | exportname, fins, inside, overhangs, prop, stl | M3 | not ported |
