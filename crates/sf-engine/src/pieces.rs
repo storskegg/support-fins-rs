@@ -8,7 +8,7 @@ use crate::jsnum;
 use crate::overhangs::{Analysis, BED_EPS, Topology};
 use crate::types::Rot3;
 
-/// One floating piece: `{ faces, lowest, drop }` (web/pieces.js:114).
+/// One floating piece: `{ faces, lowest, drop }` (web/pieces.js:122).
 #[derive(Clone, Debug, PartialEq)]
 pub struct FloatingPiece {
     pub faces: usize,
@@ -37,7 +37,7 @@ fn find(parent: &mut [i32], mut x: i32) -> i32 {
 /// on another piece, in the seated frame of `result`; `drop` is how far the lowest point hangs
 /// over whatever is below it (the bare plate: its height).
 ///
-/// `floatingPieces(topo, result, rot = IDENTITY3)` (web/pieces.js:25-125); callers pass
+/// `floatingPieces(topo, result, rot = IDENTITY3)` (web/pieces.js:29-125); callers pass
 /// `IDENTITY3` for the default.
 pub fn floating_pieces(topo: &Topology, result: &Analysis, rot: &Rot3) -> Vec<FloatingPiece> {
     let pos = &topo.pos;

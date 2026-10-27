@@ -50,10 +50,10 @@ impl Default for IslandConfig {
     }
 }
 
-/// `EPS` (web/islands.js:36).
+/// `EPS` (web/islands.js:34).
 const EPS: f64 = 1e-6;
 
-/// `topo._vgraph` (web/islands.js:39-57), cached per topology: vertex neighbours and incident
+/// `topo._vgraph` (web/islands.js:57), cached per topology: vertex neighbours and incident
 /// faces (CSR), rotation-invariant.
 #[derive(Debug)]
 pub struct VGraph {
@@ -65,7 +65,7 @@ pub struct VGraph {
     nbr: Vec<i32>,
 }
 
-/// `vertexGraph(topo)` (web/islands.js:39-58).
+/// `vertexGraph(topo)` (web/islands.js:37-58).
 fn vertex_graph(topo: &Topology) -> &VGraph {
     topo.cache.vgraph.get_or_init(|| {
         let vid = &topo.vid;
@@ -115,7 +115,7 @@ fn vertex_graph(topo: &Topology) -> &VGraph {
     })
 }
 
-/// One island: the object `findIslands` returns (web/islands.js:62-65, keys in JS order: `z`,
+/// One island: the object `findIslands` returns (web/islands.js:260, 265-276, keys in JS order: `z`,
 /// `area`, `points`, then `x`, `y` added by the final pass).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Island {
