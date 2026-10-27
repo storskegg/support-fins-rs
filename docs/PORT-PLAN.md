@@ -253,6 +253,9 @@ V8 bit for bit through the parity replay. The `overhangs.js` cases are recorded.
 - **Report:** a serial-Rust vs JS timing table. **Demo:** the CLI on your own parts.
 
 ### M4 — App foundations and core loop (major: app usable)
+
+Split into **M4a** (FFI, app skeleton, a viewer with live overhang shading) and **M4b** (the core loop),
+with a checkpoint between them. The interface is specified in `docs/FFI.md`.
 - **FFI:** `sf-ffi` via UniFFI → a Swift package. Zero-copy vertex and index buffers from Rust into
   `MTLBuffer` (`bytesNoCopy`, page-aligned). A job system with progress, cancel and
   generation counters.
