@@ -84,10 +84,10 @@ Web-only rows:
 | `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | not ported |
 | `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | green |
-| `sway.test.js` | 19 | fins, inside, overhangs, prop, stl, sway | M3 | not ported |
-| `sway_clearance.test.js` | 2 | inside, overhangs, stl, sway | M3 | not ported |
-| `sway_cross_gauge.test.js` | 3 | fins, finworker, inside, nozzle, overhangs, prop, prop/brace, stl, sway, threemf | M3 | not ported |
-| `sway_depth.test.js` | 7 | fins, finworker, inside, overhangs, prop, stl, sway, threemf | M3 | not ported |
+| `sway.test.js` | 19 | fins, inside, overhangs, prop, stl, sway | M3 | partial: 16 of 19 ported (js_sway.rs); the 3 that build through buildFins wait for it |
+| `sway_clearance.test.js` | 2 | inside, overhangs, stl, sway | M3 | green |
+| `sway_cross_gauge.test.js` | 3 | fins, finworker, inside, nozzle, overhangs, prop, prop/brace, stl, sway, threemf | M3 | partial: 2 of 3 ported (js_sway_cross_gauge.rs); the worker/export case waits for finworker and threemf |
+| `sway_depth.test.js` | 7 | fins, finworker, inside, overhangs, prop, stl, sway, threemf | M3 | partial: 5 of 7 ported (js_sway_depth.rs); the worker and export cases wait for finworker and threemf |
 | `tails.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tall.test.js` | 4 | draw, fins, fins/tall, inside, overhangs, prop, stl | M3 | not ported |
 | `tap.test.js` | 4 | inside, overhangs, stl, ui/tap | — | dropped (web-only) |
