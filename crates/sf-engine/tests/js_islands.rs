@@ -24,7 +24,7 @@ fn corner_cube(cx: f64, cy: f64, cz: f64, side: f64) -> Vec<f64> {
     let d: Vec<f64> = [1.0, 1.0, 1.0].iter().map(|v| v / 3.0f64.sqrt()).collect();
     // Rodrigues: turn d onto z about k = d x z
     let k = [d[1], -d[0], 0.0];
-    let s = k[0].hypot(k[1]).hypot(k[2]);
+    let s = sf_engine::jsnum::hypot(&k);
     let c = d[2];
     let (kx, ky) = (k[0] / s, k[1] / s);
     let f32r = |x: f64| (x as f32) as f64; // a Float32Array store
@@ -45,7 +45,8 @@ fn corner_cube(cx: f64, cy: f64, cz: f64, side: f64) -> Vec<f64> {
 }
 
 fn topo_parts(parts: &[Vec<f64>]) -> Arc<Topology> {
-    topo_of(parts.iter().flatten().copied().collect())
+    // `new Float32Array(...)`: every coordinate rounds to f32 (the `LOW - 0.1` slab)
+    topo_of(f32s(&parts.iter().flatten().copied().collect::<Vec<f64>>()))
 }
 
 fn islands_with(topo: &Arc<Topology>, rot: &Rot3, opts: &IslandOpts) -> Vec<Island> {
@@ -302,7 +303,7 @@ fn held_by(built: &FinsBuilt, isl: &Island) -> bool {
     isl.points.iter().any(|p| {
         built.fins.iter().any(|f| {
             f.line.iter().any(|q| {
-                (p[0] - q[0]).hypot(p[1] - q[1]) <= reach
+                sf_engine::jsnum::hypot(&[p[0] - q[0], p[1] - q[1]]) <= reach
                     && p[2] - q[2] >= -0.05
                     && p[2] - q[2] <= 1.5
             })
