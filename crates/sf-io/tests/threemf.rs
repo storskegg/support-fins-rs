@@ -222,3 +222,27 @@ fn part_kinds_have_the_js_names() {
         ["negative", "modifier", "blocker", "enforcer"]
     );
 }
+
+#[test]
+fn a_stray_slash_in_a_tag_is_an_error_not_a_hang() {
+    // JS scanXML never terminates on these (the attribute loop does not advance)
+    for bad in [
+        "<a b=\"1\" / >",
+        "<a / b>",
+        "<a/ b='1'>",
+        "<root><x /y></root>",
+    ] {
+        let r = scan_xml(bad, &mut |_| Ok(()));
+        assert_eq!(r, Err("3MF: malformed XML tag".to_string()), "{bad}");
+    }
+    // the same through the reader
+    let xml = "<model unit=\"millimeter\"><resources><object id=\"1\" / ></resources></model>";
+    let parts =
+        indexmap::IndexMap::from([("3D/3dmodel.model".to_string(), xml.as_bytes().to_vec())]);
+    assert_eq!(
+        read_three_mf_parts(&parts, &ReadOpts::default()).unwrap_err(),
+        "3MF: malformed XML tag"
+    );
+    // a slash that does close a tag, and one inside a value, are fine
+    assert!(scan_xml("<a b=\"x/y\"/><c d=e/>", &mut |_| Ok(())).is_ok());
+}
