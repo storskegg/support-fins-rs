@@ -81,3 +81,12 @@ swift-bindings:
 # Regenerate the Swift package and run its tests.
 app-core: swift-bindings
     cd app/SupportFinsCore && swift test
+
+# Generate app/SupportFins.xcodeproj from app/project.yml (XcodeGen; the project is not committed).
+app-project:
+    xcodegen generate --spec app/project.yml --project app
+
+# The viewer package's tests (camera maths, offscreen renders) and the app's tests.
+app-test: app-core app-project
+    swift test --package-path app/SupportFinsViewer
+    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS' -quiet

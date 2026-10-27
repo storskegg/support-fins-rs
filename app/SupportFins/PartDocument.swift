@@ -1,0 +1,29 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+extension UTType {
+    /// `public.standard-tesselated-geometry-format` (the system's spelling).
+    static let stl = UTType("public.standard-tesselated-geometry-format") ?? UTType(filenameExtension: "stl") ?? .data
+    static let obj = UTType("public.geometry-definition-format") ?? UTType(filenameExtension: "obj") ?? .data
+    static let threeMF = UTType("com.storskegg.supportfins.3mf") ?? UTType(filenameExtension: "3mf") ?? .data
+    /// What the system calls a `.3mf` on this Mac: there is no system type for it, so whichever app declared one
+    /// first (Shapr3D's, for instance) names it. The file's own type is what a document open is matched on.
+    static let threeMFBySuffix = UTType(filenameExtension: "3mf", conformingTo: .data)
+}
+
+/// A part file opened read-only (a part import: sessions come in M7). The window loads the file from its URL
+/// through the engine; the document itself keeps only the name.
+struct PartDocument: FileDocument {
+    static let readableContentTypes: [UTType] = [.stl, .obj, .threeMF] + (UTType.threeMFBySuffix.map { [$0] } ?? [])
+    static let writableContentTypes: [UTType] = []
+
+    var filename: String
+
+    init(configuration: ReadConfiguration) throws {
+        filename = configuration.file.filename ?? "Part"
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        throw CocoaError(.featureUnsupported)
+    }
+}
