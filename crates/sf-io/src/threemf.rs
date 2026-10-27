@@ -980,7 +980,8 @@ fn char_at(s: &str, p: usize) -> Option<char> {
 /// one callback gets both kinds of event, and an `Err` from it stops the scan (a JS callback
 /// throwing).
 ///
-/// Like the JS, a stray `/` inside a tag that is not followed by `>` never advances the scan.
+/// A stray `/` inside a tag that is not followed by `>` makes JS loop forever; here it is
+/// `Err("3MF: malformed XML tag")` (a recorded divergence).
 pub fn scan_xml(
     xml: &str,
     f: &mut dyn FnMut(XmlEvent) -> Result<(), String>,
@@ -1054,6 +1055,11 @@ pub fn scan_xml(
             if !xml[p..].starts_with('=') {
                 if !attr.is_empty() {
                     attrs.insert(attr.to_string(), String::new());
+                } else if p < n {
+                    // DIVERGENCE: JS `continue`s here without advancing `p` (a stray `/` not
+                    // followed by `>`, as in `<a / b>`) and never terminates. No input JS
+                    // finishes on reaches this branch.
+                    return Err("3MF: malformed XML tag".to_string());
                 }
                 continue;
             }

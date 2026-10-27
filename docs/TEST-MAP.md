@@ -97,7 +97,7 @@ Web-only rows:
 | `tine_shape.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tines.test.js` | 9 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tines_realparts.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `trace.test.js` | 1 | inside, overhangs, prop/config, prop/downhill, prop/trace, stl | M1 | not ported |
+| `trace.test.js` | 1 | inside, overhangs, prop/config, prop/downhill, prop/trace, stl | M1 | green |
 | `tunables.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `unserved.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `viewpresets.test.js` | 7 | inside, overhangs, stl, ui/viewpresets | M4 | not ported |
