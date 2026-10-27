@@ -56,7 +56,7 @@ Web-only rows:
 | `nearface.test.js` | 2 | inside, overhangs, prop/nearface, stl | M1 | not ported |
 | `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | not ported |
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | not ported |
-| `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | not ported |
+| `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
 | `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | not ported |
 | `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | not ported |
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | not ported |
@@ -70,7 +70,7 @@ Web-only rows:
 | `rim.test.js` | 5 | fins, inside, overhangs, prop, prop/rim, stl | M3 | not ported |
 | `rounded_feet.test.js` | 7 | fins, finworker, inside, nozzle, overhangs, prop, solids, stl, threemf | M3 | not ported |
 | `rows.test.js` | 7 | fins, fins/field, fins/rows, inside, overhangs, prop, stl | M3 | not ported |
-| `scale.test.js` | 3 | inside, overhangs, scale, stl | M1 | not ported |
+| `scale.test.js` | 3 | inside, overhangs, scale, stl | M1 | green |
 | `separate_walls.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `session.test.js` | 3 | draw, inside, overhangs, stl, threemf, zip | M3 | not ported |
 | `short_walls.test.js` | 4 | fins, inside, overhangs, prop, prop/clearance, stl | M3 | not ported |
@@ -80,7 +80,7 @@ Web-only rows:
 | `squat.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | not ported |
 | `step.test.js` | 6 | fins, inside, overhangs, prop, step, stl | M6 | not ported |
-| `stl.test.js` | 6 | inside, overhangs, stl | M1 | not ported |
+| `stl.test.js` | 6 | inside, overhangs, stl | M1 | green |
 | `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | not ported |
 | `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | not ported |
