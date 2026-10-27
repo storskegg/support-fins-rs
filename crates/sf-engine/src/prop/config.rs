@@ -1,5 +1,445 @@
 //! Port of `web/prop/config.js`. Read `docs/AGENTS.md` before changing anything here.
 
+/// `PROP.iface`: JS holds `false`, `'flat'` or `'all'` (web/prop/config.js:55, validated in
+/// `applyTunables` by `[false, 'flat', 'all'].includes`). `Off` is `false`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Iface {
+    Off,
+    Flat,
+    All,
+}
+
+/// `PROP.tineDir`: `'horizontal'` or `'vertical'` (web/prop/config.js:269).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TineDir {
+    Horizontal,
+    Vertical,
+}
+
 /// `PROP` (web/prop/config.js:9). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct PropConfig {}
+#[derive(Clone, Debug, PartialEq)]
+pub struct PropConfig {
+    /// JS key `roundFeet`.
+    pub round_feet: bool,
+    // wall thickness. 1.0 (two 0.5mm passes) not breakaway.py's
+    // 1.2: a prop is a free-standing wall with nothing bracing
+    // its sides, so it cannot go as thin as a Slant3D fin (whose
+    // tines grip the part), but 1.2 read as chunky. Contact tip
+    // stays 0.6 (Slant3D's tine width) and the base flange 1mm.
+    pub th: f64,
+    // breakaway clearance below the part
+    pub gap: f64,
+    /// JS key `footGap`.
+    // A wall standing ON THE PART stops this far above it too: a slicer's "bottom Z
+    // distance". Welded, its bottom tip scarred the part every time; with the gap
+    // the first layer only sags onto it (prototype/calibration/foot/, 2026-09-30:
+    // gap 0.2 and 0.3 printed clean, teeth were no better and one pitch failed).
+    pub foot_gap: f64,
+    // width of the contact tip
+    pub tip: f64,
+    /// JS key `baseH`.
+    // height of the flat base flange. The foot used to be a CONE
+    // that ramped up over `chamfer` mm, which reads in a slicer as
+    // a golf tee, not the upside-down T a breakaway support should
+    // be. Now the base is a thin flat slab, emitted as its own
+    // solid and unioned by the slicer, with the wall standing
+    // straight up off it.
+    //
+    // WAS 1.0 (Slant3D's ~1mm disc). Lowered to 0.6 because the
+    // flange height sets how high off the plate the TINE grip can
+    // start: `emitTines` skips any station whose wall top sits
+    // below the flange (minTop = baseH + 0.2), so a 1mm flange left
+    // the bottom ~2mm of a tilted part ungripped -- exactly where
+    // the part is least stable and peels. The flange is only an
+    // anti-wobble brace (a long wall gets its bed grip from its
+    // LENGTH, and a tilted part from the bed pad), so 0.6mm -- still
+    // three layers -- braces fine while letting the tine comb reach
+    // ~0.4mm lower down the face. Grip, not adhesion, is what the
+    // bottom band needs.
+    pub base_h: f64,
+    /// JS key `tipH`.
+    // height the tip taper runs
+    pub tip_h: f64,
+    /// JS key `neckDeg`.
+    // The neck into the tip leans no flatter than this from level (nozzle.js grows tipH
+    // to keep it). A wall too low for that height narrows its body instead (sweep.js
+    // stemHalf), so its shoulder is never an overhang (local issue 044).
+    pub neck_deg: f64,
+    // Interface crest (GitHub #21, prop/crest.js): the top ifaceLayers of a wall split off
+    // as its own solid for a toolchanger's second material. iface: false (off, one
+    // body as always), 'flat' (only under an underside within ifaceFlatDeg of level:
+    // where a PETG interface works, a few layers of tool changes) or 'all' (every
+    // wall top, a tool change every layer a tilted contact climbs through).
+    // ifaceLayers: how many of the print's layers (the "Layer height" field, as the
+    // tines) the crest is. 1: one PETG layer, one tool change each way per flat
+    // contact; the 0.6 mm (three layers) it was cost two more for no clear gain on a
+    // two-line wall top (Matthew, 2026-10-09).
+    pub iface: Iface,
+    /// JS key `ifaceLayers`.
+    pub iface_layers: f64,
+    /// JS key `ifaceFlatDeg`.
+    // 'flat': 10deg keeps a th-wide crest's edge 0.09 mm off the part (under the gap)
+    pub iface_flat_deg: f64,
+    /// JS key `footMax`.
+    // Foot half-width. Kept well under maxUnsupportedSpan/2 on purpose: props are
+    // laid in ROWS spaced maxUnsupportedSpan apart, so a foot wider than half that
+    // spacing overlaps its neighbour and the row's feet fuse into one slab -- the
+    // "thick overlapping feet, not thin fins" the flagship showed. breakaway.py's
+    // own 7.0 never hit this because a human places ONE wall per feature, never a
+    // packed row. A long wall also gets ample bed grip from its LENGTH, so the foot
+    // is only an anti-wobble brace, not the adhesion; 3.0 braces a tall thin wall
+    // fine and leaves a clean ~6mm gap between neighbours at the 12mm span.
+    // widest the foot ever gets (< maxUnsupportedSpan/2)
+    pub foot_max: f64,
+    /// JS key `footMin`.
+    pub foot_min: f64,
+    /// JS key `footRatio`.
+    // foot half-width as a fraction of wall height
+    pub foot_ratio: f64,
+    /// JS key `minSpan`.
+    // a wall shorter than this is not worth the plate space
+    pub min_span: f64,
+    /// JS key `minSpanShort`.
+    // ...unless nothing else holds the region and the wall is LOW. A lattice (issue
+    // #121, a headset's ring-and-strut shell) is all 4-6 mm strut undersides: at 7 mm
+    // every one was a stub and half the red printed into air. A short wall is fine
+    // while it stays stocky, so in the LAST-RESORT pass (web/fins/shortwalls.js: only
+    // regions no wall or wedge reached) one down to minSpanShort is kept when its
+    // height is at most maxShortAspect x its length (4.4 mm long x 22 mm tall passes;
+    // 5 mm x 126 mm, a toothpick, does not). Last resort, because a short wall that
+    // "serves" a face stands a wedge or a raster row down (tests/tails.test.js).
+    pub min_span_short: f64,
+    /// JS key `maxShortAspect`.
+    pub max_short_aspect: f64,
+    /// JS key `minHeight`.
+    // nor is one this short
+    pub min_height: f64,
+    /// JS key `minHeightSquat`.
+    // SQUAT BED SUPPORT. A flanged T-wall needs ~minHeight of headroom just to
+    // exist (gap 0.2 + baseH 0.6 + a sliver of tip taper), so a bed overhang lower
+    // than that gets NOTHING from the wall path -- its stations are trimmed as
+    // stub/blocked and the low ledge prints into air (the near-bed overhangs that
+    // came out rough on real organic parts). Below minHeight but above this floor a
+    // brimmed squat breakaway is built instead (see sweepSquat): a thin wall on a
+    // thin wide brim -- the full T-foot can't fit, but the wall still needs plate
+    // grip. Below minHeightSquat the overhang sits ~on the bed and the first few
+    // layers self-support, so nothing is built.
+    pub min_height_squat: f64,
+    /// JS key `minSpanSquat`.
+    // squat walls are cheap; a shorter low ledge still earns one
+    pub min_span_squat: f64,
+    /// JS key `squatBrimH`.
+    // A squat wall's failure mode is PEELING off the plate, not tipping: its own
+    // footprint is a hair-wide contact strip, so it needs adhesion AREA the way the
+    // bed pad gives the tall parts. It gets a flat brim -- WIDE for grip, but only a
+    // couple layers tall so it still snaps off clean, and because it sits on the
+    // plate (~gap below the overhang) it never marks the part. Half-width stays
+    // under maxUnsupportedSpan/2 so a row of squat walls never fuses brim-to-brim.
+    // ~2 layers
+    pub squat_brim_h: f64,
+    /// JS key `squatBrimW`.
+    // half-width; a 5mm-wide brim strip along the wall
+    pub squat_brim_w: f64,
+    /// JS key `lowBandMin`.
+    // A near-flat underside's LOW band (prop/tracks.js lowEdges): rows across it
+    // where no squat wall stands, narrower than this is a dip in a curved
+    // underside's sampling (a flat torus's ring), not the plate.
+    pub low_band_min: f64,
+    /// JS key `stationStep`.
+    // mm between cross-sections; a LENGTH, not a count -- see `straightness`.
+    // 1.0 rather than 2.0 deliberately, and the trade is measured: at 2.0 the
+    // matrix is 8 clean / 2 walls that would weld / 18% coverage, at 1.0 it is
+    // 9 clean / ZERO bad walls / 13%. Denser stations both contour the top more
+    // finely and probe the flanks more often, and the coverage it costs is lost
+    // to the straightness gate rejecting curved regions -- which is M6b's problem
+    // to solve by splitting them, not this one's to solve by shipping a support
+    // that fuses. "No prop is a fixable disappointment, a fused prop is a ruined
+    // print" is already this module's rule; this is that rule priced.
+    pub station_step: f64,
+    /// JS key `minStations`.
+    // a run shorter than this is not a wall
+    pub min_stations: f64,
+    /// JS key `clearProbes`.
+    // points checked down the wall for a clear path to the plate
+    pub clear_probes: f64,
+    /// JS key `sideClear`.
+    // mm the part must stay off the wall's FLANKS. Larger than `gap` on purpose:
+    // the top is meant to come within 0.2mm and be bridged over, the flanks are
+    // meant never to touch, and a slicer's own XY support distance is ~0.35 on a
+    // 0.4 nozzle for the same reason. Set to 0.15 first, which put the closest
+    // approach on the flank instead of the top on 4 of 6 walls.
+    pub side_clear: f64,
+    /// JS key `maxWander`.
+    // RMS deviation / chord: above this there is no line to sweep
+    pub max_wander: f64,
+    /// JS key `contourSlopeMin`.
+    // Run direction: at or above this underside slope (rise/run) the walls run down
+    // the slope -- a robust, part-aligned axis. Flatter than this there is no slope
+    // to read, so a near-flat ledge aligns to its longer world axis instead. Chosen
+    // over the footprint's covariance principal axis, which drifts to a spurious
+    // diagonal on a messy real overhang. See patchTracks.
+    pub contour_slope_min: f64,
+    /// JS key `splitAgreeDeg`.
+    // how far a face's normal may swing from its sub-patch SEED's before the
+    // region is split there -- see splitRegion
+    pub split_agree_deg: f64,
+    /// JS key `tubeSpreadDeg`.
+    // A region is CURVED (one wall under its lowest line, the tube case) when
+    // at least tubeCurvedFrac of its AREA has a normal more than tubeSpreadDeg
+    // from the area-weighted mean; otherwise it is a plane (rows of walls).
+    // The fraction matters, not the worst face -- a worst-face test routed the
+    // drive frame's 3,276 mm2 tilted plane to a single wall because its pocket
+    // rims fan to 66-75deg, and the flagship regressed from 9 walls / 86%
+    // coverage to 1 / 34%. Measured populations, area beyond 25deg: planes with
+    // pockets 4-29%, true curved bands 51-83%. 0.4 sits in the gap.
+    pub tube_spread_deg: f64,
+    /// JS key `tubeCurvedFrac`.
+    pub tube_curved_frac: f64,
+    /// JS key `tubeMinArea`.
+    // A region must be at least this big for the tube route. Small curved
+    // POCKETS pass the fraction test too (filter_housing carries 15-230 mm2
+    // pockets at 25-75% deviant area), but a straight chord track under a
+    // pocket that curves in PLAN drifts off the surface -- one such wall
+    // measured 0.297 against the 0.2 spec, a wall the part never lands on.
+    // The patch path serves them correctly and always did. Real tube bands
+    // measure 1,000+ mm2; 300 sits in the gap.
+    pub tube_min_area: f64,
+    /// JS key `tubeSmallMinArea`.
+    // ...except a CONVEX band (a pipe, peg or chimney on its side), which takes
+    // the tube route down to this size -- the patch path shatters small curved
+    // bands into slivers and serves nothing. Concave pockets stay out: see
+    // convexAbout. tubeConvexFrac: share of the off-line area that must tilt
+    // away from the lowest line.
+    pub tube_small_min_area: f64,
+    /// JS key `minSpanTube`.
+    // A small tube is short by nature (a 5 mm chimney is 7 mm long), and the one
+    // wall under it is its only support: minSpan's "not worth the plate space"
+    // would drop the whole feature. Such a wall may be this short.
+    pub min_span_tube: f64,
+    /// JS key `minSpanPart`.
+    // A wall standing on the part costs no plate space, so minSpan's reason doesn't
+    // apply there either: a 4 mm ledge over a mini's body is served by a 4 mm wall.
+    pub min_span_part: f64,
+    /// JS key `tubeConvexFrac`.
+    pub tube_convex_frac: f64,
+    /// JS key `tubeTwoSidedFrac`.
+    // least share of the off-line area on either side
+    pub tube_two_sided_frac: f64,
+    /// JS key `maxUnsupportedSpan`.
+    // mm an overhang may bridge unsupported: the wall-to-wall spacing across a
+    // wide patch, and the ONE dial M7b puts in front of the user. check_stl.py
+    // reads this value out of this file (MAX_UNSUPPORTED_SPAN) so the checker and
+    // the generator cannot disagree about it.
+    pub max_unsupported_span: f64,
+    /// JS key `edgeInset`.
+    // A FREE edge (the overhang ends in air) gets its outermost row this far in --
+    // flush: the 1 mm wall's face 0.1 mm inside the edge (not ON it: a wall face in
+    // the plane of the part's side face made inside-tests along that plane
+    // ambiguous -- lbracket Y20 read 266 wall verts "inside" on the Orca path). Rows used to sit mid-strip, so the
+    // lip past the last one ran to half a spacing, and on the slenderness coupon
+    // (prototype/calibration/slender/) a 4 mm lip past a mid-ledge wall curled on
+    // every ledge. Between two rows the first layer is a bridge; past the last one
+    // it is a cantilever. An ATTACHED edge (the part carries on) keeps its bridge.
+    // grows with a nozzle's wider tip (nozzle.js)
+    pub edge_inset: f64,
+    /// JS key `edgeFlatDeg`.
+    // ...on every overhang (up to 45deg from horizontal). It was only under a
+    // near-flat underside (30deg): a steeper face steps out just layerH / tan(angle)
+    // per layer down the slope, and flush walls then doubled a cube (3 -> 5). But
+    // the lip along a SIDE edge, running down the slope, is a full cantilever at any
+    // slope -- a cube at X35-X44 kept a 6.7 mm strip bare past each end wall (#269)
+    // -- and since #384 a flush end is one more row, never doubled (cube X40 3 -> 4).
+    pub edge_flat_deg: f64,
+    /// JS key `edgeFlatDegSway`.
+    // With Sway on, the old 30deg: a sway brace keeps ~5 mm off any wall's foot, and a
+    // flush wall stands at the foot of the upright side it braces, so on a tilted box
+    // the braces had nowhere to go (box X40, portal, tshape: 2 -> 0). Sway is the
+    // user's own ask, so its braces win there (Matthew 2026-10-25).
+    pub edge_flat_deg_sway: f64,
+    /// JS key `tineH`.
+    // --- TINES (the grip comb) ---------------------------------------------
+    // A plain prop stops `gap` under the overhang and the part bridges over it:
+    // a pure breakaway, no grip. The COMBINED support adds a comb of tiny
+    // horizontal nubs along the wall's top that reach the part's surface, so a
+    // tilted part cannot peel or twist off the wall -- and, because each nub is
+    // one layer line lying in the layer plane, it BENDS to snap clean instead of
+    // tearing out (fins.js documents the same reasoning for the beside-the-face
+    // fin these replace). Tines only bite where the overhang is steep enough that
+    // a horizontal poke reaches solid: past a slope of gap/reach the nub lands in
+    // the part, below it in air, and the emitter simply skips the ones that miss
+    // (verified by insidePart, never assumed) -- the same honest behaviour the
+    // beside-the-face fin had.
+    // A tine must be exactly ONE layer tall: printed that way it lays down as a
+    // single continuous bead (the nozzle runs along the wall, into the part, back
+    // out -- no retraction), which is the whole reason it fuses AND snaps off clean
+    // (FIN-SPEC.md "Why the tines must be horizontal"). One layer means one SLICER
+    // layer, so this has to equal the print's layer height -- 0.3 (Slant3D's number,
+    // his layer height) baked in a 1.5-layer tine at Matthew's 0.2mm.
+    // = slicer layer height; the DEFAULT only -- the UI's "Layer
+    // height" field drives it per build (opts.layerHeight) so the
+    // tine is always exactly one of the user's real layers
+    pub tine_h: f64,
+    /// JS key `tineW`.
+    // Tine WIDTH across the run = the bead the nozzle lays: Slant3D's spec is
+    // 0.4-0.8mm (0.4 = one nozzle pass, 0.8 = out-and-back), "as small as possible".
+    // 0.5 is his stated number ("0.5 by 0.5"). NOTE: this used to be dead -- emitTines
+    // built the tine `th` (1.0mm) wide, ~2x spec, a fat divot Matthew caught by eye.
+    pub tine_w: f64,
+    /// JS key `tinesPerWall`.
+    // (A 'point' tip and a tineWidth knob were tried on the tine coupon, 2026-10-03:
+    // no visible difference -- a 0.3-0.5 wide tine or a point likely all print as about
+    // one bead -- so both knobs are gone. prototype/calibration/README.md tine/ v1.)
+    // Tines per wall, EXACT, overriding spacing and the minGripTines floor: the comb is
+    // spaced wall-length / n. 0 = off (the default; spacing rules decide). Calibration
+    // knob (tunables.tinesPerWall), the tine coupon's how-few-still-hold row.
+    pub tines_per_wall: f64,
+    /// JS key `tineContactOffset`.
+    // mm along the bite heading: positive gap, negative overlap
+    pub tine_contact_offset: f64,
+    /// JS key `tineReachTip`.
+    // added to the reach past a contact tip wider than 0.4's (nozzle.js)
+    pub tine_reach_tip: f64,
+    /// JS key `tineReach`.
+    // how far out a tine looks for the part, horizontally: a tine is
+    // placed only if solid lies at this reach (the slope gate is
+    // gap/reach), and kissEnds searches up to 2x it for the surface the
+    // tine's end stops on (#168: no tine runs into the part). Was
+    // `tineBite`, when tines ran this far INTO the part. Shrinking it
+    // to 0.3 was tried and reverted: the tine seeds on the surface and
+    // drops `gap` below it, so a shorter reach stops gripping at/near
+    // 45deg (the common orientation). tines_realparts + draw +
+    // tine_density pin real grip there and fail below ~0.45. Print
+    // tests: the reach never changed the mark (bite coupon, retired).
+    pub tine_reach: f64,
+    /// JS key `tineStep`.
+    // mm between nubs -- the DENSE grip comb, the default
+    pub tine_step: f64,
+    /// JS key `tineStepSparse`.
+    // mm between nubs at the sparse end of the Tine-grip slider
+    pub tine_step_sparse: f64,
+    /// JS key `tineOverlap`.
+    // how far the nub sinks back into the wall, so they union
+    pub tine_overlap: f64,
+    /// JS key `minGripTines`.
+    // NOTE: a TIP-OVER-RISK density scale (tineStepSquat/tipRiskLo/tipRiskHi) was
+    // removed -- it let stable parts fall to a sparse 9mm comb that read as "laying
+    // on the face", and the cube bed-release it was meant to cure was the pad's
+    // fault, not the tines'. Surface marking from the dense comb is now tamed the
+    // deliberate way: the user's "Tine grip" slider (tineStepFor / opts.tineDensity),
+    // which DEFAULTS to dense and the minGripTines floor still protects -- never by
+    // silently starving grip. Pinned by tests/tine_density.test.js.
+    // grip floor: never fewer than this per grippable wall,
+    // however squat -- a wall that grips nothing is a loose prop
+    pub min_grip_tines: f64,
+    /// JS key `tineEdgeBand`.
+    // EDGE BIAS. Slant3D's rule is tines go on an edge/corner, never across a visible
+    // flat middle -- that mid-face march is what left Matthew's bracket "marked
+    // everywhere". So the comb runs DENSE within a band at each end of a wall's run
+    // (the run's ends sit on the overhang's edges/corners, where the marks hide and
+    // where anti-peel/twist grip has the longest moment arm anyway) and THINS across
+    // the middle by tineMidFactor. Short walls (run <= 2*band) are all-edge, so they
+    // stay dense end-to-end and the minGripTines floor is untouched.
+    // mm of dense comb held at each end of the run
+    pub tine_edge_band: f64,
+    /// JS key `tineMidFactor`.
+    // interior spacing = requested step * this (2mm dense -> 4mm)
+    pub tine_mid_factor: f64,
+    /// JS key `tineSlopeMin`.
+    // mm of rise end-to-end before a tail-less line counts as
+    // running down to a bottom edge (anchored comb) vs level
+    pub tine_slope_min: f64,
+    /// JS key `tineTopClear`.
+    // mm kept bare at a wall's TOP end, where the overhang face
+    // ends -- a nub jammed against it hangs past the part's edge
+    pub tine_top_clear: f64,
+    /// JS key `tineDir`.
+    // TINE DIRECTION (GitHub #309, prop/pins.js). 'horizontal' is the FDM comb above.
+    // 'vertical' is for RESIN: each layer is peeled off the vat floor, so a support
+    // has to be ATTACHED to the part -- a resin slicer's contact tip sinks into the
+    // model ("penetration" in Lychee, "contact depth" in Chitubox) -- and a wall a
+    // gap below a flat span holds nothing. Vertical lays pins up from the wall top,
+    // across the gap and pinDepth into the underside. Untested on a resin printer.
+    pub tine_dir: TineDir,
+    /// JS key `pinW`.
+    // pin width: a resin contact tip's 0.3-0.6 mm, inside the 0.6 wall tip
+    pub pin_w: f64,
+    /// JS key `pinTipW`.
+    // where it meets the part: a light-to-medium resin tip (0.15-0.5)
+    pub pin_tip_w: f64,
+    /// JS key `pinDepth`.
+    // how far a pin sinks into the part (the user's "Pin depth"):
+    // resin presets sink a tip 0-0.2 mm (Lychee 0, Titancraft 0.07);
+    // deeper scars more and snaps harder (#309, front walls needed a tool)
+    pub pin_depth: f64,
+    /// JS key `pinDepthMax`.
+    // the field's ceiling
+    pub pin_depth_max: f64,
+}
+
+impl Default for PropConfig {
+    fn default() -> Self {
+        PropConfig {
+            round_feet: false,
+            th: 1.0,
+            gap: 0.2,
+            foot_gap: 0.2,
+            tip: 0.6,
+            base_h: 0.6,
+            tip_h: 1.5,
+            neck_deg: 55.0,
+            iface: Iface::Off,
+            iface_layers: 1.0,
+            iface_flat_deg: 10.0,
+            foot_max: 3.0,
+            foot_min: 1.6,
+            foot_ratio: 0.12,
+            min_span: 7.0,
+            min_span_short: 4.0,
+            max_short_aspect: 6.0,
+            min_height: 1.5,
+            min_height_squat: 0.6,
+            min_span_squat: 4.0,
+            squat_brim_h: 0.4,
+            squat_brim_w: 2.5,
+            low_band_min: 1.0,
+            station_step: 1.0,
+            min_stations: 3.0,
+            clear_probes: 12.0,
+            side_clear: 0.35,
+            max_wander: 0.1,
+            contour_slope_min: 0.15,
+            split_agree_deg: 15.0,
+            tube_spread_deg: 25.0,
+            tube_curved_frac: 0.4,
+            tube_min_area: 300.0,
+            tube_small_min_area: 12.0,
+            min_span_tube: 3.0,
+            min_span_part: 3.0,
+            tube_convex_frac: 0.7,
+            tube_two_sided_frac: 0.25,
+            max_unsupported_span: 12.0,
+            edge_inset: 0.6,
+            edge_flat_deg: 45.0,
+            edge_flat_deg_sway: 30.0,
+            tine_h: 0.2,
+            tine_w: 0.5,
+            tines_per_wall: 0.0,
+            tine_contact_offset: -0.01,
+            tine_reach_tip: 0.0,
+            tine_reach: 0.5,
+            tine_step: 2.0,
+            tine_step_sparse: 5.0,
+            tine_overlap: 0.3,
+            min_grip_tines: 3.0,
+            tine_edge_band: 8.0,
+            tine_mid_factor: 2.0,
+            tine_slope_min: 1.0,
+            tine_top_clear: 0.5,
+            tine_dir: TineDir::Horizontal,
+            pin_w: 0.4,
+            pin_tip_w: 0.25,
+            pin_depth: 0.1,
+            pin_depth_max: 1.0,
+        }
+    }
+}
