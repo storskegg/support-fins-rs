@@ -32,8 +32,8 @@ Web-only rows:
 | `cut.test.js` | 13 | cut, fins, inside, overhangs, prop, stl, threemf | M6 | not ported |
 | `cutout.test.js` | 14 | cutout, draw, fins, inside, overhangs, prop, stl | M3 | not ported |
 | `downhill.test.js` | 4 | fins, inside, overhangs, prop, prop/downhill, stl | M3 | not ported |
-| `draw.test.js` | 18 | draw, fins, inside, overhangs, prop, stl | M3 | not ported |
-| `drawarc.test.js` | 7 | draw, drawarc, fins, inside, overhangs, prop, stl | M3 | not ported |
+| `draw.test.js` | 18 | draw, fins, inside, overhangs, prop, stl | M3 | green |
+| `drawarc.test.js` | 7 | draw, drawarc, fins, inside, overhangs, prop, stl | M3 | green |
 | `exportname.test.js` | 3 | exportname, fins, inside, overhangs, prop, stl | M3 | not ported |
 | `fill.test.js` | 14 | draw, fins, fins/coverage, fins/fill, fins/seating, inside, overhangs, prop, stl | M3 | not ported |
 | `finkeys.test.js` | 6 | fins, inside, overhangs, prop, stl, ui/finkeys | M4 | not ported |
@@ -63,7 +63,7 @@ Web-only rows:
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | partial: 2 of 3 ported (js_perp_hole.rs); the end-to-end case needs buildFins |
 | `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | not ported |
-| `plate_only.test.js` | 4 | draw, fins, inside, overhangs, prop, stl | M3 | not ported |
+| `plate_only.test.js` | 4 | draw, fins, inside, overhangs, prop, stl | M3 | green |
 | `platerow.test.js` | 2 | inside, overhangs, stl, ui/platerow | M4 | not ported |
 | `raster.test.js` | 4 | fins, inside, overhangs, prop, prop/raster, stl | M3 | not ported |
 | `resinfoot.test.js` | 3 | fins, inside, overhangs, prop, prop/resinfoot, stl | M3 | not ported |
