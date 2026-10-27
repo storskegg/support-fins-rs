@@ -347,4 +347,4 @@ gets a push notification, and the PR and issue are labelled `escalated`.
 
 ## 9. After parity (new features)
 
-- Stabilizing fins between neighbouring tall objects on multi-object plates, mainly for resin (see the GitHub issue labelled `post-parity`).
+- Stabilizing fins between neighbouring tall objects on multi-object plates, FDM and resin, with the user printing resin only (#50). Pairing, attachment and export follow the existing fin-placement settings, pin rules and export behaviour. Research them at planning time, and track upstream's resin improvements at each catch-up.
