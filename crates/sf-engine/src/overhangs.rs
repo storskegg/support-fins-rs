@@ -59,6 +59,9 @@ pub(crate) struct TopoCache {
     /// seating `_seated` WeakMap (web/fins/seating.js:22-34): the last pose's seated
     /// soup, keyed by the same string JS builds. `forget_seated` clears it.
     pub(crate) seated: Mutex<Option<(String, Arc<Tris>)>>,
+    /// sway `patchCache` WeakMap (web/sway.js:763-773). Filled by M3 track A.
+    #[allow(dead_code)] // remove when sway.rs uses it
+    pub(crate) sway_patches: OnceLock<crate::sway::SwayPatches>,
 }
 
 /// One overhang region (web/overhangs.js:213-217): `{ faces, area }`.

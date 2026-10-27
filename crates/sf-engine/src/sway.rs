@@ -162,3 +162,7 @@ impl Default for SwayConfig {
         }
     }
 }
+
+/// The `patchCache` WeakMap entry (web/sway.js:763-773), cached per topology. Fields: M3 track A.
+#[derive(Debug)]
+pub struct SwayPatches {}
