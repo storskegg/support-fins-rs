@@ -70,6 +70,9 @@ const cfgMods = {
   JUDGE: (await import(`${WEB}prop/judge.js`)).JUDGE,
   DOWNHILL: (await import(`${WEB}prop/downhill.js`)).DOWNHILL,
   FIELD: (await import(`${WEB}fins/field.js`)).FIELD,
+  RIM: (await import(`${WEB}prop/rim.js`)).RIM,
+  ARC: (await import(`${WEB}prop/arc.js`)).ARC,
+  CURVED: (await import(`${WEB}prop/curved.js`)).CURVED,
 };
 export { cfgMods };
 
