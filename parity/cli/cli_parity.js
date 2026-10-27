@@ -16,11 +16,9 @@
 // (`UUID#1`, `UUID#2`, ...). Anything else that differs fails. The run directory and a resume cache's key
 // are replaced by placeholders in stdout and stderr.
 //
-// EXPECTED GAPS (GAPS below): 3MF files with a slicer's negative parts. The JS CLI cuts them with
-// Manifold (web/cut.js); the Rust one says "negative parts not cut: the cutter did not load" until
-// `sf-cut` lands (#72). They are run and reported, and do NOT fail the run while they differ; the
-// moment one is identical the run fails ("now identical: move it out of GAPS"), so the list can
-// only shrink. Track A flips them to required in #72.
+// NEGATIVE PARTS: the JS CLI cuts a 3MF's negative parts with Manifold (web/cut.js); the Rust one with
+// `sf-cut` (Manifold 3.5.4 built from source with the WASM build's arithmetic, #72). Those cases (neg-*,
+// pj-cutters*) are required like every other: the cut part's mesh is byte-identical.
 import { assertPinned, UPSTREAM_ROOT } from "../oracle/lib/pin.js";
 
 assertPinned();
@@ -154,13 +152,9 @@ for (const [id, args] of [
   ["dashdash", ["--", "lbracket.stl", "-o", "o.stl"]],
   ["not-a-mesh", ["notamesh.txt"]], ["empty-stl", ["empty.stl"]], ["fin-the-fins", ["lbracket.stl", "--rot", "40,0,0", "-o", "fin.3mf", "+", "fin.3mf"]],
 ]) add(`err-${id}`, args);
-// EXPECTED GAPS: a slicer's negative parts (the cut is `sf-cut`, #72)
-const GAPS = new Set();
+// a slicer's negative parts (the cut is `sf-cut`, #72)
 for (const f of ["orca", "bambu", "prusaslicer3"]) {
-  for (const [tag, out] of [["3mf", "o.3mf"], ["stl", "o.stl"]]) {
-    GAPS.add(`gap-${f}-${tag}`);
-    add(`gap-${f}-${tag}`, [`neg-${f}.3mf`, "-o", out]);
-  }
+  for (const [tag, out] of [["3mf", "o.3mf"], ["stl", "o.stl"]]) add(`neg-${f}-${tag}`, [`neg-${f}.3mf`, "-o", out]);
 }
 // project mode
 const PJ = (id, input, flags, extra = {}) => add(`pj-${id}`, [input, "--preserve-project", ...flags], extra);
@@ -220,8 +214,7 @@ add("pj-batch-alias", ["pj-lb.3mf", "pj-cube.3mf", "--preserve-project", "-o", "
 PJ("resume", "pj-lb.3mf", ["--resume", "--json"]);
 PJ("resume-dir", "pj-lb.3mf", ["--resume", "--cache-dir", "mycache", "--json"]);
 PJ("check-resume", "pj-lb.3mf", ["--check", "--resume"]);
-// EXPECTED GAPS: a project with real cutters needs the cut (#72)
-for (const id of ["cutters", "cutters-check"]) GAPS.add(`pj-${id}`);
+// a project with real cutters needs the cut (#72)
 PJ("cutters", "pj-cutters.3mf", ["--json"]);
 PJ("cutters-check", "pj-cutters.3mf", ["--check", "--json"]);
 // a missing file: only the prefix of the runtime's message is compared
@@ -270,7 +263,7 @@ async function compareProject(a, b) {
 }
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-let failed = 0, ran = 0, gaps = 0;
+let failed = 0, ran = 0;
 for (const c of cases) {
   if (only && !c.id.includes(only)) continue;
   // "fin-the-fins": the second run reads the first's output
@@ -308,13 +301,10 @@ for (const c of cases) {
       } else problems.push(`file ${name}: bytes differ (${jf.get(name).length} vs ${rf.get(name).length})`);
     }
   }
-  if (GAPS.has(c.id)) {
-    if (problems.length) { gaps++; console.log(`GAP  ${c.id} (expected until sf-cut, #72): ${problems[0].split("\n")[0]}`); }
-    else { failed++; console.log(`FAIL ${c.id}: now identical: move it out of GAPS`); }
-  } else if (problems.length) { failed++; console.log(`FAIL ${c.id} [${c.args.join(" ")}]\n  ${problems.join("\n  ")}`); }
+  if (problems.length) { failed++; console.log(`FAIL ${c.id} [${c.args.join(" ")}]\n  ${problems.join("\n  ")}`); }
   Deno.removeSync(dirs.js, { recursive: true });
   Deno.removeSync(dirs.rs, { recursive: true });
 }
 Deno.removeSync(root, { recursive: true });
-console.log(`cli-parity: ${ran} cases, ${failed} failed, ${gaps} expected gaps`);
+console.log(`cli-parity: ${ran} cases, ${failed} failed`);
 Deno.exit(failed ? 1 : 0);

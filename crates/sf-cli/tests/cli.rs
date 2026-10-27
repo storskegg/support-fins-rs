@@ -22,7 +22,7 @@ use sf_cli::entry::{EngineOptions, Stats, compute_fins, report_line};
 use sf_engine::jsnum;
 use sf_io::json::{Json, parse};
 use sf_io::stl::{read_stl, write_binary_stl};
-use sf_io::threemf::read_three_mf;
+use sf_io::threemf::{PartKind, read_three_mf};
 use sf_io::zip::{ZipData, ZipFile, unzip, zip_store};
 use sf_testkit::{assert_close, block, rot_x, rot_y, upstream_root};
 
@@ -982,23 +982,51 @@ fn cli_version_names_the_build() {
     );
 }
 
-// cli.test.js:375 needs the Manifold cut (`sf-cut`): until then a part with a negative part comes
-// back uncut with the cutter's own "did not load" warning, and the file is still finned.
+// cli.test.js:375
 #[test]
-fn a_negative_part_is_said_not_cut_until_the_cutter_exists() {
-    let r = cli_with(&["cube.3mf", "-o", "out.3mf"], vec![("cube.3mf", orca())]);
-    assert_eq!(r.code, 0, "{:?}", r.err);
+fn a_slicers_negative_part_is_cut_out_of_the_part_104() {
+    let orca = orca();
+    let r = cli_with(
+        &["cube.3mf", "-o", "out.3mf"],
+        vec![("cube.3mf", orca.clone())],
+    );
     assert!(
-        r.err
-            .iter()
-            .any(|l| l.contains("negative parts not cut: the cutter did not load")),
-        "{:?}",
-        r.err
+        r.code == 0 && r.err.is_empty(),
+        "exit {}: {}",
+        r.code,
+        r.err.join(" | ")
     );
     let out = read_three_mf(&r.fs["out.3mf"]).unwrap();
-    assert_eq!(
-        out.objects[0].extras.len(),
-        1,
-        "the negative part rides back out beside the cube"
+    // the 3MF is the file as it was, for the slicer to cut again: the cube whole, its negative part
+    // beside it, and the supports their own object, out of its reach
+    assert!(
+        out.objects.len() == 2 && out.objects[1].name.ends_with(" supports"),
+        "objects {:?}",
+        out.objects.iter().map(|o| &o.name).collect::<Vec<_>>()
+    );
+    let (cube, supports) = (&out.objects[0], &out.objects[1]);
+    assert!(
+        cube.tris == 12 && cube.extras.len() == 1 && cube.extras[0].kind == PartKind::Negative,
+        "part {} tris, extras {}: want the whole cube and its negative",
+        cube.tris,
+        cube.extras.len()
+    );
+    // the walls are the cut cube's: the solid cube gets none
+    assert!(
+        supports.tris > 0,
+        "no supports: the fins were built for the solid cube"
+    );
+    // an STL can't carry the negative: it is the cut part
+    let s = cli_with(&["cube.3mf", "-o", "out.stl"], vec![("cube.3mf", orca)]);
+    assert!(
+        s.code == 0 && s.err.is_empty(),
+        "exit {}: {}",
+        s.code,
+        s.err.join(" | ")
+    );
+    let tris = (s.fs["out.stl"].len() - 84) / 50;
+    assert!(
+        tris > 12 + supports.tris,
+        "the STL is {tris} triangles: the cube came out uncut"
     );
 }
