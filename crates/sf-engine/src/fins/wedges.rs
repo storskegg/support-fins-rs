@@ -77,7 +77,7 @@ impl Default for PerpConfig {
     }
 }
 
-/// `TH0` (web/fins/wedges.js:62): the tuned wedge's thickness, read once when the module loads
+/// `TH0` (web/fins/wedges.js:69): the tuned wedge's thickness, read once when the module loads
 /// (so the default `PERP.th`, whatever a later `applyTunables` sets). A thicker blade (Wall
 /// lines, nozzle.js) is also read at its edges.
 fn th0() -> f64 {
@@ -92,7 +92,7 @@ pub struct GripPatches {
     pub face_map: IndexMap<usize, usize>,
 }
 
-/// Port of `gripPatches` (web/fins/wedges.js:26-31): DRAW mode support: every grippable face in
+/// Port of `gripPatches` (web/fins/wedges.js:29-34): DRAW mode support: every grippable face in
 /// this pose, and a map from any face index to the patch it belongs to. Grip-first Draw lets
 /// the user pick the face by hand, so the UI needs to know which faces CAN take a fin (to guide
 /// the pointer) and, given a picked face, which patch to stand a fin against. This is
@@ -116,7 +116,7 @@ pub fn grip_patches(topo: &Topology, result: &Analysis, rot: &Rot3) -> GripPatch
     GripPatches { patches, face_map }
 }
 
-/// `pushSolid` (web/fins/wedges.js:67-75): push a closed solid, flipping winding to outward if
+/// `pushSolid` (web/fins/wedges.js:72-81): push a closed solid, flipping winding to outward if
 /// its signed volume is negative.
 fn push_solid(local: &[V4], out: &mut Vec<V4>) {
     let mut v = 0.0;
@@ -140,7 +140,7 @@ fn push_solid(local: &[V4], out: &mut Vec<V4>) {
     }
 }
 
-/// `extrudeRing` (web/fins/wedges.js:78-91): extrude a planar ring (a list of [x,y,z]) by +/-
+/// `extrudeRing` (web/fins/wedges.js:84-97): extrude a planar ring (a list of [x,y,z]) by +/-
 /// half along the horizontal uDir.
 fn extrude_ring(ring: &[[f64; 3]], u_dir: Xy, half: f64, out: &mut Vec<V4>) {
     let n = ring.len();
@@ -164,10 +164,10 @@ fn extrude_ring(ring: &[[f64; 3]], u_dir: Xy, half: f64, out: &mut Vec<V4>) {
     push_solid(&local, out);
 }
 
-/// `CUT_TOP` (web/fins/wedges.js:106).
+/// `CUT_TOP` (web/fins/wedges.js:110).
 const CUT_TOP: f64 = 0.05;
 
-/// Port of `emitBlade` (web/fins/wedges.js:107-124): the wedge's blade, with the Cutouts pattern
+/// Port of `emitBlade` (web/fins/wedges.js:111-129): the wedge's blade, with the Cutouts pattern
 /// through it when one is picked.
 ///
 /// A cube stood on its edge at 45deg is held by wedges, not prop walls, so a wedge that only
@@ -240,7 +240,7 @@ fn emit_blade(
     extrude_ring(ring, u_dir, half, out);
 }
 
-/// Port of `crestSections` (web/fins/wedges.js:132-141): the interface crest along a blade's
+/// Port of `crestSections` (web/fins/wedges.js:136-145): the interface crest along a blade's
 /// `top`, as sections across it (uDir, signed the way emitBlade's sections face so the ribbon
 /// winds outward), or `None` (JS `null`) when a station repeats in XY (a vertical step: no run to
 /// sweep along).
@@ -280,7 +280,7 @@ fn crest_sections(
     )
 }
 
-/// Port of `emitFoot` (web/fins/wedges.js:154-198): a flat foot flange under the wedge's bed
+/// Port of `emitFoot` (web/fins/wedges.js:159-206): a flat foot flange under the wedge's bed
 /// footprint (a -> b at z=0).
 ///
 /// The flange reaches `footHalf` past both ends of the run, and past the LOW end that is under
@@ -398,7 +398,7 @@ fn emit_foot(
     push_solid(&local, out);
 }
 
-/// Port of `columnClear` (web/fins/wedges.js:208-220): is a wedge at this u standable AND
+/// Port of `columnClear` (web/fins/wedges.js:217-230): is a wedge at this u standable AND
 /// uninterrupted by a bore? Two conditions:
 ///   - its first contiguous contact run (from the bed up) is tall enough to matter;
 ///   - the face does NOT resume ABOVE a gap -- material / void / material is a BORE punched
@@ -433,7 +433,7 @@ fn column_clear(p: &Patch, u: f64, cfg: &Config) -> bool {
     top >= perp.min_h && resume < 2
 }
 
-/// Port of `perpColumns` (web/fins/wedges.js:229-257): the u positions to stand wedges at across
+/// Port of `perpColumns` (web/fins/wedges.js:239-266): the u positions to stand wedges at across
 /// [lo, hi]. With no hole this is the old even row (round(span/pitch) columns). A bore/slot
 /// splits the standable u's into BANDS on either side of it; each band gets its own row, so a
 /// drawn or auto fin lands as two fins FLANKING the bore instead of one column dying at the void.
@@ -497,7 +497,7 @@ pub fn perp_columns(p: &Patch, lo: f64, hi: f64, pitch: f64, cfg: &Config) -> Ve
     cols
 }
 
-/// Port of `clearRun` (web/fins/wedges.js:277-327): the longest run of contact stations whose
+/// Port of `clearRun` (web/fins/wedges.js:288-331): the longest run of contact stations whose
 /// blade column stands clear of the part.
 ///
 /// A wedge drops straight from the face it holds to the bed, so any of the part under that face
@@ -649,7 +649,7 @@ pub struct PerpFins {
     pub wedges: Vec<WedgeRec>,
 }
 
-/// Port of `buildPerpFins` (web/fins/wedges.js:337-410): tile perpendicular wedges across one
+/// Port of `buildPerpFins` (web/fins/wedges.js:337-411): tile perpendicular wedges across one
 /// down-facing patch. Reads the crest and the tine capture through `ctx`.
 pub fn build_perp_fins(
     p: &Patch,
@@ -819,7 +819,7 @@ pub fn build_perp_fins(
     }
 }
 
-/// Port of `propServesPatch` (web/fins/wedges.js:419-440): does a prop wall already stand under
+/// Port of `propServesPatch` (web/fins/wedges.js:420-440): does a prop wall already stand under
 /// this patch's footprint? Decided in space, not by face index: a prop `line` is a centreline of
 /// [x,y,z] points, and the patch's world footprint is the xy bbox of its four (u,t) corners. If
 /// any prop point lands in that box (plus a small margin) the patch is already served and a wedge
@@ -869,7 +869,7 @@ pub fn prop_serves_patch(p: &Patch, props: &[PropRecord], cfg: &Config) -> bool 
     false
 }
 
-/// Port of `wedgeVeto` (web/fins/wedges.js:456-466): the veto buildProps applies to raster walls
+/// Port of `wedgeVeto` (web/fins/wedges.js:452-462): the veto buildProps applies to raster walls
 /// (web/prop/raster.js) in auto mode: a raster wall may not stand under a patch the normal
 /// pass's walls leave to a WEDGE, because the wedge's tines grip from the bed. bore_bracket X45:
 /// a raster wall under the leaning face dropped its wedge and the part's lowest grip rose
@@ -919,7 +919,7 @@ pub fn wedge_veto(
     })
 }
 
-/// Port of `unservedAfterWedges` (web/fins/wedges.js:458-461): overhang regions still unsupported
+/// Port of `unservedAfterWedges` (web/fins/wedges.js:475-477): overhang regions still unsupported
 /// once the wedges are in: neither served by a prop wall nor standing over any wedge. This used
 /// to be `unserved - wedged PATCHES` -- a patch count off a region count, two different
 /// segmentations -- so wedges under one region hid others nothing supports (hub_corner X45: a
@@ -939,7 +939,7 @@ pub fn unserved_after_wedges(
     bare_after_wedges(topo, rot, result, served_regions, wedge_tris, cfg).len()
 }
 
-/// Port of `bareAfterWedges` (web/fins/wedges.js:463-490): the regions unservedAfterWedges counts,
+/// Port of `bareAfterWedges` (web/fins/wedges.js:480-501): the regions unservedAfterWedges counts,
 /// as indices into `result.regions`.
 pub fn bare_after_wedges(
     topo: &Topology,

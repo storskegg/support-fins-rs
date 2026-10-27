@@ -119,7 +119,7 @@ impl Default for PadConfig {
     }
 }
 
-/// What `buildPad` returns besides the triangles it pushes (web/fins/pad.js:228-230, 520-521).
+/// What `buildPad` returns besides the triangles it pushes (web/fins/pad.js:184, 250, 520-521).
 /// Track D's `fins::build::PadInfo` is this shape; `style` is `Sure`, `Light` or `Custom` (never
 /// `Auto`). `auto_sure` is only set by the conforming pad, `small_foot` and `outline` by `tag`.
 #[derive(Clone, Debug, PartialEq)]
@@ -142,7 +142,7 @@ struct Outline {
     length: f64,
 }
 
-/// Port of `firstLayerOutline` (web/fins/pad.js:70-85): the part's section at the layer's
+/// Port of `firstLayerOutline` (web/fins/pad.js:74-91): the part's section at the layer's
 /// mid-height (where a slicer cuts).
 fn first_layer_outline(part_tris: &Tris, zc: f64) -> Outline {
     let pt = &part_tris.v;
@@ -176,7 +176,7 @@ fn first_layer_outline(part_tris: &Tris, zc: f64) -> Outline {
     Outline { segs, length }
 }
 
-/// The oval's frame (`{ cx, cy, ax, ay, bx, by, r1, r2 }`, web/fins/pad.js:174).
+/// The oval's frame (`{ cx, cy, ax, ay, bx, by, r1, r2 }`, web/fins/pad.js:171).
 struct Frame {
     cx: f64,
     cy: f64,
@@ -188,7 +188,7 @@ struct Frame {
     r2: f64,
 }
 
-/// Port of `buildPad` (web/fins/pad.js:119-230): a breakaway pad under the part's bed contact,
+/// Port of `buildPad` (web/fins/pad.js:117-251): a breakaway pad under the part's bed contact,
 /// its triangles' vertices pushed onto `out`. `None` is JS `null` (fewer than three contact points).
 ///
 /// Not a nicety: a part tilted into a strong orientation rests on an EDGE, so its bed contact is
@@ -197,7 +197,7 @@ struct Frame {
 /// for its outline AND the seated part triangles, so its TOP can hold `gap` clear of the part
 /// instead of welding to it. `layer_h` is JS's `layerH = FIN.tineH` default, passed explicitly.
 pub fn build_pad(
-    contact: &[[f64; 3]],
+    contact: &[[f64; 2]],
     part_tris: &Tris,
     out: &mut Vec<V4>,
     layer_h: f64,
@@ -211,7 +211,7 @@ pub fn build_pad(
 }
 
 fn build_pad_inner(
-    contact: &[[f64; 3]],
+    contact: &[[f64; 2]],
     part_tris: &Tris,
     out: &mut Vec<[f64; 3]>,
     layer_h: f64,
@@ -441,7 +441,7 @@ fn build_pad_inner(
     })
 }
 
-/// Port of `brimPad` (web/fins/pad.js:253-522): the BRIM-STYLE pad (PAD.style 'light', and
+/// Port of `brimPad` (web/fins/pad.js:274-522): the BRIM-STYLE pad (PAD.style 'light', and
 /// 'custom'): the same oval, `h` tall (one layer for 'light'), standing `g` off the part's
 /// first-layer outline -- see PAD.style for why. `grab` raises (or, negative, lowers) its top
 /// against the part's underside the way PAD.grab does for the 'sure' pad; 'light' uses 0.
@@ -465,7 +465,7 @@ fn build_pad_inner(
 #[allow(clippy::too_many_arguments)]
 fn brim_pad(
     part_tris: &Tris,
-    contact: &[[f64; 3]],
+    contact: &[[f64; 2]],
     e: &Frame,
     h: f64,
     g: f64,

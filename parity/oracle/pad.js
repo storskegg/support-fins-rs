@@ -1,6 +1,6 @@
 // Records parity/corpus/pad/buildPad.jsonl from web/fins/pad.js, called directly (`direct-*` scenes) and as
 // the 54 golden scenes' builds call it (`build-*`).
-//   buildPad  args: [contact (the lowest vertices, [x,y,z]...), partTris ($seated), out ([]), layerH, {$config: {PAD, FIN}}]
+//   buildPad  args: [contact (the lowest vertices, [x, y]...), partTris ($seated), out ([]), layerH, {$config: {PAD, FIN}}]
 //             out: {ret, tris}: `ret` is null (fewer than three contact points) or the pad's info object
 //             ({r1, r2, cells, height, points, oval, style, [autoSure,] smallFoot, outline}); `tris` a Float64Array
 //             of 4 numbers per vertex the call pushed onto `out` (x, y, z, tag; a pad's vertices are untagged).
@@ -104,7 +104,7 @@ try {
     const topo = buildTopology({ getAttribute: () => ({ array: pos }) });
     const rot = sitePose([0, 0, 0]);
     const res = analyze(topo, 45, rot);
-    buildPad([[0, 0, 0], [1, 1, 0]], seatedPartTris(topo, rot, res.offset), [], 0.2);
+    buildPad([[0, 0], [1, 1]], seatedPartTris(topo, rot, res.offset), [], 0.2);
   }
 
   // --- the golden scenes' own builds ----------------------------------------------------------------
