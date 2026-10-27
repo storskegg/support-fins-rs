@@ -1,5 +1,5 @@
 //! Replay of `parity/corpus/orient/` (recorded by `parity/oracle/orient.js` from web/orient.js):
-//! `layer_verdict`, `load_alignment` and `suggest_strength_pose`. Exact.
+//! `layer_verdict`, `load_alignment`, `suggest_strength_pose` and `suggest_orientations`. Exact.
 mod common;
 use ::parity::{Tol, Value, load_cases};
 use common::*;
@@ -88,4 +88,70 @@ fn suggest_strength_pose_replays() {
         check("suggestStrengthPose", c, &actual, &Tol::Exact);
     }
     assert!(none > 0 && some > 0);
+}
+
+#[test]
+fn suggest_orientations_replays() {
+    let cases = load_cases("orient", "suggestOrientations");
+    assert!(cases.len() > 30);
+    let mut conf = std::collections::BTreeSet::new();
+    for c in &cases {
+        let a = resolve_args(&c.args);
+        let o = a[1].plain();
+        let cfg = cfg_of(&a);
+        let r = suggest_orientations(
+            a[0].topo(),
+            o.get("top").num() as usize,
+            o.get("threshold").num(),
+            &cfg,
+        );
+        conf.insert(r.confidence.as_str());
+        let actual = obj(vec![
+            (
+                "candidates",
+                Value::Arr(
+                    r.candidates
+                        .iter()
+                        .map(|k| {
+                            obj(vec![
+                                ("rot", num_value(&k.rot)),
+                                ("overArea", Value::Num(k.over_area)),
+                                ("bedArea", Value::Num(k.bed_area)),
+                                ("height", Value::Num(k.height)),
+                                (
+                                    "size",
+                                    obj(vec![
+                                        ("x", Value::Num(k.size.x)),
+                                        ("y", Value::Num(k.size.y)),
+                                        ("z", Value::Num(k.size.z)),
+                                    ]),
+                                ),
+                                ("regions", Value::Num(k.regions as f64)),
+                                ("walls", Value::Num(k.walls as f64)),
+                                ("coverage", Value::Num(k.coverage)),
+                                ("volume", Value::Num(k.volume)),
+                                (
+                                    "seating",
+                                    Value::from(match k.seating {
+                                        sf_engine::fins::seating::SeatingKind::Face => "face",
+                                        sf_engine::fins::seating::SeatingKind::Edge => "edge",
+                                        sf_engine::fins::seating::SeatingKind::Point => "point",
+                                    }),
+                                ),
+                                ("holes", Value::Num(k.holes as f64)),
+                                ("bore", Value::Num(k.bore as f64)),
+                                ("score", Value::Num(k.score)),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
+            ("confidence", Value::from(r.confidence.as_str())),
+        ]);
+        check("suggestOrientations", c, &actual, &Tol::Exact);
+    }
+    assert!(
+        conf.len() >= 2,
+        "the corpus must reach several confidences: {conf:?}"
+    );
 }

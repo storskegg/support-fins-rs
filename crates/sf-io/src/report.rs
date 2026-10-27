@@ -18,11 +18,15 @@
 //!
 //! Line numbers are at the checkout's commit (299ef49).
 
-use sf_engine::fins::build::FinsBuilt;
+use std::sync::Arc;
+
+use sf_engine::config::Config;
+use sf_engine::fins::build::{FinsBuilt, build_fins};
 use sf_engine::fins::pad::PadStyle;
 use sf_engine::jsnum;
-use sf_engine::overhangs::Analysis;
+use sf_engine::overhangs::{Analysis, Topology, analyze, build_topology};
 
+use crate::fins_opts::fins_opts_from_json;
 use crate::json::{Json, parse};
 use crate::scale::scale_about;
 
@@ -140,6 +144,110 @@ pub fn report_part(pos: &[f64], scale: f64) -> Vec<f64> {
         p = centred(&scale_about(&p, scale, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]));
     }
     p
+}
+
+/// `SIZE_TOL` (web/report.js:82): mm, as a saved session's (ui/session.js).
+const SIZE_TOL: f64 = 0.05;
+
+/// What `replayReport` returns: `{ topo, res, built }`, or `{ why }` when the file isn't the one
+/// reported.
+#[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)] // a one-shot result, not stored in bulk
+pub enum Replay {
+    Built {
+        topo: Arc<Topology>,
+        res: Analysis,
+        built: FinsBuilt,
+    },
+    Why(String),
+}
+
+/// Port of `replayReport` (web/report.js:92-107): rebuild a report's fins from the file's
+/// triangles: the build, or `Why` when the file isn't the one reported (another size or triangle
+/// count). The same calls the page makes: analyze(topo, threshold, rot), then buildFins with the
+/// reported request. `cfg` is the engine's config as a fresh process has it (the page's Worker
+/// does the same; the request's tunables are applied to a copy).
+pub fn replay_report(pos: &[f64], rep: &Json, cfg: &Config) -> Replay {
+    let version = rep.get("v");
+    if version != Some(&Json::Num(REPORT_V)) {
+        // `report version ${rep?.v}, this replays ${REPORT.v}`
+        return Replay::Why(format!(
+            "report version {}, this replays {}",
+            version.map_or("undefined".to_string(), Json::to_js_string),
+            jsnum::to_js_string(REPORT_V)
+        ));
+    }
+    // `rep.scale ?? 1`
+    let scale = match rep.get("scale") {
+        None | Some(Json::Null) => 1.0,
+        Some(Json::Num(n)) => *n,
+        Some(other) => jsnum::string_to_number(&other.to_js_string()),
+    };
+    let p = report_part(pos, scale);
+    let faces = p.len() / 9;
+    let part = rep.get("part").expect("rep.part");
+    let want_faces = match part.get("faces") {
+        Some(Json::Num(n)) => *n,
+        other => panic!("rep.part.faces: {other:?}"),
+    };
+    if faces as f64 != want_faces {
+        return Replay::Why(format!(
+            "{faces} triangles, the report has {}",
+            jsnum::to_js_string(want_faces)
+        ));
+    }
+    let (lo, hi) = box_of(&p);
+    let size: Vec<f64> = (0..3).map(|k| hi[k] - lo[k]).collect();
+    let want: Vec<f64> = match part.get("size") {
+        Some(Json::Arr(a)) => a
+            .iter()
+            .map(|v| match v {
+                Json::Num(n) => *n,
+                other => panic!("rep.part.size: {other:?}"),
+            })
+            .collect(),
+        other => panic!("rep.part.size: {other:?}"),
+    };
+    if size
+        .iter()
+        .enumerate()
+        .any(|(k, &v)| jsnum::abs(v - want[k]) > SIZE_TOL)
+    {
+        return Replay::Why(format!(
+            "the part is {} mm, the report's {}",
+            size.iter()
+                .map(|&v| jsnum::to_fixed(v, 2))
+                .collect::<Vec<_>>()
+                .join(" x "),
+            want.iter()
+                .map(|&v| jsnum::to_js_string(v))
+                .collect::<Vec<_>>()
+                .join(" x ")
+        ));
+    }
+    let topo = Arc::new(build_topology(p));
+    let rot: [f64; 9] = match rep.get("rot") {
+        Some(Json::Arr(a)) if a.len() == 9 => {
+            let mut r = [0.0; 9];
+            for (i, v) in a.iter().enumerate() {
+                r[i] = match v {
+                    Json::Num(n) => *n,
+                    other => panic!("rep.rot: {other:?}"),
+                };
+            }
+            r
+        }
+        other => panic!("rep.rot: {other:?}"),
+    };
+    let threshold = match rep.get("threshold") {
+        Some(Json::Num(n)) => *n,
+        other => panic!("rep.threshold: {other:?}"),
+    };
+    let res = analyze(&topo, threshold, &rot);
+    let opts =
+        fins_opts_from_json(rep.get("opts").expect("rep.opts")).expect("rep.opts is an object");
+    let built = build_fins(&topo, &res, &rot, &opts, cfg);
+    Replay::Built { topo, res, built }
 }
 
 /// The numbers a report leads with (`reportCoverage`'s object, web/report.js:109-127); `None` is

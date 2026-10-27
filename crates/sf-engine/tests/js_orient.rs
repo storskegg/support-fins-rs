@@ -1,11 +1,14 @@
 //! Port of upstream `tests/orient.test.js` (web/orient.js): the layer-posture bucket, the
-//! load-alignment verdict and the strength solver. The two `suggestOrientations` cases need
-//! `build_fins` and are ported with it (PR 2).
+//! load-alignment verdict, the strength solver and the minimise-support suggestions.
 
+use std::sync::Arc;
+
+use sf_engine::config::Config;
 use sf_engine::orient::*;
 use sf_engine::overhangs::analyze;
+use sf_engine::types::IDENTITY3;
 use sf_engine::types::Xyz;
-use sf_testkit::{assert_close, block_topo};
+use sf_testkit::{assert_close, block_topo, tilted_block_topo};
 
 fn size(x: f64, y: f64, z: f64) -> Xyz {
     Xyz { x, y, z }
@@ -163,4 +166,63 @@ fn layer_verdict_buckets_at_the_five_percent_band() {
     assert_eq!(layer_verdict(&size(100.0, 50.0, 94.9)), Posture::Mixed);
     assert_eq!(layer_verdict(&size(100.0, 50.0, 52.5)), Posture::Strong);
     assert_eq!(layer_verdict(&size(0.1, 0.1, 0.1)), Posture::Weak);
+}
+
+// orient.test.js:64
+#[test]
+fn suggest_orientations_finds_the_flat_pose_for_a_part_saved_tilted() {
+    // A block whose vertices were tilted 60deg and saved that way: as loaded it has a broad
+    // downward overhang, but rotating it back flat needs no support at all. The suggester must
+    // surface that pose and rank it on top.
+    let topo = Arc::new(tilted_block_topo(0.0, 60.0, 0.0, 40.0, 0.0, 12.0, 60.0));
+    let as_loaded = analyze(&topo, 45.0, &IDENTITY3);
+    assert!(
+        as_loaded.over_area > 1.0,
+        "the tilted-as-saved block should have an overhang as loaded"
+    );
+
+    let cfg = Config::default();
+    let Suggestions {
+        candidates,
+        confidence,
+    } = suggest_orientations(&topo, 3, 45.0, &cfg);
+    assert!(!candidates.is_empty(), "expected at least one candidate");
+    assert!(["high", "medium", "low", "none"].contains(&confidence.as_str()));
+
+    let best = &candidates[0];
+    assert!(
+        best.over_area < as_loaded.over_area,
+        "the best pose should reduce overhang area"
+    );
+    assert!(
+        best.over_area < 1.0,
+        "the best pose should be ~support-free, got {} mm^2",
+        best.over_area
+    );
+    assert_eq!(
+        best.regions, 0,
+        "the best pose should have no overhang regions"
+    );
+}
+
+// orient.test.js:82
+#[test]
+fn suggest_orientations_candidates_are_ranked_best_first_and_well_formed() {
+    let topo = Arc::new(tilted_block_topo(0.0, 60.0, 0.0, 40.0, 0.0, 12.0, 60.0));
+    let cfg = Config::default();
+    let Suggestions { candidates, .. } = suggest_orientations(&topo, 3, 45.0, &cfg);
+    for i in 1..candidates.len() {
+        assert!(
+            candidates[i - 1].score <= candidates[i].score,
+            "candidates must be sorted by score"
+        );
+    }
+    for c in &candidates {
+        assert_eq!(c.rot.len(), 9, "rot must be a 3x3 (9-element) matrix");
+        let _ = c.seating; // each candidate reports a seating kind
+        assert!(
+            c.size.z.is_finite(),
+            "each candidate carries its full seated size"
+        );
+    }
 }

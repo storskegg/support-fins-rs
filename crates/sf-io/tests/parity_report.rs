@@ -11,6 +11,8 @@ use sf_engine::pieces::FloatingPiece;
 use sf_engine::types::Xyz;
 use sf_io::json::Json;
 use sf_io::report::*;
+use sf_testkit::parity::resolve_args;
+use sf_testkit::parity_config::config;
 
 fn check(c: &Case, actual: Value) {
     let expected = c
@@ -333,4 +335,63 @@ fn report_url_replays() {
         check(c, Value::Str(url));
     }
     assert!(cut >= 1, "the corpus must reach the too-long link");
+}
+
+/// The vertex hash of `oracle/buildfins.js` (two 32-bit FNV-style hashes over every float64 word).
+fn hash(tris: &[[f64; 4]]) -> Value {
+    let (mut h1, mut h2) = (0x811c9dc5u32, 0x9747b28cu32);
+    for v in tris {
+        for x in v {
+            let b = x.to_bits();
+            for w in [b as u32, (b >> 32) as u32] {
+                h1 = (h1 ^ w).wrapping_mul(16777619);
+                h2 = (h2 ^ w).wrapping_mul(0x01000193) ^ (h2 >> 13);
+            }
+        }
+    }
+    Value::Arr(vec![Value::Num(h1 as f64), Value::Num(h2 as f64)])
+}
+
+#[test]
+fn replay_report_replays() {
+    let cases = load_cases("report", "replayReport");
+    assert!(cases.len() > 50);
+    let (mut built_n, mut why_n) = (0, 0);
+    for c in &cases {
+        let a = resolve_args(&c.args);
+        let pos: Vec<f64> = match a[0].plain() {
+            Value::F32(v) => v.iter().map(|&x| x as f64).collect(),
+            o => panic!("pos: {o:?}"),
+        };
+        let rep = sf_io::json::parse(a[1].plain().str()).expect("rep JSON");
+        let cfg = config(a[2].config());
+        let actual = match replay_report(&pos, &rep, &cfg) {
+            Replay::Why(w) => {
+                why_n += 1;
+                Value::Obj(vec![("why".into(), Value::Str(w))])
+            }
+            Replay::Built { res, built, .. } => {
+                built_n += 1;
+                Value::Obj(vec![
+                    (
+                        "nTriangles".into(),
+                        Value::Num(built.triangles.len() as f64),
+                    ),
+                    ("hash".into(), hash(&built.triangles)),
+                    ("nPad".into(), Value::Num(built.pad_triangles.len() as f64)),
+                    ("padHash".into(), hash(&built.pad_triangles)),
+                    ("nFins".into(), Value::Num(built.fins.len() as f64)),
+                    (
+                        "coverage".into(),
+                        coverage_value(&report_coverage(&built, &res)),
+                    ),
+                ])
+            }
+        };
+        check(c, actual);
+    }
+    assert!(
+        built_n > 20 && why_n > 10,
+        "{built_n} built, {why_n} refused"
+    );
 }

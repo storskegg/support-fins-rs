@@ -57,7 +57,7 @@ Web-only rows:
 | `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | green |
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | not ported |
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
-| `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | partial: 11 of 13 ported (js_orient.rs); the two suggestOrientations cases follow with build_fins |
+| `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | green |
 | `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | partial: 2 of 14 ported (js_pad.rs, the `buildPad` ones); the rest build through buildFins |
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | not ported |
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
@@ -104,4 +104,4 @@ Web-only rows:
 | `wedge_clear.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
 | `part_wall_ends.test.js` | 1 | prop/attached | M3 (catch-up to 299ef49) | green |
-| `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | not ported |
+| `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | 3 of 4 ported (sf-io/tests/js_report.rs); the locale case is the page's i18n (M7) |

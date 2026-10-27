@@ -23,8 +23,13 @@
 
 use indexmap::IndexMap;
 
+use std::sync::Arc;
+
+use crate::config::Config;
+use crate::fins::build::{FinsOpts, build_fins};
+use crate::fins::seating::SeatingKind;
 use crate::jsnum;
-use crate::overhangs::{Topology, analyze};
+use crate::overhangs::{Analysis, Topology, analyze};
 use crate::types::{Rot3, Xyz};
 
 type V3 = [f64; 3];
@@ -227,6 +232,215 @@ pub fn candidate_downs(topo: &Topology, max_clusters: usize) -> Vec<V3> {
 
 /// `DOWN` (web/orient.js:134).
 pub const DOWN: V3 = [0.0, 0.0, -1.0];
+
+/// One ranked pose of `suggestOrientations` (web/orient.js:177-195): the metrics the UI shows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Candidate {
+    pub rot: Rot3,
+    pub over_area: f64,
+    pub bed_area: f64,
+    pub height: f64,
+    /// Full `{x, y, z}` so callers can run `layerVerdict` on the pose.
+    pub size: Xyz,
+    pub regions: usize,
+    pub walls: usize,
+    pub coverage: f64,
+    pub volume: f64,
+    pub seating: SeatingKind,
+    pub holes: usize,
+    pub bore: usize,
+    pub score: f64,
+}
+
+/// `confidence` of `suggestOrientations`: how clearly the top pick beats the runner-up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Confidence {
+    High,
+    Medium,
+    Low,
+    /// A part that can only balance on a point has no printable pose at all.
+    None,
+}
+
+impl Confidence {
+    /// The JS string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Confidence::High => "high",
+            Confidence::Medium => "medium",
+            Confidence::Low => "low",
+            Confidence::None => "none",
+        }
+    }
+}
+
+/// What `suggestOrientations` returns: `{ candidates, confidence }`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Suggestions {
+    pub candidates: Vec<Candidate>,
+    pub confidence: Confidence,
+}
+
+/// `.sort((p, r) => p.x - r.x)` comparator: stable, a NaN difference compares as 0.
+fn cmp_diff(d: f64) -> std::cmp::Ordering {
+    if d < 0.0 {
+        std::cmp::Ordering::Less
+    } else if d > 0.0 {
+        std::cmp::Ordering::Greater
+    } else {
+        std::cmp::Ordering::Equal
+    }
+}
+
+/// Port of `suggestOrientations` (web/orient.js:136-218): rank orientations for printability.
+/// Returns up to `top` candidates, best first, each with the metrics the UI shows and a
+/// `confidence`. JS defaults `top = 3`, `threshold = 45`; callers pass them. `cfg` is the config
+/// the finalists' `buildFins` runs under.
+///
+/// **The analyze-aliasing hazard (issue #23), reproduced.** JS `analyze` returns the topology's
+/// scratch arrays: every result of pass 1 shares ONE `over` / `kept` / `onBed`, which hold the flags
+/// of the LAST `analyze` call (the last candidate of `downs`, before the sort). Pass 2 hands each
+/// finalist's result to `buildFins`, so every finalist is built from its own regions, areas, size
+/// and offset but the last candidate's face flags. No stage of `buildFins` writes those arrays
+/// (checked: the only writes are in `analyze`). Here each `Analysis` owns its arrays, so the
+/// finalists get a copy with the last candidate's flags put back.
+pub fn suggest_orientations(
+    topo: &Arc<Topology>,
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+) -> Suggestions {
+    let downs = candidate_downs(topo, 12);
+
+    // pass 1: cheap analyze() on every candidate
+    struct Scored {
+        rot: Rot3,
+        a: Analysis,
+        cheap: f64,
+    }
+    let mut scored: Vec<Scored> = downs
+        .iter()
+        .map(|&d| {
+            let rot = rot_from_to(d, DOWN);
+            let a = analyze(topo, threshold, &rot);
+            // The small overhangs analyze() drops as slivers ARE the hole ceilings, slot roofs and
+            // bore tops that print rough by surprise -- a pose that turns them UP prints them
+            // clean with no support, so fewer is better. This is the quality-first counterpart to
+            // the bore-guard: it gives the "rotate so the hole points up" warning a pose to
+            // actually land on.
+            let holes = (a.raw_region_count - a.regions.len()) as f64;
+            // printability proxy: overhang area dominates, bed contact helps adhesion, height is
+            // a mild time/tipping penalty, holes-in-overhang a rough-surface penalty. Lower is
+            // better.
+            let cheap = a.over_area
+                + jsnum::max(0.0, 200.0 - a.bed_area) * 0.25
+                + a.size.z * 2.0
+                + holes * 2.0;
+            Scored { rot, a, cheap }
+        })
+        .collect();
+    // (the aliased flags: the last analyze call's, before the sort)
+    let last_flags = scored
+        .last()
+        .map(|s| (s.a.over.clone(), s.a.kept.clone(), s.a.on_bed.clone()));
+    scored.sort_by(|p, r| cmp_diff(p.cheap - r.cheap));
+
+    // pass 2: full fin build on the finalists, to measure real finnable coverage
+    let n_final = jsnum::max((top + 2) as f64, 5.0) as usize;
+    let mut built: Vec<Candidate> = scored
+        .into_iter()
+        .take(n_final)
+        .map(|mut s| {
+            if let Some((over, kept, on_bed)) = &last_flags {
+                s.a.over = over.clone();
+                s.a.kept = kept.clone();
+                s.a.on_bed = on_bed.clone();
+            }
+            let b = build_fins(
+                topo,
+                &s.a,
+                &s.rot,
+                &FinsOpts {
+                    mode: Some("prop".to_string()),
+                    bed_pad: Some(true),
+                    ..Default::default()
+                },
+                cfg,
+            );
+            // buildFins reports `unserved` = overhang regions that took NO wall; coverage is
+            // DISPLAY only (how many fins the user will get), never a score driver -- rewarding
+            // coverage rewards ADDING supports, and printability wants fewer.
+            let n_reg = s.a.regions.len() as f64;
+            let coverage = if n_reg != 0.0 {
+                (n_reg - b.unserved) / n_reg
+            } else {
+                1.0
+            };
+            let point = b.seating.kind == SeatingKind::Point;
+            // Holes/slots/bore tops in overhang (the dropped slivers) print rough. Walls inside a
+            // bore are supported (Matthew's print tests, 2026-09-27) but still have to be pulled
+            // out of the hole, so a pose that points the holes UP stays mildly preferred. Both
+            // weighted below the plastic/height terms so they tip near-ties, not so hard they
+            // chase a few holes into a worse-supported pose.
+            let holes = s.a.raw_region_count - s.a.regions.len();
+            let bore = b.props.iter().filter(|q| q.in_bore == Some(true)).count();
+            // Printability cost, lower is better: the overhang that needs supporting at all
+            // dominates; then the plastic the fins themselves cost, a height penalty (layers =
+            // time, and tall = tippy), a bed-adhesion bonus, and the rough-hole penalty. A part
+            // balanced on a point is unprintable in this pose -- push it to the bottom, not out,
+            // so it still shows with an honest "nothing can hold this".
+            let score = s.a.over_area
+                + (b.volume / 1000.0) * 2.0
+                + s.a.size.z * 3.0
+                + jsnum::max(0.0, 300.0 - s.a.bed_area) * 0.5
+                + holes as f64 * 2.0
+                + bore as f64 * 5.0
+                + if point { 1e6 } else { 0.0 };
+            Candidate {
+                rot: s.rot,
+                over_area: s.a.over_area,
+                bed_area: s.a.bed_area,
+                height: s.a.size.z,
+                size: s.a.size,
+                regions: s.a.regions.len(),
+                walls: b.props.len(),
+                coverage,
+                volume: b.volume,
+                seating: b.seating.kind,
+                holes,
+                bore,
+                score,
+            }
+        })
+        .collect();
+    built.sort_by(|p, r| cmp_diff(p.score - r.score));
+
+    // Confidence is the honest part, and it is about the POSE, not the fins: how clearly does the
+    // top pick beat the runner-up? A big separation means "print it this way"; a near-tie means
+    // several orientations are about as good and the user's judgement (or the load, once placed)
+    // should decide. A part that can only balance on a point has no printable pose at all.
+    let mut confidence = Confidence::High;
+    match (built.first(), built.get(1)) {
+        (None, _) => confidence = Confidence::None,
+        (Some(best), _) if best.seating == SeatingKind::Point => confidence = Confidence::None,
+        (Some(best), Some(second)) => {
+            let sep = (second.score - best.score) / jsnum::max(1.0, best.score);
+            confidence = if sep > 0.25 {
+                Confidence::High
+            } else if sep > 0.08 {
+                Confidence::Medium
+            } else {
+                Confidence::Low
+            };
+        }
+        _ => {}
+    }
+    built.truncate(top);
+    Suggestions {
+        candidates: built,
+        confidence,
+    }
+}
 
 /// Port of `crossFraction` (web/orient.js:233-236): cos of the angle between two unit-ish
 /// directions in the same frame. `None` is JS's `null`.
