@@ -32,7 +32,7 @@ you start a ticket, and again whenever a review sends you back.
    ```
    Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
    ```
-5. Push your branch and open a PR against `main` with `gh pr create --repo storskegg/support-fins-rs`.
+5. Push your branch and open a PR against `main`. **Never** base a PR on another PR's branch: squash-merging deletes that branch, and GitHub then closes your PR for good. If you need unmerged work, open as a draft against `main` and rebase once it lands. Then, with `gh pr create --repo storskegg/support-fins-rs`.
    Use the PR body template below, put `Closes #<ticket>` in it, and end the body with:
    ```
    🤖 Generated with [Claude Code](https://claude.com/claude-code)
