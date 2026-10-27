@@ -62,12 +62,12 @@ Web-only rows:
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | green |
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_patches.rs) |
 | `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | green (js_perp_hole.rs) |
-| `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | not ported |
+| `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | green (js_pins.rs) |
 | `plate_only.test.js` | 4 | draw, fins, inside, overhangs, prop, stl | M3 | green |
 | `platerow.test.js` | 2 | inside, overhangs, stl, ui/platerow | M4 | not ported |
-| `raster.test.js` | 4 | fins, inside, overhangs, prop, prop/raster, stl | M3 | not ported |
-| `resinfoot.test.js` | 3 | fins, inside, overhangs, prop, prop/resinfoot, stl | M3 | not ported |
-| `rim.test.js` | 5 | fins, inside, overhangs, prop, prop/rim, stl | M3 | not ported |
+| `raster.test.js` | 4 | fins, inside, overhangs, prop, prop/raster, stl | M3 | green (js_raster.rs) |
+| `resinfoot.test.js` | 3 | fins, inside, overhangs, prop, prop/resinfoot, stl | M3 | green (js_resinfoot.rs) |
+| `rim.test.js` | 5 | fins, inside, overhangs, prop, prop/rim, stl | M3 | green (js_rim.rs) |
 | `rounded_feet.test.js` | 7 | fins, finworker, inside, nozzle, overhangs, prop, solids, stl, threemf | M3 | not ported |
 | `rows.test.js` | 7 | fins, fins/field, fins/rows, inside, overhangs, prop, stl | M3 | green |
 | `scale.test.js` | 3 | inside, overhangs, scale, stl | M1 | green |
@@ -76,7 +76,7 @@ Web-only rows:
 | `short_walls.test.js` | 4 | fins, inside, overhangs, prop, prop/clearance, stl | M3 | green |
 | `small_holes.test.js` | 10 | fins, fins/coverage, inside, overhangs, planes, prop, stl | M3 | not ported |
 | `small_holes_i18n.test.js` | 1 |  | M3 | not ported |
-| `small_tubes.test.js` | 3 | fins, inside, overhangs, prop, prop/raster, stl | M3 | not ported |
+| `small_tubes.test.js` | 3 | fins, inside, overhangs, prop, prop/raster, stl | M3 | green (js_small_tubes.rs) |
 | `squat.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | green |
 | `step.test.js` | 6 | fins, inside, overhangs, prop, step, stl | M6 | not ported |

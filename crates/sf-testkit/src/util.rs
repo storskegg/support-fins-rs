@@ -29,6 +29,16 @@ pub fn models_dir() -> PathBuf {
     upstream_root().join("prototype/stress/models")
 }
 
+/// `readSTL` of `tests/fixtures/<name>.stl` in the upstream checkout (raster.test.js `example`).
+pub fn load_fixture_soup(name: &str) -> Vec<f64> {
+    let path = upstream_root()
+        .join("tests/fixtures")
+        .join(format!("{name}.stl"));
+    let bytes =
+        std::fs::read(&path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    sf_io::stl::read_stl(&bytes).unwrap_or_else(|e| panic!("{}: {}", path.display(), e.0))
+}
+
 /// Port of `assertClose` (tests/_util.js:22-24). Like JS, a NaN difference does not fail
 /// (`NaN > tol` is false). The message is `${msg || 'not close'}: ${a} vs ${b} (tol ${tol})`.
 pub fn assert_close(a: f64, b: f64, tol: f64, msg: &str) {
