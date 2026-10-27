@@ -7,7 +7,7 @@ use std::sync::Arc;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
 use sf_io::obj::read_obj;
 use sf_io::stl::read_stl;
-use sf_io::threemf::read_three_mf;
+use sf_io::threemf::{PartKind, ThreeMfObject, read_three_mf};
 
 use crate::gpu::GpuBuffer;
 
@@ -43,8 +43,9 @@ pub struct PartInfo {
     pub triangles: u64,
     /// Bounding-box size x, y, z in mm, in the model frame.
     pub size: Vec<f64>,
-    /// Every edge is shared by exactly two faces (after the engine's 1 micron weld).
-    pub watertight: bool,
+    /// What import did, in the page's words (`web/ui/io.js` `renderImportNote`): the negative parts cut
+    /// out of it, and why any were not. Empty for a part without negative parts.
+    pub notes: Vec<String>,
 }
 
 /// `analyze`'s numbers (web/overhangs.js `analyze`), for the readout.
@@ -66,10 +67,11 @@ pub struct Part {
     name: String,
     topo: Arc<Topology>,
     size: [f64; 3],
+    notes: Vec<String>,
 }
 
 impl Part {
-    fn new(name: String, positions: Vec<f64>) -> Part {
+    fn new(name: String, positions: Vec<f64>, notes: Vec<String>) -> Part {
         let mut lo = [f64::INFINITY; 3];
         let mut hi = [f64::NEG_INFINITY; 3];
         for v in positions.as_chunks::<3>().0 {
@@ -87,6 +89,7 @@ impl Part {
             name,
             topo: Arc::new(build_topology(positions)),
             size,
+            notes,
         }
     }
 
@@ -125,8 +128,7 @@ impl Part {
             name: self.name.clone(),
             triangles: self.topo.n_faces as u64,
             size: self.size.to_vec(),
-            // each shared edge is one adjacency pair, and a closed surface has 3F/2 edges
-            watertight: self.topo.n_faces > 0 && self.topo.adj_a.len() * 2 == self.topo.n_faces * 3,
+            notes: self.notes.clone(),
         }
     }
 
@@ -191,8 +193,69 @@ fn stem(path: &str) -> String {
         .map_or_else(|| path.to_string(), |s| s.to_string_lossy().into_owned())
 }
 
+/// `tn(one, other)` in English: the singular for exactly one.
+fn plural(n: usize, one: &str, other: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { other })
+}
+
+/// A 3MF object with a slicer's negative parts cut out of it, as `web/ui/io.js` does at import
+/// (`cutChosen`), and the notes `renderImportNote` writes for it (the cut ones, and the kept
+/// modifiers / support blockers).
+fn cut_object(o: ThreeMfObject) -> (String, Vec<f64>, Vec<String>) {
+    let has_negative = o.extras.iter().any(|e| e.kind == PartKind::Negative);
+    let kept = o
+        .extras
+        .iter()
+        .filter(|e| e.kind != PartKind::Negative)
+        .count();
+    let mut notes = Vec::new();
+    let positions = if has_negative {
+        let c = sf_cut::cut_negatives(&o.positions, None, &o.extras);
+        if c.cut > 0 {
+            notes.push(format!(
+                "cut out {}",
+                plural(c.cut, "negative part", "negative parts")
+            ));
+            // the export carries the negative parts too, and a slicer draws one over the walls standing in its cut
+            notes.push(
+                "in your slicer, walls inside a negative part show once you slice".to_string(),
+            );
+        }
+        match c.why {
+            Some("open") => notes.push(
+                "negative parts not cut: the part is not a closed solid, so its fins are for the uncut shape".into(),
+            ),
+            Some("whole") => notes.push("negative parts not cut: they would remove the whole part".into()),
+            Some("load") => {
+                notes.push("negative parts not cut: the cutter did not load (try opening the file again)".into())
+            }
+            _ if c.uncut > 0 => notes.push(format!(
+                "{} not cut: {}",
+                plural(c.uncut, "negative part", "negative parts"),
+                if c.uncut == 1 { "it is not a closed solid" } else { "they are not closed solids" }
+            )),
+            _ => {}
+        }
+        c.positions
+    } else {
+        o.positions
+    };
+    if kept > 0 {
+        notes.push(format!(
+            "kept {} for the 3MF export",
+            plural(
+                kept,
+                "modifier/support blocker",
+                "modifiers/support blockers"
+            )
+        ));
+    }
+    (o.name, positions, notes)
+}
+
 /// STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
-/// the CLI's `readPart` gets it). Negative parts are not cut here (the viewer shows the file's solids).
+/// the CLI's `readPart` gets it). A 3MF object's negative parts are cut out at import, as the page does
+/// (`web/ui/io.js`), through `sf-cut`; `PartInfo.notes` says what was cut and why anything was not.
 #[uniffi::export]
 pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     let bytes = std::fs::read(&path).map_err(|e| FfiError::Io {
@@ -200,29 +263,31 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     })?;
     let format = |message: String| FfiError::Format { message };
     let lower = path.to_ascii_lowercase();
-    let mut parts: Vec<(String, Vec<f64>)> = Vec::new();
+    let mut parts: Vec<(String, Vec<f64>, Vec<String>)> = Vec::new();
     if lower.ends_with(".stl") {
-        parts.push((stem(&path), read_stl(&bytes).map_err(|e| format(e.0))?));
+        parts.push((
+            stem(&path),
+            read_stl(&bytes).map_err(|e| format(e.0))?,
+            vec![],
+        ));
     } else if lower.ends_with(".obj") {
         for o in read_obj(&bytes).map_err(format)?.objects {
-            parts.push((o.name, o.positions));
+            parts.push((o.name, o.positions, vec![]));
         }
     } else if lower.ends_with(".3mf") {
         let m = read_three_mf(&bytes).map_err(format)?;
         drop(bytes);
         let objects = m.objects;
         if objects.is_empty() {
-            parts.push((stem(&path), m.positions));
+            parts.push((stem(&path), m.positions, vec![]));
         } else {
             drop(m.positions); // the merged soup of every object: not needed beside them
-            for o in objects {
-                parts.push((o.name, o.positions));
-            }
+            parts.extend(objects.into_iter().map(cut_object));
         }
     } else {
         return Err(format("reads .stl, .3mf and .obj only".into()));
     }
-    parts.retain(|(_, p)| !p.is_empty());
+    parts.retain(|(_, p, _)| !p.is_empty());
     if parts.is_empty() {
         return Err(format("no triangles in the file".into()));
     }
@@ -230,7 +295,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     Ok(parts
         .into_iter()
         .enumerate()
-        .map(|(i, (name, pos))| {
+        .map(|(i, (name, pos, notes))| {
             Arc::new(Part::new(
                 if name.is_empty() {
                     format!("{base} {}", i + 1)
@@ -238,6 +303,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
                     name
                 },
                 pos,
+                notes,
             ))
         })
         .collect())

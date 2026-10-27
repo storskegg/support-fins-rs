@@ -704,6 +704,7 @@ dependencies = [
 name = "sf-ffi"
 version = "0.1.0"
 dependencies = [
+ "sf-cut",
  "sf-engine",
  "sf-io",
  "sf-testkit",

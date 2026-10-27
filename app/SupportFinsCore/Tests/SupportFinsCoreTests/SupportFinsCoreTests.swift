@@ -49,7 +49,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let info = parts[0].info()
     #expect(info.name == "cube")
     #expect(info.triangles == 12)
-    #expect(info.watertight)
+    #expect(info.notes.isEmpty)
     #expect(info.size == [40, 40, 40])
 }
 
