@@ -4,6 +4,7 @@ pub mod exportname;
 pub mod json;
 pub mod obj;
 pub mod paintcode;
+pub mod report;
 pub mod scale;
 pub mod stl;
 mod text;
