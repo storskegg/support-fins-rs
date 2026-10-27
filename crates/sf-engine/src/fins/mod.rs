@@ -1,5 +1,6 @@
 //! `web/fins/`: the fin passes.
 pub mod config;
+pub mod coverage;
 pub mod field;
 pub mod fill;
 pub mod pad;

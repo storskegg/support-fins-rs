@@ -105,6 +105,7 @@ you start a ticket, and again whenever a review sends you back.
 | `Map` / `Set` | `IndexMap` / `IndexSet` (insertion order) |
 | a callback parameter | `impl Fn(…) -> …` (or `&dyn Fn` if it is stored) |
 | `PROP.x`, `FIN.y`, … (module config) | `cfg.prop.x`, `cfg.fin.y`, with `cfg: &Config` as the **last** parameter |
+| crest module state, or `globalThis.__TINECAP` (M2+ prop pipeline) | `ctx: &prop::ctx::BuildCtx` as the **last** parameter in place of `cfg`. Read config through `ctx.cfg`. See `prop/ctx.rs` for the rule |
 | a `WeakMap` or `topo._x` cache keyed on the topology | its slot in `overhangs::TopoCache` (`OnceLock`) |
 | a `WeakMap` keyed on a tris array | a cache field on `Tris` |
 | a `WeakMap` keyed on the `analyze` result | ask: the orchestrator adds a slot |
