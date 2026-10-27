@@ -14,6 +14,7 @@ miniz_oxide.workspace = true
 
 [dev-dependencies]
 parity = { path = "../../parity" }
+sf-testkit.workspace = true
 
 [lints]
 workspace = true

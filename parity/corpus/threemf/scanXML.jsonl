@@ -1,0 +1,41 @@
+{"id":"empty","args":[""],"out":[]}
+{"id":"text","args":["no tags"],"out":[]}
+{"id":"simple","args":["<a x='1' y=\"2\"/>"],"out":[["open","a",{"x":"1","y":"2"},true]]}
+{"id":"nested","args":["<a><b c='d'>text</b><e/></a>"],"out":[["open","a",{},false],["open","b",{"c":"d"},false],["close","b"],["open","e",{},true],["close","a"]]}
+{"id":"decl","args":["<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<model unit=\"inch\"><x/></model>"],"out":[["open","model",{"unit":"inch"},false],["open","x",{},true],["close","model"]]}
+{"id":"comment","args":["<a><!-- <b/> --><c/></a>"],"out":[["open","a",{},false],["open","c",{},true],["close","a"]]}
+{"id":"comment_unterminated","args":["<a><!-- <b/> <c/>"],"out":[["open","a",{},false]]}
+{"id":"comment_short","args":["<a><!--></a>"],"out":[["open","a",{},false],["close","a"]]}
+{"id":"cdata","args":["<a><![CDATA[ <b/> ]]><c/></a>"],"out":[["open","a",{},false],["open","c",{},true],["close","a"]]}
+{"id":"cdata_unterminated","args":["<a><![CDATA[ <b/> <c/>"],"out":[["open","a",{},false]]}
+{"id":"doctype","args":["<!DOCTYPE x [<!ENTITY e 'v'>]><a/>"],"out":[["open","a",{},true]]}
+{"id":"pi_unterminated","args":["<a/><?pi never ends"],"out":[["open","a",{},true]]}
+{"id":"gt_in_value","args":["<object name=\"a > b\" id=\"1\"/>"],"out":[["open","object",{"name":"a > b","id":"1"},true]]}
+{"id":"single_quotes","args":["<a b='say \"hi\"'/>"],"out":[["open","a",{"b":"say \"hi\""},true]]}
+{"id":"unquoted","args":["<a b=1 c=2/>"],"out":[["open","a",{"b":"1","c":"2"},true]]}
+{"id":"unquoted_slash","args":["<a b=1/>"],"out":[["open","a",{"b":"1"},true]]}
+{"id":"no_value","args":["<a b c='1' d/>"],"out":[["open","a",{"b":"","c":"1","d":""},true]]}
+{"id":"spaces_around_eq","args":["<a b = '1' c\t=\n\"2\"/>"],"out":[["open","a",{"b":"1","c":"2"},true]]}
+{"id":"empty_value","args":["<a b=\"\" c=''/>"],"out":[["open","a",{"b":"","c":""},true]]}
+{"id":"unterminated_quote","args":["<a b=\"never closed"],"out":[["open","a",{"b":"never closed"},false]]}
+{"id":"unterminated_tag","args":["<a b='1'"],"out":[["open","a",{"b":"1"},false]]}
+{"id":"only_lt","args":["<"],"out":[["open","",{},false]]}
+{"id":"lt_end","args":["<a"],"out":[["open","a",{},false]]}
+{"id":"close_only","args":["</a>"],"out":[["close","a"]]}
+{"id":"close_spaces","args":["</ a >"],"out":[["close","a"]]}
+{"id":"close_unterminated","args":["</a"],"out":[]}
+{"id":"ns_prefix","args":["<m:object p:path=\"/3D/x.model\" id=\"3\"/>"],"out":[["open","m:object",{"p:path":"/3D/x.model","id":"3"},true]]}
+{"id":"dup_attr","args":["<a b=\"1\" b=\"2\"/>"],"out":[["open","a",{"b":"2"},true]]}
+{"id":"equals_first","args":["<a =x>"],"out":[["open","a",{"":"x"},false]]}
+{"id":"trailing_text","args":["<a/>tail"],"out":[["open","a",{},true]]}
+{"id":"entities","args":["<a b=\"&lt;&amp;&quot;\"/>"],"out":[["open","a",{"b":"&lt;&amp;&quot;"},true]]}
+{"id":"unicode","args":["<a n=\"café 中\" é=\"1\"/>"],"out":[["open","a",{"n":"café 中","é":"1"},true]]}
+{"id":"nbsp_ws","args":["<a b='1'　c='2'/>"],"out":[["open","a",{"b":"1","c":"2"},true]]}
+{"id":"crlf","args":["<a\r\nb='1'\r\n/>"],"out":[["open","a",{"b":"1"},true]]}
+{"id":"newline_in_tag","args":["<a\n  b='1'\n  c='2'\n>"],"out":[["open","a",{"b":"1","c":"2"},false]]}
+{"id":"empty_name","args":["< />"],"out":[["open","",{},true]]}
+{"id":"numeric_like","args":["<a b='1'/><a b='2'/>"],"out":[["open","a",{"b":"1"},true],["open","a",{"b":"2"},true]]}
+{"id":"deep","args":["<a><b><c><d/></c></b></a>"],"out":[["open","a",{},false],["open","b",{},false],["open","c",{},false],["open","d",{},true],["close","c"],["close","b"],["close","a"]]}
+{"id":"angle_in_cdata_end","args":["<![CDATA[x]]>"],"out":[]}
+{"id":"closing_in_attrs","args":["<a b=\"</a>\"/>"],"out":[["open","a",{"b":"</a>"},true]]}
+{"id":"question_in_name","args":["<a?b/>"],"out":[["open","a?b",{},true]]}
