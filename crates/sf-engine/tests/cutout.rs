@@ -8,7 +8,7 @@ use sf_engine::solids::ribbon;
 
 type V3 = [f64; 3];
 
-fn volume(tris: &[V3]) -> f64 {
+fn volume(tris: &[[f64; 4]]) -> f64 {
     tris.chunks(3)
         .map(|t| {
             let (a, b, c) = (t[0], t[1], t[2]);
@@ -66,7 +66,7 @@ fn with_pattern(p: &str) -> Config {
     c
 }
 
-fn run(l: f64, h: f64, cfg: &Config) -> (bool, Vec<V3>, f64) {
+fn run(l: f64, h: f64, cfg: &Config) -> (bool, Vec<[f64; 4]>, f64) {
     let (st, full) = straight(l, h, cfg);
     let mut out = Vec::new();
     let ret = cut_wall(&st, &full, &mut out, &Wall::from(&cfg.prop), cfg);

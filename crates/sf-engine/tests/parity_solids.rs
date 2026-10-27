@@ -46,8 +46,13 @@ fn frame(v: &Value) -> impl Fn(f64, f64, f64) -> [f64; 3] {
     move |a, b, c| std::array::from_fn(|k| o[k] + a * u[k] + b * vv[k] + c * w[k])
 }
 
-fn flat(tris: &[[f64; 3]]) -> Value {
-    Value::F64(tris.iter().flatten().copied().collect())
+/// The vertices' xyz as the recorded Float64Array; every vertex these emitters push is untagged.
+fn flat3(out: &[[f64; 4]]) -> Value {
+    assert!(
+        out.iter().all(|v| v[3] == 0.0),
+        "an untagged emitter pushed a tagged vertex"
+    );
+    Value::F64(out.iter().flat_map(|v| [v[0], v[1], v[2]]).collect())
 }
 
 fn replay(function: &str, min: usize, f: impl Fn(&Case) -> Value) {
@@ -93,7 +98,7 @@ fn rounded_flange_replays() {
     replay("rounded_flange", 60, |c| {
         let mut out = Vec::new();
         rounded_flange(&sections(&c.args[0]), &mut out);
-        flat(&out)
+        flat3(&out)
     });
 }
 
@@ -102,7 +107,7 @@ fn ribbon_replays() {
     replay("ribbon", 100, |c| {
         let mut out = Vec::new();
         ribbon(&sections(&c.args[0]), &mut out);
-        flat(&out)
+        flat3(&out)
     });
 }
 
@@ -117,7 +122,7 @@ fn box_extrude_replays() {
             frame(&c.args[3]),
             &mut out,
         );
-        flat(&out)
+        flat3(&out)
     });
 }
 
@@ -133,7 +138,7 @@ fn loft_extrude_replays() {
             frame(&c.args[4]),
             &mut out,
         );
-        flat(&out)
+        flat3(&out)
     });
 }
 
@@ -143,6 +148,6 @@ fn stack_extrude_replays() {
         let mut out = Vec::new();
         let polys: Vec<Vec<[f64; 2]>> = c.args[0].arr().iter().map(poly).collect();
         stack_extrude(&polys, &nums(&c.args[1]), frame(&c.args[2]), &mut out);
-        flat(&out)
+        flat3(&out)
     });
 }
