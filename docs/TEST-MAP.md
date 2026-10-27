@@ -23,7 +23,7 @@ Web-only rows:
 |---|---|---|---|---|
 | `arc.test.js` | 2 | fins, inside, overhangs, prop, prop/arc, prop/curved, prop/surface, stl | M3 | not ported |
 | `bores.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `brace.test.js` | 5 | fins, inside, overhangs, prop, prop/brace, stl | M3 | not ported |
+| `brace.test.js` | 5 | fins, inside, overhangs, prop, prop/brace, stl | M3 | green |
 | `bridge_dir.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `calibrate.test.js` | 3 | inside, overhangs, stl, ui/calibrate | M4 | not ported |
 | `circular.test.js` | 9 | fins, fins/downhill, inside, overhangs, prop, prop/circular, stl | M3 | not ported |
