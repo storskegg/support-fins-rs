@@ -11,7 +11,6 @@ pub struct Tris {
     /// x, y, z per vertex, 3 vertices per face, exactly the JS `Float64Array`.
     pub v: Vec<f64>,
     /// `buildZGrid`'s grid (web/prop/surface.js:45), built on first use.
-    #[allow(dead_code)] // read by the M1 surface port; remove when it lands
     pub(crate) z_grid: OnceLock<crate::prop::surface::ZGrid>,
 }
 
