@@ -357,3 +357,265 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
     }
     Ok(out)
 }
+
+// ================================================================================================
+// Project mode (plugins/cli/project-zip.js): a project is edited, not re-exported.
+// ================================================================================================
+
+/// The error `DataView` throws for a read past the end.
+const OUTSIDE: &str = "Offset is outside the bounds of the DataView";
+
+fn rd16(b: &[u8], o: usize) -> Result<u16, String> {
+    b.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| OUTSIDE.to_string())
+}
+
+fn rd32(b: &[u8], o: usize) -> Result<u32, String> {
+    b.get(o..o + 4)
+        .map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
+        .ok_or_else(|| OUTSIDE.to_string())
+}
+
+/// One entry of a [`ProjectZip`] (project-zip.js:46-47): `{ name, offset, start, size, length,
+/// method, crc, record, end }`. `offset` is the local header, `start` the compressed payload,
+/// `size` its compressed length, `length` the inflated one, `record` the central-directory
+/// record, `end` where the next entry (or the central directory) begins.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProjectEntry {
+    pub name: String,
+    pub offset: usize,
+    pub start: usize,
+    pub size: usize,
+    pub length: usize,
+    pub method: u16,
+    pub crc: u32,
+    pub record: Vec<u8>,
+    pub end: usize,
+}
+
+/// A project archive: each unchanged ZIP entry's local header and compressed payload are
+/// retained, and only the members needed for analysis are inflated. Port of `ProjectZip`
+/// (plugins/cli/project-zip.js:9-98).
+#[derive(Clone, Debug)]
+pub struct ProjectZip {
+    pub bytes: Vec<u8>,
+    /// by name, in central-directory order
+    pub entries: IndexMap<String, ProjectEntry>,
+    /// the offset of the central directory
+    pub central: usize,
+    /// the archive comment
+    pub comment: Vec<u8>,
+}
+
+/// `node:zlib` `inflateRaw`: unlike the lenient `DecompressionStream` reader above, a truncated
+/// or invalid stream is an error (Node's messages for the two commonest are used).
+fn inflate_raw_strict(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let mut state = InflateState::new_boxed(DataFormat::Raw);
+    let mut out: Vec<u8> = Vec::new();
+    let mut buf = vec![0u8; 64 * 1024];
+    let mut input = bytes;
+    loop {
+        let r = inflate(&mut state, input, &mut buf, MZFlush::None);
+        out.extend_from_slice(&buf[..r.bytes_written]);
+        input = &input[r.bytes_consumed..];
+        match r.status {
+            Ok(MZStatus::StreamEnd) => return Ok(out),
+            Ok(_) => {
+                if r.bytes_consumed == 0 && r.bytes_written == 0 {
+                    return Err("unexpected end of file".to_string());
+                }
+            }
+            Err(MZError::Buf) => return Err("unexpected end of file".to_string()),
+            Err(_) => return Err("invalid data".to_string()),
+        }
+    }
+}
+
+impl ProjectZip {
+    /// `new ProjectZip(bytes)` (project-zip.js:10-57).
+    pub fn new(bytes: &[u8]) -> Result<ProjectZip, String> {
+        let len = bytes.len();
+        // the end-of-central-directory record: the last one whose comment length reaches the end
+        let mut end: Option<usize> = None;
+        if len >= 22 {
+            let mut i = len - 22;
+            let floor = len.saturating_sub(65557);
+            loop {
+                if rd32(bytes, i)? == 0x06054b50 && i + 22 + rd16(bytes, i + 20)? as usize == len {
+                    end = Some(i);
+                    break;
+                }
+                if i == floor {
+                    break;
+                }
+                i -= 1;
+            }
+        }
+        let Some(end) = end else {
+            return Err("not a ZIP project".to_string());
+        };
+        let count = rd16(bytes, end + 10)? as usize;
+        let mut at = rd32(bytes, end + 16)? as usize;
+        if rd16(bytes, end + 4)? != 0
+            || rd16(bytes, end + 6)? != 0
+            || rd16(bytes, end + 8)? as usize != count
+            || count == 65535
+            || at == 0xffffffff
+            || (end >= 20 && rd32(bytes, end - 20)? == 0x07064b50)
+        {
+            return Err("--preserve-project does not support multi-disk or ZIP64 archives".to_string());
+        }
+        let central = at;
+        let comment = bytes[end + 22..].to_vec();
+        let directory_end = at + rd32(bytes, end + 12)? as usize;
+        if directory_end != end {
+            return Err("invalid ZIP directory".to_string());
+        }
+        let mut entries: IndexMap<String, ProjectEntry> = IndexMap::new();
+        for _ in 0..count {
+            if at + 46 > end || rd32(bytes, at)? != 0x02014b50 {
+                return Err("invalid ZIP entry".to_string());
+            }
+            let name_len = rd16(bytes, at + 28)? as usize;
+            let extra = rd16(bytes, at + 30)? as usize;
+            let comment_len = rd16(bytes, at + 32)? as usize;
+            let next = at + 46 + name_len + extra + comment_len;
+            if next > end {
+                return Err("truncated ZIP entry".to_string());
+            }
+            let name = decode(&bytes[at + 46..at + 46 + name_len]);
+            let offset = rd32(bytes, at + 42)? as usize;
+            let size = rd32(bytes, at + 20)? as usize;
+            let length = rd32(bytes, at + 24)? as usize;
+            let method = rd16(bytes, at + 10)?;
+            let flags = rd16(bytes, at + 8)?;
+            if [offset, size, length].contains(&0xffffffff) {
+                return Err("ZIP64 entries are not supported in project mode".to_string());
+            }
+            if flags & 1 != 0 || ![0, 8].contains(&method) {
+                return Err(format!("unsupported ZIP encoding: {name}"));
+            }
+            if rd16(bytes, at + 34)? != 0 || offset + 30 > central || rd32(bytes, offset)? != 0x04034b50 {
+                return Err(format!("invalid ZIP member: {name}"));
+            }
+            let local_name = rd16(bytes, offset + 26)? as usize;
+            let local_extra = rd16(bytes, offset + 28)? as usize;
+            let start = offset + 30 + local_name + local_extra;
+            let local = bytes.get(offset + 30..offset + 30 + local_name).unwrap_or(&[]);
+            if start + size > central || decode(local) != name {
+                return Err(format!("invalid ZIP data: {name}"));
+            }
+            if entries.contains_key(&name)
+                || name.starts_with('/')
+                || name.contains('\\')
+                || name.split('/').any(|p| p == ".." || p == ".")
+            {
+                return Err(format!("ambiguous ZIP path: {name}"));
+            }
+            let crc = rd32(bytes, at + 16)?;
+            entries.insert(
+                name.clone(),
+                ProjectEntry {
+                    name,
+                    offset,
+                    start,
+                    size,
+                    length,
+                    method,
+                    crc,
+                    record: bytes[at..next].to_vec(),
+                    end: 0,
+                },
+            );
+            at = next;
+        }
+        if at != end {
+            return Err("invalid ZIP directory length".to_string());
+        }
+        // `sorted.sort((a, b) => a.offset - b.offset)` (stable), then each entry ends where the
+        // next begins
+        let mut order: Vec<String> = entries.keys().cloned().collect();
+        order.sort_by_key(|n| entries[n].offset);
+        for (i, n) in order.iter().enumerate() {
+            let e_end = order.get(i + 1).map_or(central, |m| entries[m].offset);
+            let e = entries.get_mut(n).unwrap();
+            e.end = e_end;
+            if e.start + e.size > e.end {
+                return Err(format!("overlapping ZIP entries: {}", e.name));
+            }
+        }
+        Ok(ProjectZip { bytes: bytes.to_vec(), entries, central, comment })
+    }
+
+    /// `read(name)` (project-zip.js:59-70): the member inflated and checked against its
+    /// recorded length and CRC.
+    pub fn read(&self, name: &str) -> Result<Vec<u8>, String> {
+        let e = self.entries.get(name).ok_or_else(|| format!("missing project member: {name}"))?;
+        let raw = &self.bytes[e.start..e.start + e.size];
+        // node:zlib inflateRaw (both Node and Deno provide it)
+        let data = if e.method == 0 { raw.to_vec() } else { inflate_raw_strict(raw)? };
+        if data.len() != e.length || crc32(&data) != e.crc {
+            return Err(format!("corrupt project member: {name}"));
+        }
+        Ok(data)
+    }
+
+    /// `text(name)` (project-zip.js:72): `new TextDecoder().decode(..)`.
+    pub fn text(&self, name: &str) -> Result<String, String> {
+        Ok(decode(&self.read(name)?))
+    }
+
+    /// `patch(changes)` (project-zip.js:74-96): the archive with `changes` applied (`None` deletes
+    /// a member, `Some` replaces or adds one, as `zipStore` writes it). Every entry not named in
+    /// `changes` is copied byte for byte: local header, compressed payload and central record
+    /// (only its local-header offset is rewritten), in the original order; the changed members
+    /// follow, in `changes` order; the archive comment is kept.
+    pub fn patch(&self, changes: &[(String, Option<ZipData>)]) -> Result<Vec<u8>, String> {
+        let files: Vec<ZipFile> = changes
+            .iter()
+            .filter_map(|(n, d)| d.clone().map(|data| ZipFile { name: n.clone(), data }))
+            .collect();
+        let added = ProjectZip::new(&zip_store(&files))?;
+        let mut locals: Vec<Vec<u8>> = Vec::new();
+        let mut records: Vec<Vec<u8>> = Vec::new();
+        let mut offset = 0usize;
+        let mut append = |zip: &'_ ProjectZip, e: &ProjectEntry| {
+            let raw_start = e.offset;
+            let raw_end = e.end;
+            let mut record = e.record.clone();
+            // `setUint32(42, offset, true)`
+            record[42..46].copy_from_slice(&(offset as u32).to_le_bytes());
+            locals.push(zip.bytes[raw_start..raw_end].to_vec());
+            records.push(record);
+            offset += raw_end - raw_start;
+        };
+        for e in self.entries.values() {
+            if !changes.iter().any(|(n, _)| *n == e.name) {
+                append(self, e);
+            }
+        }
+        for e in added.entries.values() {
+            append(&added, e);
+        }
+        let size: usize = records.iter().map(Vec::len).sum();
+        if offset + size >= 0xffffffff || records.len() >= 65535 {
+            return Err("output would require ZIP64".to_string());
+        }
+        let mut end = vec![0u8; 22 + self.comment.len()];
+        end[0..4].copy_from_slice(&0x06054b50u32.to_le_bytes());
+        end[8..10].copy_from_slice(&(records.len() as u16).to_le_bytes());
+        end[10..12].copy_from_slice(&(records.len() as u16).to_le_bytes());
+        end[12..16].copy_from_slice(&(size as u32).to_le_bytes());
+        end[16..20].copy_from_slice(&(offset as u32).to_le_bytes());
+        end[20..22].copy_from_slice(&(self.comment.len() as u16).to_le_bytes());
+        end[22..].copy_from_slice(&self.comment);
+        let mut out: Vec<u8> = Vec::new();
+        for l in &locals {
+            out.extend_from_slice(l);
+        }
+        for r in &records {
+            out.extend_from_slice(r);
+        }
+        out.extend_from_slice(&end);
+        Ok(out)
+    }
+}
