@@ -1,0 +1,4 @@
+[submodule "crates/sf-cut/vendor/manifold"]
+	path = crates/sf-cut/vendor/manifold
+	url = https://github.com/elalish/manifold.git
+	shallow = true
