@@ -237,14 +237,46 @@ fn report_coverage_replays() {
                 z: 0.0,
             },
         };
-        check(c, value_of(&report_coverage(&built, &a).to_json()));
+        check(c, coverage_value(&report_coverage(&built, &a)));
     }
+}
+
+/// The JS object `reportCoverage` returns: every key present, `undefined` where it is `None`.
+fn coverage_value(c: &Coverage) -> Value {
+    let n = |v: Option<f64>| v.map_or(Value::Undefined, Value::Num);
+    let u = |v: Option<usize>| n(v.map(|x| x as f64));
+    Value::Obj(vec![
+        ("overhangs".into(), Value::Num(c.overhangs as f64)),
+        ("supports".into(), Value::Num(c.supports as f64)),
+        ("braces".into(), u(c.braces)),
+        ("props".into(), u(c.props)),
+        ("tines".into(), Value::Num(c.tines as f64)),
+        ("swayBraces".into(), u(c.sway_braces)),
+        ("bareArea".into(), n(c.bare_area)),
+        ("redArea".into(), n(c.red_area)),
+        ("barePct".into(), n(c.bare_pct)),
+        ("fillWalls".into(), u(c.fill_walls)),
+        ("fillBare".into(), n(c.fill_bare)),
+        (
+            "fillCapped".into(),
+            c.fill_capped.map_or(Value::Undefined, Value::Bool),
+        ),
+        ("islandsBare".into(), u(c.islands_bare)),
+        ("unserved".into(), n(c.unserved)),
+        ("smallHoles".into(), u(c.small_holes)),
+        ("floating".into(), u(c.floating)),
+        ("pad".into(), Value::Str(c.pad.clone())),
+    ])
 }
 
 /// A recorded coverage object back into a `Coverage` (absent keys are `None`).
 fn coverage_of(v: &Value) -> Coverage {
     let get = |k: &str| match v {
-        Value::Obj(o) => o.iter().find(|(n, _)| n == k).map(|(_, x)| x),
+        Value::Obj(o) => o
+            .iter()
+            .find(|(n, _)| n == k)
+            .map(|(_, x)| x)
+            .filter(|x| !matches!(x, Value::Undefined)),
         _ => None,
     };
     let n = |k: &str| get(k).map(Value::num);

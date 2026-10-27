@@ -358,7 +358,8 @@ pub fn report_url(rep: &Json, cov: &Coverage, opts: &UrlOpts) -> String {
     };
     let lines: Vec<Option<String>> = vec![
         line("Site", Some(format!("{} ({})", opts.where_, opts.when))),
-        line("Mode", Some(mode.clone())),
+        // (`line` drops an `undefined` value: a request with no mode has no Mode line)
+        line("Mode", mode_json.map(|_| mode.clone())),
         line("Overhangs", Some(jsnum::to_js_string(cov.overhangs as f64))),
         // Draw places no walls itself: the hand-drawn count below is its tally
         if is_draw {
