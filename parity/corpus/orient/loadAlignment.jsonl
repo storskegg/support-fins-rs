@@ -1,0 +1,13 @@
+{"id":"0,0,1","args":[[0,0,1]],"out":{"cross":1,"quality":"poor","text":"The load pulls straight across the layers — where prints split first."}}
+{"id":"0,0,-1","args":[[0,0,-1]],"out":{"cross":1,"quality":"poor","text":"The load pulls straight across the layers — where prints split first."}}
+{"id":"1,0,0","args":[[1,0,0]],"out":{"cross":0,"quality":"good","text":"The load runs along the layers — the strong direction. Good."}}
+{"id":"0,1,0","args":[[0,1,0]],"out":{"cross":0,"quality":"good","text":"The load runs along the layers — the strong direction. Good."}}
+{"id":"1,0,1","args":[[1,0,1]],"out":{"cross":0.7071067811865475,"quality":"mixed","text":"The load partly crosses the layers."}}
+{"id":"1.7320508075688772,0,1","args":[[1.7320508075688772,0,1]],"out":{"cross":0.5,"quality":"good","text":"The load runs along the layers — the strong direction. Good."}}
+{"id":"1,1,1","args":[[1,1,1]],"out":{"cross":0.5773502691896258,"quality":"mixed","text":"The load partly crosses the layers."}}
+{"id":"0,0,0","args":[[0,0,0]],"out":null}
+{"id":"1e-10,0,0","args":[[1e-10,0,0]],"out":null}
+{"id":"0.3,-0.2,0.9","args":[[0.3,-0.2,0.9]],"out":{"cross":0.9282791216329142,"quality":"poor","text":"The load pulls straight across the layers — where prints split first."}}
+{"id":"-1,2,-3","args":[[-1,2,-3]],"out":{"cross":0.8017837257372733,"quality":"mixed","text":"The load partly crosses the layers."}}
+{"id":"1,0,1.7320508","args":[[1,0,1.7320508]],"out":{"cross":0.8660254028383291,"quality":"poor","text":"The load pulls straight across the layers — where prints split first."}}
+{"id":"1,0,1.1547","args":[[1,0,1.1547]],"out":{"cross":0.755928794967557,"quality":"mixed","text":"The load partly crosses the layers."}}
