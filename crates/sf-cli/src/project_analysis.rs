@@ -4,7 +4,9 @@
 use std::collections::HashSet;
 
 use indexmap::IndexMap;
-use sf_io::threemf::{PartKind, ReadExtra, ReadOpts, ThreeMfObject, XmlEvent, read_three_mf_parts, scan_xml};
+use sf_io::threemf::{
+    PartKind, ReadExtra, ReadOpts, ThreeMfObject, XmlEvent, read_three_mf_parts, scan_xml,
+};
 use sf_io::zip::ProjectZip;
 
 use crate::cut::cut_negatives;
@@ -18,7 +20,10 @@ const CONFIG: &str = "Metadata/model_settings.config";
 /// decoded geometry.
 pub fn negative_components(object: &Node, config: &Node) -> Result<usize, String> {
     let parts = children(config, "part");
-    let negatives: Vec<&&Node> = parts.iter().filter(|p| p.attr_exact("subtype") == Some("negative_part")).collect();
+    let negatives: Vec<&&Node> = parts
+        .iter()
+        .filter(|p| p.attr_exact("subtype") == Some("negative_part"))
+        .collect();
     if negatives.is_empty() {
         return Ok(0);
     }
@@ -27,16 +32,28 @@ pub fn negative_components(object: &Node, config: &Node) -> Result<usize, String
     let components: Vec<&Node> = comps_parent.map_or_else(Vec::new, |c| children(c, "component"));
     for part in negatives {
         let id = part.attr_exact("id").filter(|i| !i.is_empty());
-        let unique = id.is_some_and(|i| parts.iter().filter(|p| p.attr_exact("id") == Some(i)).count() == 1);
+        let unique = id.is_some_and(|i| {
+            parts
+                .iter()
+                .filter(|p| p.attr_exact("id") == Some(i))
+                .count()
+                == 1
+        });
         let Some(id) = id.filter(|_| unique) else {
             return Err("negative parts have missing or ambiguous part IDs".to_string());
         };
-        if !components.iter().any(|c| c.attr_exact("objectid") == Some(id)) {
+        if !components
+            .iter()
+            .any(|c| c.attr_exact("objectid") == Some(id))
+        {
             return Err(format!("negative part {id} has no component"));
         }
         ids.insert(id);
     }
-    let count = components.iter().filter(|c| c.attr_exact("objectid").is_some_and(|o| ids.contains(o))).count();
+    let count = components
+        .iter()
+        .filter(|c| c.attr_exact("objectid").is_some_and(|o| ids.contains(o)))
+        .count();
     if count == components.len() {
         return Err("negative parts leave no printable body components".to_string());
     }
@@ -44,7 +61,7 @@ pub fn negative_components(object: &Node, config: &Node) -> Result<usize, String
 }
 
 /// What the seam in `subtractProjectNegatives` cuts with.
-pub type Cutter = dyn Fn(&[f64], &[ReadExtra]) -> Result<crate::cut::CutResult, String>;
+pub type Cutter<'a> = dyn Fn(&[f64], &[ReadExtra]) -> Result<crate::cut::CutResult, String> + 'a;
 
 /// Port of `subtractProjectNegatives` (project-analysis.js:32-62): strict project policy; the
 /// ordinary CLI/browser keep their existing fallback. `cut` is a private test seam for failures
@@ -52,9 +69,14 @@ pub type Cutter = dyn Fn(&[f64], &[ReadExtra]) -> Result<crate::cut::CutResult, 
 pub fn subtract_project_negatives(
     model: &ThreeMfObject,
     expected: usize,
-    cut: &Cutter,
+    cut: &Cutter<'_>,
 ) -> Result<Vec<f64>, String> {
-    let negatives: Vec<ReadExtra> = model.extras.iter().filter(|e| e.kind == PartKind::Negative).cloned().collect();
+    let negatives: Vec<ReadExtra> = model
+        .extras
+        .iter()
+        .filter(|e| e.kind == PartKind::Negative)
+        .cloned()
+        .collect();
     if negatives.len() != expected {
         return Err(format!(
             "negative parts: expected {expected} cutter components, decoded {}; missing or empty cutter geometry",
@@ -93,7 +115,10 @@ pub fn subtract_project_negatives(
 }
 
 /// The default seam: `cutNegatives` (`crate::cut`).
-pub fn default_cut(positions: &[f64], negatives: &[ReadExtra]) -> Result<crate::cut::CutResult, String> {
+pub fn default_cut(
+    positions: &[f64],
+    negatives: &[ReadExtra],
+) -> Result<crate::cut::CutResult, String> {
     Ok(cut_negatives(positions, negatives))
 }
 
@@ -103,7 +128,9 @@ fn part_path(path: &str) -> Result<String, String> {
     if name.is_empty()
         || name.contains('\\')
         || name.contains([':', '?', '#', '%'])
-        || name.split('/').any(|p| p.is_empty() || p == ".." || p == ".")
+        || name
+            .split('/')
+            .any(|p| p.is_empty() || p == ".." || p == ".")
     {
         return Err(format!("unsupported model path: {path}"));
     }
@@ -125,7 +152,7 @@ pub fn project_positions(
     root_bytes: &[u8],
     config_bytes: &[u8],
     plan: &PositionsPlan,
-    cut: &Cutter,
+    cut: &Cutter<'_>,
 ) -> Result<Vec<f64>, String> {
     let mut members: IndexMap<String, Vec<u8>> = IndexMap::new();
     members.insert(ROOT.to_string(), root_bytes.to_vec());
@@ -154,7 +181,10 @@ pub fn project_positions(
         let text = text.strip_prefix('\u{feff}').unwrap_or(&text).to_string();
         let mut paths: Vec<String> = Vec::new();
         scan_xml(&text, &mut |ev| {
-            if let XmlEvent::Open { name: tag, attrs, .. } = ev {
+            if let XmlEvent::Open {
+                name: tag, attrs, ..
+            } = ev
+            {
                 let local = tag.rsplit(':').next().unwrap_or(tag);
                 if local == "model"
                     && let Some(unit) = attrs.get("unit").filter(|u| !u.is_empty())
@@ -163,7 +193,9 @@ pub fn project_positions(
                     return Err(format!("project mode requires millimeter units in {name}"));
                 }
                 if local == "component"
-                    && let Some((_, path)) = attrs.iter().find(|(k, _)| k.rsplit(':').next() == Some("path"))
+                    && let Some((_, path)) = attrs
+                        .iter()
+                        .find(|(k, _)| k.rsplit(':').next() == Some("path"))
                     && !path.is_empty()
                 {
                     let p = part_path(path)?;
@@ -185,13 +217,25 @@ pub fn project_positions(
     let comps = child(plan.object, "components");
     for component in comps.map_or_else(Vec::new, |c| children(c, "component")) {
         let Some(path) = attr(component, "path").filter(|p| !p.is_empty()) else {
-            return Err("inline component meshes are not yet supported in project mode".to_string());
+            return Err(
+                "inline component meshes are not yet supported in project mode".to_string(),
+            );
         };
-        load(zip, &part_path(path)?, &mut members, &mut visiting, &mut visited)?;
+        load(
+            zip,
+            &part_path(path)?,
+            &mut members,
+            &mut visiting,
+            &mut visited,
+        )?;
     }
     let parsed = read_three_mf_parts(
         &members,
-        &ReadOpts { build_index: Some(plan.number - 1), double_precision: true, outward_winding: true },
+        &ReadOpts {
+            build_index: Some(plan.number - 1),
+            double_precision: true,
+            outward_winding: true,
+        },
     )?;
     let model = parsed.objects.into_iter().next().ok_or("no object")?;
     members.clear();

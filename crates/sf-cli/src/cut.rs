@@ -23,11 +23,22 @@ pub struct CutResult {
 
 /// Port of `cutNegatives(obj)` (web/cut.js:151-198) for `{ positions, extras }`.
 pub fn cut_negatives(positions: &[f64], extras: &[ReadExtra]) -> CutResult {
-    let negs: Vec<&ReadExtra> = extras.iter().filter(|e| e.kind == PartKind::Negative).collect();
-    let same = CutResult { positions: positions.to_vec(), cut: 0, uncut: negs.len(), why: None };
+    let negs: Vec<&ReadExtra> = extras
+        .iter()
+        .filter(|e| e.kind == PartKind::Negative)
+        .collect();
+    let same = CutResult {
+        positions: positions.to_vec(),
+        cut: 0,
+        uncut: negs.len(),
+        why: None,
+    };
     if negs.is_empty() {
         return same;
     }
     // (the cutter cannot load: no Manifold in this build)
-    CutResult { why: Some("load"), ..same }
+    CutResult {
+        why: Some("load"),
+        ..same
+    }
 }

@@ -25,7 +25,10 @@ pub struct Node {
 impl Node {
     /// `node.attrs[name]`
     pub fn attr_exact(&self, name: &str) -> Option<&str> {
-        self.attrs.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
+        self.attrs
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
     }
 }
 
@@ -64,8 +67,12 @@ fn decode(s: &str) -> Result<String, String> {
             if let Some(semi) = rest.find(';') {
                 let body = &rest[..semi];
                 let lower = body.to_ascii_lowercase();
-                let hex = lower.strip_prefix("#x").filter(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_hexdigit()));
-                let dec = body.strip_prefix('#').filter(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_digit()));
+                let hex = lower
+                    .strip_prefix("#x")
+                    .filter(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_hexdigit()));
+                let dec = body
+                    .strip_prefix('#')
+                    .filter(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_digit()));
                 let named = ["amp", "lt", "gt", "quot", "apos"].contains(&lower.as_str());
                 if hex.is_some() || dec.is_some() || named {
                     if let Some(h) = hex {
@@ -201,7 +208,11 @@ fn attributes(raw: &str) -> Result<Vec<(String, String)>, String> {
                 return None;
             }
             let close = raw[r + 1..].find(quote as char)?;
-            Some((raw[p..q].to_string(), raw[r + 1..r + 1 + close].to_string(), r + 1 + close + 1))
+            Some((
+                raw[p..q].to_string(),
+                raw[r + 1..r + 1 + close].to_string(),
+                r + 1 + close + 1,
+            ))
         })();
         match attempt {
             Some((name, value, next)) => {
@@ -287,7 +298,10 @@ pub fn xml_tree(xml: &str) -> Result<Node, String> {
 
 /// `children(node, tag)` (project-xml.js:42).
 pub fn children<'a>(node: &'a Node, tag: &str) -> Vec<&'a Node> {
-    node.children.iter().filter(|n| local(&n.tag) == tag).collect()
+    node.children
+        .iter()
+        .filter(|n| local(&n.tag) == tag)
+        .collect()
 }
 
 /// `child(node, tag)` (project-xml.js:43).
@@ -310,12 +324,19 @@ pub fn metadata(node: &Node) -> IndexMap<String, Option<String>> {
 
 /// `meta(key, value)` (project-xml.js:46).
 pub fn meta(key: &str, value: &str) -> String {
-    format!("<metadata key=\"{}\" value=\"{}\"/>", escape_xml(key), escape_xml(value))
+    format!(
+        "<metadata key=\"{}\" value=\"{}\"/>",
+        escape_xml(key),
+        escape_xml(value)
+    )
 }
 
 /// `attr(node, name)` (project-xml.js:47): the attribute whose local name is `name`.
 pub fn attr<'a>(node: &'a Node, name: &str) -> Option<&'a str> {
-    node.attrs.iter().find(|(k, _)| local(k) == name).map(|(_, v)| v.as_str())
+    node.attrs
+        .iter()
+        .find(|(k, _)| local(k) == name)
+        .map(|(_, v)| v.as_str())
 }
 
 /// One edit: `[start, end, text]`.

@@ -106,6 +106,6 @@ Web-only rows:
 | `part_wall_ends.test.js` | 1 | prop/attached | M3 (catch-up to 299ef49) | green |
 | `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | 3 of 4 ported (sf-io/tests/js_report.rs); the locale case is the page's i18n (M7) |
 | `plugins/cli/tests/cli.test.js` | 17 | plugins/cli, plugins/shared/engine | M3 | 16 of 17 ported (sf-cli/tests/cli.rs); the negative-part cut (#104) needs Manifold (`sf-cut`), pinned meanwhile by its "not cut" warning |
-| `plugins/cli/tests/project.test.js` | 68 | plugins/cli/project* | M3 | not ported (`--preserve-project`, M3 PR 4b) |
-| `plugins/cli/tests/project_cache.test.js` | 8 | plugins/cli/project-cache | M3 | not ported (`--resume`, M3 PR 4b) |
-| `plugins/cli/tests/project_nozzle.test.js` | 2 | plugins/cli/project-nozzle | M3 | not ported (M3 PR 4b) |
+| `plugins/cli/tests/project.test.js` | 68 | plugins/cli/project* | M3 | partial: 50 of 68 ported (sf-cli/tests/project.rs). The other 18 need a cutter to *succeed* and wait for sf-cut (#72): negatives {auto,full} x mirror (4), cut-created bore (4), {open body, open cutter, partial cut, missing cutter, empty cutter, whole body} (6), plate sequence overrides, native-support override, and two resume cases. The killed-subprocess case polls the real binary for its first checkpoint instead of stopping it at a hook |
+| `plugins/cli/tests/project_cache.test.js` | 8 | plugins/cli/project-cache | M3 | 8 of 8 ported (sf-cli/tests/project_cache.rs); the build-identity case checks the binary hash is stable (JS hashes its sources, so an edit changes it) |
+| `plugins/cli/tests/project_nozzle.test.js` | 2 | plugins/cli/project-nozzle | M3 | 2 of 2 ported (sf-cli/tests/project_cache.rs) |

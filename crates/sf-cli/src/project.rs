@@ -103,7 +103,11 @@ fn inverse(m: &[f64; 12]) -> Result<[f64; 9], String> {
 }
 
 /// Port of `supportMesh` (project.js:39-51).
-fn support_mesh(tris: &[f32], offset: &sf_engine::types::Xyz, m: &[f64; 12]) -> Result<String, String> {
+fn support_mesh(
+    tris: &[f32],
+    offset: &sf_engine::types::Xyz,
+    m: &[f64; 12],
+) -> Result<String, String> {
     let inv = inverse(m)?;
     let mut points: Vec<[f64; 3]> = Vec::new();
     let mut j = 0;
@@ -145,7 +149,10 @@ struct Item<'a> {
 }
 
 /// Port of `pick` (project.js:53-64).
-fn pick<'a, 'b>(items: &'b [&'b Item<'a>], selectors: &[String]) -> Result<Vec<&'b Item<'a>>, String> {
+fn pick<'a, 'b>(
+    items: &'b [&'b Item<'a>],
+    selectors: &[String],
+) -> Result<Vec<&'b Item<'a>>, String> {
     if selectors.is_empty() {
         return Ok(items.iter().copied().filter(|o| o.printable).collect());
     }
@@ -165,7 +172,11 @@ fn pick<'a, 'b>(items: &'b [&'b Item<'a>], selectors: &[String]) -> Result<Vec<&
             return Err(format!(
                 "object {} is {}; use --list-objects",
                 Json::Str(s.clone()).stringify(),
-                if matches.is_empty() { "missing" } else { "ambiguous" }
+                if matches.is_empty() {
+                    "missing"
+                } else {
+                    "ambiguous"
+                }
             ));
         }
         if !items[matches[0]].printable {
@@ -175,7 +186,10 @@ fn pick<'a, 'b>(items: &'b [&'b Item<'a>], selectors: &[String]) -> Result<Vec<&
             chosen.push(matches[0]);
         }
     }
-    Ok((0..items.len()).filter(|k| chosen.contains(k)).map(|k| items[k]).collect())
+    Ok((0..items.len())
+        .filter(|k| chosen.contains(k))
+        .map(|k| items[k])
+        .collect())
 }
 
 fn md<'a>(m: &'a IndexMap<String, Option<String>>, key: &str) -> Option<&'a str> {
@@ -204,10 +218,13 @@ fn regular_height(
         return Ok(e.clone());
     }
     if variable {
-        return Err("variable layer heights need an explicit --layer-height for fin generation".to_string());
+        return Err(
+            "variable layer heights need an explicit --layer-height for fin generation".to_string(),
+        );
     }
     let own = metadata(config);
-    let base: Option<Json> = str_json(md(&own, "layer_height")).or_else(|| settings.get("layer_height").cloned());
+    let base: Option<Json> =
+        str_json(md(&own, "layer_height")).or_else(|| settings.get("layer_height").cloned());
     let mut heights: Vec<Option<Json>> = children(config, "part")
         .into_iter()
         .filter(|p| is_normal_part(p))
@@ -221,7 +238,11 @@ fn regular_height(
     }
     let nums: Vec<f64> = heights
         .iter()
-        .map(|h| h.as_ref().map_or(f64::NAN, |j| sf_engine::jsnum::string_to_number(&j.to_js_string())))
+        .map(|h| {
+            h.as_ref().map_or(f64::NAN, |j| {
+                sf_engine::jsnum::string_to_number(&j.to_js_string())
+            })
+        })
         .collect();
     let mut unique: Vec<f64> = Vec::new();
     for n in &nums {
@@ -230,7 +251,9 @@ fn regular_height(
         }
     }
     if heights.iter().any(|h| !positive(h.as_ref())) || unique.len() != 1 {
-        return Err("missing or conflicting regular layer heights; supply --layer-height".to_string());
+        return Err(
+            "missing or conflicting regular layer heights; supply --layer-height".to_string(),
+        );
     }
     Ok(Json::Num(nums[0]))
 }
@@ -250,7 +273,10 @@ fn filament(settings: &Json, config: &Node, explicit: Option<f64>) -> Result<f64
         n = if e > 0.0 { Some(e) } else { None };
         if n.is_none() {
             let mut unique: Vec<f64> = Vec::new();
-            for p in children(config, "part").into_iter().filter(|p| is_normal_part(p)) {
+            for p in children(config, "part")
+                .into_iter()
+                .filter(|p| is_normal_part(p))
+            {
                 let v = num(md(&metadata(p), "extruder"));
                 if v > 0.0 && !unique.contains(&v) {
                     unique.push(v);
@@ -265,12 +291,20 @@ fn filament(settings: &Json, config: &Node, explicit: Option<f64>) -> Result<f64
     }
     match n {
         Some(v) if v.fract() == 0.0 && v >= 1.0 && v <= count as f64 => Ok(v),
-        _ => Err(format!("cannot resolve an existing filament slot (1..{count}); supply --fin-extruder")),
+        _ => Err(format!(
+            "cannot resolve an existing filament slot (1..{count}); supply --fin-extruder"
+        )),
     }
 }
 
 /// Port of `setMetadata` (project.js:101-106).
-fn set_metadata(node: &Node, key: &str, value: &str, edits: &mut Vec<Edit>, appended: &mut Vec<String>) -> Result<(), String> {
+fn set_metadata(
+    node: &Node,
+    key: &str,
+    value: &str,
+    edits: &mut Vec<Edit>,
+    appended: &mut Vec<String>,
+) -> Result<(), String> {
     let existing: Vec<&Node> = children(node, "metadata")
         .into_iter()
         .filter(|m| m.attr_exact("key") == Some(key))
@@ -311,7 +345,11 @@ pub fn fin_project(input: &str, args: &Args, io: &dyn Io) -> Result<FileResult, 
         }
         Err(message) => Err(FinError {
             message,
-            report: if args.list_objects || args.list_plates { None } else { Some(report.data()) },
+            report: if args.list_objects || args.list_plates {
+                None
+            } else {
+                Some(report.data())
+            },
         }),
     }
 }
@@ -360,18 +398,31 @@ fn process_project(
     }
     let zip = ProjectZip::new(&io.read(input)?)?;
     if zip.entries.contains_key(MARKER) || zip.entries.contains_key(SUPPORTS) {
-        return Err("this project already has generated fins; use the original project".to_string());
+        return Err(
+            "this project already has generated fins; use the original project".to_string(),
+        );
     }
     // The layout, not the application name, is what this edits: Bambu Studio and its forks
     // (OrcaSlicer, QIDI Studio, ...) all write these members and plates.
-    if ![ROOT, CONFIG, SETTINGS].iter().all(|n| zip.entries.contains_key(*n)) {
-        let missing: Vec<&str> = [CONFIG, SETTINGS].into_iter().filter(|n| !zip.entries.contains_key(*n)).collect();
+    if ![ROOT, CONFIG, SETTINGS]
+        .iter()
+        .all(|n| zip.entries.contains_key(*n))
+    {
+        let missing: Vec<&str> = [CONFIG, SETTINGS]
+            .into_iter()
+            .filter(|n| !zip.entries.contains_key(*n))
+            .collect();
         return Err(format!(
             "--preserve-project needs a Bambu Studio-style project (Bambu Studio, OrcaSlicer, QIDI Studio): {} missing",
-            if missing.is_empty() { ROOT.to_string() } else { missing.join(", ") }
+            if missing.is_empty() {
+                ROOT.to_string()
+            } else {
+                missing.join(", ")
+            }
         ));
     }
-    let (root_xml, config_xml, settings_text) = (zip.text(ROOT)?, zip.text(CONFIG)?, zip.text(SETTINGS)?);
+    let (root_xml, config_xml, settings_text) =
+        (zip.text(ROOT)?, zip.text(CONFIG)?, zip.text(SETTINGS)?);
     let root = xml_tree(&root_xml)?;
     let config = xml_tree(&config_xml)?;
     if root.attr_exact("unit") != Some("millimeter") {
@@ -434,7 +485,10 @@ fn process_project(
     let build_items = children(build, "item");
     let mut items: Vec<Item> = Vec::new();
     for (index, item) in build_items.iter().enumerate() {
-        let id = item.attr_exact("objectid").unwrap_or("undefined").to_string();
+        let id = item
+            .attr_exact("objectid")
+            .unwrap_or("undefined")
+            .to_string();
         let instance = *occurrences.get(&id).unwrap_or(&0);
         occurrences.insert(id.clone(), instance + 1);
         let cfg = configs.get(&id).copied();
@@ -446,14 +500,21 @@ fn process_project(
                 md(&m, "name")
                     .filter(|n| !n.is_empty())
                     .map(str::to_string)
-                    .or_else(|| object.and_then(|o| o.attr_exact("name")).filter(|n| !n.is_empty()).map(str::to_string))
+                    .or_else(|| {
+                        object
+                            .and_then(|o| o.attr_exact("name"))
+                            .filter(|n| !n.is_empty())
+                            .map(str::to_string)
+                    })
                     .unwrap_or(fallback)
             }
             None => fallback,
         };
         items.push(Item {
             number: index + 1,
-            plate: membership.get(&format!("{id}:{instance}")).map(|(p, _)| p.clone()),
+            plate: membership
+                .get(&format!("{id}:{instance}"))
+                .map(|(p, _)| p.clone()),
             id,
             item,
             config: cfg,
@@ -479,7 +540,10 @@ fn process_project(
     }
     for id in &requested {
         let Some(plate) = plate_counts.get(id) else {
-            return Err(format!("plate {} is missing; use --list-plates", Json::Str(id.clone()).stringify()));
+            return Err(format!(
+                "plate {} is missing; use --list-plates",
+                Json::Str(id.clone()).stringify()
+            ));
         };
         if !listing && plate.1 == 0 {
             return Err(format!(
@@ -534,7 +598,10 @@ fn process_project(
                                 ("id".into(), Json::Str(o.id.clone())),
                                 ("name".into(), Json::Str(o.name.clone())),
                                 ("printable".into(), Json::Bool(o.printable)),
-                                ("plate".into(), o.plate.clone().map_or(Json::Null, Json::Str)),
+                                (
+                                    "plate".into(),
+                                    o.plate.clone().map_or(Json::Null, Json::Str),
+                                ),
                             ])
                         })
                         .collect(),
@@ -547,7 +614,11 @@ fn process_project(
                     o.name,
                     o.id,
                     o.plate.as_deref().unwrap_or("?"),
-                    if o.printable { "printable" } else { "not printable" }
+                    if o.printable {
+                        "printable"
+                    } else {
+                        "not printable"
+                    }
                 ));
             }
         }
@@ -619,7 +690,10 @@ fn process_project(
         } else if lower.ends_with("layer_config_ranges.xml") {
             let tree = xml_tree(&zip.text(name)?)?;
             for o in children(&tree, "object") {
-                variable_ids.push(o.attr_exact("id").map_or(f64::NAN, sf_engine::jsnum::string_to_number));
+                variable_ids.push(
+                    o.attr_exact("id")
+                        .map_or(f64::NAN, sf_engine::jsnum::string_to_number),
+                );
             }
         }
     }
@@ -631,7 +705,11 @@ fn process_project(
     let mut plans: Vec<Plan> = Vec::new();
     for &o in &selected {
         let planned = (|| -> Result<Plan, String> {
-            let (Some(object), Some(cfg), Some(_plate)) = (o.object, o.config, o.plate.as_ref()) else {
+            let (Some(object), Some(cfg), Some(_plate)) = (
+                o.object,
+                o.config,
+                o.plate.as_ref().filter(|p| !p.is_empty()),
+            ) else {
                 return Err("missing object settings or plate assignment".to_string());
             };
             if occurrences.get(&o.id) != Some(&1) {
@@ -643,7 +721,9 @@ fn process_project(
             let negative_count = negative_components(object, cfg)?;
             let transform = matrix(o.item.attr_exact("transform"))?;
             inverse(&transform)?;
-            let variable = order.get(&o.id).is_some_and(|&n| variable_ids.contains(&(n as f64)));
+            let variable = order
+                .get(&o.id)
+                .is_some_and(|&n| variable_ids.contains(&(n as f64)));
             let height = regular_height(&settings, cfg, args.dialog_get("layerHeight"), variable)?;
             let slot = filament(&settings, cfg, args.fin_extruder)?;
             let nozzle = project_nozzle(&settings, args.dialog_get("nozzle"))?;
@@ -656,16 +736,20 @@ fn process_project(
             set("nozzle", Json::Num(nozzle.nozzle));
             let options = options_from_dialog(&dialog)?;
             let own = metadata(cfg);
-            let native = enabled(str_json(md(&own, "enable_support")).or_else(|| settings.get("enable_support").cloned()).as_ref())
-                || children(cfg, "part")
-                    .into_iter()
-                    .any(|p| enabled(str_json(md(&metadata(p), "enable_support")).as_ref()));
+            let native = enabled(
+                str_json(md(&own, "enable_support"))
+                    .or_else(|| settings.get("enable_support").cloned())
+                    .as_ref(),
+            ) || children(cfg, "part")
+                .into_iter()
+                .any(|p| enabled(str_json(md(&metadata(p), "enable_support")).as_ref()));
             // By-object printing finishes one object before the next starts, so the fins can't be
             // their own object there: they become a part of the model. A plate can override the
             // project's print sequence.
             let plate_index = membership[&format!("{}:{}", o.id, o.instance)].1;
             let pm = metadata(plates[plate_index]);
-            let sequence = str_json(md(&pm, "print_sequence")).or_else(|| settings.get("print_sequence").cloned());
+            let sequence = str_json(md(&pm, "print_sequence"))
+                .or_else(|| settings.get("print_sequence").cloned());
             let by_object = sequence
                 .as_ref()
                 .map_or(String::new(), Json::to_js_string)
@@ -690,7 +774,11 @@ fn process_project(
                 result.warn("prints by object: any generated fins become a part of this model, so their tines weld to it");
             }
             if args.disable_native_supports
-                && children(cfg, "metadata").iter().filter(|m| m.attr_exact("key") == Some("enable_support")).count() > 1
+                && children(cfg, "metadata")
+                    .iter()
+                    .filter(|m| m.attr_exact("key") == Some("enable_support"))
+                    .count()
+                    > 1
             {
                 return Err("duplicate enable_support setting".to_string());
             }
@@ -713,10 +801,15 @@ fn process_project(
         }
     }
     if plans.is_empty() && !args.check {
-        return Err("none of the selected objects can take fins in project mode (see the warnings above)".to_string());
+        return Err(
+            "none of the selected objects can take fins in project mode (see the warnings above)"
+                .to_string(),
+        );
     }
     if !args.check && plans.iter().any(|p| p.native) && !args.disable_native_supports {
-        warn("native slicer supports remain enabled; both native supports and fins may print. Use --disable-native-supports to turn them off on selected objects.");
+        warn(
+            "native slicer supports remain enabled; both native supports and fins may print. Use --disable-native-supports to turn them off on selected objects.",
+        );
     }
     if args.resume && !io.has_project_cache() {
         return Err("--resume requires a file-system checkpoint store".to_string());
@@ -731,8 +824,14 @@ fn process_project(
                 selection_explicit: !args.objects.is_empty(),
                 settings: Json::Obj(vec![
                     ("dialog".into(), dialog),
-                    ("finExtruder".into(), args.fin_extruder.map_or(Json::Null, Json::Num)),
-                    ("disableNativeSupports".into(), Json::Bool(args.disable_native_supports)),
+                    (
+                        "finExtruder".into(),
+                        args.fin_extruder.map_or(Json::Null, Json::Num),
+                    ),
+                    (
+                        "disableNativeSupports".into(),
+                        Json::Bool(args.disable_native_supports),
+                    ),
                 ]),
                 cache_dir: args.cache_dir.as_deref(),
             },
@@ -762,14 +861,15 @@ fn process_project(
     let ids: Vec<String> = objects
         .keys()
         .cloned()
-        .chain(
-            children(&config, "object")
+        .chain(children(&config, "object").into_iter().flat_map(|o| {
+            children(o, "part")
                 .into_iter()
-                .flat_map(|o| children(o, "part").into_iter().map(|p| p.attr_exact("id").unwrap_or("undefined").to_string())),
-        )
+                .map(|p| p.attr_exact("id").unwrap_or("undefined").to_string())
+        }))
         .collect();
     for id in ids {
-        let digits = !id.is_empty() && id.as_bytes()[0] != b'0' && id.bytes().all(|b| b.is_ascii_digit());
+        let digits =
+            !id.is_empty() && id.as_bytes()[0] != b'0' && id.bytes().all(|b| b.is_ascii_digit());
         let n = sf_engine::jsnum::string_to_number(&id);
         if !digits || n > 9007199254740991.0 {
             return Err("invalid resource ID".to_string());
@@ -806,7 +906,8 @@ fn process_project(
                 p.nozzle_source
             ));
         }
-        let mut generated: Option<Generated> = cache.as_ref().and_then(|c| c.load(p.o.number, &warn));
+        let mut generated: Option<Generated> =
+            cache.as_ref().and_then(|c| c.load(p.o.number, &warn));
         let reused = generated.is_some();
         let attempt = (|| -> Result<Option<()>, String> {
             if generated.is_none() {
@@ -814,7 +915,11 @@ fn process_project(
                     &zip,
                     root_xml.as_bytes(),
                     config_xml.as_bytes(),
-                    &PositionsPlan { number: p.o.number, object: p.o.object.unwrap(), negative_count: p.negative_count },
+                    &PositionsPlan {
+                        number: p.o.number,
+                        object: p.o.object.unwrap(),
+                        negative_count: p.negative_count,
+                    },
                     &|pos, extras| default_cut(pos, extras),
                 )?;
                 if args.check {
@@ -825,14 +930,23 @@ fn process_project(
                     return Ok(None);
                 }
                 let r = compute_fins(&positions, &p.options)?;
-                generated = Some(Generated { triangles: r.triangles, offset: r.offset, stats: r.stats.to_json() });
+                generated = Some(Generated {
+                    triangles: r.triangles,
+                    offset: r.offset,
+                    stats: r.stats.to_json(),
+                });
             }
             let g = generated.as_ref().unwrap();
             // Gather this object's edits and commit them only once nothing can throw, so a
             // skipped object leaves the project exactly as it was.
             let mut appended: Vec<String> = Vec::new();
-            let (mut o_root, mut o_config, mut o_supports): (Vec<Edit>, Vec<Edit>, Vec<String>) = (vec![], vec![], vec![]);
-            let (mut o_resources, mut o_items, mut o_instances): (Vec<String>, Vec<String>, Vec<String>) = (vec![], vec![], vec![]);
+            let (mut o_root, mut o_config, mut o_supports): (Vec<Edit>, Vec<Edit>, Vec<String>) =
+                (vec![], vec![], vec![]);
+            let (mut o_resources, mut o_items, mut o_instances): (
+                Vec<String>,
+                Vec<String>,
+                Vec<String>,
+            ) = (vec![], vec![], vec![]);
             let mut support_id: Option<String> = None;
             let (mut id_ctr, mut ident_ctr) = (next_id, next_identify);
             if !g.triangles.is_empty() {
@@ -861,7 +975,10 @@ fn process_project(
                         "object {} ({}) prints by object: its fins are a part of it, so their tines weld to it",
                         p.o.number, p.o.name
                     ));
-                    o_root.push(insert(child(p.o.object.unwrap(), "components").unwrap(), &component));
+                    o_root.push(insert(
+                        child(p.o.object.unwrap(), "components").unwrap(),
+                        &component,
+                    ));
                     appended.push(part);
                 } else {
                     // Their own object, as the site's 3MF does: its own perimeters, so a tine
@@ -903,7 +1020,10 @@ fn process_project(
                 let cfg = p.o.config.unwrap();
                 set_metadata(cfg, "enable_support", "0", &mut o_config, &mut appended)?;
                 for part in children(cfg, "part") {
-                    for m in children(part, "metadata").into_iter().filter(|m| m.attr_exact("key") == Some("enable_support")) {
+                    for m in children(part, "metadata")
+                        .into_iter()
+                        .filter(|m| m.attr_exact("key") == Some("enable_support"))
+                    {
                         o_config.push((m.start, m.end, meta("enable_support", "0")));
                     }
                 }
@@ -920,17 +1040,29 @@ fn process_project(
             next_identify = ident_ctr;
             if !o_instances.is_empty() {
                 let plate_index = membership[&format!("{}:{}", p.o.id, p.o.instance)].1;
-                plate_instances.entry(plate_index).or_default().extend(o_instances);
+                plate_instances
+                    .entry(plate_index)
+                    .or_default()
+                    .extend(o_instances);
             }
             let tris = g.triangles.len() as f64 / 9.0;
             results.push(Json::Obj(vec![
                 ("number".into(), Json::Num(p.o.number as f64)),
                 ("id".into(), Json::Str(p.o.id.clone())),
                 ("name".into(), Json::Str(p.o.name.clone())),
-                ("plate".into(), p.o.plate.clone().map_or(Json::Null, Json::Str)),
-                ("supportObject".into(), support_id.map_or(Json::Null, Json::Str)),
+                (
+                    "plate".into(),
+                    p.o.plate.clone().map_or(Json::Null, Json::Str),
+                ),
+                (
+                    "supportObject".into(),
+                    support_id.map_or(Json::Null, Json::Str),
+                ),
                 ("nozzle".into(), Json::Num(p.nozzle)),
-                ("nozzleSource".into(), Json::Str(p.nozzle_source.to_string())),
+                (
+                    "nozzleSource".into(),
+                    Json::Str(p.nozzle_source.to_string()),
+                ),
                 ("layerHeight".into(), p.height.clone()),
                 ("filament".into(), Json::Num(p.slot)),
                 ("triangles".into(), Json::Num(tris)),
@@ -938,7 +1070,14 @@ fn process_project(
             ]));
             report.object(p.o.number).set(
                 "status",
-                Json::Str(if g.triangles.is_empty() { "no_supports" } else { "processed" }.to_string()),
+                Json::Str(
+                    if g.triangles.is_empty() {
+                        "no_supports"
+                    } else {
+                        "processed"
+                    }
+                    .to_string(),
+                ),
             );
             Ok(Some(()))
         })();
@@ -968,14 +1107,18 @@ fn process_project(
         return Ok(FileResult {
             input: input.to_string(),
             output: None,
-            report: "Project compatibility check; generation and slicing have not been tested.".to_string(),
+            report: "Project compatibility check; generation and slicing have not been tested."
+                .to_string(),
             json: Json::Obj(vec![
                 ("input".into(), Json::Str(input.to_string())),
                 ("output".into(), Json::Null),
                 ("objects".into(), Json::Arr(vec![])),
                 (
                     "report".into(),
-                    Json::Str("Project compatibility check; generation and slicing have not been tested.".into()),
+                    Json::Str(
+                        "Project compatibility check; generation and slicing have not been tested."
+                            .into(),
+                    ),
                 ),
             ]),
             incompatible: false,
@@ -1009,7 +1152,12 @@ fn process_project(
             l.ends_with(".gcode")
                 || l.ends_with(".bgcode")
                 || l == "metadata/slice_info.config"
-                || (l.starts_with("metadata/plate_") && l.ends_with(".json") && l["metadata/plate_".len()..l.len() - 5].bytes().all(|b| b.is_ascii_digit()) && l.len() > "metadata/plate_.json".len())
+                || (l.starts_with("metadata/plate_")
+                    && l.ends_with(".json")
+                    && l["metadata/plate_".len()..l.len() - 5]
+                        .bytes()
+                        .all(|b| b.is_ascii_digit())
+                    && l.len() > "metadata/plate_.json".len())
         })
         .cloned()
         .collect();
@@ -1038,8 +1186,16 @@ fn process_project(
     for name in &stale {
         set_change(&mut changes, name, None);
     }
-    set_change(&mut changes, ROOT, Some(ZipData::Text(edit_xml(&root_xml, root_edits)?)));
-    set_change(&mut changes, CONFIG, Some(ZipData::Text(edit_xml(&config_xml, config_edits)?)));
+    set_change(
+        &mut changes,
+        ROOT,
+        Some(ZipData::Text(edit_xml(&root_xml, root_edits)?)),
+    );
+    set_change(
+        &mut changes,
+        CONFIG,
+        Some(ZipData::Text(edit_xml(&config_xml, config_edits)?)),
+    );
     set_change(
         &mut changes,
         MARKER,
@@ -1068,28 +1224,50 @@ fn process_project(
             "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"></Relationships>".to_string()
         };
         let node = xml_tree(&text)?;
-        let used: Vec<&str> = children(&node, "Relationship").iter().filter_map(|r| r.attr_exact("Id")).collect();
+        let used: Vec<&str> = children(&node, "Relationship")
+            .iter()
+            .filter_map(|r| r.attr_exact("Id"))
+            .collect();
         let mut id = "support-fins".to_string();
         while used.contains(&id.as_str()) {
             id.push_str("-1");
         }
-        let edit = insert(&node, &format!("<Relationship Id=\"{id}\" Type=\"{REL}\" Target=\"/{SUPPORTS}\"/>"));
-        set_change(&mut changes, name, Some(ZipData::Text(edit_xml(&text, vec![edit])?)));
+        let edit = insert(
+            &node,
+            &format!("<Relationship Id=\"{id}\" Type=\"{REL}\" Target=\"/{SUPPORTS}\"/>"),
+        );
+        set_change(
+            &mut changes,
+            name,
+            Some(ZipData::Text(edit_xml(&text, vec![edit])?)),
+        );
     }
     let types_text = zip.text("[Content_Types].xml")?;
     let types = xml_tree(&types_text)?;
     let mut type_edits: Vec<Edit> = Vec::new();
-    if !children(&types, "Default").iter().any(|n| n.attr_exact("Extension") == Some("json")) {
-        type_edits.push(insert(&types, "<Default Extension=\"json\" ContentType=\"application/json\"/>"));
+    if !children(&types, "Default")
+        .iter()
+        .any(|n| n.attr_exact("Extension") == Some("json"))
+    {
+        type_edits.push(insert(
+            &types,
+            "<Default Extension=\"json\" ContentType=\"application/json\"/>",
+        ));
     }
     for node in children(&types, "Override") {
-        let part = node.attr_exact("PartName").map(|p| p.strip_prefix('/').unwrap_or(p));
+        let part = node
+            .attr_exact("PartName")
+            .map(|p| p.strip_prefix('/').unwrap_or(p));
         if part.is_some_and(|p| stale.iter().any(|s| s == p)) {
             type_edits.push((node.start, node.end, String::new()));
         }
     }
     if !type_edits.is_empty() {
-        set_change(&mut changes, "[Content_Types].xml", Some(ZipData::Text(edit_xml(&types_text, type_edits)?)));
+        set_change(
+            &mut changes,
+            "[Content_Types].xml",
+            Some(ZipData::Text(edit_xml(&types_text, type_edits)?)),
+        );
     }
     // Remove relationships to discarded preview/toolpath members.
     for name in zip.entries.keys() {
@@ -1114,12 +1292,16 @@ fn process_project(
                     Some(t) => t.to_string(),
                     None => format!("{base}{target}"),
                 };
-                stale.iter().any(|s| *s == resolved)
+                stale.contains(&resolved)
             })
             .map(|n| (n.start, n.end, String::new()))
             .collect();
         if !edits.is_empty() {
-            set_change(&mut changes, name, Some(ZipData::Text(edit_xml(&text, edits)?)));
+            set_change(
+                &mut changes,
+                name,
+                Some(ZipData::Text(edit_xml(&text, edits)?)),
+            );
         }
     }
     let bytes = zip.patch(&changes)?;
@@ -1129,7 +1311,10 @@ fn process_project(
         c.finish(&warn);
     }
     warn("project preserved; slice it again in Bambu Studio before printing.");
-    let with_tris = results.iter().filter(|r| !matches!(r.get("triangles"), Some(Json::Num(0.0)))).count();
+    let with_tris = results
+        .iter()
+        .filter(|r| !matches!(r.get("triangles"), Some(Json::Num(0.0))))
+        .count();
     let text = format!(
         "{} objects processed, {with_tris} support parts added; re-slice in Bambu Studio",
         results.len()

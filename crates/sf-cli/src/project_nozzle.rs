@@ -74,8 +74,16 @@ pub fn project_nozzle(settings: &Json, explicit: Option<&Json>) -> Result<Projec
     if unique.len() != 1 {
         return Ok(fallback(format!(
             "project has different nozzle diameters ({} mm)",
-            diameters.iter().map(|d| jsnum::to_js_string(*d)).collect::<Vec<_>>().join(", ")
+            diameters
+                .iter()
+                .map(|d| jsnum::to_js_string(*d))
+                .collect::<Vec<_>>()
+                .join(", ")
         )));
     }
-    Ok(ProjectNozzle { nozzle: diameters[0], nozzle_source: "project", warning: None })
+    Ok(ProjectNozzle {
+        nozzle: diameters[0],
+        nozzle_source: "project",
+        warning: None,
+    })
 }

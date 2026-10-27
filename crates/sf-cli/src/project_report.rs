@@ -71,17 +71,30 @@ impl ReportData {
             ("outputWritten".to_string(), Json::Bool(self.output_written)),
             (
                 "objectResults".to_string(),
-                Json::Arr(self.object_results.iter().map(ObjectResult::to_json).collect()),
+                Json::Arr(
+                    self.object_results
+                        .iter()
+                        .map(ObjectResult::to_json)
+                        .collect(),
+                ),
             ),
             (
                 "summary".to_string(),
-                Json::Obj(self.summary.iter().map(|(k, n)| (k.clone(), Json::Num(*n as f64))).collect()),
+                Json::Obj(
+                    self.summary
+                        .iter()
+                        .map(|(k, n)| (k.clone(), Json::Num(*n as f64)))
+                        .collect(),
+                ),
             ),
         ]
     }
 
     pub fn summary_count(&self, key: &str) -> usize {
-        self.summary.iter().find(|(k, _)| k == key).map_or(0, |(_, n)| *n)
+        self.summary
+            .iter()
+            .find(|(k, _)| k == key)
+            .map_or(0, |(_, n)| *n)
     }
 }
 
@@ -142,7 +155,12 @@ impl ProjectReport {
                 slot.1 += 1;
             }
         }
-        ReportData { mode: self.mode, output_written: self.output_written, object_results, summary }
+        ReportData {
+            mode: self.mode,
+            output_written: self.output_written,
+            object_results,
+            summary,
+        }
     }
 }
 
@@ -157,7 +175,11 @@ pub fn format_project_report(d: &ReportData) -> String {
     let selected = d.summary_count("selected");
     let mut lines = vec![format!(
         "{selected} selected{}; {}",
-        if counts.is_empty() { String::new() } else { format!(": {}", counts.join(", ")) },
+        if counts.is_empty() {
+            String::new()
+        } else {
+            format!(": {}", counts.join(", "))
+        },
         if d.mode == "check" {
             "compatibility only; no fins generated or output written"
         } else if d.output_written {
@@ -169,7 +191,11 @@ pub fn format_project_report(d: &ReportData) -> String {
     for o in &d.object_results {
         let nozzle = match o.get("nozzle") {
             None => String::new(),
-            Some(n) => format!("; nozzle {} mm ({})", n.to_js_string(), o.str_of("nozzleSource")),
+            Some(n) => format!(
+                "; nozzle {} mm ({})",
+                n.to_js_string(),
+                o.str_of("nozzleSource")
+            ),
         };
         let reason = match o.get("reason") {
             Some(Json::Str(r)) if !r.is_empty() => format!(" — {r}"),

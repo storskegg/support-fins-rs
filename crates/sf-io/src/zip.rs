@@ -366,7 +366,9 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
 const OUTSIDE: &str = "Offset is outside the bounds of the DataView";
 
 fn rd16(b: &[u8], o: usize) -> Result<u16, String> {
-    b.get(o..o + 2).map(|s| u16::from_le_bytes([s[0], s[1]])).ok_or_else(|| OUTSIDE.to_string())
+    b.get(o..o + 2)
+        .map(|s| u16::from_le_bytes([s[0], s[1]]))
+        .ok_or_else(|| OUTSIDE.to_string())
 }
 
 fn rd32(b: &[u8], o: usize) -> Result<u32, String> {
@@ -462,7 +464,9 @@ impl ProjectZip {
             || at == 0xffffffff
             || (end >= 20 && rd32(bytes, end - 20)? == 0x07064b50)
         {
-            return Err("--preserve-project does not support multi-disk or ZIP64 archives".to_string());
+            return Err(
+                "--preserve-project does not support multi-disk or ZIP64 archives".to_string(),
+            );
         }
         let central = at;
         let comment = bytes[end + 22..].to_vec();
@@ -494,13 +498,18 @@ impl ProjectZip {
             if flags & 1 != 0 || ![0, 8].contains(&method) {
                 return Err(format!("unsupported ZIP encoding: {name}"));
             }
-            if rd16(bytes, at + 34)? != 0 || offset + 30 > central || rd32(bytes, offset)? != 0x04034b50 {
+            if rd16(bytes, at + 34)? != 0
+                || offset + 30 > central
+                || rd32(bytes, offset)? != 0x04034b50
+            {
                 return Err(format!("invalid ZIP member: {name}"));
             }
             let local_name = rd16(bytes, offset + 26)? as usize;
             let local_extra = rd16(bytes, offset + 28)? as usize;
             let start = offset + 30 + local_name + local_extra;
-            let local = bytes.get(offset + 30..offset + 30 + local_name).unwrap_or(&[]);
+            let local = bytes
+                .get(offset + 30..offset + 30 + local_name)
+                .unwrap_or(&[]);
             if start + size > central || decode(local) != name {
                 return Err(format!("invalid ZIP data: {name}"));
             }
@@ -543,16 +552,28 @@ impl ProjectZip {
                 return Err(format!("overlapping ZIP entries: {}", e.name));
             }
         }
-        Ok(ProjectZip { bytes: bytes.to_vec(), entries, central, comment })
+        Ok(ProjectZip {
+            bytes: bytes.to_vec(),
+            entries,
+            central,
+            comment,
+        })
     }
 
     /// `read(name)` (project-zip.js:59-70): the member inflated and checked against its
     /// recorded length and CRC.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, String> {
-        let e = self.entries.get(name).ok_or_else(|| format!("missing project member: {name}"))?;
+        let e = self
+            .entries
+            .get(name)
+            .ok_or_else(|| format!("missing project member: {name}"))?;
         let raw = &self.bytes[e.start..e.start + e.size];
         // node:zlib inflateRaw (both Node and Deno provide it)
-        let data = if e.method == 0 { raw.to_vec() } else { inflate_raw_strict(raw)? };
+        let data = if e.method == 0 {
+            raw.to_vec()
+        } else {
+            inflate_raw_strict(raw)?
+        };
         if data.len() != e.length || crc32(&data) != e.crc {
             return Err(format!("corrupt project member: {name}"));
         }
@@ -572,7 +593,12 @@ impl ProjectZip {
     pub fn patch(&self, changes: &[(String, Option<ZipData>)]) -> Result<Vec<u8>, String> {
         let files: Vec<ZipFile> = changes
             .iter()
-            .filter_map(|(n, d)| d.clone().map(|data| ZipFile { name: n.clone(), data }))
+            .filter_map(|(n, d)| {
+                d.clone().map(|data| ZipFile {
+                    name: n.clone(),
+                    data,
+                })
+            })
             .collect();
         let added = ProjectZip::new(&zip_store(&files))?;
         let mut locals: Vec<Vec<u8>> = Vec::new();

@@ -25,6 +25,45 @@ pub trait Io {
     fn write(&self, path: &str, bytes: &[u8]) -> Result<(), String>;
     fn out(&self, line: &str);
     fn err(&self, line: &str);
+
+    // --- project mode (support-fins.js:14-16): present only where the host has the file system
+    // for it (`io.checkProjectOutput`, `io.writeProject`, `io.openProjectCache`)
+
+    /// Whether `check_project_output` and `write_project` exist.
+    fn has_project_io(&self) -> bool {
+        false
+    }
+    /// `io.checkProjectOutput(input, output, overwrite)`
+    fn check_project_output(
+        &self,
+        _input: &str,
+        _output: &str,
+        _overwrite: bool,
+    ) -> Result<(), String> {
+        Err("project output requires an atomic file-system writer".to_string())
+    }
+    /// `io.writeProject(input, output, bytes, overwrite)`
+    fn write_project(
+        &self,
+        _input: &str,
+        _output: &str,
+        _bytes: &[u8],
+        _overwrite: bool,
+    ) -> Result<(), String> {
+        Err("project output requires an atomic file-system writer".to_string())
+    }
+    /// Whether `open_project_cache` exists.
+    fn has_project_cache(&self) -> bool {
+        false
+    }
+    /// `io.openProjectCache({ input, bytes, selection, settings, cacheDir, warn })`
+    fn open_project_cache(
+        &self,
+        _req: &crate::project_cache::CacheRequest,
+        _warn: &dyn Fn(&str),
+    ) -> Result<Box<dyn crate::project_cache::CacheStore>, String> {
+        Err("--resume requires a file-system checkpoint store".to_string())
+    }
 }
 
 /// `shown` (cli.js:29): a percent option is typed as the site's slider shows it (0-100), not the
@@ -453,22 +492,6 @@ struct Read {
     slicer: Option<(Vec<f64>, Vec<sf_io::threemf::ReadExtra>)>,
 }
 
-/// `cutNegatives(o)` (web/cut.js): a slicer's negative parts, cut out of the part. The cut is a
-/// Manifold boolean (`sf-cut`, not part of the engine milestone yet): a part with a negative part
-/// comes back uncut with `why = 'load'` ("the cutter did not load"), a path cut.js itself has and
-/// says; a part without one is returned as it is, exactly as cut.js does.
-fn cut_negatives(o: &Obj) -> (Vec<f64>, usize, Option<&'static str>) {
-    let negs = o
-        .extras
-        .iter()
-        .filter(|e| e.kind == PartKind::Negative)
-        .count();
-    if negs == 0 {
-        return (o.positions.clone(), negs, None);
-    }
-    (o.positions.clone(), negs, Some("load"))
-}
-
 fn plural(n: usize, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
@@ -507,7 +530,8 @@ fn read_part(
         // part; a 3MF output carries them and the modifiers and support blockers back out beside
         // the part as the file had it, as the site does (#104)
         let prepared = |o: &Obj| -> Read {
-            let (positions, uncut, why) = cut_negatives(o);
+            let cut = crate::cut::cut_negatives(&o.positions, &o.extras);
+            let (positions, uncut, why) = (cut.positions, cut.uncut, cut.why);
             let why_text = match why {
                 Some("open") => {
                     Some("the part is not a closed solid, so its fins are for the uncut shape")
@@ -605,28 +629,47 @@ fn default_output(input: &str, fins_only: bool) -> String {
     }
 }
 
-/// What `finFile` returns: `{ input, output, stats, report }`.
+/// What `finFile` returns: `{ input, output, stats, report }`, or a project mode's
+/// `{ input, output, objects, report, ... }`. `json` is the object `JSON.stringify` writes.
 #[derive(Clone, Debug)]
 pub struct FileResult {
     pub input: String,
     pub output: Option<String>,
-    pub stats: crate::entry::Stats,
     pub report: String,
+    pub json: Json,
+    /// `r.summary.incompatible` (a `--check` that found an incompatible object)
+    pub incompatible: bool,
 }
 
 impl FileResult {
     /// `JSON.stringify(r)`
     pub fn to_json(&self) -> String {
-        Json::Obj(vec![
-            ("input".into(), Json::Str(self.input.clone())),
-            (
-                "output".into(),
-                self.output.clone().map_or(Json::Null, Json::Str),
-            ),
-            ("stats".into(), self.stats.to_json()),
-            ("report".into(), Json::Str(self.report.clone())),
-        ])
-        .stringify()
+        self.json.stringify()
+    }
+}
+
+/// What `finFile` throws: the message, and a project run's report (`e.projectReport`).
+#[derive(Clone, Debug)]
+pub struct FinError {
+    pub message: String,
+    pub report: Option<crate::project_report::ReportData>,
+}
+
+impl From<&str> for FinError {
+    fn from(message: &str) -> FinError {
+        FinError {
+            message: message.to_string(),
+            report: None,
+        }
+    }
+}
+
+impl From<String> for FinError {
+    fn from(message: String) -> FinError {
+        FinError {
+            message,
+            report: None,
+        }
     }
 }
 
@@ -638,9 +681,9 @@ pub fn fin_file(
     args: &Args,
     io: &dyn Io,
     engine: &EngineOptions,
-) -> Result<FileResult, String> {
+) -> Result<FileResult, FinError> {
     if args.preserve_project {
-        return Err("--preserve-project is not implemented yet".into());
+        return crate::project::fin_project(input, args, io);
     }
     let output = args
         .output
@@ -648,7 +691,7 @@ pub fn fin_file(
         .unwrap_or_else(|| default_output(input, args.fins_only));
     let out_lower = output.to_ascii_lowercase();
     if !(out_lower.ends_with(".3mf") || out_lower.ends_with(".stl")) {
-        return Err(format!("output {output}: write .3mf or .stl"));
+        return Err(format!("output {output}: write .3mf or .stl").into());
     }
     if args.fins_only && !out_lower.ends_with(".stl") {
         return Err("--fins-only writes an .stl".into());
@@ -667,12 +710,8 @@ pub fn fin_file(
         strip_ext(base)
     };
     if args.fins_only && r.triangles.is_empty() {
-        return Ok(FileResult {
-            input: input.to_string(),
-            output: None,
-            report: format!("{}; no fins, nothing written", report_line(&r.stats)),
-            stats: r.stats,
-        });
+        let report = format!("{}; no fins, nothing written", report_line(&r.stats));
+        return Ok(file_result(input, None, report, &r.stats));
     }
     // The fins come back in the engine's seated frame. --fins-only maps them back onto the part as
     // it is in the file (fin - offset); otherwise the part moves to them.
@@ -713,12 +752,32 @@ pub fn fin_file(
         write_binary_stl(&both, &name)
     };
     io.write(&output, &blob)?;
-    Ok(FileResult {
+    let report = report_line(&r.stats);
+    Ok(file_result(input, Some(output), report, &r.stats))
+}
+
+/// The `{ input, output, stats, report }` of a plain run.
+fn file_result(
+    input: &str,
+    output: Option<String>,
+    report: String,
+    stats: &crate::entry::Stats,
+) -> FileResult {
+    FileResult {
         input: input.to_string(),
-        output: Some(output),
-        report: report_line(&r.stats),
-        stats: r.stats,
-    })
+        json: Json::Obj(vec![
+            ("input".into(), Json::Str(input.to_string())),
+            (
+                "output".into(),
+                output.clone().map_or(Json::Null, Json::Str),
+            ),
+            ("stats".into(), stats.to_json()),
+            ("report".into(), Json::Str(report.clone())),
+        ]),
+        output,
+        report,
+        incompatible: false,
+    }
 }
 
 /// Port of `threeMF` (cli.js:301-306): the 3MF output. A file with a slicer's own parts goes out
@@ -928,17 +987,30 @@ pub fn run(argv: &[String], io: &dyn Io) -> i32 {
                         r.report
                     )
                 });
+                if args.check && r.incompatible {
+                    failed += 1;
+                }
             }
             Err(e) => {
                 failed += 1;
                 io.err(&if args.json {
-                    Json::Obj(vec![
-                        ("input".into(), Json::Str(input.clone())),
-                        ("error".into(), Json::Str(e)),
-                    ])
-                    .stringify()
+                    let mut f = vec![
+                        ("input".to_string(), Json::Str(input.clone())),
+                        ("error".to_string(), Json::Str(e.message.clone())),
+                    ];
+                    if let Some(r) = &e.report {
+                        f.extend(r.to_json_fields());
+                    }
+                    Json::Obj(f).stringify()
                 } else {
-                    format!("support-fins: {input}: {e}")
+                    format!(
+                        "support-fins: {input}: {}{}",
+                        e.message,
+                        e.report.as_ref().map_or(String::new(), |r| format!(
+                            "\n{}",
+                            crate::project_report::format_project_report(r)
+                        ))
+                    )
                 });
             }
         }
