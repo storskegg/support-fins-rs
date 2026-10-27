@@ -5,15 +5,34 @@
 //                   unserved, smallHoleRegions, floating: [{}..], pad: {style}|null}; res: {regions: [{}..]}
 //                   out: the coverage object (keys with undefined values are absent)
 //   reportUrl       args: [rep, cov, {where, when, drawn, removed}]  out: the link (string)
-// replayReport needs buildFins and is recorded with it. Replayed by crates/sf-testkit/tests/parity_report.rs.
+//   replayReport    args: [pos (Float64Array soup), rep (JSON text of the settings), {$config: <every config object>}]
+//                   out: {why} | {nTriangles, hash, nPad, padHash, nFins, coverage}
+// Replayed by crates/sf-io/tests/parity_report.rs.
 import { writeCases } from "./lib/encode.js";
 import { modelList } from "./lib/direct.js";
 import { WEB } from "./lib/pin.js";
 
-const { reportPart, reportSettings, reportCoverage, reportUrl } = await import(`${WEB}report.js`);
+const { reportPart, reportSettings, reportCoverage, reportUrl, replayReport } = await import(`${WEB}report.js`);
+const { buildTopology, analyze } = await import(`${WEB}overhangs.js`);
+const { buildFins } = await import(`${WEB}fins.js`);
+const { Ref, encode: enc } = await import("./lib/encode.js");
+const cfgMods = {};
+for (const [k, p] of Object.entries({
+  prop: "prop/config.js", fin: "fins/config.js", pad: "fins/pad.js", perp: "fins/wedges.js", sway: "sway.js", cut: "cutout.js",
+  island: "islands.js", trace: "prop/trace.js", tie: "prop/ties.js", brace: "prop/brace.js", resin: "prop/resinfoot.js",
+  judge: "prop/judge.js", downhill: "prop/downhill.js", field: "fins/field.js", curved: "prop/curved.js", rim: "prop/rim.js",
+  arc: "prop/arc.js", fill: "fins/fill.js", rows: "fins/rows.js", nozzle: "nozzle.js",
+})) cfgMods[k] = await import(WEB + p);
+const m = cfgMods;
+const snap = () => ({
+  PROP: m.prop.PROP, FIN: m.fin.FIN, PAD: m.pad.PAD, PERP: m.perp.PERP, SWAY: m.sway.SWAY, CUT: m.cut.CUT, ISLAND: m.island.ISLAND,
+  TRACE: m.trace.TRACE, TIE: m.tie.TIE, BRACE: m.brace.BRACE, RESIN_FOOT: m.resin.RESIN_FOOT, JUDGE: m.judge.JUDGE,
+  DOWNHILL: m.downhill.DOWNHILL, FIELD: m.field.FIELD, CURVED: m.curved.CURVED, RIM: m.rim.RIM, ARC: m.arc.ARC, FILL: m.fill.FILL,
+  ROWS: m.rows.ROWS, NOZZLE: { nozzle: m.nozzle.nozzle, wallLines: m.nozzle.wallLines },
+});
 const { readSTL } = await import(`${WEB}stl.js`);
 
-const cases = { reportPart: [], reportSettings: [], reportCoverage: [], reportUrl: [] };
+const cases = { reportPart: [], reportSettings: [], reportCoverage: [], reportUrl: [], replayReport: [] };
 
 for (const [name, path] of modelList()) {
   const pos = readSTL(Deno.readFileSync(path));
@@ -65,6 +84,44 @@ const big = { ...reps[1], opts: { ...reps[1].opts, pad: "x".repeat(9000) } };
 cases.reportUrl.push({ id: "too-long", args: [big, covs[1], urlOpts[0]], out: reportUrl(big, covs[1], urlOpts[0]) });
 const near = { ...reps[0], opts: { ...reps[0].opts, pad: "é ".repeat(560) } };
 cases.reportUrl.push({ id: "near-limit", args: [near, covs[0], urlOpts[0]], out: reportUrl(near, covs[0], urlOpts[0]) });
+
+// replayReport: a page-like build filed as JSON, replayed from the file's triangles; and the refusals
+{
+  const { siteOpts } = await import(`${WEB}../tests/_scene.js`);
+  const hashOf = (flat) => {
+    const w = new Uint32Array(flat.buffer);
+    let h1 = 0x811c9dc5, h2 = 0x9747b28c;
+    for (let i = 0; i < w.length; i++) { h1 = Math.imul(h1 ^ w[i], 16777619); h2 = Math.imul(h2 ^ w[i], 0x01000193) ^ (h2 >>> 13); }
+    return [h1 >>> 0, h2 >>> 0];
+  };
+  const flat = (tris) => { const f = new Float64Array(tris.length * 4); tris.forEach((v, i) => { f[i * 4] = v[0]; f[i * 4 + 1] = v[1]; f[i * 4 + 2] = v[2]; f[i * 4 + 3] = v[3] === 1 ? 1 : 0; }); return f; };
+  const cfgRef = () => new Ref({ $config: enc(snap()) });
+  const out = (r) => (r.why ? { why: r.why } : { nTriangles: r.built.triangles.length, hash: hashOf(flat(r.built.triangles)), nPad: r.built.padTriangles.length,
+    padHash: hashOf(flat(r.built.padTriangles)), nFins: r.built.fins.length, coverage: reportCoverage(r.built, r.res) });
+  const rotOf = (ax, az) => { const [c, s, C, S] = [Math.cos(ax), Math.sin(ax), Math.cos(az), Math.sin(az)];
+    const mm = [[C, -S * c, S * s], [S, C * c, -C * s], [0, s, c]]; return [mm[0][0], mm[1][0], mm[2][0], mm[0][1], mm[1][1], mm[2][1], mm[0][2], mm[1][2], mm[2][2]]; };
+  for (const name of ["cube", "wedge", "lowledge", "portal", "lbracket"]) {
+    const path = modelList().find(([n]) => n === name)[1];
+    const raw = readSTL(Deno.readFileSync(path));
+    for (const scale of [1, 1.5]) for (const mode of ["auto", "full", "prop"]) {
+      const rot = rotOf(Math.PI / 6, Math.PI / 9);
+      const p = reportPart(raw, scale);
+      const topo = buildTopology({ getAttribute: (k) => (k === "position" ? { array: p } : null) });
+      const res = analyze(topo, 45, rot);
+      const opts = siteOpts({ material: "pla", mode, sway: false });
+      let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < p.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], p[i + k]); hi[k] = Math.max(hi[k], p[i + k]); }
+      const rep = JSON.parse(JSON.stringify(reportSettings({ threshold: 45, rot, opts, scale, size: lo.map((v, k) => hi[k] - v), faces: p.length / 9 })));
+      const id = `${name}|s${scale}|${mode}`;
+      cases.replayReport.push({ id, args: [raw, JSON.stringify(rep), cfgRef()], out: out(replayReport(raw, rep)) });
+      if (mode === "auto") {
+        for (const [tag, bad] of [["scale", { ...rep, scale: scale === 1 ? 2 : 1 }], ["version", { ...rep, v: 99 }], ["faces", { ...rep, part: { ...rep.part, faces: rep.part.faces + 1 } }], ["nover", { opts: rep.opts }]]) {
+          cases.replayReport.push({ id: `${id}|${tag}`, args: [raw, JSON.stringify(bad), cfgRef()], out: out(replayReport(raw, bad)) });
+        }
+      }
+    }
+  }
+}
 
 for (const [fn, cs] of Object.entries(cases)) writeCases("report", fn, cs);
 console.log("report:", Object.fromEntries(Object.entries(cases).map(([k, v]) => [k, v.length])));
