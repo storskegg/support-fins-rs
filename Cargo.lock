@@ -408,6 +408,7 @@ dependencies = [
  "miniz_oxide",
  "parity",
  "sf-engine",
+ "sf-testkit",
 ]
 
 [[package]]
