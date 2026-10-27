@@ -3,13 +3,18 @@
 //! part thinner than that put the probe in air past it (the full reach, run through the part), and
 //! a second piece beyond a thin near one pulled the end out through the near one.
 //!
-//! The fourth case builds a wedge with `buildPerpFins` (fins/wedges.js, track A) and is ported
-//! with it.
+//! The fourth case builds a wedge with `buildPerpFins` (fins/wedges.js, track A).
 
+use sf_engine::config::Config;
+use sf_engine::fins::wedges::{PerpConfig, WedgeOpts, build_perp_fins};
+use sf_engine::inside::inside_part;
 use sf_engine::kiss::{KissEnds, KissOpts, kiss_ends};
-use sf_engine::overhangs::{Topology, build_topology};
+use sf_engine::overhangs::{Topology, analyze, build_topology};
+use sf_engine::planes::find_wall_patches;
+use sf_engine::prop::crest::Crest;
+use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::types::{IDENTITY3, Xyz};
-use sf_testkit::{assert_close, block};
+use sf_testkit::{assert_close, block, load_model, rot_x, tine_boxes};
 
 const O: Xyz = Xyz {
     x: 0.0,
@@ -82,4 +87,77 @@ fn kiss_ends_no_solid_within_reach_keeps_the_full_reach_solid_behind_the_seed_pu
     for d in all(&ends(&topo_of(&[[-5.0, 5.0, -1.0, 10.0, 0.0, 10.0]]))) {
         assert_close(d, -0.25, 1e-9, "behind");
     }
+}
+
+// kiss.test.js:40 -- a wedge on a thin part: its tines' top corners stay outside the part at the
+// tine's mid-layer (the tine ends are kissed to the part, even at 0.6 layers).
+#[test]
+fn kiss_ends_a_wedge_on_a_thin_part_keeps_its_tines_out_of_it_at_0_6_layers() {
+    let topo = load_model("wedge");
+    let rot = rot_x(45.0);
+    let res = analyze(&topo, 45.0, &rot);
+    let cfg = Config::default();
+    let ctx = BuildCtx::new(&cfg, Crest::new(None, 0.0, &cfg));
+    let perp = PerpConfig::default();
+    let p = find_wall_patches(&topo, &rot, &res.offset, None, None)
+        .into_iter()
+        .find(|q| q.n.z < -0.05 && q.area >= perp.min_area && (q.u1 - q.u0) >= perp.min_width)
+        .expect("a wedge patch");
+    let on = build_perp_fins(
+        &p,
+        &topo,
+        &rot,
+        &res.offset,
+        &WedgeOpts {
+            tines: Some(true),
+            layer_height: Some(0.6),
+            ..Default::default()
+        },
+        &ctx,
+    );
+    let off = build_perp_fins(
+        &p,
+        &topo,
+        &rot,
+        &res.offset,
+        &WedgeOpts {
+            tines: Some(false),
+            ..Default::default()
+        },
+        &ctx,
+    );
+    let xyz = |v: &[[f64; 4]]| -> Vec<[f64; 3]> { v.iter().map(|q| [q[0], q[1], q[2]]).collect() };
+    let mut n = 0;
+    for (i, w) in on.wedges.iter().enumerate() {
+        let pre = off.wedges[i].tri_range[1] - off.wedges[i].tri_range[0];
+        let tris = xyz(&on.triangles[w.tri_range[0] + pre..w.tri_range[1]]);
+        for t in tine_boxes(&tris).tines {
+            n += 1;
+            let mid = (t.lo[2] + t.hi[2]) / 2.0;
+            let cx = (t.lo[0] + t.hi[0]) / 2.0;
+            let cy = (t.lo[1] + t.hi[1]) / 2.0;
+            for v in t.verts.iter().filter(|q| q[2] > t.hi[2] - 1e-6) {
+                // 0.02 back toward the tine's centre: the end overlaps the part by 0.01 on purpose
+                let dx = cx - v[0];
+                let dy = cy - v[1];
+                let d = {
+                    let h = dx.hypot(dy);
+                    if h == 0.0 { 1.0 } else { h }
+                };
+                assert!(
+                    !inside_part(
+                        &topo,
+                        &rot,
+                        &res.offset,
+                        v[0] + (dx / d) * 0.02,
+                        v[1] + (dy / d) * 0.02,
+                        mid
+                    ),
+                    "a tine top corner at x {:.2} is inside the part at its mid-layer",
+                    v[0]
+                );
+            }
+        }
+    }
+    assert!(n >= 20, "wedge X45 at 0.6 built {n} wedge tines");
 }

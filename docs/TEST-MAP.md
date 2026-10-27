@@ -47,7 +47,7 @@ Web-only rows:
 | `integration.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `interface.test.js` | 9 | cutout, draw, fins, inside, overhangs, prop, prop/crest, stl, threemf | M3 | not ported |
 | `islands.test.js` | 11 | fins, fins/fill, inside, islands, overhangs, prop, stl | M3 | not ported |
-| `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | partial: 3 of 4 ported (js_kiss.rs); the wedge case needs buildPerpFins |
+| `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | green |
 | `lattice.test.js` | 2 | fins, inside, overhangs, prop, prop/lattice, stl | M3 | not ported |
 | `layout_pins.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `low_edge.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
@@ -58,10 +58,10 @@ Web-only rows:
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | not ported |
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
 | `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | partial: 11 of 13 ported (js_orient.rs); the two suggestOrientations cases follow with build_fins |
-| `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | not ported |
+| `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | partial: 2 of 14 ported (js_pad.rs, the `buildPad` ones); the rest build through buildFins |
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | not ported |
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | partial: 2 of 3 ported (js_perp_hole.rs); the end-to-end case needs buildFins |
 | `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | not ported |
 | `plate_only.test.js` | 4 | draw, fins, inside, overhangs, prop, stl | M3 | not ported |
 | `platerow.test.js` | 2 | inside, overhangs, stl, ui/platerow | M4 | not ported |
