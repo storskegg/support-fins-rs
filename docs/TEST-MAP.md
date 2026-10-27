@@ -53,7 +53,7 @@ Web-only rows:
 | `low_edge.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `must_class.test.js` | 4 | fins/coverage, inside, overhangs, stl | M2 | not ported |
 | `navpresets.test.js` | 5 | inside, overhangs, stl, ui/navpresets | M4 | not ported |
-| `nearface.test.js` | 2 | inside, overhangs, prop/nearface, stl | M1 | not ported |
+| `nearface.test.js` | 2 | inside, overhangs, prop/nearface, stl | M1 | green |
 | `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | not ported |
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | not ported |
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
@@ -83,7 +83,7 @@ Web-only rows:
 | `stl.test.js` | 6 | inside, overhangs, stl | M1 | green |
 | `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | not ported |
 | `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | not ported |
+| `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | green |
 | `sway.test.js` | 19 | fins, inside, overhangs, prop, stl, sway | M3 | not ported |
 | `sway_clearance.test.js` | 2 | inside, overhangs, stl, sway | M3 | not ported |
 | `sway_cross_gauge.test.js` | 3 | fins, finworker, inside, nozzle, overhangs, prop, prop/brace, stl, sway, threemf | M3 | not ported |
@@ -102,4 +102,4 @@ Web-only rows:
 | `unserved.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `viewpresets.test.js` | 7 | inside, overhangs, stl, ui/viewpresets | M4 | not ported |
 | `wedge_clear.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `weld.test.js` | 3 | inside, overhangs, stl | M1 | not ported |
+| `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
