@@ -61,3 +61,62 @@ export function extentXY(tris) {
   }
   return { x0, y0, x1, y1 };
 }
+
+// --- config snapshots for direct cases ---
+const cfgMods = {
+  PROP: (await import(`${WEB}prop/config.js`)).PROP,
+  FIN: (await import(`${WEB}fins/config.js`)).FIN,
+  TRACE: (await import(`${WEB}prop/trace.js`)).TRACE,
+  JUDGE: (await import(`${WEB}prop/judge.js`)).JUDGE,
+  DOWNHILL: (await import(`${WEB}prop/downhill.js`)).DOWNHILL,
+  FIELD: (await import(`${WEB}fins/field.js`)).FIELD,
+};
+export { cfgMods };
+
+/** A trailing {"$config": {NAME: ...}} snapshot of the live config objects, taken now. */
+export const cfgRef = (...names) => new Ref({ $config: Object.fromEntries(names.map((n) => [n, encode(cfgMods[n])])) });
+
+/** Run `fn` with config fields overridden, then restore them. */
+export function withConfig(over, fn) {
+  const saved = {};
+  for (const [name, fields] of Object.entries(over)) {
+    saved[name] = {};
+    for (const [k, v] of Object.entries(fields)) { saved[name][k] = cfgMods[name][k]; cfgMods[name][k] = v; }
+  }
+  try { return fn(); } finally {
+    for (const [name, fields] of Object.entries(saved)) for (const [k, v] of Object.entries(fields)) cfgMods[name][k] = v;
+  }
+}
+
+/**
+ * The biggest regions of a posed model as buildProps sees them: seated faces (`tris`), and the
+ * vertices + centroids (`pts`). At most `max` regions.
+ */
+export function regionsOf(name, deg, max = 3) {
+  const p = posed(name, deg);
+  const { topo, rot, res, offset } = p;
+  const out = [];
+  for (const [ri, region] of res.regions.slice(0, max).entries()) {
+    const tris = new Float64Array(region.faces.length * 9);
+    const pts = [];
+    region.faces.forEach((f, k) => {
+      let gx = 0, gy = 0, gz = 0;
+      for (let i = 0; i < 3; i++) {
+        const o = f * 9 + i * 3, x = topo.pos[o], y = topo.pos[o + 1], z = topo.pos[o + 2];
+        const sx = rot[0] * x + rot[3] * y + rot[6] * z + offset.x;
+        const sy = rot[1] * x + rot[4] * y + rot[7] * z + offset.y;
+        const sz = rot[2] * x + rot[5] * y + rot[8] * z + offset.z;
+        tris[k * 9 + i * 3] = sx; tris[k * 9 + i * 3 + 1] = sy; tris[k * 9 + i * 3 + 2] = sz;
+        pts.push([sx, sy, sz]);
+        gx += sx; gy += sy; gz += sz;
+      }
+      pts.push([gx / 3, gy / 3, gz / 3]);
+    });
+    out.push({ ri, region, tris, pts, ...p });
+  }
+  return out;
+}
+
+/** Models that have overhang regions at a pose, for the region-based recorders (a small, varied set). */
+export const REGION_MODELS = ["cube", "wedge", "lbracket", "torus", "sphere", "ramp", "arch", "cone", "tube", "portal", "lowledge", "staircase"];
+export const REGION_POSES = [[40, 0, 0], [0, 35, 20], [90, 0, 0], [0, 0, 0]];

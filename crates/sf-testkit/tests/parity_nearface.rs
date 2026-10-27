@@ -51,22 +51,18 @@ fn nearest_replay(file: &str) {
 }
 
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn pt_tri_dist2_direct() {
     pt_tri_replay("ptTriDist2");
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn pt_tri_dist2_captured() {
     pt_tri_replay("ptTriDist2.captured");
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn nearest_faces_direct() {
     nearest_replay("nearestFaces");
 }
 #[test]
-#[ignore = "needs M1 track A: build_topology, analyze, grid_dims (todo!() until #11 merges)"]
 fn nearest_faces_captured() {
     nearest_replay("nearestFaces.captured");
 }

@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use crate::config::Config;
 use crate::jsnum;
 use crate::overhangs::{Analysis, BED_EPS, Topology};
 use crate::tris::Tris;
@@ -105,6 +106,78 @@ pub fn bed_contact(topo: &Topology, result: &Analysis, rot: &Rot3) -> BedContact
         my /= mw;
     }
     BedContact { pts, mx, my }
+}
+
+/// `POINT_FOOTPRINT` (web/fins/seating.js:100): contact narrower than this (mm) is a point.
+const POINT_FOOTPRINT: f64 = 2.0;
+
+/// How the part meets the plate (`kind` of `seatingOf`, web/fins/seating.js:111).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeatingKind {
+    Face,
+    Edge,
+    Point,
+}
+
+/// The object `seatingOf` returns (web/fins/seating.js:114): `{ kind, span, bedArea }`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Seating {
+    pub kind: SeatingKind,
+    pub span: f64,
+    pub bed_area: f64,
+}
+
+/// Port of `seatingOf` (web/fins/seating.js:80-115): HOW the part meets the plate: on a face, on
+/// an edge, or on a single point.
+///
+/// This is the question neither support mode was asking, and it is the one that explains
+/// hub_post_foot. That part has 0.0 mm^2 of bed contact at EVERY tilt from 0 to 165 degrees --
+/// it balances on the tip of its own tapered foot -- so every overhang on it sits 70-100mm in
+/// the air. Nothing you add to a part balanced on a point will hold it. Rotate it until it sits
+/// down.
+///
+/// A tilted-onto-an-EDGE part is the flagship Stabilize case and must not be caught by this --
+/// it also has ~0 bed area, but its contact is a long line, not a dot. So the discriminator is
+/// the footprint's extent, not its area. Area decides `face`, because a part can sit on a wide
+/// footprint of many separate little pads; extent decides point-vs-edge.
+pub fn seating_of(result: &Analysis, contact_pts: &[[f64; 2]], cfg: &Config) -> Seating {
+    let (mut min_x, mut max_x, mut min_y, mut max_y) = (
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    );
+    for &[x, y] in contact_pts {
+        if x < min_x {
+            min_x = x;
+        }
+        if x > max_x {
+            max_x = x;
+        }
+        if y < min_y {
+            min_y = y;
+        }
+        if y > max_y {
+            max_y = y;
+        }
+    }
+    let span = if contact_pts.is_empty() {
+        0.0
+    } else {
+        jsnum::hypot(&[max_x - min_x, max_y - min_y])
+    };
+    let kind = if result.bed_area >= cfg.fin.pad_min_area {
+        SeatingKind::Face
+    } else if span < POINT_FOOTPRINT {
+        SeatingKind::Point
+    } else {
+        SeatingKind::Edge
+    };
+    Seating {
+        kind,
+        span,
+        bed_area: result.bed_area,
+    }
 }
 
 #[cfg(test)]
@@ -266,6 +339,42 @@ pub(crate) mod tests {
         assert_eq!(
             bed_contact(&t, &on, &IDENTITY3).pts,
             vec![[1.0, 1.0], [5.0, 1.0], [1.0, 4.0]]
+        );
+    }
+
+    #[test]
+    fn seating_of_decides_face_by_area_then_point_or_edge_by_extent() {
+        let cfg = Config::default();
+        let with_area = |bed_area: f64| Analysis {
+            bed_area,
+            ..analysis(Xyz::default())
+        };
+        // area at (or past) FIN.padMinArea = 60 is a face, whatever the contact points are
+        let s = seating_of(&with_area(60.0), &[], &cfg);
+        assert_eq!((s.kind, s.span, s.bed_area), (SeatingKind::Face, 0.0, 60.0));
+        // under it, the footprint's extent decides: < 2 mm is a point, otherwise an edge
+        assert_eq!(
+            seating_of(&with_area(59.999), &[], &cfg).kind,
+            SeatingKind::Point
+        );
+        let pts = [[0.0, 0.0], [1.0, 1.0]];
+        let s = seating_of(&with_area(0.0), &pts, &cfg);
+        assert_eq!(s.kind, SeatingKind::Point);
+        assert_eq!(s.span, jsnum::hypot(&[1.0, 1.0]));
+        assert_eq!(
+            seating_of(&with_area(0.0), &[[0.0, 0.0], [2.0, 0.0]], &cfg).kind,
+            SeatingKind::Edge
+        );
+        assert_eq!(
+            seating_of(&with_area(0.0), &[[0.0, 0.0], [1.999, 0.0]], &cfg).kind,
+            SeatingKind::Point
+        );
+        // a tunable moves the face threshold
+        let mut c2 = Config::default();
+        c2.fin.pad_min_area = 10.0;
+        assert_eq!(
+            seating_of(&with_area(10.0), &pts, &c2).kind,
+            SeatingKind::Face
         );
     }
 }
