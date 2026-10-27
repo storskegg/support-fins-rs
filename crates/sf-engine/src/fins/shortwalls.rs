@@ -143,7 +143,7 @@ pub fn last_resort_walls(
             tri_ranges,
             ..p.clone()
         });
-        served.insert(p.region);
+        served.extend(p.region);
         tines += p.tines;
     }
     ShortWalls {

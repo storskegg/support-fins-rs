@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use sf_engine::config::{Config, TunableValue, Tunables};
 use sf_engine::cutout::CUTOUT_PATTERNS;
-use sf_engine::fins::build::{FinKind, FinsOpts, SwayRequest, build_fins};
+use sf_engine::fins::build::{FinKind, FinsBuilt, FinsOpts, SwayRequest, build_fins};
 use sf_engine::jsnum;
 use sf_engine::materials::PLA;
 use sf_engine::overhangs::{analyze, build_topology};
@@ -577,6 +577,15 @@ fn separate_walls(v: &str, tine_dir: &str) -> Result<bool, String> {
 /// triangles to add under it. Pass float64 when you have it: Orca poses in double precision, and
 /// rounding back to float32 can flip a borderline tine.
 pub fn compute_fins(positions: &[f64], options: &EngineOptions) -> Result<FinsResult, String> {
+    compute_fins_detail(positions, options).map(|(r, _)| r)
+}
+
+/// `computeFins`, and the `FinsBuilt` it summarised: the app's per-fin records and readout come from
+/// the same build the CLI writes (`sf-ffi`).
+pub fn compute_fins_detail(
+    positions: &[f64],
+    options: &EngineOptions,
+) -> Result<(FinsResult, FinsBuilt), String> {
     let m = merge(options)?;
     let tunables = clearances(&m)?;
     let (pos, shift) = seat_soup(positions)?;
@@ -662,16 +671,19 @@ pub fn compute_fins(positions: &[f64], options: &EngineOptions) -> Result<FinsRe
     };
     let mut triangles = fin;
     triangles.extend(pad);
-    Ok(FinsResult {
-        triangles,
-        // seated = input + offset  (so the caller maps fins back with input = seated - offset)
-        offset: Xyz {
-            x: result.offset.x - shift.x,
-            y: result.offset.y - shift.y,
-            z: result.offset.z - shift.z,
+    Ok((
+        FinsResult {
+            triangles,
+            // seated = input + offset  (so the caller maps fins back with input = seated - offset)
+            offset: Xyz {
+                x: result.offset.x - shift.x,
+                y: result.offset.y - shift.y,
+                z: result.offset.z - shift.z,
+            },
+            stats,
         },
-        stats,
-    })
+        built,
+    ))
 }
 
 fn tunables_gap(t: &Tunables) -> Option<f64> {

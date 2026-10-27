@@ -7,7 +7,7 @@ use std::sync::Arc;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
 use sf_io::obj::read_obj;
 use sf_io::stl::read_stl;
-use sf_io::threemf::{PartKind, ThreeMfObject, read_three_mf};
+use sf_io::threemf::{PartKind, ReadExtra, ThreeMfObject, read_three_mf};
 
 use crate::gpu::GpuBuffer;
 
@@ -61,17 +61,31 @@ pub struct AnalysisSummary {
     pub size: Vec<f64>,
 }
 
+/// A slicer's parts with the uncut positions they were cut from (`readPart`'s `slicer`).
+pub(crate) type Slicer = (Vec<f64>, Vec<ReadExtra>);
+
 /// One object of a file: its welded topology (which owns the source soup in the model frame).
 #[derive(uniffi::Object)]
 pub struct Part {
     name: String,
+    /// The file's name without its extension: what the CLI names an output after.
+    stem: String,
+    /// A 3MF object that carries a slicer's own parts: its uncut positions and those parts, which a 3MF
+    /// export writes back beside the part (cli.js `readPart`).
+    slicer: Option<Arc<Slicer>>,
     topo: Arc<Topology>,
     size: [f64; 3],
     notes: Vec<String>,
 }
 
 impl Part {
-    fn new(name: String, positions: Vec<f64>, notes: Vec<String>) -> Part {
+    fn new(
+        name: String,
+        stem: String,
+        positions: Vec<f64>,
+        slicer: Option<Slicer>,
+        notes: Vec<String>,
+    ) -> Part {
         let mut lo = [f64::INFINITY; 3];
         let mut hi = [f64::NEG_INFINITY; 3];
         for v in positions.as_chunks::<3>().0 {
@@ -87,19 +101,31 @@ impl Part {
         };
         Part {
             name,
+            stem,
+            slicer: slicer.map(Arc::new),
             topo: Arc::new(build_topology(positions)),
             size,
             notes,
         }
     }
 
-    /// The part's topology, for the build (M4b) and the tests.
+    /// The part's topology, for the build and the tests.
     pub fn topology(&self) -> &Arc<Topology> {
         &self.topo
     }
+
+    /// See the field.
+    pub(crate) fn stem(&self) -> &str {
+        &self.stem
+    }
+
+    /// See the field.
+    pub(crate) fn slicer(&self) -> Option<&Slicer> {
+        self.slicer.as_deref()
+    }
 }
 
-fn rot9(rot: &[f64]) -> Result<[f64; 9], FfiError> {
+pub(crate) fn rot9(rot: &[f64]) -> Result<[f64; 9], FfiError> {
     let r: [f64; 9] = rot.try_into().map_err(|_| FfiError::Engine {
         message: format!("rot must be 9 numbers, got {}", rot.len()),
     })?;
@@ -198,16 +224,20 @@ fn plural(n: usize, one: &str, other: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { other })
 }
 
+/// An object read from a file: name, positions, its slicer's parts, import notes.
+type Loaded = (String, Vec<f64>, Option<Slicer>, Vec<String>);
+
 /// A 3MF object with a slicer's negative parts cut out of it, as `web/ui/io.js` does at import
 /// (`cutChosen`), and the notes `renderImportNote` writes for it (the cut ones, and the kept
 /// modifiers / support blockers).
-fn cut_object(o: ThreeMfObject) -> (String, Vec<f64>, Vec<String>) {
+fn cut_object(o: ThreeMfObject) -> Loaded {
     let has_negative = o.extras.iter().any(|e| e.kind == PartKind::Negative);
     let kept = o
         .extras
         .iter()
         .filter(|e| e.kind != PartKind::Negative)
         .count();
+    let slicer = (!o.extras.is_empty()).then(|| (o.positions.clone(), o.extras.clone()));
     let mut notes = Vec::new();
     let positions = if has_negative {
         let c = sf_cut::cut_negatives(&o.positions, None, &o.extras);
@@ -250,7 +280,7 @@ fn cut_object(o: ThreeMfObject) -> (String, Vec<f64>, Vec<String>) {
             )
         ));
     }
-    (o.name, positions, notes)
+    (o.name, positions, slicer, notes)
 }
 
 /// STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
@@ -263,23 +293,24 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     })?;
     let format = |message: String| FfiError::Format { message };
     let lower = path.to_ascii_lowercase();
-    let mut parts: Vec<(String, Vec<f64>, Vec<String>)> = Vec::new();
+    let mut parts: Vec<Loaded> = Vec::new();
     if lower.ends_with(".stl") {
         parts.push((
             stem(&path),
             read_stl(&bytes).map_err(|e| format(e.0))?,
+            None,
             vec![],
         ));
     } else if lower.ends_with(".obj") {
         for o in read_obj(&bytes).map_err(format)?.objects {
-            parts.push((o.name, o.positions, vec![]));
+            parts.push((o.name, o.positions, None, vec![]));
         }
     } else if lower.ends_with(".3mf") {
         let m = read_three_mf(&bytes).map_err(format)?;
         drop(bytes);
         let objects = m.objects;
         if objects.is_empty() {
-            parts.push((stem(&path), m.positions, vec![]));
+            parts.push((stem(&path), m.positions, None, vec![]));
         } else {
             drop(m.positions); // the merged soup of every object: not needed beside them
             parts.extend(objects.into_iter().map(cut_object));
@@ -287,7 +318,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     } else {
         return Err(format("reads .stl, .3mf and .obj only".into()));
     }
-    parts.retain(|(_, p, _)| !p.is_empty());
+    parts.retain(|(_, p, _, _)| !p.is_empty());
     if parts.is_empty() {
         return Err(format("no triangles in the file".into()));
     }
@@ -295,16 +326,13 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     Ok(parts
         .into_iter()
         .enumerate()
-        .map(|(i, (name, pos, notes))| {
-            Arc::new(Part::new(
-                if name.is_empty() {
-                    format!("{base} {}", i + 1)
-                } else {
-                    name
-                },
-                pos,
-                notes,
-            ))
+        .map(|(i, (name, pos, slicer, notes))| {
+            let name = if name.is_empty() {
+                format!("{base} {}", i + 1)
+            } else {
+                name
+            };
+            Arc::new(Part::new(name, base.clone(), pos, slicer, notes))
         })
         .collect())
 }

@@ -260,7 +260,9 @@ fn plan_gap(l1: &[[f64; 3]], l2: &[[f64; 3]]) -> f64 {
 fn by_region(props: &[PropRecord]) -> IndexMap<usize, Vec<&PropRecord>> {
     let mut m: IndexMap<usize, Vec<&PropRecord>> = IndexMap::new();
     for q in props {
-        m.entry(q.region).or_default().push(q);
+        if let Some(r) = q.region {
+            m.entry(r).or_default().push(q);
+        }
     }
     m
 }
@@ -683,7 +685,7 @@ fn race_regions(
         np.tri_ranges = tri_ranges;
         tag.set(&mut np, from_b);
         props.push(np);
-        served.insert(q.region);
+        served.extend(q.region);
         tines += q.tines;
         volume += q.volume;
     };

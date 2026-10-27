@@ -122,7 +122,7 @@ fn bridge_race_matches_the_oracle() {
             }
             if !b.get("out").arr().is_empty() {
                 let mut q = PropRecord {
-                    region: patches[i].0.region,
+                    region: Some(patches[i].0.region),
                     tines: b.get("tines").num() as usize,
                     tri_ranges: vec![[base, acc.out.len()]],
                     ..Default::default()
@@ -157,7 +157,10 @@ fn bridge_race_matches_the_oracle() {
             .iter()
             .map(|q| {
                 let mut kv = vec![
-                    ("region".to_string(), Value::from(q.region as f64)),
+                    (
+                        "region".to_string(),
+                        q.region.map_or(Value::Null, |r| Value::from(r as f64)),
+                    ),
                     ("tines".to_string(), Value::from(q.tines as f64)),
                     (
                         "triRanges".to_string(),

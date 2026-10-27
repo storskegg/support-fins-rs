@@ -460,7 +460,13 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
 
 
 // Public interface members begin here.
-
+// Magic number for the Rust proxy to call using the same mechanism as every other method,
+// to free the callback once it's dropped by Rust.
+private let IDX_CALLBACK_FREE: Int32 = 0
+// Callback return codes
+private let UNIFFI_CALLBACK_SUCCESS: Int32 = 0
+private let UNIFFI_CALLBACK_ERROR: Int32 = 1
+private let UNIFFI_CALLBACK_UNEXPECTED_ERROR: Int32 = 2
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
@@ -555,6 +561,339 @@ fileprivate struct FfiConverterString: FfiConverter {
         writeBytes(&buf, value.utf8)
     }
 }
+
+
+
+
+/**
+ * A finished build: the fins and the bed pad in print space (the seated frame the page draws), and
+ * the numbers and per-fin records the readout and the selection use.
+ */
+public protocol BuildResultProtocol: AnyObject, Sendable {
+    
+    /**
+     * The fins (walls, wedges, sway braces): interleaved position xyz + face normal xyz, `f32`, three
+     * vertices per triangle, in print space.
+     */
+    func fins()  -> GpuBuffer
+    
+    /**
+     * The bed pad, laid out like [`fins`](Self::fins).
+     */
+    func pad()  -> GpuBuffer
+    
+    /**
+     * `{ fins: [...], props: [...] }`: the per-fin records (`triRanges` are vertex ranges into the
+     * `fins()` buffer) and the walls with their `region` (absent on a fill-pass wall).
+     */
+    func recordsJson()  -> String
+    
+    /**
+     * The readout: `stats` and `report` as the CLI prints them, and `offset`, `mode`, `volume`, `tines`,
+     * `braceCount`, `propCount`, `unserved`, `patchCount`, `patchStats` (zero counters omitted), ...
+     */
+    func summaryJson()  -> String
+    
+}
+/**
+ * A finished build: the fins and the bed pad in print space (the seated frame the page draws), and
+ * the numbers and per-fin records the readout and the selection use.
+ */
+open class BuildResult: BuildResultProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_sf_ffi_fn_clone_buildresult(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_sf_ffi_fn_free_buildresult(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * The fins (walls, wedges, sway braces): interleaved position xyz + face normal xyz, `f32`, three
+     * vertices per triangle, in print space.
+     */
+open func fins() -> GpuBuffer  {
+    return try!  FfiConverterTypeGpuBuffer_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_buildresult_fins(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The bed pad, laid out like [`fins`](Self::fins).
+     */
+open func pad() -> GpuBuffer  {
+    return try!  FfiConverterTypeGpuBuffer_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_buildresult_pad(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * `{ fins: [...], props: [...] }`: the per-fin records (`triRanges` are vertex ranges into the
+     * `fins()` buffer) and the walls with their `region` (absent on a fill-pass wall).
+     */
+open func recordsJson() -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_buildresult_records_json(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The readout: `stats` and `report` as the CLI prints them, and `offset`, `mode`, `volume`, `tines`,
+     * `braceCount`, `propCount`, `unserved`, `patchCount`, `patchStats` (zero counters omitted), ...
+     */
+open func summaryJson() -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_buildresult_summary_json(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBuildResult: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = BuildResult
+
+    public static func lift(_ handle: UInt64) throws -> BuildResult {
+        return BuildResult(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: BuildResult) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BuildResult {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: BuildResult, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBuildResult_lift(_ handle: UInt64) throws -> BuildResult {
+    return try FfiConverterTypeBuildResult.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBuildResult_lower(_ value: BuildResult) -> UInt64 {
+    return FfiConverterTypeBuildResult.lower(value)
+}
+
+
+
+
+
+
+/**
+ * One per part: builds on its own worker thread. Each `build` bumps the generation; a job that is no
+ * longer the latest when it starts or finishes is dropped without being delivered. (Stopping one
+ * partway needs cooperative checks in the engine: M5.)
+ */
+public protocol BuilderProtocol: AnyObject, Sendable {
+    
+    /**
+     * Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
+     */
+    func build(rot: [Double], optsJson: String, listener: BuildListener)  -> UInt64
+    
+}
+/**
+ * One per part: builds on its own worker thread. Each `build` bumps the generation; a job that is no
+ * longer the latest when it starts or finishes is dropped without being delivered. (Stopping one
+ * partway needs cooperative checks in the engine: M5.)
+ */
+open class Builder: BuilderProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_sf_ffi_fn_clone_builder(self.handle, $0) }
+    }
+public convenience init(part: Part) {
+    let handle =
+        try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_constructor_builder_new(
+        FfiConverterTypePart_lower(part),uniffiCallStatus
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_sf_ffi_fn_free_builder(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
+     */
+open func build(rot: [Double], optsJson: String, listener: BuildListener) -> UInt64  {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_builder_build(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceDouble.lower(rot),
+        FfiConverterString.lower(optsJson),
+        FfiConverterCallbackInterfaceBuildListener_lower(listener),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBuilder: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = Builder
+
+    public static func lift(_ handle: UInt64) throws -> Builder {
+        return Builder(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: Builder) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Builder {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: Builder, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBuilder_lift(_ handle: UInt64) throws -> Builder {
+    return try FfiConverterTypeBuilder.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBuilder_lower(_ value: Builder) -> UInt64 {
+    return FfiConverterTypeBuilder.lower(value)
+}
+
+
 
 
 
@@ -1187,6 +1526,174 @@ public func FfiConverterTypeFfiError_lower(_ value: FfiError) -> RustBuffer {
     return FfiConverterTypeFfiError.lower(value)
 }
 
+
+
+
+/**
+ * Where a build's result (or its failure) arrives, on the builder's worker thread.
+ */
+public protocol BuildListener: AnyObject, Sendable {
+    
+    func done(generation: UInt64, result: BuildResult) 
+    
+    func failed(generation: UInt64, err: FfiError) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceBuildListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceBuildListener = UniffiVTableCallbackInterfaceBuildListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceBuildListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface BuildListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceBuildListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface BuildListener: handle missing in uniffiClone")
+            }
+        },
+        done: { (
+            uniffiHandle: UInt64,
+            generation: UInt64,
+            result: UInt64,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceBuildListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.done(
+                     generation: try FfiConverterUInt64.lift(generation),
+                     result: try FfiConverterTypeBuildResult_lift(result)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        failed: { (
+            uniffiHandle: UInt64,
+            generation: UInt64,
+            err: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceBuildListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.failed(
+                     generation: try FfiConverterUInt64.lift(generation),
+                     err: try FfiConverterTypeFfiError_lift(err)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceBuildListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceBuildListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitBuildListener() {
+    uniffi_sf_ffi_fn_init_callback_vtable_buildlistener(UniffiCallbackInterfaceBuildListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceBuildListener {
+    fileprivate static let handleMap = UniffiHandleMap<BuildListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceBuildListener : FfiConverter {
+    typealias SwiftType = BuildListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceBuildListener_lift(_ handle: UInt64) throws -> BuildListener {
+    return try FfiConverterCallbackInterfaceBuildListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceBuildListener_lower(_ v: BuildListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceBuildListener.lower(v)
+}
+
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
@@ -1240,6 +1747,31 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeBuildResult: FfiConverterRustBuffer {
+    typealias SwiftType = [BuildResult]
+
+    public static func write(_ value: [BuildResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeBuildResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [BuildResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [BuildResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeBuildResult.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypePart: FfiConverterRustBuffer {
     typealias SwiftType = [Part]
 
@@ -1270,6 +1802,22 @@ public func engineVersion() -> String  {
     uniffi_sf_ffi_fn_func_engine_version(uniffiCallStatus
     )
 })
+}
+/**
+ * Write a part and its build as the CLI writes them: `path`'s extension picks STL or 3MF, and
+ * `options_json` may carry `{ "finsOnly": true }` (the CLI's `--fins-only`, an STL of the fins mapped
+ * back onto the part as it is in the file, so only for an unposed build, as the CLI says). One part and its build per file for now: several would
+ * need a plate layout the engine does not have.
+ */
+public func export(path: String, parts: [Part], builds: [BuildResult], optionsJson: String)throws   {try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_func_export(
+        FfiConverterString.lower(path),
+        FfiConverterSequenceTypePart.lower(parts),
+        FfiConverterSequenceTypeBuildResult.lower(builds),
+        FfiConverterString.lower(optionsJson),uniffiCallStatus
+    )
+}
 }
 /**
  * STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
@@ -1303,7 +1851,25 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_func_engine_version() != 38314) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sf_ffi_checksum_func_export() != 44033) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sf_ffi_checksum_func_load_parts() != 14593) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildresult_fins() != 49288) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildresult_pad() != 65060) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildresult_records_json() != 44988) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildresult_summary_json() != 3251) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_builder_build() != 27591) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_gpubuffer_address() != 23806) {
@@ -1330,7 +1896,17 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_method_part_mesh() != 22805) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sf_ffi_checksum_constructor_builder_new() != 34376) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildlistener_done() != 33539) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildlistener_failed() != 55714) {
+        return InitializationResult.apiChecksumMismatch
+    }
 
+    uniffiCallbackInitBuildListener()
     return InitializationResult.ok
 }()
 

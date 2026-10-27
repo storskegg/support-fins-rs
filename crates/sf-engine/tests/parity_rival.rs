@@ -110,7 +110,7 @@ fn tube_rivalry_matches_the_oracle() {
             }
             for q in b.get("props").arr() {
                 acc.props.push(PropRecord {
-                    region: q.get("region").num() as usize,
+                    region: Some(q.get("region").num() as usize),
                     tines: q.get("tines").num() as usize,
                     tri_ranges: vec![[base, acc.out.len()]],
                     ..Default::default()
@@ -174,7 +174,10 @@ fn tube_rivalry_matches_the_oracle() {
             .iter()
             .map(|q| {
                 Value::Obj(vec![
-                    ("region".into(), Value::from(q.region as f64)),
+                    (
+                        "region".into(),
+                        q.region.map_or(Value::Null, |r| Value::from(r as f64)),
+                    ),
                     ("tines".into(), Value::from(q.tines as f64)),
                     (
                         "triRanges".into(),

@@ -45,7 +45,7 @@ fn build(acc: &mut Acc, verts: Vec<[f64; 4]>) {
     let base = acc.out.len();
     acc.out.extend(verts);
     acc.props.push(PropRecord {
-        region: 3,
+        region: Some(3),
         tri_ranges: vec![[base, acc.out.len()]],
         ..Default::default()
     });

@@ -176,7 +176,7 @@ fn pass_of(b: &Value, is_normal: bool) -> PropsPass {
         .arr()
         .iter()
         .map(|q| PropRecord {
-            region: q.get("region").num() as usize,
+            region: Some(q.get("region").num() as usize),
             tines: q.get("tines").num() as usize,
             volume: q.get("volume").num(),
             height: q.get("height").num(),
@@ -339,7 +339,10 @@ fn race_against_matches_js() {
             .iter()
             .map(|q| {
                 Value::Obj(vec![
-                    ("region".into(), Value::from(q.region as f64)),
+                    (
+                        "region".into(),
+                        q.region.map_or(Value::Null, |r| Value::from(r as f64)),
+                    ),
                     (
                         "id".into(),
                         if same {

@@ -76,7 +76,7 @@ fn world() -> (sf_engine::overhangs::Topology, Analysis) {
 
 fn wall(region: usize, x: f64, grip: Option<f64>) -> PropRecord {
     PropRecord {
-        region,
+        region: Some(region),
         line: vec![[x - 3.0, 0.0, 10.0], [x, 0.0, 10.0], [x + 3.0, 0.0, 10.0]],
         height: 10.0,
         volume: 5.0,
@@ -147,7 +147,7 @@ fn a_second_pass_that_holds_clearly_more_takes_the_region() {
     );
     assert_eq!(*asked.borrow(), vec![vec![0]]); // only the bare region is rebuilt
     assert_eq!(swapped, Some(1));
-    let regions: Vec<usize> = raced.props.iter().map(|q| q.region).collect();
+    let regions: Vec<usize> = raced.props.iter().filter_map(|q| q.region).collect();
     assert_eq!(regions, vec![0, 1]);
     assert_eq!(raced.props[0].raster, Some(true));
     assert_eq!(raced.props[1].raster, Some(false));
@@ -247,7 +247,7 @@ fn the_veto_drops_second_pass_walls_before_the_race() {
     let normal = pass(vec![wall(1, 40.0, None)]);
     let second = pass(vec![wall(0, 0.0, None)]);
     let opts = BuildOpts {
-        raster_veto: Some(std::rc::Rc::new(|q: &PropRecord, _| q.region == 0)),
+        raster_veto: Some(std::rc::Rc::new(|q: &PropRecord, _| q.region == Some(0))),
         ..Default::default()
     };
     let p = |_: &IndexSet<usize>| second.clone();

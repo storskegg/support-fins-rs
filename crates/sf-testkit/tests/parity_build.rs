@@ -130,7 +130,10 @@ fn summary(r: &PropsPass, full: bool, cap: Value) -> Value {
         .map(|q| {
             let tag = |t: Option<bool>| t.map_or(Value::Null, Value::from);
             Value::Obj(vec![
-                ("region".into(), n(q.region as f64)),
+                (
+                    "region".into(),
+                    q.region.map_or(Value::Null, |r| n(r as f64)),
+                ),
                 ("id".into(), n(q.id as f64)),
                 ("tines".into(), n(q.tines as f64)),
                 ("caps".into(), q.caps.map_or(Value::Null, pair)),

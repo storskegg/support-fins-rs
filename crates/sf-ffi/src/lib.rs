@@ -5,9 +5,12 @@
 //! only converts formats and adds no geometry logic.
 #![allow(unsafe_code)]
 
+mod builder;
 mod gpu;
 mod part;
+mod records;
 
+pub use builder::{BuildListener, BuildResult, Builder, build_part, export};
 pub use gpu::GpuBuffer;
 pub use part::{AnalysisSummary, FfiError, Part, PartInfo, load_parts};
 
