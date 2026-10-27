@@ -172,6 +172,10 @@ pub struct PropRecord {
     pub rim: Option<bool>,
     pub downhill: Option<bool>,
     pub curved: Option<bool>,
+    /// `fill: true`: a wall of the fill pass (web/fins.js `withFill`). JS gives it only `tines`, `span`,
+    /// `height`, `line`, `triRanges`, `partAttached` and `squat` of the keys above; the rest is
+    /// this record's default.
+    pub fill: bool,
 }
 
 /// What `buildPass` / `buildProps` return (web/prop.js:707-712, `noProps` at 99-104): the support
