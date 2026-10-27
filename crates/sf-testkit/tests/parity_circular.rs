@@ -1,7 +1,6 @@
 //! Replay of `parity/corpus/circular/*` (recorded by `parity/oracle/circular.js` from
 //! web/prop/circular.js). Exact: every output is arithmetic on the inputs (plus `surfaceZAt`).
-//! `circular_tracks` calls `sweep::foot_for` (track B), so its replays are ignored until that
-//! lands in `main` (run them with `--ignored`).
+//! `circular_tracks` calls `sweep::foot_for` (track B, merged).
 mod common;
 use ::parity::{Case, Tol, Value, load_cases};
 use common::*;
@@ -146,7 +145,6 @@ fn tracks_run(c: &Case) -> Value {
 }
 
 #[test]
-#[ignore = "needs sweep::foot_for (M2 track B)"]
 fn circular_tracks_soup() {
     replay("circularTracks.soup", 30, tracks_run);
 }

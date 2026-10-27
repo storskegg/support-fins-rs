@@ -1,7 +1,6 @@
 //! Tests of `sf_engine::prop::circular`: recognition of complete circular rims (and every way it
 //! refuses), the caller-owned cache, the surrounding-geometry phase, and the early exits of
-//! `circular_tracks`. (Its radial candidates need `sweep::foot_for`, track B; those tests are
-//! ignored until it lands, and the parity corpus `circular/circularTracks.soup` pins them.)
+//! `circular_tracks` (needs `sweep::foot_for`) is pinned by the parity corpus `circular/circularTracks.soup`.)
 mod support;
 use sf_engine::config::Config;
 use sf_engine::overhangs::{analyze, build_topology};
@@ -221,7 +220,6 @@ fn tracks_refuse_before_any_foot_is_measured() {
 }
 
 #[test]
-#[ignore = "needs sweep::foot_for (M2 track B)"]
 fn tracks_lay_radial_walls_over_an_annular_slope() {
     let cfg = Config::default();
     let (tris, _, _) = recess_region(120);
