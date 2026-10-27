@@ -81,7 +81,7 @@ Web-only rows:
 | `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | green |
 | `step.test.js` | 6 | fins, inside, overhangs, prop, step, stl | M6 | not ported |
 | `stl.test.js` | 6 | inside, overhangs, stl | M1 | green |
-| `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | not ported |
+| `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | green (sf-engine/tests/js_suggest_worker.rs; the worker is a direct `suggest_orientations` call on a `Config` the tunables were applied to) |
 | `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green (js_supports.rs) |
 | `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | green |
 | `sway.test.js` | 19 | fins, inside, overhangs, prop, stl, sway | M3 | green (js_sway.rs) |
@@ -109,3 +109,5 @@ Web-only rows:
 | `plugins/cli/tests/project.test.js` | 68 | plugins/cli/project* | M3 | 68 of 68 ported (sf-cli/tests/project.rs); the six "never falls back" cases are one test, and the killed-subprocess case polls the real binary for its first checkpoint instead of stopping it at a hook |
 | `plugins/cli/tests/project_cache.test.js` | 8 | plugins/cli/project-cache | M3 | 8 of 8 ported (sf-cli/tests/project_cache.rs); the build-identity case checks the binary hash is stable (JS hashes its sources, so an edit changes it) |
 | `plugins/cli/tests/project_nozzle.test.js` | 2 | plugins/cli/project-nozzle | M3 | 2 of 2 ported (sf-cli/tests/project_cache.rs) |
+| `plugins/shared/tests/options.test.js` | 11 | plugins/shared/engine | M3 | 11 of 11 ported (sf-cli/tests/js_options.rs); `ENGINE_DEFAULTS` is not a Rust value, so "the entry's defaults are the schema's" is checked by behaviour |
+| `plugins/shared/tests/entry_options.test.js` | 15 | plugins/shared/engine | M3 | 15 of 15 ported (sf-cli/tests/js_entry_options.rs); typed options replace computeFins' mistyped-value refusals (see the file header) |
