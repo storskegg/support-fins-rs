@@ -344,3 +344,7 @@ gets a push notification, and the PR and issue are labelled `escalated`.
 
 - **What counts as "more accurate".** Deferred by the user until testing. Until then, deviations are not allowed.
 - MCP server: optional after M7.
+
+## 9. After parity (new features)
+
+- Stabilizing fins between neighbouring tall objects on multi-object plates, mainly for resin (see the GitHub issue labelled `post-parity`).
