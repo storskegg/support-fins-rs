@@ -2,8 +2,17 @@
 //! `docs/AGENTS.md` before changing anything here.
 
 pub mod cli;
+pub mod cut;
 pub mod entry;
 pub mod options;
+pub mod project;
+pub mod project_analysis;
+pub mod project_cache;
+pub mod project_io;
+pub mod project_nozzle;
+pub mod project_report;
+pub mod project_xml;
+pub mod uuid;
 
 /// `VERSION` (plugins/cli/version.js): run from a checkout it is the unstamped base.
 pub const VERSION: &str = "0.7.0";

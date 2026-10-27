@@ -14,9 +14,11 @@ path = "src/main.rs"
 [dependencies]
 sf-engine.workspace = true
 sf-io.workspace = true
+indexmap.workspace = true
 
 [dev-dependencies]
 sf-testkit.workspace = true
+miniz_oxide.workspace = true
 
 [lints]
 workspace = true
