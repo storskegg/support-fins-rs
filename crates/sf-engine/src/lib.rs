@@ -3,6 +3,7 @@
 
 pub mod config;
 pub mod cutout;
+pub mod draw;
 pub mod drawarc;
 pub mod fins;
 pub mod gridsize;
@@ -12,10 +13,12 @@ pub mod jsnum;
 pub mod kiss;
 pub mod materials;
 pub mod nozzle;
+pub mod orient;
 pub mod overhangs;
 pub mod pieces;
 pub mod planes;
 pub mod prop;
+pub mod report;
 pub mod solids;
 pub mod sway;
 pub mod three;

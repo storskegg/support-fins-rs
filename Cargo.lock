@@ -391,6 +391,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sf-cli"
+version = "0.1.0"
+dependencies = [
+ "sf-engine",
+ "sf-io",
+]
+
+[[package]]
 name = "sf-engine"
 version = "0.1.0"
 dependencies = [
