@@ -48,3 +48,9 @@ js-test file="":
 cli-parity filter="":
     cargo build --release -p sf-cli
     deno run --allow-read --allow-write --allow-run --allow-env parity/cli/cli_parity.js target/release/support-fins {{filter}}
+
+# M3 timing, JS engine (Deno) vs single-threaded Rust engine (release), written to docs/PERF-M3.md. Skips private-fixtures/ cases when the file is absent.
+bench-m3:
+    deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js run
+    cargo run --release -q -p sf-testkit --example bench_m3
+    deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js report
