@@ -61,13 +61,21 @@ async function run() {
   const large = Object.entries(triCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n]) => n);
   for (const m of large) for (const [name, rot] of ORIENTS) add({ group: "worst", model: m, pose: name, rot });
 
-  // 3. the private coin file, each object at the pose it has in the file (read now, kept only in memory)
-  let privateObjects = 0;
+  // 3. the private coin file, each object at the pose it has in the file (read now, kept only in memory).
+  //    JS may be unable to load it at all (V8's ~512 MB string limit on a huge model XML): then there is one
+  //    case with `jsError`, and the Rust side enumerates the objects itself.
+  let privateObjects = 0, privateError = null;
   try {
     const bytes = Deno.readFileSync(PRIVATE);
-    privateObjects = (await readThreeMF(bytes)).objects.length;
-    for (let i = 0; i < privateObjects; i++) {
-      cases.push({ group: "private", model: "Earth Focus Many Vertical", pose: `object ${i + 1}`, rot: [1, 0, 0, 0, 1, 0, 0, 0, 1], object: i });
+    try {
+      privateObjects = (await readThreeMF(bytes)).objects.length;
+      for (let i = 0; i < privateObjects; i++) {
+        cases.push({ group: "private", model: "Earth Focus Many Vertical", pose: `object ${i + 1}`, rot: [1, 0, 0, 0, 1, 0, 0, 0, 1], object: i });
+      }
+    } catch (e) {
+      privateError = String(e?.message ?? e);
+      console.log(`bench-m3: JS cannot load ${PRIVATE.split("/").pop()}: ${privateError}`);
+      cases.push({ group: "private", model: "Earth Focus Many Vertical", pose: "all objects", rot: [1, 0, 0, 0, 1, 0, 0, 0, 1], object: null, jsError: privateError });
     }
   } catch (e) {
     if (!(e instanceof Deno.errors.NotFound)) throw e;
@@ -92,19 +100,25 @@ async function run() {
   };
   const rows = [];
   for (const c of cases) {
-    await once(c); // warm-up, discarded
-    const r = [];
-    for (let i = 0; i < RUNS; i++) r.push(await once(c));
-    rows.push({ ...c, triangles: r[0].triangles, outVerts: r[0].out,
-      load: median(r.map((x) => x.load)), weld: median(r.map((x) => x.weld)), build: median(r.map((x) => x.build)) });
-    console.log(`${c.group} ${c.model} ${c.pose}: ${r[0].triangles} tris, build ${rows.at(-1).build.toFixed(1)} ms`);
+    if (c.jsError) { rows.push({ ...c }); continue; }
+    try {
+      await once(c); // warm-up, discarded
+      const r = [];
+      for (let i = 0; i < RUNS; i++) r.push(await once(c));
+      rows.push({ ...c, triangles: r[0].triangles, outVerts: r[0].out,
+        load: median(r.map((x) => x.load)), weld: median(r.map((x) => x.weld)), build: median(r.map((x) => x.build)) });
+      console.log(`${c.group} ${c.model} ${c.pose}: ${r[0].triangles} tris, build ${rows.at(-1).build.toFixed(1)} ms`);
+    } catch (e) {
+      rows.push({ ...c, jsError: String(e?.message ?? e) });
+      console.log(`${c.group} ${c.model} ${c.pose}: JS failed: ${rows.at(-1).jsError}`);
+    }
   }
   Deno.mkdirSync(OUT, { recursive: true });
   const dec = new TextDecoder();
   const sh = (cmd, ...args) => { try { return dec.decode(new Deno.Command(cmd, { args, stdout: "piped" }).outputSync().stdout).trim(); } catch { return "?"; } };
   const meta = { runs: RUNS, deno: Deno.version.deno, chip: sh("sysctl", "-n", "machdep.cpu.brand_string"),
     os: `macOS ${sh("sw_vers", "-productVersion")}`, large, upstream: Deno.readTextFileSync(`${REPO}UPSTREAM`).match(/commit=(\w+)/)[1],
-    privateFile: privateObjects ? PRIVATE.split("/").pop() : null };
+    privateFile: (privateObjects || privateError) ? PRIVATE.split("/").pop() : null };
   Deno.writeTextFileSync(`${OUT}js.json`, JSON.stringify({ meta, cases: rows }));
 }
 
@@ -113,19 +127,46 @@ function report() {
   const rs = JSON.parse(Deno.readTextFileSync(`${OUT}rust.json`));
   const f = (ms) => (ms < 10 ? ms.toFixed(2) : ms < 100 ? ms.toFixed(1) : ms.toFixed(0));
   const ratio = (a, b) => (b > 0 ? `${(a / b).toFixed(1)}x` : "-");
-  const table = (group) => {
-    const out = ["| model | pose | triangles | JS ms | Rust ms | ratio | JS load / weld ms | Rust load / weld ms |", "|---|---|---:|---:|---:|---:|---:|---:|"];
-    const sel = js.cases.map((c, i) => [c, rs.cases[i]]).filter(([c]) => c.group === group);
-    for (const [c, r] of sel) {
-      out.push(`| ${c.model} | ${c.pose} | ${c.triangles} | ${f(c.build)} | ${f(r.build)} | ${ratio(c.build, r.build)} | ${f(c.load)} / ${f(c.weld)} | ${f(r.load)} / ${f(r.weld)} |`);
-    }
-    const jb = sel.reduce((s, [c]) => s + c.build, 0), rb = sel.reduce((s, [, r]) => s + r.build, 0);
-    return { text: out.join("\n"), n: sel.length, jb, rb, med: median(sel.map(([c, r]) => c.build / r.build)) };
+  const head = ["| model | pose | triangles | JS ms | Rust ms | ratio | JS load / weld ms | Rust load / weld ms |", "|---|---|---:|---:|---:|---:|---:|---:|"];
+  const jsLimit = (c, r) => {
+    const mb = r?.modelXmlMB ? `${Math.round(r.modelXmlMB)} MB model XML` : "model XML too large";
+    return /maximum length|string length/i.test(c.jsError) ? `cannot load (V8 string limit, ${mb})` : `failed: ${c.jsError}`;
   };
-  const g = table("golden"), w = table("worst"), p = table("private");
-  const same = js.cases.every((c, i) => rs.cases[i].outVerts === c.outVerts);
-  const mism = js.cases.filter((c, i) => rs.cases[i].outVerts !== c.outVerts).length;
+  // rows for one group: [text rows, builds with both sides timed]
+  const rowsOf = (group) => {
+    const out = [], both = [];
+    js.cases.forEach((c, i) => {
+      if (c.group !== group) return;
+      const r = rs.cases[i];
+      if (r.objects) { // the private file, enumerated by the Rust side because JS could not load it
+        if (r.rustError) { out.push(`| ${c.model} | ${c.pose} | - | ${c.jsError ? jsLimit(c, r) : "-"} | Rust failed: ${r.rustError} | - | - | - |`); return; }
+        for (const o of r.objects) out.push(`| ${c.model} | object ${o.index + 1} | ${o.triangles} | ${jsLimit(c, r)} | ${f(o.build)} | - | - | - / ${f(o.weld)} |`);
+        return;
+      }
+      if (c.jsError) { out.push(`| ${c.model} | ${c.pose} | ${r.triangles} | ${jsLimit(c, r)} | ${f(r.build)} | - | - | ${f(r.load)} / ${f(r.weld)} |`); return; }
+      out.push(`| ${c.model} | ${c.pose} | ${c.triangles} | ${f(c.build)} | ${f(r.build)} | ${ratio(c.build, r.build)} | ${f(c.load)} / ${f(c.weld)} | ${f(r.load)} / ${f(r.weld)} |`);
+      both.push([c, r]);
+    });
+    const jb = both.reduce((s, [c]) => s + c.build, 0), rb = both.reduce((s, [, r]) => s + r.build, 0);
+    return { text: [...head, ...out].join("\n"), n: out.length, both, jb, rb, med: median(both.map(([c, r]) => c.build / r.build)) };
+  };
+  const g = rowsOf("golden"), w = rowsOf("worst"), p = rowsOf("private");
+  const mism = [g, w, p].flatMap((t) => t.both).filter(([c, r]) => r.outVerts !== c.outVerts).length;
+  const compared = [g, w, p].reduce((s, t) => s + t.both.length, 0);
   const sum = (t, label) => `${label}: ${t.n} builds, total JS ${f(t.jb)} ms vs Rust ${f(t.rb)} ms (${ratio(t.jb, t.rb)} overall, median per-build ratio ${t.med.toFixed(1)}x)`;
+
+  // the private file: whole-file numbers from the Rust side
+  const pc = js.cases.map((c, i) => [c, rs.cases[i]]).find(([c, r]) => c.group === "private" && r.objects);
+  let privateNotes = "";
+  if (pc) {
+    const [c, r] = pc;
+    const rss = (() => { try { const m = Deno.readTextFileSync(`${OUT}rust-time.txt`).match(/(\d+)\s+maximum resident set size/); return m ? m[1] : null; } catch { return null; } })();
+    privateNotes = [
+      c.jsError ? `- **JS:** ${jsLimit(c, r)}. \`readThreeMFParts\` decodes the whole model XML into one string, which V8 caps near 512 MB (\`threemf.js\` \`TextDecoder\`), so the JS engine cannot open this file at all and no JS time exists.` : "",
+      r.rustError ? `- **Rust:** failed: ${r.rustError}` : `- **Rust:** load (read + unzip + scan the whole file, median of ${js.meta.runs}) ${f(r.loadMs)} ms; ${r.objects.length} objects, ${r.objects.reduce((s, o) => s + o.triangles, 0)} triangles in all; weld and build are per object, below.`,
+      rss ? `- **Peak memory (Rust, whole \`bench_m3\` process, \`/usr/bin/time -l\`):** ${(Number(rss) / 2 ** 20).toFixed(0)} MiB. The stress models add a few MB; the coin file dominates.` : "",
+    ].filter(Boolean).join("\n");
+  }
   const md = `# M3 timing: JS engine vs single-threaded Rust engine
 
 The serial baseline M5 improves on. Regenerate with \`just bench-m3\` (writes this file).
@@ -136,13 +177,13 @@ The serial baseline M5 improves on. Regenerate with \`just bench-m3\` (writes th
 - **Method:** each case is timed ${js.meta.runs} times after one discarded warm-up; the table gives the median. The phases are separate:
   **load** = read the file and parse it into a position soup, **weld** = \`buildTopology\` + \`analyze\`, and the **JS ms / Rust ms** columns are \`buildFins\` alone (the ratio is JS over Rust, so above 1 means Rust is faster).
   Every run starts from a fresh topology, so lazily built grids are charged to the build.
-- **Same work:** the Rust build produced the same support vertex count as JS in ${js.cases.length - mism} of ${js.cases.length} cases${same ? "" : ` (${mism} differ; see below)`}. Both engines are tested for exact equality in the parity corpus, so these timings compare equal work.
+- **Same work:** the Rust build produced the same support vertex count as JS in ${compared - mism} of ${compared} compared cases${mism ? ` (${mism} differ)` : ""}. Both engines are tested for exact equality in the parity corpus, so these timings compare equal work.
 
 ## Summary
 
 - ${sum(g, "Stress models at their golden poses")}
 - ${sum(w, "Worst orientations of the " + js.meta.large.join(", ") + " models")}
-${p.n ? `- ${sum(p, "Private coin file")}` : "- Private coin file: not present on this machine (skipped)."}
+${p.n ? (p.both.length ? `- ${sum(p, "Private coin file")}` : `- Private coin file: ${p.n} Rust builds timed; the JS engine cannot load the file (see below).`) : "- Private coin file: not present on this machine (skipped)."}
 
 ## Stress models at their golden poses
 
@@ -158,12 +199,15 @@ ${w.text}
 ${p.n ? `
 ## Private coin file (${js.meta.privateFile})
 
-Each object at the pose it has in the file. Only counts and timings are recorded here; none of its geometry, outputs or corpus is stored.
+Each object at the pose it has in the file. Only the file name, counts and timings are recorded here; none of its geometry, outputs or corpus is stored.
+
+${privateNotes}
 
 ${p.text}
 ` : ""}`;
   Deno.writeTextFileSync(`${REPO}docs/PERF-M3.md`, md);
-  console.log(`wrote docs/PERF-M3.md\n${sum(g, "golden")}\n${sum(w, "worst")}${p.n ? "\n" + sum(p, "private") : ""}`);
+  console.log(`wrote docs/PERF-M3.md\n${sum(g, "golden")}\n${sum(w, "worst")}${p.both.length ? "\n" + sum(p, "private") : ""}`);
+  if (pc) console.log(privateNotes);
 }
 
 const cmd = Deno.args[0];
