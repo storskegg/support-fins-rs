@@ -21,13 +21,13 @@ Web-only rows:
 
 | JS test | cases | modules it exercises | milestone | status |
 |---|---|---|---|---|
-| `arc.test.js` | 2 | fins, inside, overhangs, prop, prop/arc, prop/curved, prop/surface, stl | M3 | not ported |
-| `bores.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `arc.test.js` | 2 | fins, inside, overhangs, prop, prop/arc, prop/curved, prop/surface, stl | M3 | green |
+| `bores.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | green |
 | `brace.test.js` | 5 | fins, inside, overhangs, prop, prop/brace, stl | M3 | green |
-| `bridge_dir.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `bridge_dir.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | green |
 | `calibrate.test.js` | 3 | inside, overhangs, stl, ui/calibrate | M4 | not ported |
 | `circular.test.js` | 9 | fins, fins/downhill, inside, overhangs, prop, prop/circular, stl | M3 | not ported |
-| `coverage.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `coverage.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
 | `curved.test.js` | 5 | fins, fins/downhill, inside, overhangs, prop, prop/curved, stl | M3 | not ported |
 | `cut.test.js` | 13 | cut, fins, inside, overhangs, prop, stl, threemf | M6 | not ported |
 | `cutout.test.js` | 14 | cutout, draw, fins, inside, overhangs, prop, stl | M3 | not ported |
@@ -38,9 +38,9 @@ Web-only rows:
 | `fill.test.js` | 14 | draw, fins, fins/coverage, fins/fill, fins/seating, inside, overhangs, prop, stl | M3 | not ported |
 | `finkeys.test.js` | 6 | fins, inside, overhangs, prop, stl, ui/finkeys | M4 | not ported |
 | `fins.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `floating.test.js` | 5 | fins, inside, overhangs, pieces, prop, stl | M3 | not ported |
+| `floating.test.js` | 5 | fins, inside, overhangs, pieces, prop, stl | M3 | green |
 | `footprint.test.js` | 15 | inside, overhangs, stl, ui/footprint | M4 | not ported |
-| `free_edge.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `free_edge.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
 | `glfail.test.js` | 1 | inside, overhangs, stl, ui/glfail | — | dropped (web-only) |
 | `glguard.test.js` | 2 | inside, overhangs, stl, ui/glguard | — | dropped (web-only) |
 | `golden.test.js` | 2 | draw, fins | M3 | green |
@@ -48,9 +48,9 @@ Web-only rows:
 | `interface.test.js` | 9 | cutout, draw, fins, inside, overhangs, prop, prop/crest, stl, threemf | M3 | not ported |
 | `islands.test.js` | 11 | fins, fins/fill, inside, islands, overhangs, prop, stl | M3 | not ported |
 | `kiss.test.js` | 4 | fins/wedges, inside, kiss, overhangs, planes, stl | M3 | green |
-| `lattice.test.js` | 2 | fins, inside, overhangs, prop, prop/lattice, stl | M3 | not ported |
-| `layout_pins.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `low_edge.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `lattice.test.js` | 2 | fins, inside, overhangs, prop, prop/lattice, stl | M3 | green |
+| `layout_pins.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green |
+| `low_edge.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | green |
 | `must_class.test.js` | 4 | fins/coverage, inside, overhangs, stl | M2 | green |
 | `navpresets.test.js` | 5 | inside, overhangs, stl, ui/navpresets | M4 | not ported |
 | `nearface.test.js` | 2 | inside, overhangs, prop/nearface, stl | M1 | green |
