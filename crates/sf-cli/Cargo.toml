@@ -15,5 +15,8 @@ path = "src/main.rs"
 sf-engine.workspace = true
 sf-io.workspace = true
 
+[dev-dependencies]
+sf-testkit.workspace = true
+
 [lints]
 workspace = true

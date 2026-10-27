@@ -43,3 +43,8 @@ js-test file="":
     else
         deno test -A tests/
     fi
+
+# The `support-fins` binary against the JS command line on the same inputs: exit code, stdout, stderr and every output file, byte for byte.
+cli-parity filter="":
+    cargo build --release -p sf-cli
+    deno run --allow-read --allow-write --allow-run --allow-env parity/cli/cli_parity.js target/release/support-fins {{filter}}
