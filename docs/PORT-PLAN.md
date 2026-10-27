@@ -26,7 +26,7 @@ from it one milestone at a time; this file stays the source of truth for *why*.
 | STEP | Native **OpenCascade**, pinned to the version occt-import-js 0.0.23 was built from, same tessellation parameters. |
 | Booleans | **Manifold 3.5.4** (the vendored version) through its official C API (`manifoldc`) via `bindgen`. |
 | Integrations | Ship a Rust **CLI** with the same flags as `plugins/cli` (generated from `options.json`). Host plugins (Blender, Fusion, …) stay on the JS engine. |
-| Upstream | Port against the pin; at **every milestone boundary**, diff `web/` + `tests/` since the pin, port the changes, move the pin (`UPSTREAM` file). |
+| Upstream | **Frozen at `299ef49` until full feature parity (M7).** Decided by the user on 2026-10-27: no milestone-boundary catch-ups until then, so the first goal isn't a moving target. After parity, catch up in one pass, then at each later milestone. The JS checkout must stay at the `UPSTREAM` commit. |
 | Process | From M3 on, **two** Sonnet 5.5 (medium) agents (four in M0–M2; reduced 2026-10-27 to stay within usage limits) write the code in their own worktrees and open PRs. The orchestrator writes briefs, reviews, merges. Two failed reviews on one ticket → re-assigned to Opus, and the user is alerted. All four work within a milestone; the orchestrator stops at each milestone for the user's go-ahead. |
 | Reporting | Written report at every milestone (landed, parity, perf vs JS, known gaps). Demo build at the major ones: **M3** engine done, **M4** app usable, **M7** full parity. |
 
@@ -188,7 +188,7 @@ which Rust code has to follow.
 
 ## 5. Milestones
 
-Each milestone ends with a stop: a written report, the user's go-ahead, then upstream catch-up.
+Each milestone ends with a stop: a written report, then the user's go-ahead. Upstream catch-ups are paused until M7 (see §1).
 Tracks **A–D** are the four agents. Agents rotate between tracks; the track is the work, not the agent.
 
 **The maths comes first.** M0–M3 are engine-only: all four agents port maths, file formats
@@ -294,7 +294,7 @@ V8 bit for bit through the parity replay. The `overhangs.js` cases are recorded.
 - A pass over the menu bar, keyboard shortcuts and trackpad gestures.
 - **Demo:** side by side with the web app on your own parts.
 
-Upstream catch-up also runs between every pair of milestones.
+Upstream catch-ups are paused until full parity (M7). After that, one catch-up pass brings in everything that changed upstream.
 
 ---
 
