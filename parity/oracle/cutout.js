@@ -55,7 +55,7 @@ const cap = await captureModules(
     { rel: 'prop/resinfoot.js', fns: ['windowedFlange'] },
   ],
   {
-    cap: 60,
+    cap: 1e9, // keep every call: the picks below are made here, not by the sampler
     copy: ['tests/_util.js', 'tests/_scene.js', 'prototype/stress/models/'],
     args: {
       cutWall: recordOut('cutWall', 2, [0, 1], [3]),
@@ -247,22 +247,23 @@ try {
 
   // --- patch cutWall / windowedFlange outs with what they pushed, then write ---------------------
   const flat = (tris) => Float64Array.from(tris.flat());
+  const calls = Object.fromEntries(Object.entries(cap.sink.calls).map(([k, v]) => [k, v.entries()]));
   for (const name of ['cutWall', 'windowedFlange']) {
-    for (const e of cap.sink.calls[name]) {
+    for (const e of calls[name]) {
       const rec = recs.get(`${name}:${e.scene}#${e.n}`);
       if (!rec) throw new Error(`no recorded out for ${name} ${e.scene}#${e.n}`);
       e.out = { ret: e.out, tris: encode(flat(rec)) };
     }
   }
-  const counts = Object.fromEntries(Object.entries(cap.sink.calls).map(([k, v]) => [k, v.length]));
+  const counts = Object.fromEntries(Object.entries(calls).map(([k, v]) => [k, v.length]));
   // Evenly spaced picks across the whole run (direct cases first, golden-scene builds last), so
   // the thinned corpus still holds every kind; `thin()` would keep only the first ones.
   const spread = (calls, n) => (calls.length <= n ? calls : Array.from({ length: n }, (_, i) => calls[Math.floor((i * calls.length) / n)]));
-  const out = (calls, n) => ({ cap: Infinity, calls });
-  flush('cutout', out({ holesFor: spread(cap.sink.calls.holesFor, 500) }));
-  flush('cutout', out({ honeycombHoles: spread(cap.sink.calls.honeycombHoles, 80) }));
-  flush('cutout', out({ cutWall: spread(cap.sink.calls.cutWall, 60) }));
-  flush('resinfoot', out({ windowedFlange: spread(cap.sink.calls.windowedFlange, 40) }));
+  const out = (picked) => ({ calls: Object.fromEntries(Object.entries(picked).map(([k, v]) => [k, { entries: () => v }])) });
+  flush('cutout', out({ holesFor: spread(calls.holesFor, 500) }));
+  flush('cutout', out({ honeycombHoles: spread(calls.honeycombHoles, 80) }));
+  flush('cutout', out({ cutWall: spread(calls.cutWall, 60) }));
+  flush('resinfoot', out({ windowedFlange: spread(calls.windowedFlange, 40) }));
   console.log('cutout: captured', JSON.stringify(counts));
 } finally {
   cap.cleanup();
