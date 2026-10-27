@@ -1,0 +1,94 @@
+# The source of truth for the Xcode project (`just app-project` generates app/SupportFins.xcodeproj, which is
+# git-ignored). The viewer and SupportFinsCore (track D, `just app-core` builds its XCFramework) are local packages.
+name: SupportFins
+options:
+  bundleIdPrefix: com.storskegg
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  xcodeVersion: "27.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    ARCHS: arm64            # this Mac only: the XCFramework is aarch64-apple-darwin
+    ONLY_ACTIVE_ARCH: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+packages:
+  Viewer:
+    path: SupportFinsViewer
+  SupportFinsCore:
+    path: SupportFinsCore
+targets:
+  SupportFins:
+    type: application
+    platform: macOS
+    sources:
+      - SupportFins
+    dependencies:
+      - package: Viewer
+        product: Viewer
+      - package: SupportFinsCore
+        product: SupportFinsCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFins
+        PRODUCT_NAME: Support Fins
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Support Fins
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
+        INFOPLIST_KEY_NSHumanReadableCopyright: MIT
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: SupportFins/SupportFins.entitlements
+    info:
+      path: SupportFins/Info.plist
+      properties:
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: STL model
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.standard-tesselated-geometry-format]
+          - CFBundleTypeName: OBJ model
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.geometry-definition-format]
+          - CFBundleTypeName: 3MF model
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.storskegg.supportfins.3mf]
+            CFBundleTypeExtensions: ["3mf"]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: com.storskegg.supportfins.3mf
+            UTTypeDescription: 3MF model
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: ["3mf"]
+              public.mime-type: ["model/3mf"]
+  SupportFinsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - SupportFinsTests
+    dependencies:
+      - target: SupportFins
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFinsTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Support Fins.app/Contents/MacOS/Support Fins"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  SupportFins:
+    build:
+      targets:
+        SupportFins: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [SupportFinsTests]
+    profile:
+      config: Release
