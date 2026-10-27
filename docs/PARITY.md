@@ -107,3 +107,12 @@ Recorder API: `captureModules([{rel, fns}], {refs: true, config: {fn: ['PROP', .
 A function listed in `config` gets **one extra trailing argument**, `{"$config": {...}}`, snapshotted at
 call time. Its replay strips that argument and builds the `&Config` (the last parameter, per the type
 mapping) with `sf_testkit::parity::config(..)`.
+
+## Recording what a call leaves in `out`
+
+Functions that push onto, compact or truncate a caller's `out` array (`sweep`, `dropCollapsed`,
+`buildSquatBed`, …) are recorded by wrapping `out` in a `Proxy` for the call. The case records
+`out.length` at entry (the absolute indices, such as `triRange`, depend on it) and the slice
+`out[from..]` as it stands after the call, which covers in-place compaction and a rejected wall's
+truncation. The replay seeds a Rust `out` of the same length, calls the function, and compares the same
+slice. `capture.js`'s `opts.pushes` does this for captured calls.
