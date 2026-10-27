@@ -60,7 +60,7 @@ Web-only rows:
 | `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | green |
 | `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | green (js_pad.rs: the `buildPad` ones; js_pad_fins.rs: the rest) |
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | green |
-| `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_patches.rs) |
 | `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | green (js_perp_hole.rs) |
 | `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | not ported |
 | `plate_only.test.js` | 4 | draw, fins, inside, overhangs, prop, stl | M3 | green |
@@ -71,7 +71,7 @@ Web-only rows:
 | `rounded_feet.test.js` | 7 | fins, finworker, inside, nozzle, overhangs, prop, solids, stl, threemf | M3 | not ported |
 | `rows.test.js` | 7 | fins, fins/field, fins/rows, inside, overhangs, prop, stl | M3 | green |
 | `scale.test.js` | 3 | inside, overhangs, scale, stl | M1 | green |
-| `separate_walls.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `separate_walls.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_separate_walls.rs) |
 | `session.test.js` | 3 | draw, inside, overhangs, stl, threemf, zip | M3 | green |
 | `short_walls.test.js` | 4 | fins, inside, overhangs, prop, prop/clearance, stl | M3 | green |
 | `small_holes.test.js` | 10 | fins, fins/coverage, inside, overhangs, planes, prop, stl | M3 | not ported |
@@ -82,7 +82,7 @@ Web-only rows:
 | `step.test.js` | 6 | fins, inside, overhangs, prop, step, stl | M6 | not ported |
 | `stl.test.js` | 6 | inside, overhangs, stl | M1 | green |
 | `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | not ported |
-| `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green (js_supports.rs) |
 | `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | green |
 | `sway.test.js` | 19 | fins, inside, overhangs, prop, stl, sway | M3 | green (js_sway.rs) |
 | `sway_clearance.test.js` | 2 | inside, overhangs, stl, sway | M3 | green |
@@ -98,8 +98,8 @@ Web-only rows:
 | `tines.test.js` | 9 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `tines_realparts.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `trace.test.js` | 1 | inside, overhangs, prop/config, prop/downhill, prop/trace, stl | M1 | green |
-| `tunables.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | not ported |
-| `unserved.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
+| `tunables.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | green (js_tunables.rs) |
+| `unserved.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_unserved.rs) |
 | `viewpresets.test.js` | 7 | inside, overhangs, stl, ui/viewpresets | M4 | not ported |
 | `wedge_clear.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green |
 | `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
