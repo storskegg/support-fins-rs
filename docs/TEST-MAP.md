@@ -68,14 +68,14 @@ Web-only rows:
 | `raster.test.js` | 4 | fins, inside, overhangs, prop, prop/raster, stl | M3 | green (js_raster.rs) |
 | `resinfoot.test.js` | 3 | fins, inside, overhangs, prop, prop/resinfoot, stl | M3 | green (js_resinfoot.rs) |
 | `rim.test.js` | 5 | fins, inside, overhangs, prop, prop/rim, stl | M3 | green (js_rim.rs) |
-| `rounded_feet.test.js` | 7 | fins, finworker, inside, nozzle, overhangs, prop, solids, stl, threemf | M3 | not ported |
+| `rounded_feet.test.js` | 7 | fins, finworker, inside, nozzle, overhangs, prop, solids, stl, threemf | M3 | green (sf-io/tests/js_rounded_feet.rs; finworker is a direct `build_fins` call) |
 | `rows.test.js` | 7 | fins, fins/field, fins/rows, inside, overhangs, prop, stl | M3 | green |
 | `scale.test.js` | 3 | inside, overhangs, scale, stl | M1 | green |
 | `separate_walls.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_separate_walls.rs) |
 | `session.test.js` | 3 | draw, inside, overhangs, stl, threemf, zip | M3 | green |
 | `short_walls.test.js` | 4 | fins, inside, overhangs, prop, prop/clearance, stl | M3 | green |
-| `small_holes.test.js` | 10 | fins, fins/coverage, inside, overhangs, planes, prop, stl | M3 | not ported |
-| `small_holes_i18n.test.js` | 1 |  | M3 | not ported |
+| `small_holes.test.js` | 10 | fins, fins/coverage, inside, overhangs, planes, prop, stl | M3 | green (sf-cli/tests/js_small_holes.rs; goes through `computeFins`, `drawWall`) |
+| `small_holes_i18n.test.js` | 1 |  | M7 | deferred: checks the page's `web/i18n/*.js` dictionaries, which arrive with the M7 UI/i18n work (like the locale case of report.test.js) |
 | `small_tubes.test.js` | 3 | fins, inside, overhangs, prop, prop/raster, stl | M3 | green (js_small_tubes.rs) |
 | `squat.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | green (js_squat.rs) |
 | `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | green |
