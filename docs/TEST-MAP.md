@@ -103,5 +103,5 @@ Web-only rows:
 | `viewpresets.test.js` | 7 | inside, overhangs, stl, ui/viewpresets | M4 | not ported |
 | `wedge_clear.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | not ported |
 | `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
-| `part_wall_ends.test.js` | 1 | prop/attached | M3 (catch-up to 299ef49) | not ported |
+| `part_wall_ends.test.js` | 1 | prop/attached | M3 (catch-up to 299ef49) | green |
 | `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | not ported |
