@@ -3,43 +3,31 @@
 use sf_engine::fins::build::*;
 use sf_engine::fins::seating::{Seating, SeatingKind};
 use sf_engine::planes::PatchStats;
-use sf_engine::prop::build::Skipped;
 
 fn empty() -> FinsBuilt {
-    FinsBuilt {
-        triangles: vec![],
-        pad_triangles: vec![],
-        pad: None,
-        mode: "prop".into(),
-        fins: vec![],
-        props: vec![],
-        volume: 0.0,
-        skipped: Skipped::default(),
-        rejected: Rejected::default(),
-        patch_count: 0,
-        patch_stats: PatchStats::default(),
-        tines: 0,
-        served_regions: vec![],
-        unserved: 0.0,
-        sag_risk: false,
-        seating: Seating {
-            kind: SeatingKind::Face,
-            span: 0.0,
-            bed_area: 0.0,
-        },
-        tip: None,
-        brace_count: None,
-        prop_count: None,
-        fill: None,
-        curved_fill: None,
-        curved_dropped: false,
-        sway: None,
-        small_hole_regions: 0,
-        small_hole_mask: None,
-        tall_ribs: None,
-        floating: vec![],
-        bare: None,
-    }
+    FinsBuilt::empty(Seating {
+        kind: SeatingKind::Face,
+        span: 0.0,
+        bed_area: 0.0,
+    })
+}
+
+#[test]
+fn empty_is_a_part_that_got_no_walls() {
+    let b = empty();
+    assert_eq!(b.mode, "prop");
+    assert!(b.triangles.is_empty() && b.pad_triangles.is_empty() && b.fins.is_empty());
+    assert!(b.props.is_empty() && b.pad.is_none() && b.served_regions.is_empty());
+    assert_eq!(
+        (b.tines, b.patch_count, b.unserved, b.volume),
+        (0, 0, 0.0, 0.0)
+    );
+    assert_eq!(b.rejected, Rejected::default());
+    assert_eq!(b.patch_stats, PatchStats::default());
+    assert!(!b.sag_risk && b.tip.is_none());
+    // the keys only a later stage writes are still absent
+    assert!(b.brace_count.is_none() && b.prop_count.is_none() && b.fill.is_none());
+    assert!(b.sway.is_none() && b.tall_ribs.is_none() && b.bare.is_none() && !b.curved_dropped);
 }
 
 #[test]
