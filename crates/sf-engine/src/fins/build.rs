@@ -217,3 +217,43 @@ pub struct FinsBuilt {
     pub floating: Vec<FloatingPiece>,
     pub bare: Option<Bare>,
 }
+
+impl FinsBuilt {
+    /// A `built` as `buildFinsCore`'s prop-mode return has it before any pass touches it, for a
+    /// part that got no walls (`noProps()`, web/prop.js:99-105, through the return at
+    /// web/fins.js:447-476): no triangles, `mode: 'prop'`, every counter 0, `rejected` and
+    /// `patchStats` zeroed, `tip: null`, and none of the keys a later stage adds (`braceCount`,
+    /// `fill`, `sway`, `tallRibs`, `bare`, ...). `seating` is the one value it cannot invent.
+    pub fn empty(seating: Seating) -> FinsBuilt {
+        FinsBuilt {
+            triangles: Vec::new(),
+            pad_triangles: Vec::new(),
+            pad: None,
+            mode: "prop".to_string(),
+            fins: Vec::new(),
+            props: Vec::new(),
+            volume: 0.0,
+            skipped: Skipped::default(),
+            rejected: Rejected::default(),
+            patch_count: 0,
+            patch_stats: PatchStats::default(),
+            tines: 0,
+            served_regions: Vec::new(),
+            unserved: 0.0,
+            sag_risk: false,
+            seating,
+            tip: None,
+            brace_count: None,
+            prop_count: None,
+            fill: None,
+            curved_fill: None,
+            curved_dropped: false,
+            sway: None,
+            small_hole_regions: 0,
+            small_hole_mask: None,
+            tall_ribs: None,
+            floating: Vec::new(),
+            bare: None,
+        }
+    }
+}
