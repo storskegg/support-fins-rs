@@ -10,6 +10,7 @@ struct FinsToggle: View {
                isOn: Binding(get: { session.finsOn }, set: { on in session.perform(on ? "Add Fins" : "Remove Fins") { session.finsOn = on } }))
             .toggleStyle(.button)
             .help("Build the supports for this pose")
+            .accessibilityIdentifier("fins-toggle")
     }
 }
 
@@ -30,5 +31,6 @@ struct BuildSpinner: View {
         .allowsHitTesting(false)
         .transition(.opacity)
         .accessibilityLabel("Generating supports")
+        .accessibilityIdentifier("build-spinner")
     }
 }

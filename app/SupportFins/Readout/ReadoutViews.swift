@@ -26,6 +26,7 @@ struct StatsCard: View {
             LabeledContent("Fins") {
                 HStack(spacing: 4) {
                     Text(fins?.fins ?? "—").foregroundStyle(fins?.finsWarn == true ? Color.orange : Color.primary)
+                        .accessibilityIdentifier("stat-fins")
                     if let info = fins?.info, !info.isEmpty {
                         Button { showFinInfo.toggle() } label: { Image(systemName: "info.circle") }
                             .buttonStyle(.plain)

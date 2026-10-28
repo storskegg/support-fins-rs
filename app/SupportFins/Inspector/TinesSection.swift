@@ -19,6 +19,7 @@ struct TinesSection: View {
                     HStack {
                         Text(settings.pins ? "fewer" : "light").font(.caption).foregroundStyle(.secondary)
                         Slider(value: $settings.tineDensity, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
+                            .accessibilityIdentifier("tine-density")
                         Text(settings.pins ? "more" : "firm").font(.caption).foregroundStyle(.secondary)
                     }
                 }

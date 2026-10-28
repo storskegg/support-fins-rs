@@ -34,6 +34,7 @@ struct ExportMenu: View {
     var body: some View {
         Menu("Export", systemImage: "square.and.arrow.up") { ExportItems(model: model) }
             .disabled(model == nil)
+            .accessibilityIdentifier("export-menu")
     }
 }
 

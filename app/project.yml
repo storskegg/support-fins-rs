@@ -80,6 +80,18 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Support Fins.app/Contents/MacOS/Support Fins"
         BUNDLE_LOADER: "$(TEST_HOST)"
+  SupportFinsUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - SupportFinsUITests
+    dependencies:
+      - target: SupportFins
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFinsUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: SupportFins
 schemes:
   SupportFins:
     build:
@@ -92,3 +104,12 @@ schemes:
       targets: [SupportFinsTests]
     profile:
       config: Release
+  # The UI tests drive the real window: `just app-uitest` (needs the Mac's Accessibility permission for Xcode's
+  # test runner). They are not part of `just app-test`.
+  SupportFinsUI:
+    build:
+      targets:
+        SupportFins: all
+    test:
+      config: Debug
+      targets: [SupportFinsUITests]
