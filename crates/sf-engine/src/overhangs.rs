@@ -257,6 +257,18 @@ pub fn build_topology_serial(pos: Vec<f64>) -> Topology {
 /// `analyze(topo, thresholdDeg, rot)` (web/overhangs.js:171-244). JS defaults:
 /// `thresholdDeg = DEFAULT_THRESHOLD`, `rot = IDENTITY3`; callers pass them explicitly.
 pub fn analyze(topo: &Topology, threshold_deg: f64, rot: &Rot3) -> Analysis {
+    analyze_with(
+        topo,
+        threshold_deg,
+        rot,
+        topo.n_faces >= crate::weld::PAR_MIN_FACES,
+    )
+}
+
+/// `analyze`, with the per-vertex and per-face passes on all cores (`par`) or on this thread. The two
+/// give the same `Analysis` bit for bit (`par` is only a speed choice; the tests force both).
+#[doc(hidden)]
+pub fn analyze_with(topo: &Topology, threshold_deg: f64, rot: &Rot3, par: bool) -> Analysis {
     let pos = &topo.pos;
     let n_faces = topo.n_faces;
     let nrm = &topo.nrm;
@@ -266,39 +278,81 @@ pub fn analyze(topo: &Topology, threshold_deg: f64, rot: &Rot3) -> Analysis {
     let cut = -(jsnum::cos((threshold_deg * std::f64::consts::PI) / 180.0) + ANGLE_EPS);
 
     let mut zr = vec![0.0f64; n_faces * 3];
-    let mut min_x = f64::INFINITY;
-    let mut max_x = f64::NEG_INFINITY;
-    let mut min_y = f64::INFINITY;
-    let mut max_y = f64::NEG_INFINITY;
-    let mut min_z = f64::INFINITY;
-    let mut max_z = f64::NEG_INFINITY;
+    let (mut min_x, mut max_x) = (f64::INFINITY, f64::NEG_INFINITY);
+    let (mut min_y, mut max_y) = (f64::INFINITY, f64::NEG_INFINITY);
+    let (mut min_z, mut max_z) = (f64::INFINITY, f64::NEG_INFINITY);
 
-    let mut p = 0;
-    for v in 0..n_faces * 3 {
-        let (x, y, z) = (pos[p], pos[p + 1], pos[p + 2]);
-        let xr = rot[0] * x + rot[3] * y + rot[6] * z;
-        let yr = rot[1] * x + rot[4] * y + rot[7] * z;
-        let zz = rot[2] * x + rot[5] * y + rot[8] * z;
-        zr[v] = zz;
-        if xr < min_x {
-            min_x = xr;
+    if par {
+        // Pieces of the vertex list rotate and bound on their own, then the bounds are combined
+        // left to right with the same strict `<` / `>` the loop below uses, so a tie (+0 against
+        // -0) keeps the earlier vertex's value exactly as the serial scan does.
+        use rayon::prelude::*;
+        const CH: usize = 1 << 14;
+        type Bounds = ([f64; 3], [f64; 3]);
+        let (lo, hi): Bounds = zr
+            .par_chunks_mut(CH)
+            .zip(pos.par_chunks(CH * 3))
+            .map(|(zc, pc)| {
+                let mut lo = [f64::INFINITY; 3];
+                let mut hi = [f64::NEG_INFINITY; 3];
+                for (z, p) in zc.iter_mut().zip(pc.as_chunks::<3>().0) {
+                    let (x, y, zv) = (p[0], p[1], p[2]);
+                    let r = [
+                        rot[0] * x + rot[3] * y + rot[6] * zv,
+                        rot[1] * x + rot[4] * y + rot[7] * zv,
+                        rot[2] * x + rot[5] * y + rot[8] * zv,
+                    ];
+                    *z = r[2];
+                    for k in 0..3 {
+                        if r[k] < lo[k] {
+                            lo[k] = r[k];
+                        }
+                        if r[k] > hi[k] {
+                            hi[k] = r[k];
+                        }
+                    }
+                }
+                (lo, hi)
+            })
+            .reduce(
+                || ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]),
+                |(l1, h1): Bounds, (l2, h2): Bounds| {
+                    (
+                        std::array::from_fn(|k| if l2[k] < l1[k] { l2[k] } else { l1[k] }),
+                        std::array::from_fn(|k| if h2[k] > h1[k] { h2[k] } else { h1[k] }),
+                    )
+                },
+            );
+        (min_x, min_y, min_z) = (lo[0], lo[1], lo[2]);
+        (max_x, max_y, max_z) = (hi[0], hi[1], hi[2]);
+    } else {
+        let mut p = 0;
+        for v in 0..n_faces * 3 {
+            let (x, y, z) = (pos[p], pos[p + 1], pos[p + 2]);
+            let xr = rot[0] * x + rot[3] * y + rot[6] * z;
+            let yr = rot[1] * x + rot[4] * y + rot[7] * z;
+            let zz = rot[2] * x + rot[5] * y + rot[8] * z;
+            zr[v] = zz;
+            if xr < min_x {
+                min_x = xr;
+            }
+            if xr > max_x {
+                max_x = xr;
+            }
+            if yr < min_y {
+                min_y = yr;
+            }
+            if yr > max_y {
+                max_y = yr;
+            }
+            if zz < min_z {
+                min_z = zz;
+            }
+            if zz > max_z {
+                max_z = zz;
+            }
+            p += 3;
         }
-        if xr > max_x {
-            max_x = xr;
-        }
-        if yr < min_y {
-            min_y = yr;
-        }
-        if yr > max_y {
-            max_y = yr;
-        }
-        if zz < min_z {
-            min_z = zz;
-        }
-        if zz > max_z {
-            max_z = zz;
-        }
-        p += 3;
     }
 
     let mut on_bed = vec![0u8; n_faces];
@@ -307,18 +361,34 @@ pub fn analyze(topo: &Topology, threshold_deg: f64, rot: &Rot3) -> Analysis {
     let mut over_area = 0.0f64;
     let mut over_face_count = 0usize;
 
-    for f in 0..n_faces {
-        // face height above the plate, after re-seating on the lowest point
+    // face height above the plate, after re-seating on the lowest point; a face on the bed is
+    // not tested for overhang
+    let flags = |f: usize| -> (u8, u8) {
         let h = jsnum::max_of(&[zr[f * 3], zr[f * 3 + 1], zr[f * 3 + 2]]) - min_z;
         if h < BED_EPS {
-            on_bed[f] = 1;
-            bed_area += area[f];
-            continue;
+            return (1, 0);
         }
-
         let nzr = rot[2] * nrm[f * 3] + rot[5] * nrm[f * 3 + 1] + rot[8] * nrm[f * 3 + 2];
-        if nzr < cut {
-            over[f] = 1;
+        (0, (nzr < cut) as u8)
+    };
+    if par {
+        // the flags are per-face and independent; the area sums stay in face order below
+        use rayon::prelude::*;
+        on_bed
+            .par_iter_mut()
+            .zip(over.par_iter_mut())
+            .enumerate()
+            .with_min_len(1 << 12)
+            .for_each(|(f, (b, o))| (*b, *o) = flags(f));
+    } else {
+        for f in 0..n_faces {
+            (on_bed[f], over[f]) = flags(f);
+        }
+    }
+    for f in 0..n_faces {
+        if on_bed[f] == 1 {
+            bed_area += area[f];
+        } else if over[f] == 1 {
             over_area += area[f];
             over_face_count += 1;
         }

@@ -133,3 +133,55 @@ fn stress_models_and_fixtures() {
     }
     assert!(seen > 0, "no stress models found");
 }
+
+fn same_analysis(
+    name: &str,
+    a: &sf_engine::overhangs::Analysis,
+    b: &sf_engine::overhangs::Analysis,
+) {
+    assert_eq!(a, b, "{name}");
+    let bits = |x: f64| x.to_bits();
+    assert_eq!(bits(a.bed_area), bits(b.bed_area), "{name}: bed_area");
+    assert_eq!(bits(a.over_area), bits(b.over_area), "{name}: over_area");
+    for (u, v) in [
+        (a.offset.x, b.offset.x),
+        (a.offset.y, b.offset.y),
+        (a.offset.z, b.offset.z),
+        (a.size.x, b.size.x),
+        (a.size.y, b.size.y),
+        (a.size.z, b.size.z),
+    ] {
+        assert_eq!(bits(u), bits(v), "{name}: offset/size");
+    }
+    for (r, s) in a.regions.iter().zip(&b.regions) {
+        assert_eq!(bits(r.area), bits(s.area), "{name}: region area");
+    }
+}
+
+/// `analyze` on all cores equals `analyze` on one, for rotations that put zeros of both signs among
+/// the bounds (axis turns, flips) and general ones.
+#[test]
+fn analyze_parallel_matches_serial() {
+    use sf_engine::overhangs::analyze_with;
+    let topo = build_topology_serial(torus(300, 200));
+    let mut rots: Vec<[f64; 9]> = vec![
+        [1., 0., 0., 0., 1., 0., 0., 0., 1.],
+        [1., 0., 0., 0., 0., 1., 0., -1., 0.],
+        [0., -1., 0., 1., 0., 0., 0., 0., 1.],
+        [-1., 0., 0., 0., 1., 0., 0., 0., -1.],
+        [1., 0., 0., 0., -1., 0., 0., 0., -1.],
+    ];
+    let mut r = Lcg(5);
+    for _ in 0..6 {
+        let (a, b) = (r.next() as f64 / 1e9, r.next() as f64 / 1e9);
+        let (ca, sa, cb, sb) = (a.cos(), a.sin(), b.cos(), b.sin());
+        rots.push([cb, 0., sb, sa * sb, ca, -sa * cb, -ca * sb, sa, ca * cb]);
+    }
+    for (i, rot) in rots.iter().enumerate() {
+        for thr in [45.0, 30.0] {
+            let s = analyze_with(&topo, thr, rot, false);
+            let p = analyze_with(&topo, thr, rot, true);
+            same_analysis(&format!("rot {i}, threshold {thr}"), &s, &p);
+        }
+    }
+}
