@@ -300,6 +300,7 @@ fn each_leftover_point(
         only
     });
     for f in 0..topo.n_faces {
+        cfg.cancel.check();
         if result.analysis.over[f] == 0 || cls[f] != MUST || only.as_ref().is_some_and(|o| !o[f]) {
             continue;
         }
@@ -1307,6 +1308,7 @@ fn brace_fill(
         RefCell::new((0..props.len()).map(|_| None).collect());
     let mut n = 0;
     for k in 0..props.len() {
+        cfg.cancel.check();
         let Some(floor) = &floors[k] else { continue };
         let mut out: Vec<V4> = Vec::new();
         let built = {
@@ -1854,6 +1856,7 @@ impl Fill<'_> {
     /// group gets a try.
     fn wall_for(&mut self, live: &[Pt], g: &[usize], local: bool, ctx: &mut BuildCtx) -> WallRes {
         let cfg = self.cfg;
+        cfg.cancel.check();
         let red_pts: Vec<Pt> = g.iter().map(|&i| live[i]).collect();
         let red_at = RedGrid::new(&red_pts, cfg);
         let mut st = WallState {

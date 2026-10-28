@@ -268,6 +268,7 @@ pub fn brace_tall_walls(
     let grid = RefCell::new(grid);
     let mut total = 0usize;
     for k in tall {
+        cfg.cancel.check();
         let f = &built.fins[k];
         // braceWall takes the part's surface: Auto's lines sit the gap under it, the fill
         // pass's (drawnWall's `top`) are the surface itself

@@ -1488,6 +1488,7 @@ pub fn build_sway_braces(
     };
     let mut faces: Vec<&Cand> = Vec::new();
     for c in &cands {
+        cfg.cancel.check();
         if faces.len() as f64 >= sw.max_faces {
             break;
         }
@@ -1504,6 +1505,7 @@ pub fn build_sway_braces(
     let mut out: Vec<V4> = Vec::new();
     let (mut tines, mut skipped) = (0usize, 0usize);
     for c in &faces {
+        cfg.cancel.check();
         let p = &c.p;
         for u in columns_for(p, cfg) {
             let mut placed: Option<SwayRib> = None;

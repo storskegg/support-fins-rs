@@ -573,6 +573,7 @@ pub(crate) fn build_pass(
     ctx: &BuildCtx,
 ) -> PropsPass {
     let cfg = ctx.cfg;
+    cfg.cancel.check();
     let prop = &cfg.prop;
     let pos = &topo.pos;
     let step = opts.step.unwrap_or(prop.station_step);
@@ -656,6 +657,7 @@ pub(crate) fn build_pass(
     // absence of output recorded as success is exactly how M5's scoreboard lied.
     let mut patches: Vec<Patch> = Vec::new();
     for ri in 0..result.regions.len() {
+        cfg.cancel.check();
         if only.is_some_and(|o| !o.contains(&ri)) {
             continue;
         }
@@ -920,6 +922,7 @@ pub(crate) fn build_pass(
     let mut rims: IndexMap<usize, Vec<Vec<[f64; 3]>>> = IndexMap::new(); // region -> its rim tracks (prop/rim.js)
     let mut pi = 0;
     while pi < patches.len() {
+        cfg.cancel.check();
         let patch = patches[pi].clone();
         pi += 1;
         let i = pi - 1;
@@ -1044,6 +1047,7 @@ pub(crate) fn build_pass(
         // to `lines` mid-loop (rasterRest).
         let mut li = 0;
         while li < lines.lines.len() {
+            cfg.cancel.check();
             let mut line = lines.lines[li].pts.clone();
             let line_rim = lines.lines[li].rim;
             li += 1;
@@ -1121,6 +1125,7 @@ fn place_line(
     z_bed: f64,
 ) {
     let (topo, rot, off, cfg, ctx) = (env.topo, env.rot, env.off, env.cfg, env.ctx);
+    cfg.cancel.check();
     let prop = &cfg.prop;
     // PART-ATTACHED first: if solid part sits below this overhang, a support must stand on THAT
     // floor, not stilt to the plate through the part (the bug Matthew hit on a real hub).
@@ -1346,6 +1351,7 @@ fn place_line(
     let mut reason: Option<&str> = None;
     let mut tries = 0;
     while tries < 4 && !placed {
+        cfg.cancel.check();
         tries += 1;
         let run2 = longest_run(&with_low_tails(&tall_a, &low_a));
         let Some(run2) = run2.filter(|r| ((r[1] - r[0]) as f64) >= prop.min_stations) else {
@@ -1523,11 +1529,13 @@ pub fn build_props(
     ctx: &BuildCtx,
 ) -> PropsPass {
     let cfg = ctx.cfg;
+    cfg.cancel.check();
     let judge_cache = JudgeCache::default();
     let circular_cache = CircularCache::new();
     let mut o = opts.clone();
     o.circular_frames = Some(circular_regions(topo, result, rot, &circular_cache, cfg));
     let opts = &o;
+    cfg.cancel.check();
     let cap_from = ctx.cap_len().unwrap_or(0); // tests' tine capture: see withRaster
     // Auto's judge builds with and without downhill walls: everything up to the race the flag gates
     // is the same in both, so the second build replays what the first recorded (fins/downhill.js).
@@ -1648,6 +1656,7 @@ pub fn build_props(
             }
         };
         let base = compute_base();
+        cfg.cancel.check();
         if let BaseMemo::Record(slot @ None) = &mut *ctx.base_memo.borrow_mut() {
             *slot = Some((base.clone(), ctx.tine_cap.borrow().clone()));
         }

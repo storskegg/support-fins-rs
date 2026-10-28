@@ -66,6 +66,7 @@ pub fn station_is_clear(
     offset: &Xyz,
     cfg: &Config,
 ) -> bool {
+    cfg.cancel.check();
     let p = line[k];
     let Some((sx, sy)) = across(line, k) else {
         return true;
@@ -116,6 +117,7 @@ pub fn station_certified(
     offset: &Xyz,
     cfg: &Config,
 ) -> bool {
+    cfg.cancel.check();
     let p = line[k];
     let Some((sx, sy)) = across(line, k) else {
         return true;
