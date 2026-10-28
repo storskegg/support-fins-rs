@@ -147,7 +147,10 @@ fn check(r: &BuildResult, expected: &Json, name: &str) {
         for k in ["tines", "span", "height", "fill", "squat", "rimWall"] {
             assert_eq!(field(g, k), field(w, k), "{what}: {k}");
         }
-        same_opt(g, "id", field(w, "id"), &what);
+        // a fill-pass wall has no id in JS (the FFI writes the engine's placeholder); every other wall's must match
+        if !matches!(field(w, "fill"), Json::Bool(true)) {
+            assert_eq!(field(g, "id"), field(w, "id"), "{what}: id");
+        }
         same_opt(g, "region", field(w, "region"), &what);
         same_opt(g, "inBore", field(w, "inBore"), &what);
     }

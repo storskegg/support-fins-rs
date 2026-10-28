@@ -89,8 +89,8 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   they are empty unless the interface material (`iface`) is on. A `fins` entry is `{ id, kind (prop|wedge|sway), height,
   length, tines, rows, stilt, lean, bearing, span, short, fill, joined, braces?, ribs?, triRanges, line }`;
   `triRanges` are `[from, to)` **vertex** ranges into the `fins()` buffer (what per-fin removal cuts out). A
-  `props` entry is `{ id?, region?, tines, span, height, fill, squat, rimWall, inBore? }`: **a fill-pass wall has no
-  `id` and no `region`** (`PropRecord.region` is an `Option`, #23).
+  `props` entry is `{ id, region?, tines, span, height, fill, squat, rimWall, inBore? }`: **a fill-pass wall has no
+  `region`** (and its `id` is a placeholder: `fill` says so) (`PropRecord.region` is an `Option`, #23).
 - **`export`** writes exactly the bytes `finFile` writes (`sf_cli::cli::output_bytes`, shared with the CLI):
   the path's extension picks STL or 3MF; `options_json` is `{}` or `{ "finsOnly": true }` (an STL of the fins
   mapped back onto the part; like `--fins-only` it refuses a posed build). One part and its build per file; a
