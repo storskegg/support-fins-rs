@@ -54,13 +54,15 @@ final class FakeDriver: BuildDriving {
     private(set) var generation: UInt64 = 0
     private(set) var calls: [String] = []
     private(set) var requests: [(rotation: [Double], options: String)] = []
+    private(set) var tunables: [String] = []
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    func build(rotation: [Double], optionsJSON: String) -> UInt64 {
+    func build(rotation: [Double], optionsJSON: String, tunablesJSON: String) -> UInt64 {
         generation += 1
         building = true
         calls.append("build")
         requests.append((rotation, optionsJSON))
+        tunables.append(tunablesJSON)
         return generation
     }
     func cancel() { calls.append("cancel"); finish() }
@@ -94,6 +96,16 @@ struct BuildControllerTests {
     }
 
     final class Box { var options = "{}"; var reads = 0 }
+
+    @Test func aBuildCarriesTheSettingsTunablesAsWellAsTheirOptions() {
+        var s = FinSettings()
+        s.gap = 0.3
+        s.interfaceMaterial = .flat
+        let (c, d, _, _) = rig(request: { BuildRequest(rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], settings: s) })
+        c.setEnabled(true)
+        #expect(d.requests.first?.options == s.optionsJSON() && d.tunables.first == s.tunablesJSON())
+        #expect(d.tunables.first?.contains(#""propGap":0.3"#) == true && d.tunables.first?.contains(#""iface":"flat""#) == true)
+    }
 
     @Test func theDelaysAreTheWebs() {
         #expect(BuildController.debounce == .milliseconds(180))      // ui/settings.js:154

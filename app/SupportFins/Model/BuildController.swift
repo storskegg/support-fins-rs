@@ -5,11 +5,17 @@ import Observation
 struct BuildRequest: Equatable, Sendable {
     var rotation: [Double]
     var optionsJSON: String
+    /// The page's `tunables` (`FinSettings.tunablesJSON()`); `{}` for none.
+    var tunablesJSON: String
 
-    init(rotation: [Double], optionsJSON: String) { (self.rotation, self.optionsJSON) = (rotation, optionsJSON) }
+    init(rotation: [Double], optionsJSON: String, tunablesJSON: String = "{}") {
+        (self.rotation, self.optionsJSON, self.tunablesJSON) = (rotation, optionsJSON, tunablesJSON)
+    }
 
     /// The request for a pose and the inspector's settings.
-    init(rotation: [Double], settings: FinSettings) { self.init(rotation: rotation, optionsJSON: settings.optionsJSON()) }
+    init(rotation: [Double], settings: FinSettings) {
+        self.init(rotation: rotation, optionsJSON: settings.optionsJSON(), tunablesJSON: settings.tunablesJSON())
+    }
 }
 
 /// The part of `BuildModel` the scheduler drives (a fake stands in for it in tests).
@@ -17,7 +23,7 @@ struct BuildRequest: Equatable, Sendable {
 protocol BuildDriving: AnyObject {
     var building: Bool { get }
     var generation: UInt64 { get }
-    @discardableResult func build(rotation: [Double], optionsJSON: String) -> UInt64
+    @discardableResult func build(rotation: [Double], optionsJSON: String, tunablesJSON: String) -> UInt64
     func cancel()
     func clear()
     func settled() async
@@ -99,7 +105,7 @@ final class BuildController {
             driver.clear()
             return
         }
-        let g = driver.build(rotation: req.rotation, optionsJSON: req.optionsJSON)
+        let g = driver.build(rotation: req.rotation, optionsJSON: req.optionsJSON, tunablesJSON: req.tunablesJSON)
         armSpinner(for: g)
     }
 
