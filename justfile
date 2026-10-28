@@ -101,6 +101,11 @@ app-test: app-core app-project
 app-uitest: app-core app-project
     xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
 
+# M5 timing: the Rust fin build per case beside the M3 serial numbers, written into docs/PERF-M5.md (Rust only, no Deno). `just bench-m5 needle` times matching cases and prints only. Skips private-fixtures/ cases when the file is absent.
+bench-m5 filter="":
+    cargo build --release -q -p sf-testkit --example bench_m5
+    target/release/examples/bench_m5 {{filter}}
+
 # M5 load / weld timing: a generated 1.5M-face STL and OBJ (under target/bench-load/, never committed) and the private 3MF when present. Prints a table; `just bench-load stl` runs one input.
 bench-load *inputs:
     cargo build --release -q -p sf-testkit --example bench_load

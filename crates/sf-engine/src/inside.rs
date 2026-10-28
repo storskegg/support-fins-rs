@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use rayon::prelude::*;
+
 use crate::gridsize::grid_dims;
 use crate::jsnum;
 use crate::overhangs::Topology;
@@ -342,6 +344,74 @@ fn dist2(p: [f64; 3], q: [f64; 3]) -> f64 {
     dx * dx + dy * dy + dz * dz
 }
 
+/// Are all of `a`'s vertices on one side of `b`'s plane, and farther from it than `sqrt(best)`
+/// (with a margin much wider than any rounding), or the same the other way round? Then no point of
+/// `a` is within `sqrt(best)` of `b`, `a` cannot cross `b`, and none of the distances `solidClearance`
+/// measures between the two (vertex to triangle, edge to edge) can beat `best`: the pair is skipped
+/// whole. A sliver with no usable plane, or a NaN, answers no.
+fn planes_apart(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3], best: f64) -> bool {
+    fn one_way(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3], reach: f64) -> bool {
+        let (e1x, e1y, e1z) = (b[1][0] - b[0][0], b[1][1] - b[0][1], b[1][2] - b[0][2]);
+        let (e2x, e2y, e2z) = (b[2][0] - b[0][0], b[2][1] - b[0][1], b[2][2] - b[0][2]);
+        let (nx, ny, nz) = (
+            e1y * e2z - e1z * e2y,
+            e1z * e2x - e1x * e2z,
+            e1x * e2y - e1y * e2x,
+        );
+        let nn = nx * nx + ny * ny + nz * nz;
+        // (the normal's length is the sliver's twice-area: use no plane below 1e-9 mm2)
+        if nn.is_nan() || nn <= 1e-18 || !nn.is_finite() {
+            return false;
+        }
+        let need = reach * nn.sqrt();
+        let d =
+            |p: &[f64; 3]| nx * (p[0] - b[0][0]) + ny * (p[1] - b[0][1]) + nz * (p[2] - b[0][2]);
+        let (d0, d1, d2) = (d(&a[0]), d(&a[1]), d(&a[2]));
+        (d0 > need && d1 > need && d2 > need) || (d0 < -need && d1 < -need && d2 < -need)
+    }
+    // a margin of 1e-6 relative (plus 1e-9 mm) on the reach covers the rounding of the dots
+    let reach = best.sqrt() * (1.0 + 1e-6) + 1e-9;
+    reach.is_finite() && (one_way(a, b, reach) || one_way(b, a, reach))
+}
+
+/// One chunk of `solid_clearance`'s walk: the best distance found (`r_max^2` if none), the
+/// closest pair, and whether it ended on a pierce (then `best` is 0 and the pair is the pierce).
+struct Chunk {
+    best: f64,
+    bp: Option<[f64; 3]>,
+    bq: Option<[f64; 3]>,
+    pierced: bool,
+}
+
+/// A solid with fewer triangles than this is walked on the calling thread.
+const PAR_MIN_TRIS: usize = 48;
+/// Chunks a larger solid is cut into (at least `PAR_MIN_CHUNK` triangles each).
+const PAR_CHUNKS: usize = 32;
+const PAR_MIN_CHUNK: usize = 8;
+
+thread_local! {
+    /// The "already measured against this solid triangle" stamps of `solid_clearance`, one per part
+    /// triangle, kept per thread across calls: a stamp is unique to one solid triangle (the counter
+    /// only grows), so stale entries never match and the array is not cleared per call.
+    static SEEN: std::cell::RefCell<(Vec<i32>, i32)> = const { std::cell::RefCell::new((Vec::new(), 0)) };
+}
+
+/// Run `f` with this thread's stamp array (at least `n_faces` long) and a stamp counter with room
+/// for `n_stamps` more. `f` must not call back into `with_seen`.
+fn with_seen<R>(n_faces: usize, n_stamps: usize, f: impl FnOnce(&mut [i32], &mut i32) -> R) -> R {
+    SEEN.with(|cell| {
+        let (seen, stamp) = &mut *cell.borrow_mut();
+        if seen.len() < n_faces {
+            seen.resize(n_faces, 0);
+        }
+        if *stamp as i64 + n_stamps as i64 >= i32::MAX as i64 {
+            seen.iter_mut().for_each(|s| *s = 0);
+            *stamp = 0;
+        }
+        f(seen, stamp)
+    })
+}
+
 /// The exact minimum clearance between an added solid and the part, or `None` if it is at
 /// least `rMax` everywhere.
 ///
@@ -431,154 +501,204 @@ pub fn solid_clearance(
         })
         .collect();
 
-    // Per-call stamp array (see the Divergence note).
-    let mut seen = vec![0i32; topo.n_faces];
-    let mut stamp: i32 = 0;
+    // One chunk of the solid's triangles `[lo, hi)` (vertex indices, a multiple of 3 apart): its
+    // own best, with `best = r_max^2` to start. A pierce ends the chunk (nothing beats zero).
+    let scan = |lo: usize, hi: usize, seen: &mut [i32], stamp: &mut i32| -> Chunk {
+        let mut best = r_max * r_max;
+        let mut bp: Option<[f64; 3]> = None;
+        let mut bq: Option<[f64; 3]> = None;
+        let mut t = lo;
+        while t < hi {
+            *stamp += 1;
+            let a_tri = [mv[t], mv[t + 1], mv[t + 2]];
+            let mut x_lo = f64::INFINITY;
+            let mut x_hi = f64::NEG_INFINITY;
+            let mut y_lo = f64::INFINITY;
+            let mut y_hi = f64::NEG_INFINITY;
+            let mut z_lo = f64::INFINITY;
+            let mut z_hi = f64::NEG_INFINITY;
+            for q in &a_tri {
+                if q[0] < x_lo {
+                    x_lo = q[0];
+                }
+                if q[0] > x_hi {
+                    x_hi = q[0];
+                }
+                if q[1] < y_lo {
+                    y_lo = q[1];
+                }
+                if q[1] > y_hi {
+                    y_hi = q[1];
+                }
+                if q[2] < z_lo {
+                    z_lo = q[2];
+                }
+                if q[2] > z_hi {
+                    z_hi = q[2];
+                }
+            }
+            // the fine grid unless this triangle's box spans more than COARSE_CELLS of
+            // it; then the coarse one (fewer, fuller cells beat a walk of empty ones)
+            let mut g = grid;
+            let mut g_is_coarse = coarse_is_fine;
+            let mut a0 = clamp_idx(jsnum::floor((y_lo - r_max - g.min_y) * g.sy), g.ny);
+            let mut a1 = clamp_idx(jsnum::floor((y_hi + r_max - g.min_y) * g.sy), g.ny);
+            let mut b0 = clamp_idx(jsnum::floor((z_lo - r_max - g.min_z) * g.sz), g.nz);
+            let mut b1 = clamp_idx(jsnum::floor((z_hi + r_max - g.min_z) * g.sz), g.nz);
+            if ((a1 - a0 + 1) * (b1 - b0 + 1)) as f64 > COARSE_CELLS {
+                g = ig.coarse();
+                g_is_coarse = true;
+                a0 = clamp_idx(jsnum::floor((y_lo - r_max - g.min_y) * g.sy), g.ny);
+                a1 = clamp_idx(jsnum::floor((y_hi + r_max - g.min_y) * g.sy), g.ny);
+                b0 = clamp_idx(jsnum::floor((z_lo - r_max - g.min_z) * g.sz), g.nz);
+                b1 = clamp_idx(jsnum::floor((z_hi + r_max - g.min_z) * g.sz), g.nz);
+            }
 
-    let mut best = r_max * r_max;
-    let mut bp: Option<[f64; 3]> = None;
-    let mut bq: Option<[f64; 3]> = None;
-    let mut t = 0;
-    'walls: while t < mv.len() {
-        stamp += 1;
-        let a_tri = [mv[t], mv[t + 1], mv[t + 2]];
-        let mut x_lo = f64::INFINITY;
-        let mut x_hi = f64::NEG_INFINITY;
-        let mut y_lo = f64::INFINITY;
-        let mut y_hi = f64::NEG_INFINITY;
-        let mut z_lo = f64::INFINITY;
-        let mut z_hi = f64::NEG_INFINITY;
-        for q in &a_tri {
-            if q[0] < x_lo {
-                x_lo = q[0];
-            }
-            if q[0] > x_hi {
-                x_hi = q[0];
-            }
-            if q[1] < y_lo {
-                y_lo = q[1];
-            }
-            if q[1] > y_hi {
-                y_hi = q[1];
-            }
-            if q[2] < z_lo {
-                z_lo = q[2];
-            }
-            if q[2] > z_hi {
-                z_hi = q[2];
-            }
-        }
-        // the fine grid unless this triangle's box spans more than COARSE_CELLS of
-        // it; then the coarse one (fewer, fuller cells beat a walk of empty ones)
-        let mut g = grid;
-        let mut g_is_coarse = coarse_is_fine;
-        let mut a0 = clamp_idx(jsnum::floor((y_lo - r_max - g.min_y) * g.sy), g.ny);
-        let mut a1 = clamp_idx(jsnum::floor((y_hi + r_max - g.min_y) * g.sy), g.ny);
-        let mut b0 = clamp_idx(jsnum::floor((z_lo - r_max - g.min_z) * g.sz), g.nz);
-        let mut b1 = clamp_idx(jsnum::floor((z_hi + r_max - g.min_z) * g.sz), g.nz);
-        if ((a1 - a0 + 1) * (b1 - b0 + 1)) as f64 > COARSE_CELLS {
-            g = ig.coarse();
-            g_is_coarse = true;
-            a0 = clamp_idx(jsnum::floor((y_lo - r_max - g.min_y) * g.sy), g.ny);
-            a1 = clamp_idx(jsnum::floor((y_hi + r_max - g.min_y) * g.sy), g.ny);
-            b0 = clamp_idx(jsnum::floor((z_lo - r_max - g.min_z) * g.sz), g.nz);
-            b1 = clamp_idx(jsnum::floor((z_hi + r_max - g.min_z) * g.sz), g.nz);
-        }
-
-        for a in a0..=a1 {
-            for b in b0..=b1 {
-                let c = a * g.nz + b;
-                for i in g.start[c]..g.start[c + 1] {
-                    let f = g.items[i as usize] as usize;
-                    if seen[f] == stamp {
-                        continue; // this part tri already measured vs this wall tri
-                    }
-                    seen[f] = stamp;
-                    let o = f * 9;
-                    // reject on the axis-aligned boxes before any real geometry
-                    let bx0 = jsnum::min_of(&[pos[o], pos[o + 3], pos[o + 6]]);
-                    if bx0 > x_hi + r_max {
-                        continue;
-                    }
-                    let bx1 = jsnum::max_of(&[pos[o], pos[o + 3], pos[o + 6]]);
-                    if bx1 < x_lo - r_max {
-                        continue;
-                    }
-                    let by0 = jsnum::min_of(&[pos[o + 1], pos[o + 4], pos[o + 7]]);
-                    if by0 > y_hi + r_max {
-                        continue;
-                    }
-                    let by1 = jsnum::max_of(&[pos[o + 1], pos[o + 4], pos[o + 7]]);
-                    if by1 < y_lo - r_max {
-                        continue;
-                    }
-                    let bz0 = jsnum::min_of(&[pos[o + 2], pos[o + 5], pos[o + 8]]);
-                    if bz0 > z_hi + r_max {
-                        continue;
-                    }
-                    let bz1 = jsnum::max_of(&[pos[o + 2], pos[o + 5], pos[o + 8]]);
-                    if bz1 < z_lo - r_max {
-                        continue;
-                    }
-
-                    let b_tri = tri_verts(pos, f);
-
-                    // INTERSECTION FIRST. Every distance primitive below is only valid
-                    // for triangles that do not cross.
-                    let mut pierce = tri_tri_pierce(&a_tri, &b_tri);
-                    if pierce.is_some() {
-                        // Which pierce is reported (callers trim the station nearest it)
-                        // depends on the order the cells are walked. Report the one the old
-                        // 64 x 64 walk met first, so the trim is the same at any grid size.
-                        if !g_is_coarse {
-                            pierce = coarse_pierce(&a_tri, x_lo, x_hi, y_lo, y_hi, z_lo, z_hi);
+            for a in a0..=a1 {
+                for b in b0..=b1 {
+                    let c = a * g.nz + b;
+                    for i in g.start[c]..g.start[c + 1] {
+                        let f = g.items[i as usize] as usize;
+                        if seen[f] == *stamp {
+                            continue; // this part tri already measured vs this wall tri
                         }
-                        best = 0.0;
-                        bp = pierce;
-                        bq = pierce;
-                        break 'walls; // nothing beats zero
-                    }
+                        seen[f] = *stamp;
+                        let o = f * 9;
+                        // reject on the axis-aligned boxes before any real geometry
+                        let bx0 = jsnum::min_of(&[pos[o], pos[o + 3], pos[o + 6]]);
+                        if bx0 > x_hi + r_max {
+                            continue;
+                        }
+                        let bx1 = jsnum::max_of(&[pos[o], pos[o + 3], pos[o + 6]]);
+                        if bx1 < x_lo - r_max {
+                            continue;
+                        }
+                        let by0 = jsnum::min_of(&[pos[o + 1], pos[o + 4], pos[o + 7]]);
+                        if by0 > y_hi + r_max {
+                            continue;
+                        }
+                        let by1 = jsnum::max_of(&[pos[o + 1], pos[o + 4], pos[o + 7]]);
+                        if by1 < y_lo - r_max {
+                            continue;
+                        }
+                        let bz0 = jsnum::min_of(&[pos[o + 2], pos[o + 5], pos[o + 8]]);
+                        if bz0 > z_hi + r_max {
+                            continue;
+                        }
+                        let bz1 = jsnum::max_of(&[pos[o + 2], pos[o + 5], pos[o + 8]]);
+                        if bz1 < z_lo - r_max {
+                            continue;
+                        }
 
-                    // verts of the part tri against the solid tri and vice versa
-                    for q in &b_tri {
-                        let cp = tri_closest_p(&a_tri, *q);
-                        let dd = dist2(cp, *q);
-                        if dd < best {
-                            best = dd;
-                            bp = Some(cp);
-                            bq = Some(*q);
+                        let b_tri = tri_verts(pos, f);
+
+                        // A pair a plane apart can neither cross nor come nearer than `best`
+                        if planes_apart(&a_tri, &b_tri, best) {
+                            continue;
                         }
-                    }
-                    for q in &a_tri {
-                        let cp = tri_closest_p(&b_tri, *q);
-                        let dd = dist2(*q, cp);
-                        if dd < best {
-                            best = dd;
-                            bp = Some(*q);
-                            bq = Some(cp);
+
+                        // INTERSECTION FIRST. Every distance primitive below is only valid
+                        // for triangles that do not cross.
+                        let mut pierce = tri_tri_pierce(&a_tri, &b_tri);
+                        if pierce.is_some() {
+                            // Which pierce is reported (callers trim the station nearest it)
+                            // depends on the order the cells are walked. Report the one the old
+                            // 64 x 64 walk met first, so the trim is the same at any grid size.
+                            if !g_is_coarse {
+                                pierce = coarse_pierce(&a_tri, x_lo, x_hi, y_lo, y_hi, z_lo, z_hi);
+                            }
+                            return Chunk {
+                                best: 0.0,
+                                bp: pierce,
+                                bq: pierce,
+                                pierced: true,
+                            }; // nothing beats zero
                         }
-                    }
-                    // all nine edge pairs
-                    for ea in 0..3 {
-                        for eb in 0..3 {
-                            let (p_a, p_b) = seg_seg_closest(
-                                a_tri[ea],
-                                a_tri[(ea + 1) % 3],
-                                b_tri[eb],
-                                b_tri[(eb + 1) % 3],
-                            );
-                            let dd = dist2(p_a, p_b);
+
+                        // verts of the part tri against the solid tri and vice versa
+                        for q in &b_tri {
+                            let cp = tri_closest_p(&a_tri, *q);
+                            let dd = dist2(cp, *q);
                             if dd < best {
                                 best = dd;
-                                bp = Some(p_a);
-                                bq = Some(p_b);
+                                bp = Some(cp);
+                                bq = Some(*q);
+                            }
+                        }
+                        for q in &a_tri {
+                            let cp = tri_closest_p(&b_tri, *q);
+                            let dd = dist2(*q, cp);
+                            if dd < best {
+                                best = dd;
+                                bp = Some(*q);
+                                bq = Some(cp);
+                            }
+                        }
+                        // all nine edge pairs
+                        for ea in 0..3 {
+                            for eb in 0..3 {
+                                let (p_a, p_b) = seg_seg_closest(
+                                    a_tri[ea],
+                                    a_tri[(ea + 1) % 3],
+                                    b_tri[eb],
+                                    b_tri[(eb + 1) % 3],
+                                );
+                                let dd = dist2(p_a, p_b);
+                                if dd < best {
+                                    best = dd;
+                                    bp = Some(p_a);
+                                    bq = Some(p_b);
+                                }
                             }
                         }
                     }
                 }
             }
+            t += 3;
         }
-        t += 3;
+        Chunk {
+            best,
+            bp,
+            bq,
+            pierced: false,
+        }
+    };
+
+    // The chunks' results merge in the solid's triangle order, so the answer is the serial walk's:
+    // the first pierce, else the smallest distance, the earliest one on a tie (a later chunk must
+    // beat the best so far strictly, as the walk's `dd < best` does).
+    let n_tri = mv.len() / 3;
+    let chunks: Vec<Chunk> = if n_tri < PAR_MIN_TRIS {
+        with_seen(topo.n_faces, n_tri, |seen, stamp| {
+            vec![scan(0, mv.len(), seen, stamp)]
+        })
+    } else {
+        let per = n_tri.div_ceil(PAR_CHUNKS).max(PAR_MIN_CHUNK);
+        (0..n_tri.div_ceil(per))
+            .into_par_iter()
+            .map(|c| {
+                let (lo, hi) = (c * per * 3, ((c + 1) * per * 3).min(mv.len()));
+                with_seen(topo.n_faces, (hi - lo) / 3, |seen, stamp| {
+                    scan(lo, hi, seen, stamp)
+                })
+            })
+            .collect()
+    };
+    let mut best = r_max * r_max;
+    let mut bp: Option<[f64; 3]> = None;
+    let mut bq: Option<[f64; 3]> = None;
+    for ch in chunks {
+        if ch.pierced {
+            best = 0.0;
+            bp = ch.bp;
+            bq = ch.bq;
+            break;
+        }
+        if ch.best < best {
+            best = ch.best;
+            bp = ch.bp;
+            bq = ch.bq;
+        }
     }
     let bp = bp?;
     let bq = bq.expect("bq is set with bp");

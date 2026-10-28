@@ -17,6 +17,7 @@
 use std::cell::RefCell;
 
 use crate::config::Config;
+use crate::prop::build::PropsPass;
 use crate::prop::crest::Crest;
 
 /// One captured tine: `{ x, y, z, biteX, biteY }` (web/prop/tines.js:283, web/prop/pins.js:87).
@@ -29,6 +30,18 @@ pub struct TineSeed {
     pub bite_y: f64,
 }
 
+/// What `build_props` computes before the downhill race (the normal pass, the raster, circular and
+/// rim races) and the tine capture as it stood then. Auto's judge builds twice, with downhill walls
+/// and without; the two builds share all of this (the downhill flag only gates the race after it),
+/// so the first records it and the second replays it.
+#[derive(Debug, Default)]
+pub enum BaseMemo {
+    #[default]
+    Off,
+    Record(Option<(PropsPass, Option<Vec<TineSeed>>)>),
+    Replay(PropsPass, Option<Vec<TineSeed>>),
+}
+
 /// See the module docs.
 #[derive(Debug)]
 pub struct BuildCtx<'a> {
@@ -36,6 +49,8 @@ pub struct BuildCtx<'a> {
     pub crest: Crest,
     /// `globalThis.__TINECAP`
     pub tine_cap: RefCell<Option<Vec<TineSeed>>>,
+    /// See [`BaseMemo`]; `Off` unless Auto's judge turns it on.
+    pub base_memo: RefCell<BaseMemo>,
 }
 
 impl<'a> BuildCtx<'a> {
@@ -45,6 +60,7 @@ impl<'a> BuildCtx<'a> {
             cfg,
             crest,
             tine_cap: RefCell::new(None),
+            base_memo: RefCell::new(BaseMemo::Off),
         }
     }
 
