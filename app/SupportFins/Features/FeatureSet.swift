@@ -106,6 +106,7 @@ struct FeatureCommands: Commands {
     var body: some Commands {
         let menus = Self.menus
         CommandGroup(after: .newItem) { menu(.fileExport) }
+        CommandGroup(after: .undoRedo) { menu(.edit) }
         if menus.count > 0 { CommandMenu(menus[0].title) { menu(menus[0]) } }
         if menus.count > 1 { CommandMenu(menus[1].title) { menu(menus[1]) } }
         if menus.count > 2 { CommandMenu(menus[2].title) { menu(menus[2]) } }

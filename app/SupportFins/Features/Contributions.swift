@@ -125,6 +125,8 @@ struct MenuID: Hashable, Identifiable {
     static let view = MenuID(title: "View", order: 0)
     static let model = MenuID(title: "Model", order: 10)
     static let fileExport = MenuID(title: "File", order: 100, isFileGroup: true)
+    /// Items after Undo and Redo in the Edit menu (Remove Model from Plate).
+    static let edit = MenuID(title: "Edit", order: 110, isFileGroup: true)
 }
 
 /// A run of one menu's entries from one feature. Sections of a menu come in `order`, so a feature's items sit
