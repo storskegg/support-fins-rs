@@ -16,18 +16,40 @@ you start a ticket, and again whenever a review sends you back.
 
 ## Workflow
 
-1. Work in your own worktree, never in the main checkout:
+1. **One worktree per ticket, no extra copies.** Work in your own worktree, never in the main
+   checkout, and don't clone the repo again or add a second worktree for the same ticket (each
+   one is a full `target/` build; the machine has four agents on twelve cores). Builds share the
+   `sccache` compile cache across worktrees (`tools/sccache`), and are capped at 4 jobs
+   (`CARGO_BUILD_JOBS`, `XCODE_JOBS`).
    ```sh
    git -C ~/RustRoverProjects/support-fins-rs fetch origin
    git -C ~/RustRoverProjects/support-fins-rs worktree add ~/RustRoverProjects/sfrs-wt/<ticket#>-<slug> -b t<ticket#>-<slug> origin/main
    ```
    Do all your work, builds and commits inside that directory.
+
+   **Heavy runs take the machine lock.** `app-test`, `app-uitest` and every `bench-*` recipe go
+   through `tools/lock/lock.py`: one at a time on the Mac, whichever worktree starts them. If it
+   prints "waiting for <holder>", wait; never work around it, and never wait for the load to drop
+   (the Mac idles around 3). Benchmarks record the load before and during the run.
+
+   **After adding or moving Swift files, regenerate the project (`just app-project`) before
+   testing; `just gate` does it.** The Xcode project is generated and gitignored, and a stale one
+   silently skips new test files (201 tests run instead of 211). `just gate` prints the test count.
+
+   **UI tests (`app-uitest`) are the orchestrator's only.** They take over the user's mouse and
+   keyboard, and `FinsLoopUITests` is flaky under heavy load (a hit point while scrolling, `FinsLoopUITests.swift:51`; the lock exists partly to prevent that), so no agent runs them and `just gate` leaves them out. The headless
+   `EndToEndTests` in `app-test` covers the same loop.
+
+   **After merges the orchestrator runs `just tidy --apply`** to remove worktrees whose work is
+   on GitHub. Don't delete your own worktree; say in your report when you're done with it.
 2. Touch only the files your ticket lists. If you need to change a file outside that list
    (a shared `Cargo.toml`, another agent's module, a signature the orchestrator wrote),
    **stop and ask** in a comment on your issue (`gh issue comment <n> --repo storskegg/support-fins-rs`).
    Don't work around it.
-3. Before opening the PR, run `just check` in your worktree. It must be fully green: fmt,
-   clippy with `-D warnings`, every test, and parity.
+3. Before opening the PR, and again before you report back, run `just gate` in your worktree. It
+   runs every gate a PR needs (fmt, clippy with `-D warnings`, every test, the deno tests,
+   `cli-parity`, and the app gates when `app/` or the bindings changed) and prints one summary
+   table. It must exit 0. Paste the table in the PR. `just check` is the quick Rust-only subset.
 4. Commit in small logical steps. Every commit message ends with:
    ```
    Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
