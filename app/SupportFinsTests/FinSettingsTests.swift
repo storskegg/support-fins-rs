@@ -23,7 +23,7 @@ struct FinSettingsTests {
             return Case(id: try #require(obj["id"] as? String),
                         form: try JSONSerialization.data(withJSONObject: args[0]),
                         dialog: try #require(out["dialog"] as? [String: Any]),
-                        tunables: try #require(out["tunables"] as? [String: Any]))
+                        tunables: try #require((out["finOpts"] as? [String: Any])?["tunables"] as? [String: Any]))
         }
     }
 
