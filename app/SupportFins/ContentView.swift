@@ -46,5 +46,6 @@ struct ContentView: View {
         .focusedSceneValue(\.removal, model.wiring?.removal)
         // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
         .onExitCommand { model.wiring?.escape() }
+        .environment(model.session)
     }
 }

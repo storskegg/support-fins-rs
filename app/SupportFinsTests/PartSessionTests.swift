@@ -80,18 +80,31 @@ struct PartSessionTests {
 struct PartSessionSettingsTests {
     func tweaked(_ s: FinSettings, _ gap: Double) -> FinSettings { var t = s; t.gap = gap; return t }
 
-    @Test func aSliderDragIsOneStepAndASeparateEditAnother() {
+    @Test func aSliderDragIsOneStepHoweverLongTheHoldOrManyTheWrites() {
         let s = PartSession()
-        let t0 = Date(timeIntervalSince1970: 1000)
         let base = s.settings
-        for (i, g) in [0.25, 0.3, 0.35].enumerated() { s.setSettings(tweaked(base, g), now: t0.addingTimeInterval(Double(i) * 0.1)) }
-        #expect(s.history.undoStack.count == 1)                              // one drag
-        s.setSettings(tweaked(base, 0.4), now: t0.addingTimeInterval(5))     // a later edit
-        #expect(s.history.undoStack.count == 2)
-        s.undo()
+        s.settingsEditing(true)                              // thumb down
+        for g in [0.25, 0.3, 0.35] { s.setSettings(tweaked(base, g)) }
+        #expect(s.history.undoStack.isEmpty && !s.canUndo)    // not until it is released, however long that takes
+        s.settingsEditing(false)                             // released
+        #expect(s.history.undoStack.count == 1 && s.settings.gap == 0.35)
+        s.setSettings(tweaked(base, 0.4))                    // a control with no editing phase: a step per write
+        s.setSettings(tweaked(base, 0.1))
+        #expect(s.history.undoStack.count == 3)
+        s.undo(); s.undo()
         #expect(s.settings.gap == 0.35)
         s.undo()
         #expect(s.settings == base)
+    }
+
+    @Test func aDragThatEndsWhereItStartedRecordsNothing() {
+        let s = PartSession()
+        let base = s.settings
+        s.settingsEditing(true)
+        s.setSettings(tweaked(base, 0.3))
+        s.setSettings(base)
+        s.settingsEditing(false)
+        #expect(s.history.undoStack.isEmpty)
     }
 
     @Test func theInspectorBindingWritesThroughTheSession() {
