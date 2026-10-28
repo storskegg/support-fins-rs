@@ -93,17 +93,15 @@ final class ExportModel {
     @ObservationIgnored private let source: @MainActor () -> Source?
     @ObservationIgnored private let finsOn: @MainActor () -> Bool
     @ObservationIgnored private let panel: any SavePanel
-    @ObservationIgnored private let objectCount: @MainActor () -> Int
     @ObservationIgnored private let removedKeys: @MainActor () -> Set<FinKey>
     /// The format ⌘E writes again.
     private(set) var lastFormat = ExportFormat.stl
 
     init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, source: @escaping @MainActor () -> Source?,
          removed: @escaping @MainActor () -> Set<FinKey> = { [] },
-         objectCount: @escaping @MainActor () -> Int = { 1 }, panel: any SavePanel = SystemSavePanel()) {
+         panel: any SavePanel = SystemSavePanel()) {
         self.build = build
         self.removedKeys = removed
-        self.objectCount = objectCount
         self.source = source
         self.finsOn = finsOn
         self.panel = panel
@@ -124,12 +122,6 @@ final class ExportModel {
         return Availability(
             enabled: hasFins ? Set(ExportFormat.allCases) : [.stl, .threeMF],
             note: hasFins ? nil : "No supports on this plate: STL and 3MF write the part alone.")
-    }
-
-    /// Said in the menu when the file holds several objects (UI-MAP "multi-object files one part per file until
-    /// M6"): they would need a plate layout the engine does not have.
-    var multiObjectNote: String? {
-        objectCount() > 1 ? "This file has \(objectCount()) objects: export writes the one being edited. One file per object until plates arrive." : nil
     }
 
     /// The suggested file name: `part-fins-0.4nozzle-0.2layer.stl` (`export_file_name`, `ui/export.js` `plateName`).

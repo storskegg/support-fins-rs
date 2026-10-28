@@ -19,13 +19,16 @@ struct ContentView: View {
                     .overlay(alignment: .topLeading) { FrameOverlay(controller: controller) }
                     #endif
             }
+            if model.showsEmptyState {
+                EmptyWindowView(compact: model.hasOpened) { OpenFlow.importModel(into: model) }
+            }
             if let status = model.status {
                 Text(status).padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
             }
             if let w = model.wiring, w.spinnerVisible { BuildSpinner() }
         }
         .overlay(alignment: .top) { LayFaceHint(model: model.layFace) }
-        .overlay(alignment: .bottom) { if model.controller != nil { ViewToolbar(session: model.session, registry: toolbar) } }
+        .overlay(alignment: .bottom) { if model.controller != nil, model.hasPart { ViewToolbar(session: model.session, registry: toolbar) } }
         .environment(toolbar)
         // track D's popovers plug into the toolbar's Suggest and Strength slots once a single part is on show
         .onChange(of: model.suggest.map(ObjectIdentifier.init), initial: true) { _, _ in registerTools() }
@@ -51,7 +54,8 @@ struct ContentView: View {
             ToolbarItem { ExportMenu(model: model.wiring?.exporter) }
             ToolbarItem { Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector) }
         }
-        .navigationTitle(document.filename)
+        .openFlow(model)
+        .navigationTitle(model.openedName ?? document.filename)
         .task {
             await model.load(url: configuration?.fileURL)
             await Benchmark.runIfRequested(model.controller)

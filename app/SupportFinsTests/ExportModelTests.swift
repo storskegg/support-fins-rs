@@ -84,12 +84,12 @@ final class ExportModelTests {
         try #require(try loadParts(path: try writeSTL("export-tests-cube.stl", box(0, 20, 0, 20, 0, 20), in: dir)).first)
     }
 
-    func rig(_ part: Part, finsOn: Bool = true, panel: any SavePanel = StubPanel(), objects: Int = 1,
+    func rig(_ part: Part, finsOn: Bool = true, panel: any SavePanel = StubPanel(),
              pose: [Double] = identity, removed: Set<FinKey> = []) -> (ExportModel, BuildModel) {
         let build = BuildModel(part: part)
         let model = ExportModel(build: build, finsOn: { finsOn }, source: {
             .init(partName: "bracket.stl", part: part, nozzle: 0.4, layerHeight: 0.2, pose: pose, threshold: 45, bed: [256, 256])
-        }, removed: { removed }, objectCount: { objects }, panel: panel)
+        }, removed: { removed }, panel: panel)
         return (model, build)
     }
 
@@ -210,11 +210,5 @@ final class ExportModelTests {
         let before = StubPanel.asked.count
         let none = rig(part, panel: StubPanel(answer: target))
         #expect(none.0.run(.stl) == nil && StubPanel.asked.count == before)
-    }
-
-    @Test func aFileWithSeveralObjectsSaysOneFilePerObject() throws {
-        let (several, _) = rig(try tShape(), objects: 3)
-        #expect(several.multiObjectNote?.contains("3 objects") == true)
-        #expect(rig(try tShape()).0.multiObjectNote == nil)
     }
 }
