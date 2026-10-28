@@ -391,8 +391,9 @@ fn merge_parts_equals_loading_an_stl_of_their_triangles() {
 fn import_notes_read_as_the_page_writes_them() {
     // an STL: nothing
     assert!(load("cube").info().import_note.is_empty());
-    // an OBJ of two objects: the picked one, then both merged (io.js:359-365)
-    let path = tmp("two.obj");
+    // an OBJ of two objects: the picked one, then both merged (io.js:359-365); its own file name, since
+    // `load_parts_reads_an_obj_with_several_objects` writes `two.obj` in parallel
+    let path = tmp("two-notes.obj");
     std::fs::write(
         &path,
         "o a\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\no b\nv 5 0 0\nv 6 0 0\nv 5 1 0\nf 4 5 6\n",
