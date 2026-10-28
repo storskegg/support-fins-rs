@@ -1159,6 +1159,13 @@ public protocol PartProtocol: AnyObject, Sendable {
     func suggestOrientations(thresholdDeg: Double, optsJson: String, context: SuggestContext) throws  -> SuggestResult
     
     /**
+     * The wide search: [`Part::suggest_orientations`] over `density` times the web's candidate
+     * budget (10 is the wide default), finer steps of the same candidate generator, ranked and
+     * worded exactly the same. Blocking, and slower than the default only by the cheap first pass.
+     */
+    func suggestOrientationsWide(thresholdDeg: Double, optsJson: String, context: SuggestContext, density: Double) throws  -> SuggestResult
+    
+    /**
      * The strongest printable pose for a load. `dir_local`: the load in the part's own frame;
      * `dir_world`: the same load in the current pose.
      */
@@ -1303,6 +1310,24 @@ open func suggestOrientations(thresholdDeg: Double, optsJson: String, context: S
 }
     
     /**
+     * The wide search: [`Part::suggest_orientations`] over `density` times the web's candidate
+     * budget (10 is the wide default), finer steps of the same candidate generator, ranked and
+     * worded exactly the same. Blocking, and slower than the default only by the cheap first pass.
+     */
+open func suggestOrientationsWide(thresholdDeg: Double, optsJson: String, context: SuggestContext, density: Double)throws  -> SuggestResult  {
+    return try  FfiConverterTypeSuggestResult_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_part_suggest_orientations_wide(
+            self.uniffiCloneHandle(),
+        FfiConverterDouble.lower(thresholdDeg),
+        FfiConverterString.lower(optsJson),
+        FfiConverterTypeSuggestContext_lower(context),
+        FfiConverterDouble.lower(density),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * The strongest printable pose for a load. `dir_local`: the load in the part's own frame;
      * `dir_world`: the same load in the current pose.
      */
@@ -1383,6 +1408,12 @@ public protocol SuggesterProtocol: AnyObject, Sendable {
      * Queue a ranking; returns its generation.
      */
     func suggest(thresholdDeg: Double, optsJson: String, context: SuggestContext, listener: SuggestListener)  -> UInt64
+    
+    /**
+     * Queue the wide search ([`Part::suggest_orientations_wide`]); returns its generation. A newer
+     * request stops it between candidates.
+     */
+    func suggestWide(thresholdDeg: Double, optsJson: String, context: SuggestContext, density: Double, listener: SuggestListener)  -> UInt64
     
 }
 /**
@@ -1478,6 +1509,24 @@ open func suggest(thresholdDeg: Double, optsJson: String, context: SuggestContex
         FfiConverterDouble.lower(thresholdDeg),
         FfiConverterString.lower(optsJson),
         FfiConverterTypeSuggestContext_lower(context),
+        FfiConverterCallbackInterfaceSuggestListener_lower(listener),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Queue the wide search ([`Part::suggest_orientations_wide`]); returns its generation. A newer
+     * request stops it between candidates.
+     */
+open func suggestWide(thresholdDeg: Double, optsJson: String, context: SuggestContext, density: Double, listener: SuggestListener) -> UInt64  {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_suggester_suggest_wide(
+            self.uniffiCloneHandle(),
+        FfiConverterDouble.lower(thresholdDeg),
+        FfiConverterString.lower(optsJson),
+        FfiConverterTypeSuggestContext_lower(context),
+        FfiConverterDouble.lower(density),
         FfiConverterCallbackInterfaceSuggestListener_lower(listener),uniffiCallStatus
     )
 })
@@ -3417,6 +3466,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_method_part_suggest_orientations() != 946) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sf_ffi_checksum_method_part_suggest_orientations_wide() != 34369) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sf_ffi_checksum_method_part_suggest_strength_pose() != 50056) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3424,6 +3476,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_suggester_suggest() != 57294) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_suggester_suggest_wide() != 32635) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_constructor_builder_new() != 34376) {

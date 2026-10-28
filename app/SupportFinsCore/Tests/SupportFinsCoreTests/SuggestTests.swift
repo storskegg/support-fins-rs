@@ -67,6 +67,22 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     #expect(stale == 0)
 }
 
+@Test func theWideSearchRanksTheSameWayOnMoreCandidates() async throws {
+    let part = try #require(try loadParts(path: try modelPath("sphere")).first)
+    // density 1 is the web's own candidate set
+    let web = try part.suggestOrientations(thresholdDeg: 45, optsJson: "{}", context: context)
+    #expect(try part.suggestOrientationsWide(thresholdDeg: 45, optsJson: "{}", context: context, density: 1) == web)
+    let suggester = Suggester(part: part)
+    let collector = Collector()
+    let generation = suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", context: context, density: 10, listener: collector)
+    for await event in collector.stream {
+        guard case .suggested(let g, let result) = event else { Issue.record("not a suggestion"); return }
+        #expect(g == generation)
+        #expect(result.rows.count == 3 && result.rows[0].rank == "Best")
+        break
+    }
+}
+
 @Test func loadAlignmentGivesTheVerdictTheStrengthPopoverShows() throws {
     let up = try #require(try loadAlignment(dirWorld: [0, 0, 1]))
     #expect(up.quality == "poor" && up.canSuggest)
