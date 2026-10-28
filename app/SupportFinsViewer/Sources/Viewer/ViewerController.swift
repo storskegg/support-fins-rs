@@ -18,7 +18,8 @@ public final class ViewerController {
     public var hoverLocation: (part: Int, face: Int)? { hoverFace.flatMap { renderer.locate($0) } }
 
     public var thresholdDegrees: Double = 45 { didSet { if thresholdDegrees != oldValue { refreshFlags() } } }
-    public var rotationDegrees = SIMD3<Float>.zero { didSet { if rotationDegrees != oldValue { refreshPose() } } }
+    /// The pose: takes model coordinates to print coordinates (the session's `Pose`).
+    public var rotation = matrix_identity_float3x3 { didSet { if rotation != oldValue { refreshPose() } } }
     public var volume = PrinterVolume.standard { didSet { renderer.setVolume(volume) } }
     public var highlightSmall = true { didSet { renderer.highlightSmall = highlightSmall } }
 
@@ -65,7 +66,7 @@ public final class ViewerController {
 
     public func apply(_ view: CameraView) { renderer.camera.apply(view) }
 
-    private func currentRotation() -> simd_float3x3 { rotationMatrix(degrees: rotationDegrees) }
+    private func currentRotation() -> simd_float3x3 { rotation }
 
     func refreshPose() {
         guard !renderer.meshes.isEmpty else { return }

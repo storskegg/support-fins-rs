@@ -36,7 +36,7 @@ struct ControllerTests {
         #expect(before.filter { FaceFlags(rawValue: $0).contains(.kept) }.isEmpty)
         #expect(before.filter { FaceFlags(rawValue: $0).contains(.onBed) }.count == 2)   // the bottom's two triangles
         c.thresholdDegrees = 50
-        c.rotationDegrees = [45, 0, 0]
+        c.rotation = rotationMatrix(degrees: [45, 0, 0])
         await settle()
         let after = flags(c)
         #expect(after.filter { FaceFlags(rawValue: $0).contains(.kept) }.count == 4)     // two faces lean 45 degrees
@@ -47,8 +47,8 @@ struct ControllerTests {
 
     @Test func aStaleFlagAnswerIsDropped() async throws {
         let (c, _) = try rig()
-        c.rotationDegrees = [45, 0, 0]
-        c.rotationDegrees = [0, 0, 0]
+        c.rotation = rotationMatrix(degrees: [45, 0, 0])
+        c.rotation = matrix_identity_float3x3
         await settle()
         #expect(flags(c).filter { FaceFlags(rawValue: $0).contains(.kept) }.isEmpty)
     }

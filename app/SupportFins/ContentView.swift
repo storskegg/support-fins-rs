@@ -6,7 +6,7 @@ struct ContentView: View {
     @Environment(\.documentConfiguration) private var configuration
     @State private var model = ViewerModel()
     @State private var inspector = true
-    @State private var settings = SettingsStore().load()
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -23,7 +23,7 @@ struct ContentView: View {
         }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
-                InspectorView(controller: controller, settings: $settings)
+                InspectorView(controller: controller, settings: model.session.settingsBinding)
                     .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
             }
         }
@@ -35,6 +35,9 @@ struct ContentView: View {
             await model.load(url: configuration?.fileURL)
             await Benchmark.runIfRequested(model.controller)
         }
+        .onChange(of: model.session.pose) { _, pose in model.controller?.rotation = pose.float3x3 }
+        .onChange(of: undoManager, initial: true) { _, m in model.session.undoManager = m }
         .focusedSceneValue(\.viewer, model.controller)
+        .focusedSceneValue(\.session, model.session)
     }
 }
