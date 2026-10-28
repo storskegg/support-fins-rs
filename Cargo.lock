@@ -771,6 +771,7 @@ dependencies = [
  "indexmap",
  "miniz_oxide",
  "parity",
+ "rayon",
  "sf-engine",
  "sf-testkit",
 ]
