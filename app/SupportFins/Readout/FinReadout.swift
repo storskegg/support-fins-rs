@@ -13,6 +13,28 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
         var autoSure: Bool
         var smallFoot: Bool
         var outline: Double
+
+        init(style: String, autoSure: Bool, smallFoot: Bool, outline: Double) {
+            (self.style, self.autoSure, self.smallFoot, self.outline) = (style, autoSure, smallFoot, outline)
+        }
+        /// `outline` is null when the pad has no first-layer edge to measure; JS reads `null < 1` as true.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            style = try c.decode(String.self, forKey: .style)
+            autoSure = try c.decode(Bool.self, forKey: .autoSure)
+            smallFoot = try c.decode(Bool.self, forKey: .smallFoot)
+            outline = try c.decodeIfPresent(Double.self, forKey: .outline) ?? 0
+        }
+        private enum CodingKeys: String, CodingKey { case style, autoSure, smallFoot, outline }
+    }
+    /// `islandsBuild`: what the midair-starts card is told. `all` is a Full build with no fill pass (every start is unwalled).
+    struct IslandsBuild: Decodable, Equatable, Sendable {
+        var bare: Int?
+        var capped: Bool?
+        var all: Bool?
+    }
+    struct Bounds: Decodable, Equatable, Sendable {
+        var min: [Double], max: [Double]
     }
     struct Floating: Decodable, Equatable, Sendable { var drop: Double }
     struct Fill: Decodable, Equatable, Sendable {
@@ -57,12 +79,17 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
     /// `summary_json()`'s `finVolumeMm3` / `padVolumeMm3`: the grams receipt's volumes (`meshVolumeMM3`)
     var finVolumeMm3 = 0.0
     var padVolumeMm3 = 0.0
+    /// `fillReach(bare.coverage)` in mm; nil with `bare`
+    var fillReach: Double?
+    /// The extent of the fin and pad vertices in print space; nil when there are none
+    var addedBounds: Bounds?
+    /// nil unless the mode is Full
+    var islandsBuild: IslandsBuild?
 
     init() {}
 
     /// From `BuildResult.summary_json()` (docs/FFI.md): the same keys the JS `built` has, plus `hasPad`. The
-    /// record count is `records_json().fins.count` (the summary has no per-fin list). `pad`'s details
-    /// (Sure hold chosen by Auto, the small-foot outline) are not in the summary yet: a pad reads as `added`.
+    /// record count is `records_json().fins.count` (the summary has no per-fin list).
     init(summaryJSON: String, finCount: Int) throws {
         self = try JSONDecoder().decode(ReadoutBuilt.self, from: Data(summaryJSON.utf8))
         self.finCount = finCount
@@ -71,7 +98,7 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
     private enum Key: String, CodingKey {
         case mode, fins, propCount, braceCount, tines, tallRibs, sway, seating, pad, floating, sagRisk, fill, curvedFill
         case curvedDropped, bare, unserved, smallHoleRegions, skipped, patchStats, patchCount, rejected
-        case hasPad, finVolumeMm3, padVolumeMm3
+        case hasPad, finVolumeMm3, padVolumeMm3, fillReach, addedBounds, islandsBuild
     }
 
     /// A key missing from the JSON takes its default, as `undefined` reads in the JS (`built.skipped?.onPart`).
@@ -103,6 +130,9 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
         rejected = try c.decodeIfPresent(Rejected.self, forKey: .rejected) ?? Rejected()
         finVolumeMm3 = try c.decodeIfPresent(Double.self, forKey: .finVolumeMm3) ?? 0
         padVolumeMm3 = try c.decodeIfPresent(Double.self, forKey: .padVolumeMm3) ?? 0
+        fillReach = try c.decodeIfPresent(Double.self, forKey: .fillReach)
+        addedBounds = try c.decodeIfPresent(Bounds.self, forKey: .addedBounds)
+        islandsBuild = try c.decodeIfPresent(IslandsBuild.self, forKey: .islandsBuild)
     }
 }
 

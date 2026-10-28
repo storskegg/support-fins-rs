@@ -7,12 +7,15 @@ import Viewer
 struct InspectorView: View {
     @Bindable var controller: ViewerController
     @Binding var settings: FinSettings
+    /// The stats and status cards, in place of M4a's Part block; nil keeps the block.
+    var readout: AnyView?
     @SceneStorage(SettingsStore.Key.sections) private var sections = SectionState()
     @State private var customVolume = false
 
     var body: some View {
         Form {
-            PartSections(controller: controller, settings: $settings)
+            if let readout { readout }
+            PartSections(controller: controller, settings: $settings, withPartBlock: readout == nil)
             Section {
                 PrinterSection(settings: $settings, open: $sections.printer)
                 PlacementSection(settings: $settings)
