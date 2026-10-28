@@ -12,6 +12,8 @@ enum Shaders {
         // x: hovered face (global; 0xFFFFFFFF = none), y: vertex stride in floats, z: highlight small overhangs,
         // w: this part's first global face
         uint4 params;
+        // the section plane: kept where dot(xyz, p) + w >= 0 (print space); all zero = no cut
+        float4 clip;
     };
 
     // Face flag bits, as `FaceFlags` in MeshSource.swift.
@@ -26,10 +28,19 @@ enum Shaders {
     constant float3 HOVER = float3(0.302, 0.639, 1.0);
     constant float3 BACK = float3(0.09, 0.10, 0.13);
 
+    // The vertex stage's result carries the section plane's clip distance, which a fragment stage cannot take as
+    // input: MeshIn is the same minus it (members match by name).
+    struct MeshIn {
+        float4 position [[position]];
+        float3 normal;
+        float3 color [[flat]];
+    };
+
     struct MeshOut {
         float4 position [[position]];
         float3 normal;
         float3 color [[flat]];
+        float clip_d [[clip_distance]] [1];
     };
 
     vertex MeshOut mesh_vertex(uint vid [[vertex_id]],
@@ -48,13 +59,15 @@ enum Shaders {
         else if (f & FLAG_BED) c = BED;
         if (face + u.params.w == u.params.x) c = mix(c, HOVER, 0.65);
         MeshOut out;
-        out.position = u.viewProj * (u.model * float4(p, 1));
+        float4 world = u.model * float4(p, 1);
+        out.position = u.viewProj * world;
         out.normal = (u.model * float4(n, 0)).xyz;
         out.color = c;
+        out.clip_d[0] = dot(u.clip.xyz, world.xyz) + u.clip.w;
         return out;
     }
 
-    float3 shade(MeshOut in) {
+    float3 shade(MeshIn in) {
         float3 n = normalize(in.normal);
         // the web rig (web/ui/scene.js): hemisphere + key + fill + a light from under the plate, because
         // the overhangs this tool exists to show are on the underside
@@ -66,16 +79,25 @@ enum Shaders {
         return saturate(lit);
     }
 
-    fragment float4 mesh_fragment(MeshOut in [[stage_in]], bool front [[front_facing]]) {
+    fragment float4 mesh_fragment(MeshIn in [[stage_in]], bool front [[front_facing]]) {
         if (!front) return float4(BACK, 1);
         return float4(shade(in), 1);
     }
 
     // Stale supports: the same lighting, blended at buffer(0) opacity (the web sets the fin, pad and drawn
     // materials to 0.25 while a rebuild is out, `ui/finbuild.js markFinsStale`), so the part shows through.
-    fragment float4 support_stale_fragment(MeshOut in [[stage_in]], bool front [[front_facing]],
+    fragment float4 support_stale_fragment(MeshIn in [[stage_in]], bool front [[front_facing]],
                                            constant float& alpha [[buffer(0)]]) {
         return float4(front ? shade(in) : BACK, alpha);
+    }
+
+    // The section view's Ghost (ui/section.js ghostMat): the cut-away half again as faint glass, one flat colour
+    // (PLAIN), lit like the part, both sides, buffer(0) the opacity.
+    fragment float4 ghost_fragment(MeshIn in [[stage_in]], bool front [[front_facing]],
+                                   constant float& alpha [[buffer(0)]]) {
+        in.color = PLAIN;
+        if (!front) in.normal = -in.normal;
+        return float4(shade(in), alpha);
     }
 
     // Supports (fins, pad): print space already (no model matrix), one flat colour per draw call, lit like the
@@ -86,9 +108,11 @@ enum Shaders {
                                   constant float4& color [[buffer(3)]]) {
         uint o = vid * u.params.y;
         MeshOut out;
-        out.position = u.viewProj * float4(verts[o], verts[o + 1], verts[o + 2], 1);
+        float3 world = float3(verts[o], verts[o + 1], verts[o + 2]);
+        out.position = u.viewProj * float4(world, 1);
         out.normal = float3(verts[o + 3], verts[o + 4], verts[o + 5]);
         out.color = color.xyz;
+        out.clip_d[0] = dot(u.clip.xyz, world) + u.clip.w;
         return out;
     }
 
@@ -102,17 +126,24 @@ enum Shaders {
         out.position = u.viewProj * (u.model * float4(verts[o], verts[o + 1], verts[o + 2], 1));
         out.normal = float3(verts[o + 3], verts[o + 4], verts[o + 5]);
         out.color = color.xyz;
+        out.clip_d[0] = 1;       // the HUD is not part of the model: the cut leaves it alone
         return out;
     }
 
     // The fin a removal click would drop: translucent, unlit, over the fins (ui/remove.js hoverFinMaterial).
-    fragment float4 support_overlay_fragment(MeshOut in [[stage_in]], constant float4& color [[buffer(0)]]) {
+    fragment float4 support_overlay_fragment(MeshIn in [[stage_in]], constant float4& color [[buffer(0)]]) {
         return color;
     }
+
+    struct IdIn {
+        float4 position [[position]];
+        uint face [[flat]];
+    };
 
     struct IdOut {
         float4 position [[position]];
         uint face [[flat]];
+        float clip_d [[clip_distance]] [1];
     };
 
     vertex IdOut id_vertex(uint vid [[vertex_id]],
@@ -121,13 +152,15 @@ enum Shaders {
         uint o = vid * u.params.y;
         float3 p = float3(verts[o], verts[o + 1], verts[o + 2]);
         IdOut out;
-        out.position = u.viewProj * (u.model * float4(p, 1));
+        float4 world = u.model * float4(p, 1);
+        out.position = u.viewProj * world;
         out.face = vid / 3 + u.params.w;
+        out.clip_d[0] = dot(u.clip.xyz, world.xyz) + u.clip.w;
         return out;
     }
 
     // Face index + 1 (0 = nothing); the picking texture is R32Uint.
-    fragment uint id_fragment(IdOut in [[stage_in]]) { return in.face + 1; }
+    fragment uint id_fragment(IdIn in [[stage_in]]) { return in.face + 1; }
 
     struct LineOut { float4 position [[position]]; };
 

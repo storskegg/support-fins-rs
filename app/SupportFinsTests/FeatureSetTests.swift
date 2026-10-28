@@ -128,7 +128,7 @@ struct FeatureSetTests {
         expected.insert("frame-time", at: 0)
         #endif
         #expect(model.features.overlays.map(\.id) == expected)
-        #expect(model.toolbar.slots.map(\.id) == ["rotate", "suggest", "strength", "view"])
+        #expect(model.toolbar.slots.map(\.id) == ["rotate", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["remove-fins"])
@@ -140,7 +140,7 @@ struct FeatureSetTests {
 
     @Test func theRealFeaturesRegisterTheirSlotsOnlyWhenTheyCanOpen() {
         let model = ViewerModel()
-        #expect(model.toolbar.badges[.rotate] != nil && model.toolbar.badges[.view] != nil)
+        #expect(model.toolbar.badges[.rotate] != nil && model.toolbar.badges[.view] != nil && model.toolbar.badges[.section] != nil)
         #expect(model.toolbar.badges[.suggest] == nil && model.toolbar.badges[.strength] == nil)   // no part yet
     }
 
@@ -150,7 +150,7 @@ struct FeatureSetTests {
         #if DEBUG
         view.append("  Show Frame Time")
         #endif
-        view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]"]
+        view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]", "  -", "  Section View"]
         let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
                      "  Lay a Face Flat", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]"]

@@ -63,7 +63,8 @@ private struct SlotButton: View {
                     .glassEffect(.regular, in: .capsule).offset(y: -30).allowsHitTesting(false)
             }
         }
-        .popover(isPresented: Binding(get: { registry.open == slot && badge != nil },
+        .accessibilityIdentifier("toolbar-\(slot.id)")
+        .popover(isPresented: Binding(get: { registry.open == slot && badge != nil && (badge?.tool?.isOn() ?? true) },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {
             badge?.popover().padding(12)

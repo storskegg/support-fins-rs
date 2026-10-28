@@ -10,6 +10,7 @@ enum Features {
         SuggestFeature.self,
         StrengthFeature.self,
         ViewFeature.self,
+        SectionFeature.self,
         RemoveFinsFeature.self,
         ExportFeature.self,
         ReadoutFeature.self,

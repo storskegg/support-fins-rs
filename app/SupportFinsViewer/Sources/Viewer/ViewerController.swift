@@ -105,7 +105,13 @@ public final class ViewerController {
         renderer = r
         r.setVolume(volume)
         r.onCameraChange = { [weak self] in MainActor.assumeIsolated { self?.cameraRevision &+= 1 } }
+        // the section plane's handle takes the part's rings' place while it is up (`planeHandleShown`)
+        r.section.onChange = { [weak self] in MainActor.assumeIsolated { self?.updateGizmo(); self?.clearHover() } }
+        r.section.onCursorChange = { [weak self] in MainActor.assumeIsolated { self?.onCursorChange?() } }
     }
+
+    /// The section view (`web/ui/section.js`).
+    public var section: SectionTool { renderer.section }
 
     // MARK: the part
 
@@ -276,13 +282,13 @@ public final class ViewerController {
     }
 
     func updateGizmo() {
-        guard showRings, !supportPicking, !facePicking, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
+        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
         renderer.setGizmo(GizmoDisplay(center: drag?.center ?? gizmoCenter, hover: ringHover, active: ringDragging, fade: ringFade))
     }
 
     /// The ring under a pixel, if the rings are on.
     public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoHandle? {
-        guard showRings, !supportPicking, !facePicking, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
+        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
         return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
                                                     width: Float(width), height: Float(height))
     }
@@ -326,6 +332,9 @@ public final class ViewerController {
 
     /// Pointer moved over the view: light the ring under it, otherwise pick the face.
     public func pointerMoved(x: Int, y: Int, width: Int, height: Int) {
+        // the section plane's handle owns the pointer: no pick lights up through it (`planeBusy`)
+        section.pointerMoved(x: x, y: y, width: width, height: height)
+        if section.busy { clearHover(); return }
         let ring = ringAt(x: x, y: y, width: width, height: height)
         if ring != ringHover { ringHover = ring }
         if ring != nil { clearHover() } else { hover(x: x, y: y, width: width, height: height) }
@@ -369,12 +378,17 @@ public final class ViewerController {
                     let tri = await renderer.pickSupport(x: p.x, y: p.y, width: p.w, height: p.h)
                     guard supportPicking else { continue }
                     hoverSupportTriangle = tri
+                    if section.isOn {
+                        let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
+                        section.overPart = tri != nil || face != nil
+                    }
                     hoveringSupport = tri != nil
                     onSupportHover?(tri)
                     continue
                 }
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
                 let before = hoveringFaceToLay
+                section.overPart = face != nil
                 hoverFace = face
                 // the web lights the hovered face only while Lay a face flat is armed (`web/ui/pose.js layHover`)
                 renderer.setHover(facePicking ? face : nil)
@@ -386,6 +400,7 @@ public final class ViewerController {
 
     public func clearHover() {
         pendingPick = nil
+        section.overPart = false
         let wasLit = hoveringFaceToLay
         hoverFace = nil
         renderer.setHover(nil)

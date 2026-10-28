@@ -20,6 +20,10 @@ extension ToolbarSlot: @unchecked Sendable {}   // immutable text and numbers
 struct ToolbarBadge {
     var isLit: () -> Bool
     var popover: () -> AnyView
+    /// A tool badge (Section, `addBadge` with `setOn`, `ui/toolbar.js:134-142`) is a tool that is on or off: the first
+    /// click turns it on and opens its popover; opening another popover leaves it on (its badge stays lit); a click on
+    /// the lit badge brings its popover back, and with the popover open turns it off. A panel badge has none.
+    var tool: (isOn: () -> Bool, setOn: (Bool) -> Void)?
 
     init<Content: View>(isLit: @escaping () -> Bool = { false }, @ViewBuilder popover: @escaping () -> Content) {
         self.isLit = isLit
@@ -49,12 +53,31 @@ final class ToolbarRegistry {
         badges[slot] = ToolbarBadge(isLit: isLit, popover: popover)
     }
 
+    /// Register a tool badge: lit while the tool is on, with its popover.
+    func registerTool<Content: View>(_ slot: ToolbarSlot, isOn: @escaping () -> Bool, setOn: @escaping (Bool) -> Void,
+                                     @ViewBuilder popover: @escaping () -> Content) {
+        var badge = ToolbarBadge(isLit: isOn, popover: popover)
+        badge.tool = (isOn, setOn)
+        badges[slot] = badge
+    }
+
     func unregister(_ slot: ToolbarSlot) {
         badges[slot] = nil
         if open == slot { open = nil }
     }
 
-    func toggle(_ slot: ToolbarSlot) { open = open == slot ? nil : slot }
+    func toggle(_ slot: ToolbarSlot) {
+        guard let tool = badges[slot]?.tool else { open = open == slot ? nil : slot; return }
+        if !tool.isOn() {
+            tool.setOn(true)
+            open = tool.isOn() ? slot : nil
+        } else if open != slot {
+            open = slot
+        } else {
+            tool.setOn(false)
+            open = nil
+        }
+    }
     func fold() { open = nil }
 
     private var flashGeneration = 0
