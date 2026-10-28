@@ -69,8 +69,7 @@ final class BuildWiring {
                           bed: [Double(controller.volume.x), Double(controller.volume.y)])
                 }
             },
-            removed: { [session] in session.removedFins },
-            objectCount: { [session] in session.parts.count })
+            removed: { [session] in session.removedFins })
         build.onUpdate = { [weak self] in self?.show() }
         self.build = build
         self.scheduler = scheduler

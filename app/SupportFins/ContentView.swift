@@ -19,6 +19,9 @@ struct ContentView: View {
                     .overlay(alignment: .topLeading) { FrameOverlay(controller: controller) }
                     #endif
             }
+            if model.showsEmptyState {
+                EmptyWindowView(compact: model.hasOpened) { OpenFlow.importModel(into: model) }
+            }
             if let status = model.status {
                 Text(status).padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
             }
@@ -26,7 +29,7 @@ struct ContentView: View {
         }
         .overlay(alignment: .top) { LayFaceHint(model: model.layFace) }
         .overlay(alignment: .bottom) {
-            if let controller = model.controller {
+            if let controller = model.controller, model.hasPart {
                 // the view cube sits above the toolbar's left end, and steps aside for a popover (`ui/viewcube.js`)
                 VStack(alignment: .leading, spacing: 8) {
                     ViewCubeView(controller: controller)
@@ -59,7 +62,8 @@ struct ContentView: View {
             ToolbarItem { ExportMenu(model: model.wiring?.exporter) }
             ToolbarItem { Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector) }
         }
-        .navigationTitle(document.filename)
+        .openFlow(model)
+        .navigationTitle(model.openedName ?? document.filename)
         .task {
             await model.load(url: configuration?.fileURL)
             await Benchmark.runIfRequested(model.controller)

@@ -39,21 +39,55 @@ final class ViewerModel {
         ringEdits?.onEvent = { rotate.ring($0) }
     }
 
+    /// The object picker, while a file with several objects waits for a choice (`pickObjects`, `ui/io.js:140`).
+    var picker: ObjectPickerModel?
+    /// A file was tried in this window (the empty window then shows only the button, `#drop.compact`).
+    private(set) var hasOpened = false
+    private(set) var isLoading = false
+    /// The name of the file on show, which can differ from the document's when a file is opened in place.
+    private(set) var openedName: String?
+    var hasPart: Bool { (controller?.partCount ?? 0) > 0 }
+
+    /// No part, nothing loading and no picker open: the intro (or the compact button) fills the window.
+    var showsEmptyState: Bool { controller != nil && !hasPart && !isLoading && picker == nil }
+
     func load(url: URL?) async {
         guard let controller else { return }
+        hasOpened = true
+        isLoading = true
+        defer { isLoading = false }
         do {
             let parts = try await loader.load(url: url, device: controller.renderer.device)
-            guard let first = parts.first else { status = "The file has no mesh."; return }
-            layFace.cancel()
-            session.replaceParts(parts.compactMap { $0.mesh as? CorePart })
-            controller.rotation = session.pose.float3x3
-            wiring?.attach()
-            controller.show(parts.map(\.mesh), name: parts.count == 1 ? first.name : "\(url?.lastPathComponent ?? first.name) (\(parts.count) objects)")
-            status = nil
-            makeTools(parts, controller: controller)
+            guard !parts.isEmpty else { status = "The file has no mesh."; return }
+            // a plate of several goes to the picker; cancelling it keeps whatever is on show (`io.js:200-205`)
+            guard parts.count > 1 else { show(parts, url: url); return }
+            let picker = ObjectPickerModel(objects: parts.map {
+                let d = $0.mesh.bounds.max - $0.mesh.bounds.min
+                return (name: $0.name, triangles: $0.mesh.faceCount, size: [Double(d.x), Double(d.y), Double(d.z)])
+            })
+            picker.onCancel = { [weak self] in self?.picker = nil }
+            picker.onLoad = { [weak self] chosen in
+                guard let self else { return }
+                self.picker = nil
+                guard chosen.count == 1 else { self.status = MergeUnavailable().localizedDescription; return }
+                self.show([parts[chosen[0]]], url: url)
+            }
+            self.picker = picker
         } catch {
             status = error.localizedDescription
         }
+    }
+
+    private func show(_ parts: [LoadedPart], url: URL?) {
+        guard let controller, let first = parts.first else { return }
+        layFace.cancel()
+        session.replaceParts(parts.compactMap { $0.mesh as? CorePart })
+        controller.rotation = session.pose.float3x3
+        wiring?.attach()
+        controller.show(parts.map(\.mesh), name: first.name)
+        openedName = url?.lastPathComponent ?? first.name
+        status = nil
+        makeTools(parts, controller: controller)
     }
 }
 
