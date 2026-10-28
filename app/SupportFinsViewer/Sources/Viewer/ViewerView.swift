@@ -2,9 +2,10 @@ import AppKit
 import MetalKit
 import SwiftUI
 
-/// The MTKView with the trackpad and mouse input: the Default preset of the web app (`web/ui/navpresets.js`)
-/// plus the trackpad. Two-finger scroll orbits, pinch zooms, Shift or Option with the scroll pans, the
-/// wheel of a mouse zooms; left drag orbits, right and middle drag pan; hovering picks a face.
+/// The MTKView with the trackpad and mouse input: the Mouse preset of the web app (`web/ui/navpresets.js`,
+/// Default until the View popover says otherwise) plus the trackpad. Default: two-finger scroll orbits, pinch
+/// zooms, Shift or Option with the scroll pans, the wheel of a mouse zooms; left drag orbits, middle drag
+/// dollies, right drag pans; hovering picks a face.
 public final class ViewerMTKView: MTKView {
     weak var controller: ViewerController?
     private var tracking: NSTrackingArea?
@@ -98,15 +99,23 @@ public final class ViewerMTKView: MTKView {
                 return
             }
             controller?.clearHover()
-            if e.modifierFlags.contains(.shift) { controller?.pan(dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height) }
-            else { controller?.orbit(dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height) }
+            navigate(.left, e)
         }
     }
-    public override func rightMouseDragged(with e: NSEvent) {
-        MainActor.assumeIsolated { controller?.pan(dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height) }
+    public override func rightMouseDragged(with e: NSEvent) { MainActor.assumeIsolated { navigate(.right, e) } }
+    public override func otherMouseDragged(with e: NSEvent) { MainActor.assumeIsolated { navigate(.middle, e) } }
+
+    /// A drag with a button down does what the Mouse preset says (`web/ui/navpresets.js`); Shift, Ctrl or Cmd
+    /// swaps orbit and pan, as OrbitControls does.
+    @MainActor private func navigate(_ button: NavPreset.Button, _ e: NSEvent) {
+        guard let c = controller else { return }
+        let chord = !e.modifierFlags.isDisjoint(with: [.shift, .control, .command])
+        c.navigate(c.navPreset.dragAction(button, modifier: chord), dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height)
     }
-    public override func otherMouseDragged(with e: NSEvent) {
-        MainActor.assumeIsolated { controller?.pan(dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height) }
+
+    public override func layout() {
+        super.layout()
+        MainActor.assumeIsolated { controller?.viewHeight = bounds.height }
     }
 
     public override func scrollWheel(with e: NSEvent) {
@@ -114,11 +123,9 @@ public final class ViewerMTKView: MTKView {
             guard let c = controller else { return }
             if e.hasPreciseScrollingDeltas {
                 // a trackpad: the scroll is the finger's drag
-                if e.modifierFlags.contains(.shift) || e.modifierFlags.contains(.option) {
-                    c.pan(dx: e.scrollingDeltaX, dy: e.scrollingDeltaY, viewHeight: bounds.height)
-                } else {
-                    c.orbit(dx: e.scrollingDeltaX, dy: e.scrollingDeltaY, viewHeight: bounds.height)
-                }
+                let chord = !e.modifierFlags.isDisjoint(with: [.shift, .option])
+                c.navigate(c.navPreset.scrollAction(modifier: chord), dx: e.scrollingDeltaX, dy: e.scrollingDeltaY,
+                           viewHeight: bounds.height)
             } else {
                 c.zoom(wheelDelta: -e.scrollingDeltaY * 10)   // a wheel notch is about 10 web wheel units
             }

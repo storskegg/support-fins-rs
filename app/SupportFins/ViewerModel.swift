@@ -23,6 +23,8 @@ final class ViewerModel {
     let layFace: LayFaceModel
     /// The Rotate popover's model (`ui/pose.js`).
     let rotate: RotateModel
+    /// The View popover's Mouse preset (`ui/navigation.js`).
+    let view: ViewSettings
 
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
@@ -30,6 +32,7 @@ final class ViewerModel {
         layFace = LayFaceModel(session: session, controller: controller)
         let rotate = RotateModel(session: session, controller: controller)
         self.rotate = rotate
+        view = ViewSettings(controller: controller)
         if controller == nil { status = "This Mac has no usable Metal device." }
         wiring = controller.map { BuildWiring(session: session, controller: $0) }
         ringEdits = controller.map { RingEdits(session: session, controller: $0) }

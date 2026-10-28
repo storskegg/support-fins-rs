@@ -25,7 +25,17 @@ struct ContentView: View {
             if let w = model.wiring, w.spinnerVisible { BuildSpinner() }
         }
         .overlay(alignment: .top) { LayFaceHint(model: model.layFace) }
-        .overlay(alignment: .bottom) { if model.controller != nil { ViewToolbar(session: model.session, registry: toolbar) } }
+        .overlay(alignment: .bottom) {
+            if let controller = model.controller {
+                // the view cube sits above the toolbar's left end, and steps aside for a popover (`ui/viewcube.js`)
+                VStack(alignment: .leading, spacing: 8) {
+                    ViewCubeView(controller: controller)
+                        .opacity(toolbar.open == nil && toolbar.flash == nil ? 1 : 0)
+                        .allowsHitTesting(toolbar.open == nil && toolbar.flash == nil)
+                    ViewToolbar(session: model.session, registry: toolbar)
+                }
+            }
+        }
         .environment(toolbar)
         // track D's popovers plug into the toolbar's Suggest and Strength slots once a single part is on show
         .onChange(of: model.suggest.map(ObjectIdentifier.init), initial: true) { _, _ in registerTools() }
@@ -71,6 +81,7 @@ struct ContentView: View {
 
     private func registerTools() {
         model.rotate.registry = toolbar
+        if let controller = model.controller { toolbar.register(.view) { ViewPopover(controller: controller, settings: model.view) } }
         toolbar.register(.rotate) { RotatePopover(model: model.rotate, layFace: model.layFace) }
         guard let controller = model.controller, let suggest = model.suggest, let strength = model.strength else {
             toolbar.unregister(.suggest); toolbar.unregister(.strength); return
