@@ -113,7 +113,11 @@ fn load_parts_gives_a_3mf_one_part_per_object() {
     for p in &parts {
         let i = p.info();
         assert_eq!(i.triangles, 12);
-        assert!(i.notes.is_empty());
+        // a single pick from a plate of two (io.js:33)
+        assert_eq!(
+            i.import_note,
+            format!("3MF: imported “{}” of 2 objects.", i.name)
+        );
         assert!(
             i.size.iter().all(|&s| (s - 10.0).abs() < 1e-3),
             "{:?}",
@@ -380,10 +384,55 @@ fn merge_parts_equals_loading_an_stl_of_their_triangles() {
         assert_eq!(m, w);
     }
     assert_eq!(merged.mesh().len_bytes(), want.mesh().len_bytes());
-    assert!(
-        mi.notes
-            .contains(&"merged 2 of 5 objects into one part".to_string())
+    assert!(mi.import_note.is_empty(), "an STL has no import note");
+}
+
+#[test]
+fn import_notes_read_as_the_page_writes_them() {
+    // an STL: nothing
+    assert!(load("cube").info().import_note.is_empty());
+    // an OBJ of two objects: the picked one, then both merged (io.js:359-365)
+    let path = tmp("two.obj");
+    std::fs::write(
+        &path,
+        "o a\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\no b\nv 5 0 0\nv 6 0 0\nv 5 1 0\nf 4 5 6\n",
+    )
+    .unwrap();
+    let parts = load_parts(path.to_string_lossy().into_owned()).unwrap();
+    assert_eq!(
+        parts[1].info().import_note,
+        "OBJ: imported “b” of 2 objects."
     );
+    let merged = merge_parts(parts, 2).unwrap().info();
+    assert_eq!(
+        merged.import_note,
+        "OBJ: merged 2 of 2 objects into one part."
+    );
+    assert_eq!(merged.notes, vec!["merged 2 of 2 objects into one part"]);
+    // a 3MF of two objects, merged (io.js:34)
+    let cube: Vec<[f64; 3]> = block(0.0, 10.0, 0.0, 10.0, 0.0, 10.0)
+        .chunks(3)
+        .map(|c| [c[0], c[1], c[2]])
+        .collect();
+    let other: Vec<[f64; 3]> = cube.iter().map(|v| [v[0] + 30.0, v[1], v[2]]).collect();
+    let bytes = write_three_mf(
+        &cube,
+        &other,
+        "pair",
+        &ThreeMfOpts {
+            separate: true,
+            ..Default::default()
+        },
+    );
+    let path = tmp("pair2.3mf");
+    std::fs::write(&path, bytes).unwrap();
+    let parts = load_parts(path.to_string_lossy().into_owned()).unwrap();
+    let merged = merge_parts(parts, 2).unwrap().info();
+    assert_eq!(
+        merged.import_note,
+        "3MF: merged 2 of 2 objects into one part."
+    );
+    assert_eq!(merged.triangles, 24);
 }
 
 #[test]

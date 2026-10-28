@@ -46,6 +46,7 @@ struct OpenFlowTests {
         picker.load()
         #expect(model.picker == nil && model.hasPart && model.status == nil)
         #expect(model.session.parts.count == 1 && model.session.parts[0].info.name == "small")
+        #expect(model.session.parts[0].info.importNote == "OBJ: imported “small” of 3 objects.")
         #expect(model.controller?.size == SIMD3<Float>(10, 10, 10))
     }
 
@@ -75,7 +76,8 @@ struct OpenFlowTests {
         #expect(model.picker == nil && model.status == nil)
         // small (10 mm) and big (20 mm) cubes at the origin: 12 + 12 triangles, one part, the union's box
         #expect(model.session.parts.count == 1)
-        #expect(model.session.parts[0].info.notes.contains("merged 2 of 3 objects into one part"))
+        #expect(model.session.parts[0].info.notes == ["merged 2 of 3 objects into one part"])
+        #expect(model.session.parts[0].info.importNote == "OBJ: merged 2 of 3 objects into one part.")
         #expect(model.session.parts[0].info.triangles == 24 && model.controller?.faceCount == 24)
         #expect(model.controller?.size == SIMD3<Float>(20, 20, 20))
     }
@@ -84,6 +86,15 @@ struct OpenFlowTests {
         let model = ViewerModel()
         await model.load(url: try TestParts.write(TestParts.box(0, 30, 0, 30, 0, 30), name: "open-flow-solo.stl").asURL)
         #expect(model.picker == nil && model.hasPart)
+        #expect(model.session.parts[0].info.importNote.isEmpty)    // an STL has no import note
+    }
+
+    @Test func theStatusCardListsItsLinesInThePagesOrder() {
+        let lines = StatusCard.lines(importNote: "OBJ: imported “b” of 2 objects.", flat: "flat", flatGood: true,
+                                     fin: "fin", overWarn: "over", island: "island")
+        #expect(lines.map(\.text) == ["OBJ: imported “b” of 2 objects.", "flat", "fin", "over", "island"])
+        #expect(lines.map(\.bar) == [nil, nil, nil, StatusCard.amber, StatusCard.red], "the warning cards' bars")
+        #expect(StatusCard.lines(importNote: "", flat: "", flatGood: false, fin: "", overWarn: "", island: nil).isEmpty)
     }
 
     @Test func largestByTrianglesFirstAndPreselected() {

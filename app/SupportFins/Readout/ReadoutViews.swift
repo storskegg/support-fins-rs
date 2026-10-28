@@ -72,18 +72,38 @@ struct StatsCard: View {
 struct StatusCard: View {
     var part: PartReadout
     var fins: FinReadout?
-    var importNotes: [String] = []
+    /// `#s-import-note` (`renderImportNote`, `ui/io.js:26`); empty hides it.
+    var importNote = ""
+    /// `#island-warn` (`renderIslandCard`): last in the card, in the island card's red.
+    var islandCard: String?
     @State private var showReceiptInfo = false
 
+    /// The card's lines in the order of `index.html:603-610`: import, flat, fin, over-warn, island-warn. The two
+    /// warning cards carry the web's 3 px bar on their left (`.over-warn` amber #ffb454, `.island-warn` red
+    /// #ff5a4d, `style.css:874-887`).
+    static func lines(importNote: String, flat: String, flatGood: Bool, fin: String, overWarn: String,
+                      island: String?) -> [(text: String, color: Color, bar: Color?)] {
+        (importNote.isEmpty ? [] : [(importNote, Color.secondary, nil)])
+            + (flat.isEmpty ? [] : [(flat, flatGood ? Color.green : Color.secondary, nil)])
+            + (fin.isEmpty ? [] : [(fin, Color.secondary, nil)])
+            + (overWarn.isEmpty ? [] : [(overWarn, Color.primary, Self.amber)])
+            + (island.map { [($0, Color.primary, Self.red)] } ?? [])
+    }
+
+    static let amber = Color(red: 1, green: 0.706, blue: 0.329)
+    static let red = Color(red: 1, green: 0.353, blue: 0.302)
+
     var body: some View {
-        let notes: [(String, Bool)] = importNotes.map { ($0, false) }
-            + (part.flatNote.isEmpty ? [] : [(part.flatNote, part.flatNoteGood)])
-            + (part.overWarn.isEmpty ? [] : [(part.overWarn, false)])
-            + (fins?.lead.isEmpty == false ? [(fins!.lead, false)] : [])
+        let notes = Self.lines(importNote: importNote, flat: part.flatNote, flatGood: part.flatNoteGood,
+                               fin: fins?.lead ?? "", overWarn: part.overWarn, island: islandCard)
         if !notes.isEmpty || fins?.grams != nil {
             Section("Status") {
                 ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
-                    Text(note.0).font(.callout).foregroundStyle(note.1 ? Color.green : Color.secondary)
+                    Text(note.text).font(.callout).foregroundStyle(note.color)
+                        .padding(.leading, note.bar == nil ? 0 : 9)
+                        .overlay(alignment: .leading) {
+                            if let bar = note.bar { RoundedRectangle(cornerRadius: 1.5).fill(bar).frame(width: 3) }
+                        }
                 }
                 if let grams = fins?.grams {
                     HStack {

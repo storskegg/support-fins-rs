@@ -48,6 +48,9 @@ pub struct PartInfo {
     /// What import did, in the page's words (`web/ui/io.js` `renderImportNote`): the negative parts cut
     /// out of it, and why any were not. Empty for a part without negative parts.
     pub notes: Vec<String>,
+    /// `renderImportNote` (`web/ui/io.js:26`): `notes` as the Status card's line, "3MF: a; b." or "OBJ: ...",
+    /// empty when there is nothing to say (an STL, a lone object).
+    pub import_note: String,
     /// How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
     /// (`web/ui/part.js` `analysisTiming`).
     pub weld_ms: f64,
@@ -159,6 +162,9 @@ pub struct Part {
     topo: Arc<Topology>,
     size: [f64; 3],
     notes: Vec<String>,
+    import_note: String,
+    /// What the reader decided (`lastImportMeta`), kept so a merge can sum it.
+    meta: ImportMeta,
     weld_ms: f64,
 }
 
@@ -169,7 +175,9 @@ impl Part {
         positions: Vec<f64>,
         slicer: Option<Slicer>,
         colors: Option<PartColors>,
-        notes: Vec<String>,
+        meta: ImportMeta,
+        objects_len: usize,
+        chosen_len: usize,
     ) -> Part {
         let mut lo = [f64::INFINITY; 3];
         let mut hi = [f64::NEG_INFINITY; 3];
@@ -184,6 +192,8 @@ impl Part {
         } else {
             [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
         };
+        let notes = meta.clauses(objects_len, chosen_len, &name);
+        let import_note = meta.line(&notes);
         let started = std::time::Instant::now();
         let topo = build_topology(positions);
         let weld_ms = started.elapsed().as_secs_f64() * 1e3;
@@ -195,6 +205,8 @@ impl Part {
             topo: Arc::new(topo),
             size,
             notes,
+            import_note,
+            meta,
             weld_ms,
         }
     }
@@ -250,6 +262,7 @@ impl Part {
             triangles: self.topo.n_faces as u64,
             size: self.size.to_vec(),
             notes: self.notes.clone(),
+            import_note: self.import_note.clone(),
             weld_ms: self.weld_ms,
         }
     }
@@ -343,21 +356,151 @@ fn plural(n: usize, one: &str, other: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { other })
 }
 
-/// An object read from a file: name, positions, its slicer's parts, import notes.
+/// An object read from a file: name, positions, its slicer's parts, what the reader decided.
 type Loaded = (
     String,
     Vec<f64>,
     Option<Slicer>,
     Option<PartColors>,
-    Vec<String>,
+    ImportMeta,
 );
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Kind {
+    Stl,
+    Obj,
+    ThreeMf,
+}
+
+/// `lastImportMeta` (`web/ui/io.js:273-285`): what the reader had to decide, for the import note.
+#[derive(Clone, Debug)]
+struct ImportMeta {
+    kind: Kind,
+    /// the chosen object's meshes (`chosen[0].meshes`)
+    meshes: usize,
+    /// the file's ignored support/non-printable bodies
+    skipped: usize,
+    cut: usize,
+    uncut: usize,
+    why: Option<&'static str>,
+    /// modifiers / support blockers kept for the 3MF export
+    extras: usize,
+    unit: String,
+}
+
+impl ImportMeta {
+    fn new(kind: Kind) -> ImportMeta {
+        ImportMeta {
+            kind,
+            meshes: 1,
+            skipped: 0,
+            cut: 0,
+            uncut: 0,
+            why: None,
+            extras: 0,
+            unit: String::new(),
+        }
+    }
+
+    /// The notes of `renderImportNote` (`web/ui/io.js:26-69`) in the web's order and words. Session notes
+    /// (`restored ...`) are for a file this app wrote with a session: M7.
+    fn clauses(&self, objects_len: usize, chosen_len: usize, chosen_name: &str) -> Vec<String> {
+        let mut n = Vec::new();
+        let head = |n: &mut Vec<String>| {
+            n.push(if chosen_len == 1 {
+                format!("imported “{chosen_name}” of {objects_len} objects")
+            } else {
+                format!("merged {chosen_len} of {objects_len} objects into one part")
+            })
+        };
+        match self.kind {
+            Kind::Stl => {}
+            Kind::Obj => {
+                if objects_len > 1 {
+                    head(&mut n);
+                }
+            }
+            Kind::ThreeMf => {
+                if objects_len > 1 {
+                    head(&mut n);
+                } else if self.meshes > 1 {
+                    n.push(format!("merged {} bodies into one part", self.meshes));
+                }
+                if self.skipped > 0 {
+                    n.push(format!(
+                        "ignored {}",
+                        plural(
+                            self.skipped,
+                            "support/non-printable body",
+                            "support/non-printable bodies"
+                        )
+                    ));
+                }
+                if self.cut > 0 {
+                    n.push(format!(
+                        "cut out {}",
+                        plural(self.cut, "negative part", "negative parts")
+                    ));
+                    // the export carries the negative parts too, and a slicer draws one over the walls standing in its cut
+                    n.push(
+                        "in your slicer, walls inside a negative part show once you slice".into(),
+                    );
+                }
+                match self.why {
+                    Some("open") => n.push(
+                        "negative parts not cut: the part is not a closed solid, so its fins are for the uncut shape".into(),
+                    ),
+                    Some("whole") => n.push("negative parts not cut: they would remove the whole part".into()),
+                    Some("load") => n.push(
+                        "negative parts not cut: the cutter did not load (try opening the file again)".into(),
+                    ),
+                    _ if self.uncut > 0 => n.push(if self.uncut == 1 {
+                        "1 negative part not cut: it is not a closed solid".into()
+                    } else {
+                        format!("{} negative parts not cut: they are not closed solids", self.uncut)
+                    }),
+                    _ => {}
+                }
+                if self.extras > 0 {
+                    n.push(format!(
+                        "kept {} for the 3MF export",
+                        plural(
+                            self.extras,
+                            "modifier/support blocker",
+                            "modifiers/support blockers"
+                        )
+                    ));
+                }
+                if !self.unit.is_empty() && self.unit != "millimeter" {
+                    n.push(format!("converted from {} to mm", self.unit));
+                }
+            }
+        }
+        n
+    }
+
+    /// `3MF: a; b.` / `OBJ: a.` / nothing.
+    fn line(&self, clauses: &[String]) -> String {
+        if clauses.is_empty() {
+            return String::new();
+        }
+        let tag = match self.kind {
+            Kind::ThreeMf => "3MF",
+            Kind::Obj => "OBJ",
+            Kind::Stl => return String::new(),
+        };
+        format!("{tag}: {}.", clauses.join("; "))
+    }
+}
 
 /// A 3MF object with a slicer's negative parts cut out of it, as `web/ui/io.js` does at import
 /// (`cutChosen`), and the notes `renderImportNote` writes for it (the cut ones, and the kept
 /// modifiers / support blockers).
 fn cut_object(o: ThreeMfObject) -> Loaded {
     let has_negative = o.extras.iter().any(|e| e.kind == PartKind::Negative);
-    let kept = o
+    let mut meta = ImportMeta::new(Kind::ThreeMf);
+    meta.meshes = o.meshes;
+    meta.extras = o
         .extras
         .iter()
         .filter(|e| e.kind != PartKind::Negative)
@@ -367,49 +510,16 @@ fn cut_object(o: ThreeMfObject) -> Loaded {
         colors: o.colors.clone(),
         extras: o.extras.clone(),
     });
-    let mut notes = Vec::new();
     let (positions, colors) = if has_negative {
         let c = sf_cut::cut_negatives(&o.positions, o.colors.as_ref(), &o.extras);
-        if c.cut > 0 {
-            notes.push(format!(
-                "cut out {}",
-                plural(c.cut, "negative part", "negative parts")
-            ));
-            // the export carries the negative parts too, and a slicer draws one over the walls standing in its cut
-            notes.push(
-                "in your slicer, walls inside a negative part show once you slice".to_string(),
-            );
-        }
-        match c.why {
-            Some("open") => notes.push(
-                "negative parts not cut: the part is not a closed solid, so its fins are for the uncut shape".into(),
-            ),
-            Some("whole") => notes.push("negative parts not cut: they would remove the whole part".into()),
-            Some("load") => {
-                notes.push("negative parts not cut: the cutter did not load (try opening the file again)".into())
-            }
-            _ if c.uncut > 0 => notes.push(format!(
-                "{} not cut: {}",
-                plural(c.uncut, "negative part", "negative parts"),
-                if c.uncut == 1 { "it is not a closed solid" } else { "they are not closed solids" }
-            )),
-            _ => {}
-        }
+        meta.cut = c.cut;
+        meta.uncut = c.uncut;
+        meta.why = c.why;
         (c.positions, c.colors)
     } else {
         (o.positions, o.colors)
     };
-    if kept > 0 {
-        notes.push(format!(
-            "kept {} for the 3MF export",
-            plural(
-                kept,
-                "modifier/support blocker",
-                "modifiers/support blockers"
-            )
-        ));
-    }
-    (o.name, positions, slicer, colors, notes)
+    (o.name, positions, slicer, colors, meta)
 }
 
 /// STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
@@ -429,21 +539,38 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
             read_stl(&bytes).map_err(|e| format(e.0))?,
             None,
             None,
-            vec![],
+            ImportMeta::new(Kind::Stl),
         ));
     } else if lower.ends_with(".obj") {
         for o in read_obj(&bytes).map_err(format)?.objects {
-            parts.push((o.name, o.positions, None, None, vec![]));
+            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Obj)));
         }
     } else if lower.ends_with(".3mf") {
         let m = read_three_mf(&bytes).map_err(format)?;
         drop(bytes);
         let objects = m.objects;
+        let (skipped, unit) = (m.skipped, m.unit);
+        let file = |mut meta: ImportMeta| {
+            meta.skipped = skipped;
+            meta.unit.clone_from(&unit);
+            meta
+        };
         if objects.is_empty() {
-            parts.push((stem(&path), m.positions, None, None, vec![]));
+            parts.push((
+                stem(&path),
+                m.positions,
+                None,
+                None,
+                file(ImportMeta::new(Kind::ThreeMf)),
+            ));
         } else {
             drop(m.positions); // the merged soup of every object: not needed beside them
-            parts.extend(objects.into_iter().map(cut_object));
+            parts.extend(
+                objects
+                    .into_iter()
+                    .map(cut_object)
+                    .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
+            );
         }
     } else {
         return Err(format("reads .stl, .3mf and .obj only".into()));
@@ -453,16 +580,26 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
         return Err(format("no triangles in the file".into()));
     }
     let base = stem(&path);
+    let objects_len = parts.len();
     Ok(parts
         .into_iter()
         .enumerate()
-        .map(|(i, (name, pos, slicer, colors, notes))| {
+        .map(|(i, (name, pos, slicer, colors, meta))| {
             let name = if name.is_empty() {
                 format!("{base} {}", i + 1)
             } else {
                 name
             };
-            Arc::new(Part::new(name, base.clone(), pos, slicer, colors, notes))
+            Arc::new(Part::new(
+                name,
+                base.clone(),
+                pos,
+                slicer,
+                colors,
+                meta,
+                objects_len,
+                1,
+            ))
         })
         .collect())
 }
@@ -528,12 +665,13 @@ pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>
     } else {
         None
     };
-    let mut notes: Vec<String> = parts.iter().flat_map(|p| p.notes.iter().cloned()).collect();
-    notes.push(format!(
-        "merged {} of {} objects into one part",
-        parts.len(),
-        object_count.max(parts.len() as u64)
-    ));
+    // the tallies of `cutChosen` (io.js:288-311): sums, the first reason, the first object's meshes
+    let mut meta = parts[0].meta.clone();
+    meta.cut = parts.iter().map(|p| p.meta.cut).sum();
+    meta.uncut = parts.iter().map(|p| p.meta.uncut).sum();
+    meta.why = parts.iter().find_map(|p| p.meta.why);
+    meta.extras = parts.iter().map(|p| p.meta.extras).sum();
+    let total = (object_count as usize).max(parts.len());
     let stem = parts[0].stem.clone();
     Ok(Arc::new(Part::new(
         stem.clone(),
@@ -541,6 +679,66 @@ pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>
         positions,
         slicer,
         colors,
-        notes,
+        meta,
+        total,
+        parts.len(),
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn note(m: &ImportMeta, objects: usize, chosen: usize) -> String {
+        m.line(&m.clauses(objects, chosen, "Body"))
+    }
+
+    #[test]
+    fn a_3mf_note_follows_the_pages_order_and_plurals() {
+        let mut m = ImportMeta::new(Kind::ThreeMf);
+        assert_eq!(note(&m, 1, 1), "");
+        // one object of several bodies (io.js:36)
+        m.meshes = 3;
+        assert_eq!(note(&m, 1, 1), "3MF: merged 3 bodies into one part.");
+        m.skipped = 1;
+        assert_eq!(
+            note(&m, 1, 1),
+            "3MF: merged 3 bodies into one part; ignored 1 support/non-printable body."
+        );
+        m.skipped = 2;
+        m.cut = 1;
+        m.extras = 2;
+        m.unit = "inch".into();
+        assert_eq!(
+            note(&m, 1, 1),
+            "3MF: merged 3 bodies into one part; ignored 2 support/non-printable bodies; cut out 1 negative part; in your slicer, walls inside a negative part show once you slice; kept 2 modifiers/support blockers for the 3MF export; converted from inch to mm."
+        );
+        // a plate of several: the bodies note gives way to the pick
+        assert_eq!(
+            note(&ImportMeta::new(Kind::ThreeMf), 4, 1),
+            "3MF: imported “Body” of 4 objects."
+        );
+        assert_eq!(
+            note(&ImportMeta::new(Kind::ThreeMf), 4, 3),
+            "3MF: merged 3 of 4 objects into one part."
+        );
+        let mut u = ImportMeta::new(Kind::ThreeMf);
+        u.uncut = 1;
+        assert_eq!(
+            note(&u, 1, 1),
+            "3MF: 1 negative part not cut: it is not a closed solid."
+        );
+        u.uncut = 2;
+        assert_eq!(
+            note(&u, 1, 1),
+            "3MF: 2 negative parts not cut: they are not closed solids."
+        );
+        u.why = Some("whole");
+        assert_eq!(
+            note(&u, 1, 1),
+            "3MF: negative parts not cut: they would remove the whole part."
+        );
+        u.unit = "millimeter".into();
+        assert!(!note(&u, 1, 1).contains("converted"));
+    }
 }
