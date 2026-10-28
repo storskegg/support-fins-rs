@@ -519,6 +519,30 @@ fileprivate struct FfiConverterDouble: FfiConverterPrimitive {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterBool : FfiConverter {
+    typealias FfiType = Int8
+    typealias SwiftType = Bool
+
+    public static func lift(_ value: Int8) throws -> Bool {
+        return value != 0
+    }
+
+    public static func lower(_ value: Bool) -> Int8 {
+        return value ? 1 : 0
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Bool {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: Bool, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -1095,6 +1119,18 @@ public protocol PartProtocol: AnyObject, Sendable {
      */
     func mesh()  -> GpuBuffer
     
+    /**
+     * Rank the part's poses for printability, as the Suggest popover does. Blocking: it can take
+     * seconds, so call it from a background task, or use [`Suggester`].
+     */
+    func suggestOrientations(thresholdDeg: Double, optsJson: String, context: SuggestContext) throws  -> SuggestResult
+    
+    /**
+     * The strongest printable pose for a load. `dir_local`: the load in the part's own frame;
+     * `dir_world`: the same load in the current pose.
+     */
+    func suggestStrengthPose(dirLocal: [Double], dirWorld: [Double], thresholdDeg: Double) throws  -> StrengthAdvice
+    
 }
 /**
  * One object of a file: its welded topology (which owns the source soup in the model frame).
@@ -1202,6 +1238,38 @@ open func mesh() -> GpuBuffer  {
 })
 }
     
+    /**
+     * Rank the part's poses for printability, as the Suggest popover does. Blocking: it can take
+     * seconds, so call it from a background task, or use [`Suggester`].
+     */
+open func suggestOrientations(thresholdDeg: Double, optsJson: String, context: SuggestContext)throws  -> SuggestResult  {
+    return try  FfiConverterTypeSuggestResult_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_part_suggest_orientations(
+            self.uniffiCloneHandle(),
+        FfiConverterDouble.lower(thresholdDeg),
+        FfiConverterString.lower(optsJson),
+        FfiConverterTypeSuggestContext_lower(context),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The strongest printable pose for a load. `dir_local`: the load in the part's own frame;
+     * `dir_world`: the same load in the current pose.
+     */
+open func suggestStrengthPose(dirLocal: [Double], dirWorld: [Double], thresholdDeg: Double)throws  -> StrengthAdvice  {
+    return try  FfiConverterTypeStrengthAdvice_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_part_suggest_strength_pose(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceDouble.lower(dirLocal),
+        FfiConverterSequenceDouble.lower(dirWorld),
+        FfiConverterDouble.lower(thresholdDeg),uniffiCallStatus
+    )
+})
+}
+    
 
     
 }
@@ -1245,6 +1313,171 @@ public func FfiConverterTypePart_lift(_ handle: UInt64) throws -> Part {
 #endif
 public func FfiConverterTypePart_lower(_ value: Part) -> UInt64 {
     return FfiConverterTypePart.lower(value)
+}
+
+
+
+
+
+
+/**
+ * One per part, with its own worker. Like `Builder`: each request bumps the generation, and one that
+ * is no longer the latest when it starts or finishes is dropped without being delivered.
+ */
+public protocol SuggesterProtocol: AnyObject, Sendable {
+    
+    /**
+     * Queue a strength-pose search; returns its generation.
+     */
+    func strength(dirLocal: [Double], dirWorld: [Double], thresholdDeg: Double, listener: SuggestListener)  -> UInt64
+    
+    /**
+     * Queue a ranking; returns its generation.
+     */
+    func suggest(thresholdDeg: Double, optsJson: String, context: SuggestContext, listener: SuggestListener)  -> UInt64
+    
+}
+/**
+ * One per part, with its own worker. Like `Builder`: each request bumps the generation, and one that
+ * is no longer the latest when it starts or finishes is dropped without being delivered.
+ */
+open class Suggester: SuggesterProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_sf_ffi_fn_clone_suggester(self.handle, $0) }
+    }
+public convenience init(part: Part) {
+    let handle =
+        try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_constructor_suggester_new(
+        FfiConverterTypePart_lower(part),uniffiCallStatus
+    )
+}
+    self.init(unsafeFromHandle: handle)
+}
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_sf_ffi_fn_free_suggester(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * Queue a strength-pose search; returns its generation.
+     */
+open func strength(dirLocal: [Double], dirWorld: [Double], thresholdDeg: Double, listener: SuggestListener) -> UInt64  {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_suggester_strength(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceDouble.lower(dirLocal),
+        FfiConverterSequenceDouble.lower(dirWorld),
+        FfiConverterDouble.lower(thresholdDeg),
+        FfiConverterCallbackInterfaceSuggestListener_lower(listener),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Queue a ranking; returns its generation.
+     */
+open func suggest(thresholdDeg: Double, optsJson: String, context: SuggestContext, listener: SuggestListener) -> UInt64  {
+    return try!  FfiConverterUInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_suggester_suggest(
+            self.uniffiCloneHandle(),
+        FfiConverterDouble.lower(thresholdDeg),
+        FfiConverterString.lower(optsJson),
+        FfiConverterTypeSuggestContext_lower(context),
+        FfiConverterCallbackInterfaceSuggestListener_lower(listener),uniffiCallStatus
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSuggester: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = Suggester
+
+    public static func lift(_ handle: UInt64) throws -> Suggester {
+        return Suggester(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: Suggester) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Suggester {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: Suggester, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggester_lift(_ handle: UInt64) throws -> Suggester {
+    return try FfiConverterTypeSuggester.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggester_lower(_ value: Suggester) -> UInt64 {
+    return FfiConverterTypeSuggester.lower(value)
 }
 
 
@@ -1335,6 +1568,80 @@ public func FfiConverterTypeAnalysisSummary_lower(_ value: AnalysisSummary) -> R
 }
 
 
+public struct LoadAlignment: Equatable, Hashable {
+    public var cross: Double
+    /**
+     * `good`, `mixed` or `poor`.
+     */
+    public var quality: String
+    public var text: String
+    /**
+     * Offer "Turn to the strongest printable pose" (the pose is not already good).
+     */
+    public var canSuggest: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(cross: Double, 
+        /**
+         * `good`, `mixed` or `poor`.
+         */quality: String, text: String, 
+        /**
+         * Offer "Turn to the strongest printable pose" (the pose is not already good).
+         */canSuggest: Bool) {
+        self.cross = cross
+        self.quality = quality
+        self.text = text
+        self.canSuggest = canSuggest
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LoadAlignment: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLoadAlignment: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LoadAlignment {
+        return
+            try LoadAlignment(
+                cross: FfiConverterDouble.read(from: &buf), 
+                quality: FfiConverterString.read(from: &buf), 
+                text: FfiConverterString.read(from: &buf), 
+                canSuggest: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LoadAlignment, into buf: inout [UInt8]) {
+        FfiConverterDouble.write(value.cross, into: &buf)
+        FfiConverterString.write(value.quality, into: &buf)
+        FfiConverterString.write(value.text, into: &buf)
+        FfiConverterBool.write(value.canSuggest, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLoadAlignment_lift(_ buf: RustBuffer) throws -> LoadAlignment {
+    return try FfiConverterTypeLoadAlignment.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLoadAlignment_lower(_ value: LoadAlignment) -> RustBuffer {
+    return FfiConverterTypeLoadAlignment.lower(value)
+}
+
+
 public struct PartInfo: Equatable, Hashable {
     public var name: String
     public var triangles: UInt64
@@ -1408,6 +1715,424 @@ public func FfiConverterTypePartInfo_lift(_ buf: RustBuffer) throws -> PartInfo 
 #endif
 public func FfiConverterTypePartInfo_lower(_ value: PartInfo) -> RustBuffer {
     return FfiConverterTypePartInfo.lower(value)
+}
+
+
+public struct StrengthAdvice: Equatable, Hashable {
+    /**
+     * The pose to turn to; `None` when the current one is about as strong as it gets.
+     */
+    public var pose: StrengthPose?
+    public var alreadyStrongest: Bool
+    public var note: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The pose to turn to; `None` when the current one is about as strong as it gets.
+         */pose: StrengthPose?, alreadyStrongest: Bool, note: String?) {
+        self.pose = pose
+        self.alreadyStrongest = alreadyStrongest
+        self.note = note
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension StrengthAdvice: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStrengthAdvice: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StrengthAdvice {
+        return
+            try StrengthAdvice(
+                pose: FfiConverterOptionTypeStrengthPose.read(from: &buf), 
+                alreadyStrongest: FfiConverterBool.read(from: &buf), 
+                note: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StrengthAdvice, into buf: inout [UInt8]) {
+        FfiConverterOptionTypeStrengthPose.write(value.pose, into: &buf)
+        FfiConverterBool.write(value.alreadyStrongest, into: &buf)
+        FfiConverterOptionString.write(value.note, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStrengthAdvice_lift(_ buf: RustBuffer) throws -> StrengthAdvice {
+    return try FfiConverterTypeStrengthAdvice.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStrengthAdvice_lower(_ value: StrengthAdvice) -> RustBuffer {
+    return FfiConverterTypeStrengthAdvice.lower(value)
+}
+
+
+public struct StrengthPose: Equatable, Hashable {
+    public var rot: [Double]
+    public var cross: Double
+    public var quality: String
+    public var text: String
+    public var height: Double
+    public var over: Double
+    public var bedArea: Double
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(rot: [Double], cross: Double, quality: String, text: String, height: Double, over: Double, bedArea: Double) {
+        self.rot = rot
+        self.cross = cross
+        self.quality = quality
+        self.text = text
+        self.height = height
+        self.over = over
+        self.bedArea = bedArea
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension StrengthPose: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStrengthPose: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StrengthPose {
+        return
+            try StrengthPose(
+                rot: FfiConverterSequenceDouble.read(from: &buf), 
+                cross: FfiConverterDouble.read(from: &buf), 
+                quality: FfiConverterString.read(from: &buf), 
+                text: FfiConverterString.read(from: &buf), 
+                height: FfiConverterDouble.read(from: &buf), 
+                over: FfiConverterDouble.read(from: &buf), 
+                bedArea: FfiConverterDouble.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StrengthPose, into buf: inout [UInt8]) {
+        FfiConverterSequenceDouble.write(value.rot, into: &buf)
+        FfiConverterDouble.write(value.cross, into: &buf)
+        FfiConverterString.write(value.quality, into: &buf)
+        FfiConverterString.write(value.text, into: &buf)
+        FfiConverterDouble.write(value.height, into: &buf)
+        FfiConverterDouble.write(value.over, into: &buf)
+        FfiConverterDouble.write(value.bedArea, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStrengthPose_lift(_ buf: RustBuffer) throws -> StrengthPose {
+    return try FfiConverterTypeStrengthPose.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStrengthPose_lower(_ value: StrengthPose) -> RustBuffer {
+    return FfiConverterTypeStrengthPose.lower(value)
+}
+
+
+/**
+ * What the page knows beyond the part when it ranks (`suggestCurBore`, `materialDensity`).
+ */
+public struct SuggestContext: Equatable, Hashable {
+    /**
+     * Walls the CURRENT pose stands inside a bore (`summary_json` `boreWalls`).
+     */
+    public var currentBore: UInt64
+    /**
+     * The material's density, g/cm3.
+     */
+    public var density: Double
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Walls the CURRENT pose stands inside a bore (`summary_json` `boreWalls`).
+         */currentBore: UInt64, 
+        /**
+         * The material's density, g/cm3.
+         */density: Double) {
+        self.currentBore = currentBore
+        self.density = density
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SuggestContext: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSuggestContext: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SuggestContext {
+        return
+            try SuggestContext(
+                currentBore: FfiConverterUInt64.read(from: &buf), 
+                density: FfiConverterDouble.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SuggestContext, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.currentBore, into: &buf)
+        FfiConverterDouble.write(value.density, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestContext_lift(_ buf: RustBuffer) throws -> SuggestContext {
+    return try FfiConverterTypeSuggestContext.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestContext_lower(_ value: SuggestContext) -> RustBuffer {
+    return FfiConverterTypeSuggestContext.lower(value)
+}
+
+
+public struct SuggestResult: Equatable, Hashable {
+    /**
+     * Best first, at most three; empty when there is nothing to suggest.
+     */
+    public var rows: [Suggestion]
+    /**
+     * `high`, `medium`, `low` or `none`.
+     */
+    public var confidence: String
+    /**
+     * The line under the list (or why the list is empty).
+     */
+    public var note: String
+    /**
+     * The note is the "no support" win, styled good.
+     */
+    public var noteGood: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Best first, at most three; empty when there is nothing to suggest.
+         */rows: [Suggestion], 
+        /**
+         * `high`, `medium`, `low` or `none`.
+         */confidence: String, 
+        /**
+         * The line under the list (or why the list is empty).
+         */note: String, 
+        /**
+         * The note is the "no support" win, styled good.
+         */noteGood: Bool) {
+        self.rows = rows
+        self.confidence = confidence
+        self.note = note
+        self.noteGood = noteGood
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SuggestResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSuggestResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SuggestResult {
+        return
+            try SuggestResult(
+                rows: FfiConverterSequenceTypeSuggestion.read(from: &buf), 
+                confidence: FfiConverterString.read(from: &buf), 
+                note: FfiConverterString.read(from: &buf), 
+                noteGood: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SuggestResult, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeSuggestion.write(value.rows, into: &buf)
+        FfiConverterString.write(value.confidence, into: &buf)
+        FfiConverterString.write(value.note, into: &buf)
+        FfiConverterBool.write(value.noteGood, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestResult_lift(_ buf: RustBuffer) throws -> SuggestResult {
+    return try FfiConverterTypeSuggestResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestResult_lower(_ value: SuggestResult) -> RustBuffer {
+    return FfiConverterTypeSuggestResult.lower(value)
+}
+
+
+/**
+ * One row of the Suggest list.
+ */
+public struct Suggestion: Equatable, Hashable {
+    /**
+     * The pose: nine numbers, column-major.
+     */
+    public var rot: [Double]
+    /**
+     * `Best`, `#2`, `#3`.
+     */
+    public var rank: String
+    /**
+     * The row's line, e.g. `40 mm · 4 fins · 2 rough holes`.
+     */
+    public var line: String
+    public var height: Double
+    public var fins: UInt64
+    public var roughHoles: UInt64
+    public var regions: UInt64
+    public var bore: UInt64
+    public var volume: Double
+    /**
+     * Seated on a point: shown as a bad row.
+     */
+    public var cantPrint: Bool
+    public var tier: SuggestTier
+    public var badge: String?
+    public var note: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The pose: nine numbers, column-major.
+         */rot: [Double], 
+        /**
+         * `Best`, `#2`, `#3`.
+         */rank: String, 
+        /**
+         * The row's line, e.g. `40 mm · 4 fins · 2 rough holes`.
+         */line: String, height: Double, fins: UInt64, roughHoles: UInt64, regions: UInt64, bore: UInt64, volume: Double, 
+        /**
+         * Seated on a point: shown as a bad row.
+         */cantPrint: Bool, tier: SuggestTier, badge: String?, note: String?) {
+        self.rot = rot
+        self.rank = rank
+        self.line = line
+        self.height = height
+        self.fins = fins
+        self.roughHoles = roughHoles
+        self.regions = regions
+        self.bore = bore
+        self.volume = volume
+        self.cantPrint = cantPrint
+        self.tier = tier
+        self.badge = badge
+        self.note = note
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Suggestion: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSuggestion: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Suggestion {
+        return
+            try Suggestion(
+                rot: FfiConverterSequenceDouble.read(from: &buf), 
+                rank: FfiConverterString.read(from: &buf), 
+                line: FfiConverterString.read(from: &buf), 
+                height: FfiConverterDouble.read(from: &buf), 
+                fins: FfiConverterUInt64.read(from: &buf), 
+                roughHoles: FfiConverterUInt64.read(from: &buf), 
+                regions: FfiConverterUInt64.read(from: &buf), 
+                bore: FfiConverterUInt64.read(from: &buf), 
+                volume: FfiConverterDouble.read(from: &buf), 
+                cantPrint: FfiConverterBool.read(from: &buf), 
+                tier: FfiConverterTypeSuggestTier.read(from: &buf), 
+                badge: FfiConverterOptionString.read(from: &buf), 
+                note: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Suggestion, into buf: inout [UInt8]) {
+        FfiConverterSequenceDouble.write(value.rot, into: &buf)
+        FfiConverterString.write(value.rank, into: &buf)
+        FfiConverterString.write(value.line, into: &buf)
+        FfiConverterDouble.write(value.height, into: &buf)
+        FfiConverterUInt64.write(value.fins, into: &buf)
+        FfiConverterUInt64.write(value.roughHoles, into: &buf)
+        FfiConverterUInt64.write(value.regions, into: &buf)
+        FfiConverterUInt64.write(value.bore, into: &buf)
+        FfiConverterDouble.write(value.volume, into: &buf)
+        FfiConverterBool.write(value.cantPrint, into: &buf)
+        FfiConverterTypeSuggestTier.write(value.tier, into: &buf)
+        FfiConverterOptionString.write(value.badge, into: &buf)
+        FfiConverterOptionString.write(value.note, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestion_lift(_ buf: RustBuffer) throws -> Suggestion {
+    return try FfiConverterTypeSuggestion.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestion_lower(_ value: Suggestion) -> RustBuffer {
+    return FfiConverterTypeSuggestion.lower(value)
 }
 
 
@@ -1525,6 +2250,85 @@ public func FfiConverterTypeFfiError_lift(_ buf: RustBuffer) throws -> FfiError 
 public func FfiConverterTypeFfiError_lower(_ value: FfiError) -> RustBuffer {
     return FfiConverterTypeFfiError.lower(value)
 }
+
+
+
+public enum SuggestTier: Equatable, Hashable {
+    
+    /**
+     * Needs no fins at all: the green row.
+     */
+    case free
+    /**
+     * Still needs fins, but every bore prints support-free: the "Bores clean" badge.
+     */
+    case holeClean
+    case ordinary
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SuggestTier: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSuggestTier: FfiConverterRustBuffer {
+    typealias SwiftType = SuggestTier
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SuggestTier {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .free
+        
+        case 2: return .holeClean
+        
+        case 3: return .ordinary
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SuggestTier, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .free:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .holeClean:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .ordinary:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestTier_lift(_ buf: RustBuffer) throws -> SuggestTier {
+    return try FfiConverterTypeSuggestTier.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSuggestTier_lower(_ value: SuggestTier) -> RustBuffer {
+    return FfiConverterTypeSuggestTier.lower(value)
+}
+
 
 
 
@@ -1694,6 +2498,274 @@ public func FfiConverterCallbackInterfaceBuildListener_lower(_ v: BuildListener)
     return FfiConverterCallbackInterfaceBuildListener.lower(v)
 }
 
+
+
+
+/**
+ * Where a suggestion (or its failure) arrives, on the suggester's worker thread.
+ */
+public protocol SuggestListener: AnyObject, Sendable {
+    
+    func suggested(generation: UInt64, result: SuggestResult) 
+    
+    func strength(generation: UInt64, advice: StrengthAdvice) 
+    
+    func failed(generation: UInt64, err: FfiError) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceSuggestListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceSuggestListener = UniffiVTableCallbackInterfaceSuggestListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceSuggestListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface SuggestListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceSuggestListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface SuggestListener: handle missing in uniffiClone")
+            }
+        },
+        suggested: { (
+            uniffiHandle: UInt64,
+            generation: UInt64,
+            result: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSuggestListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.suggested(
+                     generation: try FfiConverterUInt64.lift(generation),
+                     result: try FfiConverterTypeSuggestResult_lift(result)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        strength: { (
+            uniffiHandle: UInt64,
+            generation: UInt64,
+            advice: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSuggestListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.strength(
+                     generation: try FfiConverterUInt64.lift(generation),
+                     advice: try FfiConverterTypeStrengthAdvice_lift(advice)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        },
+        failed: { (
+            uniffiHandle: UInt64,
+            generation: UInt64,
+            err: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceSuggestListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.failed(
+                     generation: try FfiConverterUInt64.lift(generation),
+                     err: try FfiConverterTypeFfiError_lift(err)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    //
+    // `nonisolated(unsafe)` is needed under Swift 6 strict concurrency.
+    // This is safe because the pointee is initialized once during static init
+    // and never mutated by either side of the FFI.  Its fields are C function pointers.
+    nonisolated(unsafe) static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceSuggestListener> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceSuggestListener>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitSuggestListener() {
+    uniffi_sf_ffi_fn_init_callback_vtable_suggestlistener(UniffiCallbackInterfaceSuggestListener.vtablePtr)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceSuggestListener {
+    fileprivate static let handleMap = UniffiHandleMap<SuggestListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceSuggestListener : FfiConverter {
+    typealias SwiftType = SuggestListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSuggestListener_lift(_ handle: UInt64) throws -> SuggestListener {
+    return try FfiConverterCallbackInterfaceSuggestListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceSuggestListener_lower(_ v: SuggestListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceSuggestListener.lower(v)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
+    typealias SwiftType = String?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterString.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterString.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeLoadAlignment: FfiConverterRustBuffer {
+    typealias SwiftType = LoadAlignment?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLoadAlignment.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLoadAlignment.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeStrengthPose: FfiConverterRustBuffer {
+    typealias SwiftType = StrengthPose?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeStrengthPose.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeStrengthPose.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
@@ -1793,6 +2865,31 @@ fileprivate struct FfiConverterSequenceTypePart: FfiConverterRustBuffer {
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeSuggestion: FfiConverterRustBuffer {
+    typealias SwiftType = [Suggestion]
+
+    public static func write(_ value: [Suggestion], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeSuggestion.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Suggestion] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Suggestion]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeSuggestion.read(from: &buf))
+        }
+        return seq
+    }
+}
 /**
  * The crate version and the pinned upstream commit, e.g. `0.1.0 (upstream 299ef49)`.
  */
@@ -1832,6 +2929,17 @@ public func loadParts(path: String)throws  -> [Part]  {
     )
 })
 }
+/**
+ * `loadAlignment` for a load direction in the seated print frame (world +Z is the build axis).
+ */
+public func loadAlignment(dirWorld: [Double])throws  -> LoadAlignment?  {
+    return try  FfiConverterOptionTypeLoadAlignment.lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_func_load_alignment(
+        FfiConverterSequenceDouble.lower(dirWorld),uniffiCallStatus
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -1855,6 +2963,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_func_load_parts() != 14593) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_func_load_alignment() != 64003) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_buildresult_fins() != 49288) {
@@ -1896,7 +3007,22 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_method_part_mesh() != 22805) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sf_ffi_checksum_method_part_suggest_orientations() != 946) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_part_suggest_strength_pose() != 50056) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_suggester_strength() != 55555) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_suggester_suggest() != 57294) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sf_ffi_checksum_constructor_builder_new() != 34376) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_constructor_suggester_new() != 50179) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_buildlistener_done() != 33539) {
@@ -1905,8 +3031,18 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_method_buildlistener_failed() != 55714) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sf_ffi_checksum_method_suggestlistener_suggested() != 20394) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_suggestlistener_strength() != 8161) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_suggestlistener_failed() != 56754) {
+        return InitializationResult.apiChecksumMismatch
+    }
 
     uniffiCallbackInitBuildListener()
+    uniffiCallbackInitSuggestListener()
     return InitializationResult.ok
 }()
 

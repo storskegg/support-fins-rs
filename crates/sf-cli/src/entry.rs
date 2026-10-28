@@ -428,6 +428,12 @@ fn clearances(m: &Merged) -> Result<Tunables, String> {
     })
 }
 
+/// The clearances an Auto build under `options` runs with (`clearances`, fins_entry.js), as the
+/// `tunables` a host hands `applyTunables`: the page's `supportTunables()` for the orientation ranking.
+pub fn support_tunables(options: &EngineOptions) -> Result<Tunables, String> {
+    clearances(&merge(options)?)
+}
+
 /// Port of `seatSoup` (seat.js:68-92): seat the part at the origin OURSELVES, in float64, before
 /// the engine sees it. The engine welds vertices on a 1-micron grid of ABSOLUTE coordinates, so
 /// the same part parked at x=137 on Orca's plate welds differently than at x=0 and can grow or

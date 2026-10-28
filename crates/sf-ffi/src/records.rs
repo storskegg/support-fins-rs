@@ -6,6 +6,7 @@
 
 use sf_cli::entry::{Stats, report_line};
 use sf_engine::fins::build::{FinKind, FinRecord, FinsBuilt};
+use sf_engine::fins::seating::SeatingKind;
 use sf_engine::prop::build::PropRecord;
 use sf_engine::types::Xyz;
 use sf_io::json::Json;
@@ -142,7 +143,44 @@ pub fn summary(b: &FinsBuilt, stats: &Stats, offset: Xyz) -> Json {
             }),
         ),
         ("tallRibs", b.tall_ribs.map_or(Json::Null, u)),
+        // for the readouts and the next orientation ranking (ui/readout.js, ui/suggest.js)
+        (
+            "boreWalls",
+            u(b.props.iter().filter(|q| q.in_bore == Some(true)).count()),
+        ),
+        (
+            "seating",
+            obj(vec![
+                (
+                    "kind",
+                    Json::Str(
+                        match b.seating.kind {
+                            SeatingKind::Face => "face",
+                            SeatingKind::Edge => "edge",
+                            SeatingKind::Point => "point",
+                        }
+                        .into(),
+                    ),
+                ),
+                ("span", n(b.seating.span)),
+                ("bedArea", n(b.seating.bed_area)),
+            ]),
+        ),
+        ("hasPad", Json::Bool(b.pad.is_some())),
+        ("finVolumeMm3", n(mesh_volume(&b.triangles))),
+        ("padVolumeMm3", n(mesh_volume(&b.pad_triangles))),
     ])
+}
+
+/// `meshVolumeMM3` (web/ui/readout.js): the volume of a closed triangle soup, mm^3.
+fn mesh_volume(tris: &[sf_engine::types::V4]) -> f64 {
+    let mut v = 0.0;
+    for t in tris.as_chunks::<3>().0 {
+        let (a, b, c) = (t[0], t[1], t[2]);
+        v += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+            + a[2] * (b[0] * c[1] - b[1] * c[0]);
+    }
+    v.abs() / 6.0
 }
 
 fn kind(k: FinKind) -> &'static str {
@@ -203,6 +241,9 @@ fn prop(q: &PropRecord) -> Json {
         ("squat", Json::Bool(q.squat)),
         ("rimWall", Json::Bool(q.rim_wall)),
     ]);
+    if let Some(b) = q.in_bore {
+        kv.push(("inBore", Json::Bool(b)));
+    }
     obj(kv)
 }
 
