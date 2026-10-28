@@ -10,11 +10,18 @@ protocol ReadoutBuildSource: AnyObject {
     var readoutSummaryJSON: String? { get }
     /// `records_json().fins.count`
     var readoutFinCount: Int { get }
+    /// Some wall top got an interface crest: `records_json().crestRanges` is not empty.
+    var readoutHasCrest: Bool { get }
 }
 
 extension BuildModel: ReadoutBuildSource {
     var readoutSummaryJSON: String? { latest?.summaryJson() }
     var readoutFinCount: Int { records?.fins.count ?? 0 }
+    var readoutHasCrest: Bool {
+        guard let text = latest?.recordsJson(),
+              let o = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { return false }
+        return !((o["crestRanges"] as? [Any])?.isEmpty ?? true)
+    }
 }
 
 /// The stats card and the status card for the window's part, in the inspector's Part block (docs/UI-MAP.md
@@ -22,10 +29,8 @@ extension BuildModel: ReadoutBuildSource {
 /// the inputs: the part's analysis (`Part.analyze`, rerun when the pose or the threshold changes), the session's
 /// settings and the build.
 ///
-/// PLACEHOLDER(rust) inputs, to be replaced when `summary_json` / `AnalysisSummary` carry them (the list in the
-/// readout PR): `rawRegionCount` (= `regionCount`, so no sliver warning), the island count (0), the weld time (0),
-/// the fin+pad extent for "does not fit (with fins)" (none), the pad details, `fill` / `curvedFill`, `fillReach`
-/// and the crest flag.
+/// Everything comes from the engine: `Part.analyze` (regions, raw regions, time), `Part.islands`, `PartInfo.weldMs`,
+/// and the build's `summary_json` (pad, fill, `fillReach`, `addedBounds`) and `records_json` (`crestRanges`).
 struct ReadoutSections: View {
     let controller: ViewerController
     let session: PartSession
@@ -35,7 +40,8 @@ struct ReadoutSections: View {
 
     struct Analysis: Equatable {
         var summary: AnalysisSummary
-        var ms: Double
+        var islands: Int
+        var weldMs: Double
     }
 
     /// What the analysis depends on.
@@ -53,13 +59,13 @@ struct ReadoutSections: View {
         let regions = Int(analysis?.summary.regionCount ?? 0)
         let part = PartReadout.make(PartReadoutInput(
             name: controller.meshName, triangles: controller.faceCount, size: dims,
-            regionCount: regions, rawRegionCount: regions, // PLACEHOLDER(rust): slivers
+            regionCount: regions, rawRegionCount: Int(analysis?.summary.rawRegionCount ?? 0),
             overArea: analysis?.summary.overArea ?? 0, bedArea: analysis?.summary.bedArea ?? 0,
-            smallHoleCount: built?.smallHoleRegions ?? 0, islandCount: 0, // PLACEHOLDER(rust): islands
+            smallHoleCount: built?.smallHoleRegions ?? 0, islandCount: analysis?.islands ?? 0,
             highlightSmall: settings.highlightSmall, flatRegions: nil,
-            analysisMs: analysis?.ms ?? 0, weldMs: 0)) // PLACEHOLDER(rust): weld time
+            analysisMs: analysis?.summary.analyzeMs ?? 0, weldMs: analysis?.weldMs ?? 0))
         let fit = FitReadout.make(FitInput(
-            size: dims, added: nil, // PLACEHOLDER(rust): the fins' and pad's extent
+            size: dims, added: built?.addedBounds.map { (x0: $0.min[0], x1: $0.max[0], y0: $0.min[1], y1: $0.max[1], z1: $0.max[2]) },
             volume: (Double(controller.volume.x), Double(controller.volume.y), Double(controller.volume.z))))
         let fins = FinReadout.make(built, context(settings, built, regions))
         Group {
@@ -79,13 +85,14 @@ struct ReadoutSections: View {
         c.padStyle = s.bedPad == .off ? "auto" : s.bedPad.rawValue
         c.padCustomGap = s.bedPad == .custom ? s.padGap : 0
         c.iface = s.interfaceMaterial == .off ? nil : s.interfaceMaterial.rawValue
-        c.analysisTiming = analysis.map { "\(JS.toFixed0($0.ms)) ms" } ?? ""
+        c.analysisTiming = analysis.map { "\(JS.toFixed0($0.summary.analyzeMs)) ms · weld \(JS.toFixed0($0.weldMs)) ms" } ?? ""
         if let b = built {
             c.hasAdded = b.finCount > 0 || b.pad != nil
             c.volumeMm3 = b.finVolumeMm3 + b.padVolumeMm3
             c.wallsPresent = b.finCount > 0
         }
-        // PLACEHOLDER(rust): crestPresent (crestRanges), fillReach
+        c.crestPresent = build?.readoutHasCrest ?? false
+        c.fillReach = built?.fillReach
         return c
     }
 
@@ -93,11 +100,11 @@ struct ReadoutSections: View {
         guard let core = session.parts.first else { analysis = nil; return }
         let part = core.part, threshold = session.settings.threshold
         let rot = CorePart.columnMajor(session.pose.float3x3)
+        let weld = core.info.weldMs
         let result = await Task.detached(priority: .userInitiated) { () -> Analysis? in
-            let start = ContinuousClock.now
             guard let summary = try? part.analyze(thresholdDeg: threshold, rot: rot) else { return nil }
-            let d = ContinuousClock.now - start
-            return Analysis(summary: summary, ms: Double(d.components.seconds) * 1000 + Double(d.components.attoseconds) / 1e15)
+            let islands = (try? part.islands(thresholdDeg: threshold, rot: rot).count) ?? 0
+            return Analysis(summary: summary, islands: islands, weldMs: weld)
         }.value
         if !Task.isCancelled { analysis = result }
     }

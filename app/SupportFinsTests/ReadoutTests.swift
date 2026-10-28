@@ -216,6 +216,33 @@ struct ReadoutFromEngineTests {
         return path
     }
 
+    @Test func theNewEngineFieldsReachTheReadouts() async throws {
+        let part = try #require(try loadParts(path: try tShapePath()).first)
+        let identity: [Double] = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+        // the part's side: raw regions, the analysis time, the weld time and the midair starts
+        let a = try part.analyze(thresholdDeg: 45, rot: identity)
+        #expect(a.rawRegionCount >= a.regionCount && a.regionCount > 0 && a.analyzeMs >= 0)
+        #expect(part.info().weldMs >= 0)
+        _ = try part.islands(thresholdDeg: 45, rot: identity)
+        // the build's side: the pad, the extent and the reach are the engine's. (Flat contacts, which gives the walls a
+        // crest, travels in the tunables: its build test comes with #112, which adds `tunables_json` to the model.)
+        let model = BuildModel(part: part)
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON())
+        await model.settled()
+        #expect(model.error == nil, "\(model.error ?? "")")
+        let built = try ReadoutBuilt(summaryJSON: try #require(model.latest).summaryJson(), finCount: model.records?.fins.count ?? 0)
+        let box = try #require(built.addedBounds, "the fins have an extent")
+        #expect(box.min.count == 3 && box.max.count == 3 && box.max[2] > box.min[2] && box.min[0] < box.max[0])
+        #expect(!model.readoutHasCrest, "no crest with the interface off")
+        if built.bare != nil { #expect(built.fillReach != nil, "the reach comes with bare") }
+        if let pad = built.pad { #expect(["auto", "light", "sure", "custom"].contains(pad.style)) }
+        // the fit says what the fins add: it is wider than the bare part
+        let size = a.size
+        let fit = FitReadout.make(FitInput(size: (size[0], size[1], size[2]),
+                                           added: (box.min[0], box.max[0], box.min[1], box.max[1], box.max[2])))
+        #expect(!fit.text.isEmpty)
+    }
+
     @Test func theEnginesSummaryReadsAsFinsAndGrams() async throws {
         let part = try #require(try loadParts(path: try tShapePath()).first)
         let model = BuildModel(part: part)
