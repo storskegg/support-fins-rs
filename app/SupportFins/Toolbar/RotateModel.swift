@@ -15,7 +15,14 @@ final class RotateModel {
     @ObservationIgnored private let defaults: UserDefaults
 
     /// `#rot-delta`: "Z +90°", "free -12.5°", or empty (`showDelta`, `ui/pose.js:106`).
-    private(set) var delta = ""
+    /// Shown only while the pose is the one the turn left: undo, redo, a suggestion, Lay a face flat or any other
+    /// change of pose drops it, as the web clears `#rot-delta` on each (`history.js:198`, `suggest.js:28`,
+    /// `pose.js:283`).
+    var delta: String { deltaPose == session.pose && deltaRestores == session.restores ? written : "" }
+    private var written = ""
+    private var deltaPose: Pose?
+    private var deltaRestores = 0
+    private func write(_ text: String) { written = text; deltaPose = session.pose; deltaRestores = session.restores }
     /// `show-rings`, remembered like the web does (`sf.showRings`, `ui/pose.js:161-176`).
     var showRings: Bool {
         didSet {
@@ -50,14 +57,14 @@ final class RotateModel {
     func rotate90(about axis: Pose.Axis) {
         guard hasPart else { return }
         session.rotate90(about: axis)
-        delta = Self.deltaText(name: axis.label, degrees: 90) ?? delta
+        if let text = Self.deltaText(name: axis.label, degrees: 90) { write(text) }
     }
 
     /// Reset (`ui/pose.js:241-248`): one step, and the delta is cleared.
     func reset() {
         guard hasPart else { return }
         session.resetPose()
-        delta = ""
+        write("")
     }
 
     // MARK: ring drags
@@ -69,11 +76,11 @@ final class RotateModel {
             ringDrag = true
             flash()
         case .turned(_, let degrees, let handle):
-            if let text = Self.deltaText(name: handle.name, degrees: degrees) { delta = text }
+            if let text = Self.deltaText(name: handle.name, degrees: degrees) { write(text) }
             flash()
         case .ended:
             ringDrag = false
-            delta = ""                        // `el('rot-delta').textContent = ''` (pose.js:56)
+            write("")                         // `el('rot-delta').textContent = ''` (pose.js:56)
             flash(hold: false)                // the settled angle, then fade (`endDragAngle`)
         }
     }

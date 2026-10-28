@@ -29,6 +29,8 @@ final class PartSession {
     /// Are the fins on (the toolbar's Add fins)?
     var finsOn = false
     private(set) var history = History<SessionSnapshot>()
+    /// Counts undo / redo restores, so a view can tell "the pose is back" from "the pose never left".
+    private(set) var restores = 0
 
     /// The window's undo manager (SwiftUI's `\.undoManager`); set by the view.
     @ObservationIgnored var undoManager: UndoManager? {
@@ -128,6 +130,7 @@ final class PartSession {
     }
 
     private func restore(_ s: SessionSnapshot) {
+        restores += 1
         pose = s.pose
         settings = s.settings
         removedFins = s.removedFins

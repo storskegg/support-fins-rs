@@ -40,6 +40,25 @@ struct RotateModelTests {
         #expect(s.pose == .identity)
     }
 
+    @Test func undoAndRedoDropTheDelta() throws {
+        let (s, m, _) = try rig()
+        m.rotate90(about: .z)
+        #expect(m.delta == "Z +90°")
+        s.undo()
+        #expect(m.delta == "")
+        s.redo()
+        #expect(m.delta == "")      // the redone pose was not written by a turn of this popover
+    }
+
+    @Test func aPoseSetFromOutsideDropsTheDelta() throws {
+        let (s, m, _) = try rig()
+        m.rotate90(about: .x)
+        s.setPose(Pose.identity.rotated90(about: .y), name: "Turn Part")   // as a suggestion applies it
+        #expect(m.delta == "")
+        m.rotate90(about: .z)
+        #expect(m.delta == "Z +90°")
+    }
+
     @Test func resetIsOneStepAndClearsTheDelta() throws {
         let (s, m, _) = try rig()
         m.rotate90(about: .y)
