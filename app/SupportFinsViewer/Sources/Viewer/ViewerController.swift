@@ -44,6 +44,26 @@ public final class ViewerController {
     @ObservationIgnored public var onSupportClick: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onCancelArmed: (@MainActor () -> Void)?
     @ObservationIgnored var onCursorChange: (@MainActor () -> Void)?
+    // MARK: the rotate rings (`web/ui/pose.js`)
+
+    /// "Show rotate rings" (`sf.showRings`): the rings are drawn, and grab the pointer, only while it is on.
+    public var showRings = true { didSet { updateGizmo() } }
+    /// The rings fade back while a sway brace is aimed (`ringfade.js`); 1 = fully shown.
+    public var ringFade: Float = 1 { didSet { updateGizmo() } }
+    public private(set) var ringHover: GizmoAxis? { didSet { updateGizmo() } }
+    public private(set) var ringDragging: GizmoAxis? { didSet { updateGizmo() } }
+    /// The degrees turned so far by the ring drag in progress.
+    public private(set) var ringDegrees: Double = 0
+    @ObservationIgnored public var onRing: ((RingEvent) -> Void)?
+
+    public enum RingEvent {
+        case began(GizmoAxis)
+        /// The turn since the drag began: a world rotation about the ring's axis through the part's centre.
+        case turned(delta: simd_double3x3, degrees: Double, axis: GizmoAxis)
+        case ended(turned: Bool)
+    }
+
+    @ObservationIgnored private var drag: (state: RotateGizmo.Drag, rotation: simd_float3x3, offset: SIMD3<Float>, center: SIMD3<Float>)?
 
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var pickInFlight = false
@@ -93,27 +113,120 @@ public final class ViewerController {
     func refreshPose() {
         guard !renderer.meshes.isEmpty else { return }
         let rot = currentRotation()
-        renderer.setPose(rotation: rot, offset: seatingOffset(bounds: groupBounds, rotation: rot))
+        if let d = drag {
+            // a ring drag turns the part about the centre it grabbed, not the seating point: the part must not
+            // jump under the pointer. It is re-seated when the drag ends (the web's `shade()` note).
+            let delta = rot * d.rotation.transpose
+            renderer.setPose(rotation: rot, offset: delta * (d.offset - d.center) + d.center)
+        } else {
+            renderer.setPose(rotation: rot, offset: seatingOffset(bounds: groupBounds, rotation: rot))
+        }
+        updateGizmo()
         refreshFlags()
     }
 
-    /// The overhang colours (and, for a single part, the engine's seating offset) follow the pose live: the pose
-    /// turns at once on the bounds-seated stand-in, and the analyses swap in as they land; the newest request
-    /// wins, a stale answer is dropped.
+    /// The overhang colours (and, for a single part, the engine's seating offset) follow the pose live. The pose
+    /// turns at once on the bounds-seated stand-in; analyses run one at a time off the main actor and the newest
+    /// pose wins, so a fast drag costs one analysis per finished one, not one per event.
     func refreshFlags() {
+        guard !renderer.meshes.isEmpty else { return }
+        flagsWanted = true
+        guard !flagsRunning else { return }
+        runFlags()
+    }
+
+    @ObservationIgnored private var flagsWanted = false
+    @ObservationIgnored private var flagsRunning = false
+
+    private func runFlags() {
         let meshes = renderer.meshes
-        guard !meshes.isEmpty else { return }
+        flagsWanted = false
+        flagsRunning = true
         generation += 1
         let mine = generation
         let rot = currentRotation(), threshold = thresholdDegrees
-        for (i, mesh) in meshes.enumerated() {
-            Task { @MainActor in
-                let a = await mesh.analysis(thresholdDegrees: threshold, rotation: rot)
-                guard mine == generation else { return }
-                if meshes.count == 1, let o = a.offset { renderer.setPose(rotation: rot, offset: o) }
-                renderer.setFlags(a.flags, part: i)
+        let dragging = drag != nil
+        Task { @MainActor in
+            let tasks = meshes.map { mesh in
+                Task { @MainActor in await mesh.analysis(thresholdDegrees: threshold, rotation: rot) }
             }
+            var results: [(Int, MeshAnalysis)] = []
+            for (i, t) in tasks.enumerated() { results.append((i, await t.value)) }
+            if mine == generation && meshes.count == renderer.meshes.count {
+                for (i, a) in results {
+                    if meshes.count == 1, !dragging, let o = a.offset { renderer.setPose(rotation: rot, offset: o) }
+                    renderer.setFlags(a.flags, part: i)
+                }
+            }
+            flagsRunning = false
+            if flagsWanted { runFlags() }
         }
+    }
+
+    // MARK: ring input (pixels of the drawable, origin top left)
+
+    func ndcRay(x: Int, y: Int, width: Int, height: Int) -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
+        renderer.camera.ray(ndcX: 2 * Float(x) / Float(width) - 1, ndcY: 1 - 2 * Float(y) / Float(height))
+    }
+
+    /// The print-space middle of the part: its box centre through the pose.
+    public var gizmoCenter: SIMD3<Float> {
+        let c = (groupBounds.min + groupBounds.max) / 2
+        return renderer.rotation * c + renderer.offset
+    }
+
+    func updateGizmo() {
+        guard showRings, !supportPicking, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
+        renderer.setGizmo(GizmoDisplay(center: drag?.center ?? gizmoCenter, hover: ringHover, active: ringDragging, fade: ringFade))
+    }
+
+    /// The ring under a pixel, if the rings are on.
+    public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoAxis? {
+        guard showRings, !supportPicking, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
+        return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
+                                                    width: Float(width), height: Float(height))
+    }
+
+    /// A press: starts a ring drag when it lands on a ring. True when the ring took the press (no orbit then).
+    public func beginRingDrag(x: Int, y: Int, width: Int, height: Int) -> Bool {
+        guard let axis = ringAt(x: x, y: y, width: width, height: height) else { return false }
+        let center = gizmoCenter
+        guard let d = RotateGizmo(center: center).beginDrag(axis, ray: ndcRay(x: x, y: y, width: width, height: height)) else { return false }
+        drag = (d, rotation, renderer.offset, center)
+        ringDragging = axis
+        ringDegrees = 0
+        clearHover()
+        onRing?(.began(axis))
+        return true
+    }
+
+    public func dragRing(x: Int, y: Int, width: Int, height: Int, snap: Bool) {
+        guard let d = drag else { return }
+        let gizmo = RotateGizmo(center: d.center)
+        guard let degrees = gizmo.angle(d.state, ray: ndcRay(x: x, y: y, width: width, height: height), snap: snap),
+              degrees != ringDegrees else { return }
+        ringDegrees = degrees
+        let delta = RotateGizmo.rotation(d.state.axis, degrees: degrees)
+        rotation = simd_float3x3(columns: (SIMD3<Float>(delta.columns.0), SIMD3<Float>(delta.columns.1), SIMD3<Float>(delta.columns.2))) * d.rotation
+        onRing?(.turned(delta: delta, degrees: degrees, axis: d.state.axis))
+    }
+
+    public func endRingDrag() {
+        guard drag != nil else { return }
+        let turned = ringDegrees != 0
+        drag = nil
+        ringDragging = nil
+        onRing?(.ended(turned: turned))
+        refreshPose()      // re-seat on the plate now the pivot may move again
+    }
+
+    public func clearRingHover() { if ringHover != nil { ringHover = nil } }
+
+    /// Pointer moved over the view: light the ring under it, otherwise pick the face.
+    public func pointerMoved(x: Int, y: Int, width: Int, height: Int) {
+        let ring = ringAt(x: x, y: y, width: width, height: height)
+        if ring != ringHover { ringHover = ring }
+        if ring != nil { clearHover() } else { hover(x: x, y: y, width: width, height: height) }
     }
 
     // MARK: input (points; the view passes its height for the gesture maths)

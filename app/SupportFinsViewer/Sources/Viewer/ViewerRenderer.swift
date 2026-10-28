@@ -28,6 +28,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     let linePipeline: MTLRenderPipelineState
     let supportPipeline: MTLRenderPipelineState
     let overlayPipeline: MTLRenderPipelineState
+    let ringPipeline: MTLRenderPipelineState
+    let gizmoDepthState: MTLDepthStencilState
     let depthState: MTLDepthStencilState
     let lineDepthState: MTLDepthStencilState
     let overlayDepthState: MTLDepthStencilState
@@ -41,6 +43,11 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     /// Draw every display frame even when nothing changed (the benchmark); otherwise an idle view draws nothing.
     public var continuous = false
     public private(set) var hoverFace: Int?
+    /// The rotate rings, drawn over everything when set.
+    public private(set) var gizmo: GizmoDisplay?
+    /// Device pixels per point (ring thickness follows it); the view sets it.
+    public var pixelScale: Float = 2
+    private var viewport = SIMD2<Float>(1, 1)
     /// The parts on show: a file can hold several objects, all drawn in the file's frame.
     public private(set) var meshes: [any MeshSource] = []
     private var flagBuffers: [MTLBuffer] = []
@@ -104,6 +111,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             ca.destinationAlphaBlendFactor = .oneMinusSourceAlpha
             line.depthAttachmentPixelFormat = Self.depthFormat
             linePipeline = try device.makeRenderPipelineState(descriptor: line)
+            line.vertexFunction = lib.makeFunction(name: "ring_vertex")
+            ringPipeline = try device.makeRenderPipelineState(descriptor: line)
 
             let support = MTLRenderPipelineDescriptor()
             support.vertexFunction = lib.makeFunction(name: "support_vertex")
@@ -139,6 +148,10 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         o.depthCompareFunction = .lessEqual
         o.isDepthWriteEnabled = false
         overlayDepthState = device.makeDepthStencilState(descriptor: o)!
+        let gz = MTLDepthStencilDescriptor()
+        gz.depthCompareFunction = .always
+        gz.isDepthWriteEnabled = false
+        gizmoDepthState = device.makeDepthStencilState(descriptor: gz)!
         readback = device.makeBuffer(length: 4, options: .storageModeShared)!
         plate = PlateGeometry(volume: .standard)
         super.init()
@@ -241,6 +254,12 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         changeCount += 1
     }
 
+    public func setGizmo(_ g: GizmoDisplay?) {
+        guard g != gizmo else { return }
+        gizmo = g
+        changeCount += 1
+    }
+
     public func setHover(_ face: Int?) {
         guard face != hoverFace else { return }
         hoverFace = face
@@ -304,6 +323,28 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         draw(lines: plateBuffers[1], count: plate.major.count, color: a(Palette.gridMajor, 1), with: enc)
         draw(lines: plateBuffers[2], count: plate.edge.count, color: a(Palette.plateEdge, 1), with: enc)
         draw(lines: plateBuffers[3], count: plate.box.count, color: a(Palette.volumeBox, 0.55), with: enc)
+        if let g = gizmo, g.visible { drawGizmo(g, uniforms: &u, with: enc) }
+    }
+
+    private func drawGizmo(_ g: GizmoDisplay, uniforms u: inout Uniforms, with enc: MTLRenderCommandEncoder) {
+        let rings = RotateGizmo(center: g.center)
+        enc.setRenderPipelineState(ringPipeline)
+        enc.setDepthStencilState(gizmoDepthState)
+        enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+        var params = SIMD4<Float>(viewport.x, viewport.y, GizmoDisplay.widthPoints * pixelScale, 0)
+        enc.setVertexBytes(&params, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
+        for axis in GizmoAxis.allCases {
+            // while a ring is being dragged only that one shows; otherwise all three
+            if let active = g.active, active != axis { continue }
+            let lit = g.active == axis || g.hover == axis
+            let color = lit ? GizmoDisplay.highlight : axis.color
+            let alpha = (lit ? 1 : GizmoDisplay.opacity) * g.fade
+            let pts = rings.arc(axis, camera: camera).flatMap { [$0.x, $0.y, $0.z] }
+            var c = SIMD4<Float>(color, alpha)
+            enc.setVertexBytes(pts, length: pts.count * 4, index: 0)
+            enc.setFragmentBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
+            enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: RotateGizmo.segments * 6)
+        }
     }
 
     /// The fins (minus the removed ones, the crest in its own colour), the pad, and the removal highlight.
@@ -368,6 +409,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         pass.depthAttachment.clearDepth = 1
         pass.depthAttachment.loadAction = .clear
         pass.depthAttachment.storeAction = .dontCare
+        viewport = SIMD2(Float(drawable.texture.width), Float(drawable.texture.height))
         guard let enc = cb.makeRenderCommandEncoder(descriptor: pass) else { return }
         encodeScene(into: enc)
         enc.endEncoding()
@@ -398,6 +440,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         pass.depthAttachment.loadAction = .clear
         pass.depthAttachment.storeAction = .dontCare
         pass.depthAttachment.clearDepth = 1
+        viewport = SIMD2(Float(width), Float(height))
         let cb = queue.makeCommandBuffer()!
         let enc = cb.makeRenderCommandEncoder(descriptor: pass)!
         encodeScene(into: enc)
@@ -509,5 +552,29 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         }
         let v = readback.contents().load(as: UInt32.self)
         return v == 0 ? nil : Int(v - 1)
+    }
+}
+
+
+/// How the rotate rings are shown (see `RotateGizmo`).
+public struct GizmoDisplay: Equatable, Sendable {
+    /// three.js' hover colour (`0xffff00`).
+    public static let highlight = SIMD3<Float>(1, 1, 0)
+    public static let opacity: Float = 0.9
+    public static let widthPoints: Float = 3
+
+    public var center: SIMD3<Float>
+    public var visible = true
+    public var hover: GizmoAxis?
+    public var active: GizmoAxis?
+    /// 1 normally; the rings go faint while a sway brace is aimed (`web/ui/ringfade.js`, `FADED` = 0.15).
+    public var fade: Float = 1
+
+    public init(center: SIMD3<Float>, visible: Bool = true, hover: GizmoAxis? = nil, active: GizmoAxis? = nil, fade: Float = 1) {
+        self.center = center
+        self.visible = visible
+        self.hover = hover
+        self.active = active
+        self.fade = fade
     }
 }

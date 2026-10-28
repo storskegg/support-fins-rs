@@ -115,6 +115,29 @@ enum Shaders {
         return out;
     }
 
+    // A thick polyline in screen space: six vertices a segment (two triangles), `width` pixels wide.
+    struct RingParams { float2 viewport; float width; float pad; };
+
+    vertex LineOut ring_vertex(uint vid [[vertex_id]],
+                               const device packed_float3* pos [[buffer(0)]],
+                               constant Uniforms& u [[buffer(2)]],
+                               constant RingParams& r [[buffer(3)]]) {
+        uint seg = vid / 6;
+        uint k = vid % 6;
+        // two triangles of the quad: (t, side) = (0,-1) (0,+1) (1,-1) | (1,-1) (0,+1) (1,+1)
+        const uint tIdx[6] = {0, 0, 1, 1, 0, 1};
+        const float sideIdx[6] = {-1, 1, -1, -1, 1, 1};
+        float4 c0 = u.viewProj * float4(pos[seg], 1);
+        float4 c1 = u.viewProj * float4(pos[seg + 1], 1);
+        float2 d = normalize((c1.xy / c1.w - c0.xy / c0.w) * r.viewport + 1e-6);
+        float2 n = float2(-d.y, d.x);
+        float4 c = tIdx[k] == 0 ? c0 : c1;
+        c.xy += n * sideIdx[k] * (r.width / r.viewport) * c.w;
+        LineOut out;
+        out.position = c;
+        return out;
+    }
+
     fragment float4 line_fragment(LineOut in [[stage_in]], constant float4& color [[buffer(0)]]) {
         return color;
     }

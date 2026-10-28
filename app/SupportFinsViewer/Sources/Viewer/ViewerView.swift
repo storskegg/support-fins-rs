@@ -22,11 +22,11 @@ public final class ViewerMTKView: MTKView {
         tracking = t
     }
 
-    @MainActor private func hover(_ e: NSEvent) {
+    /// The event's position in drawable pixels, origin top left, with the drawable's size.
+    private func pixel(_ e: NSEvent) -> (x: Int, y: Int, w: Int, h: Int) {
         let p = convert(e.locationInWindow, from: nil)
         let s = scale
-        controller?.hover(x: Int(p.x * s), y: Int((bounds.height - p.y) * s),
-                          width: Int(bounds.width * s), height: Int(bounds.height * s))
+        return (Int(p.x * s), Int((bounds.height - p.y) * s), Int(bounds.width * s), Int(bounds.height * s))
     }
 
     // A click is a press that did not drag (the web: pointerdown and up within 4 px, `app.js`): the viewer's
@@ -34,17 +34,28 @@ public final class ViewerMTKView: MTKView {
     private var pressAt: NSPoint?
     private static let clickSlop: CGFloat = 4
 
+    /// A press that landed on a rotate ring turns the part; the drag belongs to the ring until the button is up.
+    private var ringGrabbed = false
+
     public override func mouseDown(with e: NSEvent) {
         MainActor.assumeIsolated {
             window?.makeFirstResponder(self)
             // Ctrl+click is the Mac's right click: it cancels an armed mode
             if e.modifierFlags.contains(.control), controller?.cancelArmed() == true { pressAt = nil; return }
-            pressAt = e.locationInWindow
+            let p = pixel(e)
+            ringGrabbed = controller?.beginRingDrag(x: p.x, y: p.y, width: p.w, height: p.h) ?? false
+            pressAt = ringGrabbed ? nil : e.locationInWindow
         }
     }
 
     public override func mouseUp(with e: NSEvent) {
         MainActor.assumeIsolated {
+            if ringGrabbed {
+                controller?.endRingDrag()
+                ringGrabbed = false
+                pressAt = nil
+                return
+            }
             defer { pressAt = nil }
             guard let start = pressAt, hypot(e.locationInWindow.x - start.x, e.locationInWindow.y - start.y) <= Self.clickSlop else { return }
             let p = convert(e.locationInWindow, from: nil)
@@ -68,11 +79,24 @@ public final class ViewerMTKView: MTKView {
         if pointing { addCursorRect(bounds, cursor: .pointingHand) }
     }
 
-    public override func mouseMoved(with e: NSEvent) { MainActor.assumeIsolated { hover(e) } }
-    public override func mouseExited(with e: NSEvent) { MainActor.assumeIsolated { controller?.clearHover() } }
+    public override func mouseMoved(with e: NSEvent) {
+        MainActor.assumeIsolated {
+            let p = pixel(e)
+            controller?.pointerMoved(x: p.x, y: p.y, width: p.w, height: p.h)
+        }
+    }
+    public override func mouseExited(with e: NSEvent) {
+        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover() }
+    }
 
     public override func mouseDragged(with e: NSEvent) {
         MainActor.assumeIsolated {
+            if ringGrabbed {
+                // Shift releases the 5 degree snap (`web/ui/pose.js`)
+                let p = pixel(e)
+                controller?.dragRing(x: p.x, y: p.y, width: p.w, height: p.h, snap: !e.modifierFlags.contains(.shift))
+                return
+            }
             controller?.clearHover()
             if e.modifierFlags.contains(.shift) { controller?.pan(dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height) }
             else { controller?.orbit(dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height) }
@@ -134,5 +158,7 @@ public struct ViewerViewport: NSViewRepresentable {
         return view
     }
 
-    public func updateNSView(_ view: ViewerMTKView, context: Context) {}
+    public func updateNSView(_ view: ViewerMTKView, context: Context) {
+        controller.renderer.pixelScale = Float(view.window?.backingScaleFactor ?? 2)
+    }
 }
