@@ -143,12 +143,25 @@ fn median(mut a: Vec<f64>) -> f64 {
 }
 
 /// Build `pos` once from a fresh topology: (build ms, output vertices).
-fn build_once(pos: &[f64], rot: &[f64; 9], opts: &FinsOpts, cfg: &Config) -> (f64, usize) {
+fn build_once(pos: &[f64], rot: &[f64; 9], opts: &FinsOpts, cfg: &Config) -> (f64, usize, u64) {
     let topo = Arc::new(build_topology(pos.to_vec()));
     let res = analyze(&topo, 45.0, rot);
     let t = Instant::now();
     let built = build_fins(&topo, &res, rot, opts, cfg);
-    (t.elapsed().as_secs_f64() * 1e3, built.triangles.len())
+    let ms = t.elapsed().as_secs_f64() * 1e3;
+    // FNV-1a over the bits of the output, so an A/B run proves it built the same thing
+    let mut h = 0xcbf29ce484222325u64;
+    let mut eat = |x: f64| {
+        h = (h ^ x.to_bits()).wrapping_mul(0x100000001b3);
+    };
+    for v in built.triangles.iter().chain(&built.pad_triangles) {
+        v.iter().for_each(|&x| eat(x));
+    }
+    if let Some(b) = &built.bare {
+        eat(b.area);
+        eat(b.total);
+    }
+    (ms, built.triangles.len(), h)
 }
 
 fn time_case(
@@ -157,10 +170,10 @@ fn time_case(
     runs: usize,
     opts: &FinsOpts,
     cfg: &Config,
-) -> (f64, usize) {
+) -> (f64, usize, u64) {
     let _ = build_once(pos, rot, opts, cfg); // warm-up, discarded
     let r: Vec<_> = (0..runs).map(|_| build_once(pos, rot, opts, cfg)).collect();
-    (median(r.iter().map(|x| x.0).collect()), r[0].1)
+    (median(r.iter().map(|x| x.0).collect()), r[0].1, r[0].2)
 }
 
 struct Row {
@@ -250,7 +263,7 @@ fn main() {
     let mut private_objects = None;
     let mut rows = vec![];
     for c in cases {
-        let (triangles, ms, out);
+        let (triangles, ms, out, hash);
         if c.group == Group::Private {
             if !private_path.exists() {
                 println!("skip {} {} (no private file)", c.model, c.pose);
@@ -269,12 +282,12 @@ fn main() {
             let pos = &model.objects[i].positions;
             triangles = pos.len() / 9;
             // ~1 s a build: one warm-up and fewer timed runs
-            (ms, out) = time_case(pos, &pose_rot(c.group, "flat"), runs.min(3), &opts, &cfg);
+            (ms, out, hash) = time_case(pos, &pose_rot(c.group, "flat"), runs.min(3), &opts, &cfg);
         } else {
             let bytes = std::fs::read(models_dir().join(format!("{}.stl", c.model))).unwrap();
             let pos = sf_io::stl::read_stl(&bytes).unwrap();
             triangles = pos.len() / 9;
-            (ms, out) = time_case(&pos, &pose_rot(c.group, &c.pose), runs, &opts, &cfg);
+            (ms, out, hash) = time_case(&pos, &pose_rot(c.group, &c.pose), runs, &opts, &cfg);
         }
         println!(
             "{} {}: {triangles} tris, build {} ms",
