@@ -30,6 +30,9 @@ final class BuildModel {
     private(set) var generation: UInt64 = 0
 
     @ObservationIgnored let part: Part
+    /// Called when `latest` changes: a build landed, or `clear()` forgot it. The window puts the new fins on the
+    /// viewer here.
+    @ObservationIgnored var onUpdate: (@MainActor () -> Void)?
     @ObservationIgnored private let builder: Builder
     @ObservationIgnored private var listener: Listener!
     /// The generation whose delivery is still wanted; nil after `cancel()` / `clear()`.
@@ -73,6 +76,7 @@ final class BuildModel {
         summary = nil
         records = nil
         keys = []
+        onUpdate?()
     }
 
     /// Returns when no build is outstanding.
@@ -118,6 +122,7 @@ final class BuildModel {
         building = false
         wanted = nil
         resumeWaiters()
+        if case .done = event { onUpdate?() }
     }
 
     private func resumeWaiters() {

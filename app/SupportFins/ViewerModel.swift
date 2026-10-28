@@ -10,12 +10,15 @@ final class ViewerModel {
     /// The window's state; its settings start from what the web remembers across visits (`SettingsStore`).
     let session = PartSession(settings: SettingsStore().load())
     var status: String?
+    /// The fins: builds, removal and export for the first object of the file.
+    private(set) var wiring: BuildWiring?
     @ObservationIgnored private let loader: any PartLoading
 
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
         controller = ViewerController()
         if controller == nil { status = "This Mac has no usable Metal device." }
+        wiring = controller.map { BuildWiring(session: session, controller: $0) }
     }
 
     func load(url: URL?) async {
@@ -25,6 +28,7 @@ final class ViewerModel {
             guard let first = parts.first else { status = "The file has no mesh."; return }
             session.replaceParts(parts.compactMap { $0.mesh as? CorePart })
             controller.rotation = session.pose.float3x3
+            wiring?.attach()
             controller.show(parts.map(\.mesh), name: parts.count == 1 ? first.name : "\(url?.lastPathComponent ?? first.name) (\(parts.count) objects)")
             status = nil
         } catch {

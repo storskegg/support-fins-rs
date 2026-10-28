@@ -7,6 +7,9 @@ struct SessionSnapshot: Equatable, Sendable {
     var pose: Pose
     var settings: FinSettings
     var removedFins: Set<FinKey>
+    /// The "Add fins" toggle (`finsVisible`): the web's history snapshot holds it too (`ui/history.js`), so
+    /// turning fins on and off is an undo step.
+    var finsOn = false
 }
 
 /// The state of one window's part: its objects, the pose, the settings, the fins the user removed, and the
@@ -23,6 +26,8 @@ final class PartSession {
     var pose: Pose
     var settings: FinSettings
     var removedFins: Set<FinKey>
+    /// Are the fins on (the toolbar's Add fins)?
+    var finsOn = false
     private(set) var history = History<SessionSnapshot>()
 
     /// The window's undo manager (SwiftUI's `\.undoManager`); set by the view.
@@ -38,7 +43,7 @@ final class PartSession {
         self.removedFins = removedFins
     }
 
-    var snapshot: SessionSnapshot { SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins) }
+    var snapshot: SessionSnapshot { SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins, finsOn: finsOn) }
     var canUndo: Bool { history.canUndo }
     var canRedo: Bool { history.canRedo }
 
@@ -129,6 +134,7 @@ final class PartSession {
         pose = s.pose
         settings = s.settings
         removedFins = s.removedFins
+        finsOn = s.finsOn
     }
 
     private func register(_ name: String?) {

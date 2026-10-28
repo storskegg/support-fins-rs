@@ -53,6 +53,9 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public private(set) var volume = PrinterVolume.standard
     public let stats = FrameStats()
 
+    /// The fins on screen are the last settings', not the current ones: a rebuild is out (`markFinsStale`,
+    /// `web/ui/finbuild.js`). They stay, drawn paler.
+    public var dimSupports = false { didSet { if dimSupports != oldValue { changeCount += 1 } } }
     /// The fins and bed pad of the latest build (print space), or nil.
     public private(set) var supports: SupportLayer?
     /// Vertex ranges of the fin buffer not drawn (removed fins).
@@ -317,7 +320,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         enc.setCullMode(.none)
         func draw(_ buffer: MTLBuffer?, _ range: Range<Int>, _ color: SIMD3<Float>) {
             guard let buffer, !range.isEmpty else { return }
-            var c = SIMD4(color, 1)
+            var c = SIMD4(dimSupports ? simd_mix(color, Palette.background, SIMD3(repeating: 0.55)) : color, 1)
             enc.setVertexBuffer(buffer, offset: 0, index: 0)
             enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
             enc.setVertexBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 3)

@@ -15,9 +15,17 @@ import Viewer
 @Observable
 final class RemovalModel {
     /// The keys of the fins the user clicked away, in every pose (`removedSigs`).
-    var removed: Set<FinKey> = [] {
-        didSet { if removed != oldValue { onChange?(oldValue, removed) } }
+    var removed: Set<FinKey> {
+        get { read() }
+        set {
+            let old = read()
+            guard newValue != old else { return }
+            write(newValue, actionName)
+            onChange?(old, newValue)
+        }
     }
+    /// What the next change is called in Edit > Undo ("Remove Fin", "Restore Fins").
+    @ObservationIgnored private var actionName: String?
     /// Remove mode is armed (`removeMode`): hover lights the fin a click would drop, a click drops it.
     private(set) var armed = false
     /// The record id of the fin under the pointer (`hoverFinId`).
@@ -27,9 +35,23 @@ final class RemovalModel {
     @ObservationIgnored private let finsOn: @MainActor () -> Bool
     @ObservationIgnored private let mode: @MainActor () -> FinSettings.Mode
     @ObservationIgnored var onChange: (@MainActor (_ old: Set<FinKey>, _ new: Set<FinKey>) -> Void)?
+    @ObservationIgnored private let read: @MainActor () -> Set<FinKey>
+    @ObservationIgnored private let write: @MainActor (Set<FinKey>, String?) -> Void
     @ObservationIgnored private var index: (result: ObjectIdentifier, entries: [(from: Int, to: Int, fin: Int)])?
 
-    init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, mode: @escaping @MainActor () -> FinSettings.Mode) {
+    /// - Parameters:
+    ///   - removed: where the removed keys live: the session's `removedFins` in the window (so a removal is an
+    ///     undo step), the model's own set when omitted (tests).
+    init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, mode: @escaping @MainActor () -> FinSettings.Mode,
+         removed store: (read: @MainActor () -> Set<FinKey>, write: @MainActor (Set<FinKey>, String?) -> Void)? = nil) {
+        if let store {
+            read = store.read
+            write = store.write
+        } else {
+            let own = Box()
+            read = { own.keys }
+            write = { new, _ in own.keys = new }
+        }
         self.build = build
         self.finsOn = finsOn
         self.mode = mode
@@ -126,7 +148,9 @@ final class RemovalModel {
             stored = FinKey(raw: "\(key.raw)~\(n)")
             n += 1
         }
+        actionName = "Remove Fin"
         removed.insert(stored)
+        actionName = nil
         hoveredFin = nil
     }
 
@@ -135,7 +159,9 @@ final class RemovalModel {
     func restoreAll() {
         let here = removedHere
         guard !here.isEmpty else { return }
+        actionName = "Restore Fins"
         removed.subtract(here.values)
+        actionName = nil
         hoveredFin = nil
     }
 
@@ -167,3 +193,7 @@ final class RemovalModel {
         controller.renderer.setFinHighlight(highlightedRanges)
     }
 }
+
+/// The removed keys when no session holds them.
+@MainActor
+private final class Box { var keys = Set<FinKey>() }

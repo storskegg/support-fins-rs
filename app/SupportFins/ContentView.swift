@@ -20,6 +20,7 @@ struct ContentView: View {
             if let status = model.status {
                 Text(status).padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
             }
+            if let w = model.wiring, w.spinnerVisible { BuildSpinner() }
         }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
@@ -28,6 +29,8 @@ struct ContentView: View {
             }
         }
         .toolbar {
+            ToolbarItem { FinsToggle(session: model.session) }
+            ToolbarItem { ExportMenu(model: model.wiring?.exporter) }
             ToolbarItem { Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector) }
         }
         .navigationTitle(document.filename)
@@ -39,5 +42,9 @@ struct ContentView: View {
         .onChange(of: undoManager, initial: true) { _, m in model.session.undoManager = m }
         .focusedSceneValue(\.viewer, model.controller)
         .focusedSceneValue(\.session, model.session)
+        .focusedSceneValue(\.exporter, model.wiring?.exporter)
+        .focusedSceneValue(\.removal, model.wiring?.removal)
+        // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
+        .onExitCommand { model.wiring?.escape() }
     }
 }
