@@ -9,8 +9,21 @@ struct PartSections: View {
     /// The overhang threshold is a session setting (`FinSettings.threshold`): undoable, like the web's `thr` field.
     @Binding var settings: FinSettings
     @Environment(PartSession.self) private var session
+    /// The M4a Part block; false when the stats card stands in for it.
+    var withPartBlock = true
 
     var body: some View {
+        if withPartBlock { partBlock }
+        overhang
+        Section("Printer volume") {
+            Picker("Build volume", selection: $controller.volume) {
+                ForEach(PrinterVolume.presets, id: \.self) { Text($0.label).tag($0) }
+                if !controller.volume.isPreset { Text(controller.volume.label).tag(controller.volume) }
+            }
+        }
+    }
+
+    private var partBlock: some View {
         Section("Part") {
             LabeledContent("File", value: controller.meshName)
             LabeledContent("Triangles", value: controller.faceCount.formatted())
@@ -19,16 +32,13 @@ struct PartSections: View {
                 LabeledContent("Face", value: controller.partCount > 1 ? "\(h.face.formatted()) (object \(h.part + 1))" : h.face.formatted())
             }
         }
+    }
+
+    private var overhang: some View {
         Section("Overhang") {
             LabeledContent("Threshold") {
                 Slider(value: $settings.threshold, in: 30...70, step: 1, onEditingChanged: session.settingsEditing) { Text("Threshold") }
                 Text("\(Int(settings.threshold))°").monospacedDigit().frame(width: 36, alignment: .trailing)
-            }
-        }
-        Section("Printer volume") {
-            Picker("Build volume", selection: $controller.volume) {
-                ForEach(PrinterVolume.presets, id: \.self) { Text($0.label).tag($0) }
-                if !controller.volume.isPreset { Text(controller.volume.label).tag(controller.volume) }
             }
         }
     }

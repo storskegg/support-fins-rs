@@ -47,7 +47,8 @@ struct ContentView: View {
         }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
-                InspectorView(controller: controller, settings: model.session.settingsBinding)
+                InspectorView(controller: controller, settings: model.session.settingsBinding,
+                              readout: AnyView(ReadoutSections(controller: controller, session: model.session, build: nil)))
                     .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
             }
         }
