@@ -27,7 +27,7 @@ from it one milestone at a time; this file stays the source of truth for *why*.
 | Booleans | **Manifold 3.5.4** (the vendored version) through its official C API (`manifoldc`) via `bindgen`. |
 | Integrations | Ship a Rust **CLI** with the same flags as `plugins/cli` (generated from `options.json`). Host plugins (Blender, Fusion, …) stay on the JS engine. |
 | Upstream | **Frozen at `299ef49` until full feature parity (M7).** Decided by the user on 2026-10-27: no milestone-boundary catch-ups until then, so the first goal isn't a moving target. After parity, catch up in one pass, then at each later milestone. The JS checkout must stay at the `UPSTREAM` commit. |
-| Process | From M3 on, **two** Sonnet 5.5 (medium) agents (four in M0–M2; reduced 2026-10-27 to stay within usage limits) write the code in their own worktrees and open PRs. The orchestrator writes briefs, reviews, merges. Two failed reviews on one ticket → re-assigned to Opus, and the user is alerted. All four work within a milestone; the orchestrator stops at each milestone for the user's go-ahead. |
+| Process | **Four** Sonnet 5.5 (medium) agents (two in M3–M4a to stay within usage limits; back to four from M4b, 2026-10-27) write the code in their own worktrees and open PRs. The orchestrator writes briefs, reviews, merges. Two failed reviews on one ticket → re-assigned to Opus, and the user is alerted. All four work within a milestone; the orchestrator stops at each milestone for the user's go-ahead. |
 | Reporting | Written report at every milestone (landed, parity, perf vs JS, known gaps). Demo build at the major ones: **M3** engine done, **M4** app usable, **M7** full parity. |
 
 ### Performance targets (starting values, revised once measured)
