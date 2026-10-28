@@ -26,6 +26,16 @@ final class CorePart: MeshSource {
         bounds = Self.bounds(of: buffer, vertices: faceCount * 3)
     }
 
+    /// The unit normal of face `face` in the model frame: the engine's own (winding-derived, not the file's),
+    /// which rides in the mesh buffer next to each vertex (`docs/FFI.md` `Part::mesh`), as `topology.nrm`
+    /// (`web/ui/pose.js:315`).
+    func faceNormal(_ face: Int) -> SIMD3<Double>? {
+        guard face >= 0, face < faceCount else { return nil }
+        let base = vertexBuffer.contents().bindMemory(to: Float.self, capacity: faceCount * 18)
+        let o = face * 18 + 3
+        return SIMD3(Double(base[o]), Double(base[o + 1]), Double(base[o + 2]))
+    }
+
     /// The model-frame box of the interleaved vertices (position first, six floats each). A file's objects sit
     /// where the file puts them, so the box is the mesh's own, not centred.
     static func bounds(of buffer: MTLBuffer, vertices n: Int) -> (min: SIMD3<Float>, max: SIMD3<Float>) {

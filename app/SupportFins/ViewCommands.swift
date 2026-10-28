@@ -17,9 +17,18 @@ extension FocusedValues {
     }
 }
 
+struct LayFaceKey: FocusedValueKey { typealias Value = LayFaceModel }
+extension FocusedValues {
+    var layFace: LayFaceModel? {
+        get { self[LayFaceKey.self] }
+        set { self[LayFaceKey.self] = newValue }
+    }
+}
+
 /// Model menu (docs/UI-MAP.md §8.1): the pose commands of the Rotate popover.
 struct ModelCommands: Commands {
     @FocusedValue(\.session) private var session
+    @FocusedValue(\.layFace) private var layFace
 
     var body: some Commands {
         CommandMenu("Model") {
@@ -27,6 +36,10 @@ struct ModelCommands: Commands {
                 Button("Rotate 90° About \(axis.label)") { session?.rotate90(about: axis) }
             }
             Button("Reset Rotation") { session?.resetPose() }
+            Divider()
+            // `lay-face` (ui/pose.js:221): arms the lay-a-face pointer mode; a second choice disarms it
+            Toggle("Lay a Face Flat", isOn: Binding(get: { layFace?.armed ?? false }, set: { _ in layFace?.toggle() }))
+                .disabled(layFace?.canArm != true)
         }
     }
 }

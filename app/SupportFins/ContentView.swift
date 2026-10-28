@@ -24,14 +24,18 @@ struct ContentView: View {
             }
             if let w = model.wiring, w.spinnerVisible { BuildSpinner() }
         }
+        .overlay(alignment: .top) { LayFaceHint(model: model.layFace) }
         .overlay(alignment: .bottom) { if model.controller != nil { ViewToolbar(session: model.session, registry: toolbar) } }
         .environment(toolbar)
         // track D's popovers plug into the toolbar's Suggest and Strength slots once a single part is on show
         .onChange(of: model.suggest.map(ObjectIdentifier.init), initial: true) { _, _ in registerTools() }
         .onChange(of: model.session.pose) {
+            model.layFace.cancel()          // a turn from anywhere (undo, redo, Suggest) disarms lay-flat
             model.suggest?.poseChanged()
             model.strength?.poseChanged()
         }
+        // arming folds the popover: the next click is on the part, which would only dismiss it
+        .onChange(of: model.layFace.armed) { _, armed in if armed { toolbar.fold() } }
         .onChange(of: model.controller?.thresholdDegrees) { _, t in if let t { model.strength?.threshold = t } }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
@@ -56,10 +60,11 @@ struct ContentView: View {
         .onChange(of: undoManager, initial: true) { _, m in model.session.undoManager = m }
         .focusedSceneValue(\.viewer, model.controller)
         .focusedSceneValue(\.session, model.session)
+        .focusedSceneValue(\.layFace, model.layFace)
         .focusedSceneValue(\.exporter, model.wiring?.exporter)
         .focusedSceneValue(\.removal, model.wiring?.removal)
         // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
-        .onExitCommand { model.wiring?.escape() }
+        .onExitCommand { model.layFace.cancel(); model.wiring?.escape() }
         .environment(model.session)
     }
 
