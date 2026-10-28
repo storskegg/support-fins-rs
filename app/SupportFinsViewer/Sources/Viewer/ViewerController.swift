@@ -22,6 +22,12 @@ public final class ViewerController {
     public var rotation = matrix_identity_float3x3 { didSet { if rotation != oldValue { refreshPose() } } }
     public var volume = PrinterVolume.standard { didSet { renderer.setVolume(volume) } }
     public var highlightSmall = true { didSet { renderer.highlightSmall = highlightSmall } }
+    /// The load of the Strength view, as a unit direction in the part's own frame (it turns with the part), or nil.
+    public var loadDirection: SIMD3<Float>? { didSet { if loadDirection != oldValue { refreshHUD() } } }
+    /// Show the layer frames around the part (View > Show layers).
+    public var showsLayers = false { didSet { if showsLayers != oldValue { refreshHUD() } } }
+    /// The posed part's size: the engine's when a single part has been analysed, else the rotated bounds.
+    public private(set) var posedSize = SIMD3<Float>.zero
 
     /// Remove-fins mode (`web/ui/remove.js removeActive`): the pointer picks fins, not the part's faces. Hover
     /// reports the fin buffer's triangle under the pointer, a click (a press that did not drag) reports it
@@ -122,7 +128,36 @@ public final class ViewerController {
             renderer.setPose(rotation: rot, offset: seatingOffset(bounds: groupBounds, rotation: rot))
         }
         updateGizmo()
+        posedSize = Self.rotatedSize(groupBounds, rot)
+        refreshHUD()
         refreshFlags()
+    }
+
+    static func rotatedSize(_ b: (min: SIMD3<Float>, max: SIMD3<Float>), _ rot: simd_float3x3) -> SIMD3<Float> {
+        var lo = SIMD3<Float>(repeating: .infinity), hi = SIMD3<Float>(repeating: -.infinity)
+        for i in 0..<8 {
+            let c = SIMD3<Float>(i & 1 == 0 ? b.min.x : b.max.x, i & 2 == 0 ? b.min.y : b.max.y, i & 4 == 0 ? b.min.z : b.max.z)
+            lo = simd_min(lo, rot * c)
+            hi = simd_max(hi, rot * c)
+        }
+        return hi - lo
+    }
+
+    /// The load arrow through the middle of the part and the layer frames around the posed part
+    /// (`ui/strength.js` `updateLoadArrowMesh`, `updateLayerView`).
+    func refreshHUD() {
+        guard !renderer.meshes.isEmpty else {
+            renderer.clearLoadArrow()
+            renderer.clearLayerFrames()
+            return
+        }
+        if let d = loadDirection, simd_length(d) > 1e-6 {
+            let center = (groupBounds.min + groupBounds.max) / 2
+            renderer.setLoadArrow(center: center, direction: d, extent: max(size.x, size.y, size.z))
+        } else {
+            renderer.clearLoadArrow()
+        }
+        if showsLayers { renderer.setLayerFrames(size: posedSize) } else { renderer.clearLayerFrames() }
     }
 
     /// The overhang colours (and, for a single part, the engine's seating offset) follow the pose live. The pose
@@ -155,6 +190,7 @@ public final class ViewerController {
             if mine == generation && meshes.count == renderer.meshes.count {
                 for (i, a) in results {
                     if meshes.count == 1, !dragging, let o = a.offset { renderer.setPose(rotation: rot, offset: o) }
+                    if meshes.count == 1, !dragging, let sz = a.size { posedSize = sz; refreshHUD() }
                     renderer.setFlags(a.flags, part: i)
                 }
             }

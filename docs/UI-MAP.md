@@ -254,17 +254,17 @@ The toolbar (`ui/toolbar.js`) has two kinds of badge: a **tool badge** (Section,
 | `show-rings` | checkbox | Show rotate rings | on |  | The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part. | index.html:650; ui/pose.js:174 | Rotate popover Toggle / View > Show Rotate Rings | M4b |
 | `scale-pct` | number |  | 100 | 10..1000 step any |  | index.html:660; ui/scale.js:28 | Scale popover: number field, % (no stepper arrows: Up/Down are swallowed) | M6 |
 | `scale-reset` | button | Reset |  |  |  | index.html:661; ui/scale.js:30 | Scale popover: Reset button | M6 |
-| `suggest-orient` | button | Suggest orientation |  |  |  | index.html:667; ui/suggest.js:205 | Suggest popover: button; result rows are a list | M6 |
-| `load-up` | button | ↑ |  |  | Load points up | index.html:681; ui/strength.js:232 | Strength popover: direction pad button | M6 |
-| `load-down` | button | ↓ |  |  | Load points down | index.html:682; ui/strength.js:232 | Strength popover: direction pad button | M6 |
-| `load-left` | button | ← |  |  | Load points left | index.html:683; ui/strength.js:232 | Strength popover: direction pad button | M6 |
-| `load-right` | button | → |  |  | Load points right | index.html:684; ui/strength.js:232 | Strength popover: direction pad button | M6 |
-| `load-front` | button | ⊙ front |  |  | Load points toward you | index.html:685; ui/strength.js:232 | Strength popover: direction pad button | M6 |
-| `load-back` | button | ⊗ back |  |  | Load points away from you | index.html:686; ui/strength.js:232 | Strength popover: direction pad button | M6 |
-| `load-clear` | button | Clear |  |  |  | index.html:688; ui/strength.js:219 | Strength popover: button | M6 |
-| `load-suggest` | button | Turn to the strongest printable pose |  |  |  | index.html:690; ui/strength.js:157 | Strength popover: button | M6 |
+| `suggest-orient` | button | Suggest orientation |  |  |  | index.html:667; ui/suggest.js:205 | Suggest popover: button; result rows are a list | M4b |
+| `load-up` | button | ↑ |  |  | Load points up | index.html:681; ui/strength.js:232 | Strength popover: direction pad button | M4b |
+| `load-down` | button | ↓ |  |  | Load points down | index.html:682; ui/strength.js:232 | Strength popover: direction pad button | M4b |
+| `load-left` | button | ← |  |  | Load points left | index.html:683; ui/strength.js:232 | Strength popover: direction pad button | M4b |
+| `load-right` | button | → |  |  | Load points right | index.html:684; ui/strength.js:232 | Strength popover: direction pad button | M4b |
+| `load-front` | button | ⊙ front |  |  | Load points toward you | index.html:685; ui/strength.js:232 | Strength popover: direction pad button | M4b |
+| `load-back` | button | ⊗ back |  |  | Load points away from you | index.html:686; ui/strength.js:232 | Strength popover: direction pad button | M4b |
+| `load-clear` | button | Clear |  |  |  | index.html:688; ui/strength.js:219 | Strength popover: button | M4b |
+| `load-suggest` | button | Turn to the strongest printable pose |  |  |  | index.html:690; ui/strength.js:157 | Strength popover: button | M4b |
 | `nav-preset` | select | Mouse | (see choices, * = default) | (filled by JS) |  | index.html:696; ui/navigation.js:12 | Settings > Navigation: Picker (Default, Fusion 360, Onshape, SolidWorks, Blender); trackpad gestures are separate and always on | M7 |
-| `show-layers` | checkbox | Show layers | off |  | Show the horizontal print layers around the part. | index.html:700; ui/strength.js:225 | View menu: Toggle "Show Print Layers" | M6 |
+| `show-layers` | checkbox | Show layers | off |  | Show the horizontal print layers around the part. | index.html:700; ui/strength.js:225 | View menu: Toggle "Show Print Layers" | M4b |
 | `section-ghost` | button | Ghost |  |  | Show the cut-away half as faint glass. Clicks go through it. | index.html:707; ui/section.js:346 | Section popover: segmented control Ghost / Hide | M6 |
 | `section-hide` | button | Hide |  |  | Leave the cut-away half out entirely. | index.html:708; ui/section.js:346 | Section popover: segmented control Ghost / Hide | M6 |
 | `section-flip` | button | Flip |  |  | Show the other side of the cut instead. | index.html:712; ui/section.js:391 | Section popover: button | M6 |
@@ -275,8 +275,8 @@ The toolbar (`ui/toolbar.js`) has two kinds of badge: a **tool badge** (Section,
 | `arrange-btn` | button | Arrange |  |  | Pack this plate's models apart on the bed, biggest in the middle. Undo puts them back. | index.html:733; ui/arrange.js:132 | Toolbar button "Arrange" (multi-model plates) | M6 |
 | `rotate-badge` | button | Rotate |  |  | Turn the part: 90° steps, Reset, Lay a face flat and the rotate rings. | index.html:735; ui/pose.js:129 | Toolbar button opening the Rotate popover | M4b |
 | `scale-badge` | button | Scale |  |  | Scale the part by a percent. | index.html:737; ui/scale.js:24 | Toolbar button opening the Scale popover (shows the percent when not 100) | M6 |
-| `suggest-badge` | button | Suggest |  |  | Rank the ways this part could sit on the bed. | index.html:739; ui/suggest.js:247 | Toolbar button opening the Suggest popover | M6 |
-| `strength-badge` | button | Strength |  |  | Strength arrow: which way is the part loaded in use? | index.html:741; ui/strength.js:36 | Toolbar button opening the Strength popover (lit while a load is set) | M6 |
+| `suggest-badge` | button | Suggest |  |  | Rank the ways this part could sit on the bed. | index.html:739; ui/suggest.js:247 | Toolbar button opening the Suggest popover | M4b |
+| `strength-badge` | button | Strength |  |  | Strength arrow: which way is the part loaded in use? | index.html:741; ui/strength.js:36 | Toolbar button opening the Strength popover (lit while a load is set) | M4b |
 | `section` | button | Section |  |  | Cut the view with a plane to see and draw inside the part. Drag the arrow or the sheet (or Shift + scroll) to push the cut, the rings to tilt it. Click again to turn it off. View only: the export is whole. | index.html:743; ui/section.js:379 | Toolbar toggle "Section" (tool on/off) with its popover | M6 |
 | `view-badge` | button | View |  |  | Camera views, the mouse preset and the print layers around the part. | index.html:745; ui/navigation.js:51 | Toolbar button opening the View popover | M4b |
 
@@ -410,6 +410,6 @@ The other fin settings are not persisted in the web app (they come back from a s
 ## 11. Milestone summary
 
 - **M4a** (this ticket): app skeleton; Metal viewer (orbit/pan/zoom, plate and volume box, overhang shading from `face_flags`, GPU face picking, rotation slider, frame overlay); the Part section of the inspector (File, Triangles, Size, Overhangs, Area, Bed contact, Analysis); Overhang slider and printer-volume pop-up.
-- **M4b** (core loop): Open for STL/OBJ/3MF with the object picker; rotate rings, Rotate 90°, Reset, Lay a face flat; Placement Auto and Full coverage with every setting in sections 4.1-4.2; builds on the worker with the spinner; fins/pad display; Fins/Pad/receipt/notes readouts; Undo/Redo; View popover and view cube; Export STL / 3MF / Fins only; Display toggles; tooltips as help text.
-- **M6** (tools): Draw (line/curve, sway-brace preview, select/remove), Remove fins, "+ Add walls by hand", Move/Arrange, plates and multi-model, Scale, Suggest, Strength, Section view, Show layers, All plates (3MF), STEP import, the clash banner and toast Undo.
+- **M4b** (core loop): Open for STL/OBJ/3MF with the object picker; rotate rings, Rotate 90°, Reset, Lay a face flat; Placement Auto and Full coverage with every setting in sections 4.1-4.2; builds on the worker with the spinner; fins/pad display; Fins/Pad/receipt/notes readouts; Undo/Redo; View popover and view cube; Export STL / 3MF / Fins only; Suggest orientation and the Strength arrow (load pad, verdict, "Turn to the strongest printable pose", the arrow in the view) and Show layers; Display toggles; tooltips as help text.
+- **M6** (tools): Draw (line/curve, sway-brace preview, select/remove), Remove fins, "+ Add walls by hand", Move/Arrange, plates and multi-model, Scale, Section view, All plates (3MF), STEP import, the clash banner and toast Undo.
 - **M7** (polish): settings search, tip-card pictures, localisation (six languages, RTL), calibration prints, interface material, report issue / copy settings, sessions in the 3MF, preferences window, Help menu content.

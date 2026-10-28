@@ -30,9 +30,13 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     let overlayPipeline: MTLRenderPipelineState
     let ringPipeline: MTLRenderPipelineState
     let gizmoDepthState: MTLDepthStencilState
+    /// The load arrow: like the overlay, but through the model matrix.
+    let hudPipeline: MTLRenderPipelineState
     let depthState: MTLDepthStencilState
     let lineDepthState: MTLDepthStencilState
     let overlayDepthState: MTLDepthStencilState
+    /// No depth test and no depth write: the HUD (load arrow, layer frames) is always visible.
+    let hudDepthState: MTLDepthStencilState
 
     public var camera = OrbitCamera.home() { didSet { changeCount += 1 } }
     /// Takes model coordinates to print coordinates (a pure rotation).
@@ -71,6 +75,9 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public private(set) var crestFinRanges: [Range<Int>] = []
     /// Vertex ranges of the fin buffer under a removal click's pointer, drawn red over the fins.
     public private(set) var highlightedFinRanges: [Range<Int>] = []
+    /// The load arrow (model space) and the layer frames (print space) of the Strength view; see `HUD.swift`.
+    var loadArrow: (buffer: MTLBuffer, vertices: Int)?
+    var layerFrames: (buffer: MTLBuffer, vertices: Int)?
 
     private var plate: PlateGeometry
     private var plateBuffers: [MTLBuffer?] = [nil, nil, nil, nil]
@@ -79,7 +86,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     private let readback: MTLBuffer
     private var lastDrawTime: Double?
     /// Bumped whenever something drawn changes; a test or a caller can see whether a frame was needed.
-    public private(set) var changeCount = 0
+    public internal(set) var changeCount = 0
     private var drawnCount = -1
 
     public init?(device: MTLDevice? = MTLCreateSystemDefaultDevice()) {
@@ -136,6 +143,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             oa.destinationAlphaBlendFactor = .oneMinusSourceAlpha
             overlay.depthAttachmentPixelFormat = Self.depthFormat
             overlayPipeline = try device.makeRenderPipelineState(descriptor: overlay)
+            overlay.vertexFunction = lib.makeFunction(name: "hud_vertex")
+            hudPipeline = try device.makeRenderPipelineState(descriptor: overlay)
         } catch {
             return nil
         }
@@ -155,6 +164,10 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         gz.depthCompareFunction = .always
         gz.isDepthWriteEnabled = false
         gizmoDepthState = device.makeDepthStencilState(descriptor: gz)!
+        let h = MTLDepthStencilDescriptor()
+        h.depthCompareFunction = .always
+        h.isDepthWriteEnabled = false
+        hudDepthState = device.makeDepthStencilState(descriptor: h)!
         readback = device.makeBuffer(length: 4, options: .storageModeShared)!
         plate = PlateGeometry(volume: .standard)
         super.init()
@@ -327,6 +340,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         draw(lines: plateBuffers[2], count: plate.edge.count, color: a(Palette.plateEdge, 1), with: enc)
         draw(lines: plateBuffers[3], count: plate.box.count, color: a(Palette.volumeBox, 0.55), with: enc)
         if let g = gizmo, g.visible { drawGizmo(g, uniforms: &u, with: enc) }
+        encodeHUD(into: enc)
     }
 
     private func drawGizmo(_ g: GizmoDisplay, uniforms u: inout Uniforms, with enc: MTLRenderCommandEncoder) {

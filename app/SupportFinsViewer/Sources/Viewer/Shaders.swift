@@ -81,6 +81,19 @@ enum Shaders {
         return out;
     }
 
+    // The load arrow: model space (it turns with the part), one flat colour, buffer(3).
+    vertex MeshOut hud_vertex(uint vid [[vertex_id]],
+                              const device float* verts [[buffer(0)]],
+                              constant Uniforms& u [[buffer(2)]],
+                              constant float4& color [[buffer(3)]]) {
+        uint o = vid * u.params.y;
+        MeshOut out;
+        out.position = u.viewProj * (u.model * float4(verts[o], verts[o + 1], verts[o + 2], 1));
+        out.normal = float3(verts[o + 3], verts[o + 4], verts[o + 5]);
+        out.color = color.xyz;
+        return out;
+    }
+
     // The fin a removal click would drop: translucent, unlit, over the fins (ui/remove.js hoverFinMaterial).
     fragment float4 support_overlay_fragment(MeshOut in [[stage_in]], constant float4& color [[buffer(0)]]) {
         return color;
