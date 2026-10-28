@@ -57,6 +57,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use indexmap::{IndexMap, IndexSet};
+use rayon::prelude::*;
 
 use crate::config::Config;
 use crate::draw::{DRAW_MIN_LEN, DrawOpts, DrawnOk, DrawnWall, drawn_line, drawn_wall};
@@ -266,28 +267,14 @@ impl Cells {
     }
 }
 
-/// The sub-triangle centroids of `leftoverPoints` (web/fins/fill.js:104-137), as `f(x, y, z, area)`
-/// in the order JS visits them: the leftover MUST red faces (`regions`: only those regions'), each
-/// subdivided into n x n sub-triangles.
-fn each_leftover_point(
+/// The faces `leftoverPoints` walks, in face order: the leftover MUST red faces (`regions`: only
+/// those regions').
+fn leftover_faces(
     topo: &Topology,
     result: &Targets,
-    rot: &Rot3,
     cls: &[u8],
     regions: Option<&IndexSet<usize>>,
-    cfg: &Config,
-    put: &mut dyn FnMut(f64, f64, f64, f64),
-) {
-    let pos = &topo.pos;
-    let off = &result.analysis.offset;
-    let seat = |o: usize| -> V3 {
-        [
-            rot[0] * pos[o] + rot[3] * pos[o + 1] + rot[6] * pos[o + 2] + off.x,
-            rot[1] * pos[o] + rot[4] * pos[o + 1] + rot[7] * pos[o + 2] + off.y,
-            rot[2] * pos[o] + rot[5] * pos[o + 1] + rot[8] * pos[o + 2] + off.z,
-        ]
-    };
-    let s = cfg.fill.sample;
+) -> Vec<usize> {
     let only: Option<Vec<bool>> = regions.map(|rs| {
         let mut only = vec![false; topo.n_faces];
         for &ri in rs {
@@ -299,46 +286,84 @@ fn each_leftover_point(
         }
         only
     });
-    for f in 0..topo.n_faces {
-        cfg.cancel.check();
-        if result.analysis.over[f] == 0 || cls[f] != MUST || only.as_ref().is_some_and(|o| !o[f]) {
-            continue;
-        }
-        let a_ = seat(f * 9);
-        let b_ = seat(f * 9 + 3);
-        let c_ = seat(f * 9 + 6);
-        let edge = jsnum::max(
-            jsnum::max(
-                jsnum::hypot(&[b_[0] - a_[0], b_[1] - a_[1], b_[2] - a_[2]]),
-                jsnum::hypot(&[c_[0] - b_[0], c_[1] - b_[1], c_[2] - b_[2]]),
-            ),
-            jsnum::hypot(&[a_[0] - c_[0], a_[1] - c_[1], a_[2] - c_[2]]),
-        );
-        let n = jsnum::max(1.0, jsnum::ceil(edge / s)) as usize;
-        let a = topo.area[f] / ((n * n) as f64);
-        // n x n sub-triangles: centroids on the barycentric grid
-        for i in 0..n {
-            let mut j = 0;
-            while i + j < n {
-                let (fi, fj) = (i as f64, j as f64);
-                let uv = [
-                    [fi + 1.0 / 3.0, fj + 1.0 / 3.0],
-                    [fi + 2.0 / 3.0, fj + 2.0 / 3.0],
-                ];
-                for &[u, v] in &uv[..if i + j < n - 1 { 2 } else { 1 }] {
-                    let bu = u / n as f64;
-                    let bv = v / n as f64;
-                    let bw = 1.0 - bu - bv;
-                    put(
-                        bw * a_[0] + bu * b_[0] + bv * c_[0],
-                        bw * a_[1] + bu * b_[1] + bv * c_[1],
-                        bw * a_[2] + bu * b_[2] + bv * c_[2],
-                        a,
-                    );
-                }
-                j += 1;
+    (0..topo.n_faces)
+        .filter(|&f| {
+            result.analysis.over[f] != 0 && cls[f] == MUST && only.as_ref().is_none_or(|o| o[f])
+        })
+        .collect()
+}
+
+/// One face's sub-triangle centroids, `put(x, y, z, area)` in the order JS visits them
+/// (web/fins/fill.js:104-137): the face subdivided into n x n sub-triangles.
+fn face_points(
+    topo: &Topology,
+    result: &Targets,
+    rot: &Rot3,
+    cfg: &Config,
+    f: usize,
+    put: &mut dyn FnMut(f64, f64, f64, f64),
+) {
+    cfg.cancel.check();
+    let pos = &topo.pos;
+    let off = &result.analysis.offset;
+    let seat = |o: usize| -> V3 {
+        [
+            rot[0] * pos[o] + rot[3] * pos[o + 1] + rot[6] * pos[o + 2] + off.x,
+            rot[1] * pos[o] + rot[4] * pos[o + 1] + rot[7] * pos[o + 2] + off.y,
+            rot[2] * pos[o] + rot[5] * pos[o + 1] + rot[8] * pos[o + 2] + off.z,
+        ]
+    };
+    let s = cfg.fill.sample;
+    let a_ = seat(f * 9);
+    let b_ = seat(f * 9 + 3);
+    let c_ = seat(f * 9 + 6);
+    let edge = jsnum::max(
+        jsnum::max(
+            jsnum::hypot(&[b_[0] - a_[0], b_[1] - a_[1], b_[2] - a_[2]]),
+            jsnum::hypot(&[c_[0] - b_[0], c_[1] - b_[1], c_[2] - b_[2]]),
+        ),
+        jsnum::hypot(&[a_[0] - c_[0], a_[1] - c_[1], a_[2] - c_[2]]),
+    );
+    let n = jsnum::max(1.0, jsnum::ceil(edge / s)) as usize;
+    let a = topo.area[f] / ((n * n) as f64);
+    // n x n sub-triangles: centroids on the barycentric grid
+    for i in 0..n {
+        let mut j = 0;
+        while i + j < n {
+            let (fi, fj) = (i as f64, j as f64);
+            let uv = [
+                [fi + 1.0 / 3.0, fj + 1.0 / 3.0],
+                [fi + 2.0 / 3.0, fj + 2.0 / 3.0],
+            ];
+            for &[u, v] in &uv[..if i + j < n - 1 { 2 } else { 1 }] {
+                let bu = u / n as f64;
+                let bv = v / n as f64;
+                let bw = 1.0 - bu - bv;
+                put(
+                    bw * a_[0] + bu * b_[0] + bv * c_[0],
+                    bw * a_[1] + bu * b_[1] + bv * c_[1],
+                    bw * a_[2] + bu * b_[2] + bv * c_[2],
+                    a,
+                );
             }
+            j += 1;
         }
+    }
+}
+
+/// The sub-triangle centroids of `leftoverPoints` (web/fins/fill.js:104-137), as `f(x, y, z, area)`
+/// in the order JS visits them.
+fn each_leftover_point(
+    topo: &Topology,
+    result: &Targets,
+    rot: &Rot3,
+    cls: &[u8],
+    regions: Option<&IndexSet<usize>>,
+    cfg: &Config,
+    put: &mut dyn FnMut(f64, f64, f64, f64),
+) {
+    for f in leftover_faces(topo, result, cls, regions) {
+        face_points(topo, result, rot, cfg, f, put);
     }
 }
 
@@ -354,20 +379,34 @@ fn bare_sums(
     cfg: &Config,
 ) -> (f64, f64) {
     let (mut all, mut far) = (Cells::default(), Cells::default());
-    each_leftover_point(topo, result, rot, cls, None, cfg, &mut |x, y, z, a| {
-        if z < PLATE_Z {
-            return;
+    let faces = leftover_faces(topo, result, cls, None);
+    // The points of a block of faces, with whether the wall tops leave each one bare (the `near`
+    // lookups are the cost, and pure): blocks are made in parallel and joined in face order, so
+    // the cells below are filled in the order the serial walk fills them. [x, y, z, area, bare].
+    let block = |fs: &[usize]| -> Vec<[f64; 5]> {
+        let mut pts = Vec::new();
+        for &f in fs {
+            face_points(topo, result, rot, cfg, f, &mut |x, y, z, a| {
+                if z < PLATE_Z {
+                    return;
+                }
+                let bare = near.is_some_and(|r| !r.near(x, y, z));
+                pts.push([x, y, z, a, f64::from(u8::from(bare))]);
+            });
         }
-        all.put(cfg.fill.sample, x, y, z, a);
-        if let Some(near) = near
-            && near.near(x, y, z)
-        {
-            return;
+        pts
+    };
+    let blocks: Vec<Vec<[f64; 5]>> = if faces.len() < 16 {
+        vec![block(&faces)]
+    } else {
+        faces.par_chunks(4).map(block).collect()
+    };
+    for p in blocks.iter().flatten() {
+        all.put(cfg.fill.sample, p[0], p[1], p[2], p[3]);
+        if p[4] != 0.0 {
+            far.put(cfg.fill.sample, p[0], p[1], p[2], p[3]);
         }
-        if near.is_some() {
-            far.put(cfg.fill.sample, x, y, z, a);
-        }
-    });
+    }
     let sum = |c: &Cells| c.points().iter().fold(0.0, |s, p| s + p[3]);
     let total = sum(&all);
     (if near.is_some() { sum(&far) } else { total }, total)
