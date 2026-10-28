@@ -1618,7 +1618,7 @@ pub fn build_props(
                 .filter(|q| q.circular == Some(true))
                 .filter_map(|q| q.region)
                 .collect();
-            let base = if opts.rim_walls == Some(false) || opts.raster == Some(false) {
+            if opts.rim_walls == Some(false) || opts.raster == Some(false) {
                 circ
             } else {
                 let ruler = judge_ruler(topo, result, rot, &judge_cache, cfg);
@@ -1657,8 +1657,7 @@ pub fn build_props(
                     },
                     ctx,
                 )
-            };
-            base
+            }
         };
         let base = compute_base();
         if let BaseMemo::Record(slot @ None) = &mut *ctx.base_memo.borrow_mut() {
