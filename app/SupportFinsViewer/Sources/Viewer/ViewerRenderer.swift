@@ -460,4 +460,54 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         let v = readback.contents().load(as: UInt32.self)
         return v == 0 ? nil : Int(v - 1)
     }
+
+    // MARK: picking supports
+
+    /// The triangle of the fin buffer under pixel (`x`, `y`) of a `width x height` view (origin top left), or
+    /// nil. Only the fins that are drawn can be picked: the removed ones (`hiddenFinRanges`) are not in the ID
+    /// pass, and the pad is never a candidate. The answer is the triangle index into the fin buffer
+    /// (vertex `3 * triangle`), which `triRanges` map to a fin (`web/ui/remove.js` pickFin).
+    public func pickSupport(x: Int, y: Int, width: Int, height: Int) async -> Int? {
+        guard let s = supports, s.finVertices > 0, let fins = s.fins, x >= 0, y >= 0, x < width, y < height else { return nil }
+        if idTexture?.width != width || idTexture?.height != height {
+            let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r32Uint, width: width, height: height, mipmapped: false)
+            d.usage = [.renderTarget]
+            d.storageMode = .private
+            idTexture = device.makeTexture(descriptor: d)
+            idDepth = makeDepth(width: width, height: height)
+        }
+        guard let idTexture, let idDepth, let cb = queue.makeCommandBuffer() else { return nil }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = idTexture
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].storeAction = .store
+        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        pass.depthAttachment.texture = idDepth
+        pass.depthAttachment.loadAction = .clear
+        pass.depthAttachment.storeAction = .dontCare
+        pass.depthAttachment.clearDepth = 1
+        // the part is in the pass as an occluder (a fin behind the part cannot be clicked), with no id of its own
+        var u = Uniforms(viewProj: camera.viewProjection, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1),
+                         params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0))
+        let enc = cb.makeRenderCommandEncoder(descriptor: pass)!
+        enc.setRenderPipelineState(idPipeline)
+        enc.setDepthStencilState(depthState)
+        for seg in SupportSegments.fins(total: s.finVertices, hidden: hiddenFinRanges, crest: []) {
+            enc.setVertexBuffer(fins, offset: 0, index: 0)
+            enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+            enc.drawPrimitives(type: .triangle, vertexStart: seg.range.lowerBound, vertexCount: seg.range.count)
+        }
+        enc.endEncoding()
+        let blit = cb.makeBlitCommandEncoder()!
+        blit.copy(from: idTexture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: x, y: y, z: 0),
+                  sourceSize: MTLSize(width: 1, height: 1, depth: 1), to: readback, destinationOffset: 0,
+                  destinationBytesPerRow: 4, destinationBytesPerImage: 4)
+        blit.endEncoding()
+        await withCheckedContinuation { (k: CheckedContinuation<Void, Never>) in
+            cb.addCompletedHandler { _ in k.resume() }
+            cb.commit()
+        }
+        let v = readback.contents().load(as: UInt32.self)
+        return v == 0 ? nil : Int(v - 1)
+    }
 }

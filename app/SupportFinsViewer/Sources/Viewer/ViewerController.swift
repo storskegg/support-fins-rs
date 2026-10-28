@@ -23,6 +23,28 @@ public final class ViewerController {
     public var volume = PrinterVolume.standard { didSet { renderer.setVolume(volume) } }
     public var highlightSmall = true { didSet { renderer.highlightSmall = highlightSmall } }
 
+    /// Remove-fins mode (`web/ui/remove.js removeActive`): the pointer picks fins, not the part's faces. Hover
+    /// reports the fin buffer's triangle under the pointer, a click (a press that did not drag) reports it
+    /// again, and Esc, a right click or Ctrl+click calls `onCancelArmed`.
+    public var supportPicking = false {
+        didSet {
+            guard supportPicking != oldValue else { return }
+            pendingPick = nil
+            hoverFace = nil
+            renderer.setHover(nil)
+            hoveringSupport = false
+            if !supportPicking { renderer.setFinHighlight([]) }
+        }
+    }
+    /// The fin-buffer triangle under the pointer in remove mode.
+    public private(set) var hoverSupportTriangle: Int?
+    /// The pointer is over a fin that a click would pick (the view shows a pointing hand).
+    public private(set) var hoveringSupport = false { didSet { onCursorChange?() } }
+    @ObservationIgnored public var onSupportHover: (@MainActor (Int?) -> Void)?
+    @ObservationIgnored public var onSupportClick: (@MainActor (Int?) -> Void)?
+    @ObservationIgnored public var onCancelArmed: (@MainActor () -> Void)?
+    @ObservationIgnored var onCursorChange: (@MainActor () -> Void)?
+
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var pickInFlight = false
     @ObservationIgnored private var pendingPick: (x: Int, y: Int, w: Int, h: Int)?
@@ -115,6 +137,14 @@ public final class ViewerController {
         Task { @MainActor in
             while let p = pendingPick {
                 pendingPick = nil
+                if supportPicking {
+                    let tri = await renderer.pickSupport(x: p.x, y: p.y, width: p.w, height: p.h)
+                    guard supportPicking else { continue }
+                    hoverSupportTriangle = tri
+                    hoveringSupport = tri != nil
+                    onSupportHover?(tri)
+                    continue
+                }
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
                 hoverFace = face
                 renderer.setHover(face)
@@ -127,6 +157,31 @@ public final class ViewerController {
         pendingPick = nil
         hoverFace = nil
         renderer.setHover(nil)
+        if supportPicking, hoverSupportTriangle != nil {
+            hoverSupportTriangle = nil
+            hoveringSupport = false
+            onSupportHover?(nil)
+        }
+    }
+
+    /// A click at a pixel of the drawable (origin top left) in remove mode: reports the fin-buffer triangle
+    /// under it (nil: empty space). Does nothing when the mode is off.
+    public func click(x: Int, y: Int, width: Int, height: Int) {
+        guard supportPicking else { return }
+        Task { @MainActor in
+            let tri = await renderer.pickSupport(x: x, y: y, width: width, height: height)
+            guard supportPicking else { return }
+            onSupportClick?(tri)
+        }
+    }
+
+    /// Esc, a right click or Ctrl+click while a pointer mode is armed (`app.js cancelArmed`). True when it was
+    /// armed, i.e. the event was the mode's.
+    @discardableResult
+    public func cancelArmed() -> Bool {
+        guard supportPicking else { return false }
+        onCancelArmed?()
+        return true
     }
 
     // MARK: benchmark
