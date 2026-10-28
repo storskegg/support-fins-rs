@@ -32,8 +32,12 @@ you start a ticket, and again whenever a review sends you back.
    prints "waiting for <holder>", wait; never work around it, and never wait for the load to drop
    (the Mac idles around 3). Benchmarks record the load before and during the run.
 
+   **After adding or moving Swift files, regenerate the project (`just app-project`) before
+   testing; `just gate` does it.** The Xcode project is generated and gitignored, and a stale one
+   silently skips new test files (201 tests run instead of 211). `just gate` prints the test count.
+
    **UI tests (`app-uitest`) are the orchestrator's only.** They take over the user's mouse and
-   keyboard, so no agent runs them and `just gate` leaves them out. The headless
+   keyboard, and `FinsLoopUITests` is flaky under heavy load (a hit point while scrolling, `FinsLoopUITests.swift:51`; the lock exists partly to prevent that), so no agent runs them and `just gate` leaves them out. The headless
    `EndToEndTests` in `app-test` covers the same loop.
 
    **After merges the orchestrator runs `just tidy --apply`** to remove worktrees whose work is
