@@ -65,9 +65,10 @@ final class BuildModel {
         return g
     }
 
-    /// Abandons the build in flight (the fins toggle went off, the part changed): its result will not be
-    /// delivered here. The fins already shown stay until `clear()`.
+    /// Abandons the build in flight (the fins toggle went off, the part changed): the engine stops it part-way
+    /// (`Builder.cancel`), and its result will not be delivered here. The fins already shown stay until `clear()`.
     func cancel() {
+        builder.cancel()
         wanted = nil
         building = false
         resumeWaiters()
