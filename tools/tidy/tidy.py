@@ -25,6 +25,8 @@ REPO = Path(__file__).resolve().parent.parent.parent
 WT = REPO.parent / "sfrs-wt"
 BUILD_DIRS = ("target", ".dd", ".build", "DerivedData")
 KEEP_NAMES = {"demo-dd", "uitest.dd"}
+# the orchestrator's reusable review and landing worktrees: kept, build output and all (that is their point)
+SHARED = {"review", "land"}
 
 
 def git(wt, *args):
@@ -60,6 +62,9 @@ def main():
             continue
         if wt.name.endswith(".dd") and wt.name not in KEEP_NAMES:
             remove.append((wt, "build folder"))
+            continue
+        if wt.name in SHARED:
+            keep.append((wt, "shared review/landing worktree"))
             continue
         gitfile = wt / ".git"
         if not gitfile.is_file():

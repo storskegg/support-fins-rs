@@ -53,7 +53,7 @@ struct ViewSettingsTests {
     }
 
     @Test func theViewSlotIsLastWithTheWebsTooltip() {
-        #expect(ToolbarSlot.allCases.last == .view)
+        #expect(ViewerModel().toolbar.slots.last == .view)
         let r = ToolbarRegistry()
         r.register(.view) { Text("x") }
         #expect(r.badges[.view] != nil)

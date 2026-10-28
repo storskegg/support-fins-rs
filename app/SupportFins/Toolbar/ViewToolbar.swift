@@ -14,7 +14,7 @@ struct ViewToolbar: View {
                 ToolbarButton(title: "Redo", systemImage: "arrow.uturn.forward", help: "Redo (⇧⌘Z)",
                               enabled: session.canRedo) { session.redo() }
                 Divider().frame(height: 18).padding(.horizontal, 2)
-                ForEach(ToolbarSlot.allCases) { slot in
+                ForEach(registry.slots) { slot in
                     SlotButton(slot: slot, registry: registry)
                 }
             }

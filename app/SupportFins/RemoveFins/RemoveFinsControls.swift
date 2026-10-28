@@ -1,17 +1,9 @@
 import SwiftUI
 
-struct RemovalKey: FocusedValueKey { typealias Value = RemovalModel }
-extension FocusedValues {
-    var removal: RemovalModel? {
-        get { self[RemovalKey.self] }
-        set { self[RemovalKey.self] = newValue }
-    }
-}
-
 /// `remove-fins-toggle` and `restore-fins` (docs/UI-MAP.md): in the inspector's basics, shown only in Auto
 /// and Full with fins on screen.
 struct RemoveFinsControls: View {
-    @FocusedValue(\.removal) private var model
+    let model: RemovalModel?
 
     var body: some View {
         if let model, model.controlsShown {

@@ -12,6 +12,9 @@ const CHUNK: usize = 8192;
 /// The CSR of `n_items` items over `n_cells` cells; `cells_of(i, push)` calls `push(c)` once for
 /// each cell item `i` covers (cell ids below `n_cells`). `start` has `n_cells + 1` entries.
 ///
+/// `par` says whether the parallel path may run (it joins on Rayon: never inside a `Once`, see
+/// `lazy.rs`); a mesh under `PAR_MIN_ITEMS` is bucketed serially either way.
+///
 /// Serial: count, prefix-sum, fill in item order. Parallel (a big mesh): every task lists the
 /// `(cell, item)` pairs of a block of items as `cell << 32 | item`, the blocks are joined and sorted,
 /// which puts each cell's items in ascending order: the same lists.
@@ -19,9 +22,10 @@ pub fn build_csr(
     n_items: usize,
     n_cells: usize,
     cells_of: impl Fn(usize, &mut dyn FnMut(usize)) + Sync,
+    par: bool,
 ) -> (Vec<i32>, Vec<u32>) {
     let mut start = vec![0i32; n_cells + 1];
-    if n_items < PAR_MIN_ITEMS {
+    if !par || n_items < PAR_MIN_ITEMS {
         for i in 0..n_items {
             cells_of(i, &mut |c| start[c + 1] += 1);
         }
@@ -38,6 +42,7 @@ pub fn build_csr(
         }
         return (start, items);
     }
+    crate::lazy::assert_no_init_held();
     let blocks: Vec<Vec<u64>> = (0..n_items.div_ceil(CHUNK))
         .into_par_iter()
         .map(|b| {
@@ -80,7 +85,7 @@ mod tests {
     #[test]
     fn the_parallel_path_builds_the_serial_lists() {
         let (n_items, n_cells) = (PAR_MIN_ITEMS * 2 + 77, 1000);
-        let (s0, i0) = build_csr(n_items, n_cells, cells(n_cells));
+        let (s0, i0) = build_csr(n_items, n_cells, cells(n_cells), true);
         // the serial algorithm, spelled out
         let mut lists: Vec<Vec<u32>> = vec![Vec::new(); n_cells];
         let f = cells(n_cells);

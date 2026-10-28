@@ -7,14 +7,17 @@ import Viewer
 struct InspectorView: View {
     @Bindable var controller: ViewerController
     @Binding var settings: FinSettings
-    /// The stats and status cards, in place of M4a's Part block; nil keeps the block.
-    var readout: AnyView?
+    /// The features' sections (`Feature.inspectorSections`) at the top, in the settings block after Cutouts, and
+    /// after it. An empty top keeps M4a's Part block in place of the stats and status cards.
+    var top: [InspectorSection] = []
+    var basics: [InspectorSection] = []
+    var bottom: [InspectorSection] = []
     @SceneStorage(SettingsStore.Key.sections) private var sections = SectionState()
 
     var body: some View {
         Form {
-            if let readout { readout }
-            PartSections(controller: controller, withPartBlock: readout == nil)
+            ForEach(top) { $0.content() }
+            PartSections(controller: controller, withPartBlock: top.isEmpty)
             Section {
                 PrinterSection(settings: $settings, open: $sections.printer)
                 PlacementSection(settings: $settings)
@@ -28,9 +31,10 @@ struct InspectorView: View {
                     Text("Honeycomb").tag(FinSettings.Cutout.honeycomb)
                 }
                 .help(Tip.cutout)
-                RemoveFinsControls()
+                ForEach(basics) { $0.content() }
                 MoreSettingsSection(settings: $settings, open: $sections.more)
             }
+            ForEach(bottom) { $0.content() }
         }
         .formStyle(.grouped)
         .onChange(of: settings) { _, new in SettingsStore().save(new) }

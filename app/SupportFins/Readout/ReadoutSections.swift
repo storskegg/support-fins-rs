@@ -41,6 +41,8 @@ struct ReadoutSections: View {
     let controller: ViewerController
     let session: PartSession
     var build: (any ReadoutBuildSource)?
+    /// Lines other features add to the status card.
+    var extraLines: [StatusLine] = []
 
     @State private var analysis: Analysis?
     @State private var afterRemoval: AfterRemoval?
@@ -92,7 +94,7 @@ struct ReadoutSections: View {
         Group {
             StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins)
             StatusCard(part: part, fins: fins, importNote: session.parts.first?.info.importNote ?? "",
-                       islandCard: islandCard(built, count: analysis?.islands ?? 0))
+                       islandCard: islandCard(built, count: analysis?.islands ?? 0), extra: extraLines)
         }
         .task(id: RemovalKey(removed: session.removedFins, generation: build?.readoutResult.map(ObjectIdentifier.init))) { await measureRemoval() }
         .task(id: Key(pose: session.pose, threshold: session.settings.threshold,

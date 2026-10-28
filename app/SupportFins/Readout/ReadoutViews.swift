@@ -76,6 +76,8 @@ struct StatusCard: View {
     var importNote = ""
     /// `#island-warn` (`renderIslandCard`): last in the card, in the island card's red.
     var islandCard: String?
+    /// Lines other features add (`Feature.statusLines`), after the island card.
+    var extra: [StatusLine] = []
     @State private var showReceiptInfo = false
 
     /// The card's lines in the order of `index.html:603-610`: import, flat, fin, over-warn, island-warn. The two
@@ -96,6 +98,7 @@ struct StatusCard: View {
     var body: some View {
         let notes = Self.lines(importNote: importNote, flat: part.flatNote, flatGood: part.flatNoteGood,
                                fin: fins?.lead ?? "", overWarn: part.overWarn, island: islandCard)
+            + extra.map { ($0.text, $0.color, $0.bar) }
         if !notes.isEmpty || fins?.grams != nil {
             Section("Status") {
                 ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
