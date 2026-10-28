@@ -155,14 +155,15 @@ struct ExportModelTests {
         #expect(model.error == nil && model.lastWritten == mf)
     }
 
-    @Test func aPosedBuildCannotWriteFinsOnlyAndTheEnginesMessageIsShown() async throws {
-        // the engine's export refuses `--fins-only` for a posed build (docs/FFI.md): the file would not line up
-        // with the part as it is in the file
+    @Test func aPosedBuildWritesFinsOnlyInThePrintPositionLikeThePage() async throws {
+        // the page writes the fins and pad in the print position whatever the pose (docs/FFI.md, "export")
         let (model, build) = rig(try tShape())
         build.build(rotation: tilt(30), optionsJSON: "{}")
         await build.settled()
-        #expect(model.write(.finsOnly, to: tmp("posed.stl")) == nil)
-        #expect(model.error?.contains("fins-only") == true)
+        let url = try #require(model.write(.finsOnly, to: tmp("posed.stl")))
+        #expect(model.error == nil)
+        let size = try #require(try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
+        #expect(size > 84 && (size - 84) % 50 == 0)
         #expect(model.write(.stl, to: tmp("posed-ok.stl")) != nil && model.error == nil)
     }
 
