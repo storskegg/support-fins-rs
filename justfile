@@ -116,10 +116,14 @@ bench-load *inputs:
     cargo build --release -q -p sf-testkit --example bench_load
     target/release/examples/bench_load {{inputs}}
 
-# Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5-rendering.md); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
+# Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5.md, "Rendering"); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
 bench-render *args:
     swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
 
 # Local port dashboard at http://127.0.0.1:8787: milestones, tasks and agents (tools/dashboard/state.json) beside live load, build/test processes, worktree activity, PRs and commits; pushed live every 2 s.
 dashboard:
     python3 tools/dashboard/server.py
+
+# Keep ~/RustRoverProjects/sfrs-wt small: remove worktrees whose work is on GitHub, drop build output of idle kept ones (dry run; `just tidy --apply` does it).
+tidy *args:
+    python3 tools/tidy/tidy.py {{args}}

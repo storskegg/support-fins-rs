@@ -45,7 +45,7 @@ final class SuggestModel {
     var buttonTitle: String { isRanking ? "Ranking…" : "Suggest orientation" }
 
     /// The wide search's candidate density: ten times the web's candidate poses, in less wall time than the web
-    /// (docs/PERF-M5-suggest.md).
+    /// (docs/PERF-M5.md, "Suggest").
     static let searchDensity = 10.0
 
     /// Rank the part's poses. `currentBore` is `summary_json`'s `boreWalls` for the pose on screen; `density` the
