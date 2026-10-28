@@ -6,6 +6,7 @@
 #![allow(unsafe_code)]
 
 mod builder;
+mod footprint;
 mod gpu;
 mod part;
 mod records;
@@ -14,6 +15,10 @@ mod suggest;
 pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, build_part, build_part_cancellable, export,
     export_file_name,
+};
+pub use footprint::{
+    Footprint, footprint_clash_cells, footprint_of_build, footprint_of_part, footprint_spot,
+    footprint_union, plate_under,
 };
 pub use gpu::GpuBuffer;
 pub use part::{
