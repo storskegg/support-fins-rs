@@ -17,7 +17,7 @@ sf-cli = { path = "crates/sf-cli" }
 sf-testkit = { path = "crates/sf-testkit" }
 libm = "0.2.16"
 indexmap = "2.14"
-rayon = "1.12"
+rayon = "1.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
 base64 = "0.22"
