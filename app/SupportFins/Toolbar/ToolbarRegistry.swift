@@ -64,10 +64,15 @@ final class ToolbarRegistry {
     func toggle(_ slot: ToolbarSlot) { open = open == slot ? nil : slot }
     func fold() { open = nil }
 
-    /// Show `text` above a badge, folding away after `seconds`.
-    func flash(_ text: String, over slot: ToolbarSlot, seconds: Double = 1.2) {
+    private var flashGeneration = 0
+
+    /// Show `text` above a badge, folding away after `seconds` (never, when nil: a drag holds it and the next
+    /// call replaces it).
+    func flash(_ text: String, over slot: ToolbarSlot, seconds: Double? = 1.2) {
         flash = (slot, text)
-        let shown = text
-        Task { try? await Task.sleep(for: .seconds(seconds)); if flash?.text == shown { flash = nil } }
+        flashGeneration += 1
+        guard let seconds else { return }
+        let generation = flashGeneration
+        Task { try? await Task.sleep(for: .seconds(seconds)); if flashGeneration == generation { flash = nil } }
     }
 }
