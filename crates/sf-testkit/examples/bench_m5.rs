@@ -25,10 +25,9 @@ const BEGIN: &str = "<!-- bench:begin -->";
 const END: &str = "<!-- bench:end -->";
 const PRIVATE: &str = "Earth Focus Many Vertical";
 
-/// Threads the engine builds on. 1 until a PR puts the build on Rayon; that PR changes this line to
-/// `rayon::current_num_threads()`.
+/// Threads the engine builds on (the global Rayon pool; a build parallelises inside a wall).
 fn engine_threads() -> usize {
-    1
+    rayon::current_num_threads()
 }
 
 #[derive(Clone, Copy, PartialEq)]

@@ -116,7 +116,7 @@ bench-load *inputs:
     cargo build --release -q -p sf-testkit --example bench_load
     target/release/examples/bench_load {{inputs}}
 
-# Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5-rendering.md); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
+# Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5.md, "Rendering"); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
 bench-render *args:
     swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
 

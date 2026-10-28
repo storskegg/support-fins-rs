@@ -1,207 +1,171 @@
-# M5 timing: the fin build
+# M5 performance
 
-The Rust `build_fins` per case, beside the M3 serial numbers ([PERF-M3.md](PERF-M3.md)). Regenerate the tables with `just bench-m5`
-(Rust only; the JS and M3 serial columns are read from PERF-M3.md's tables). Timings on a shared machine are noisy: compare
-A/B interleaved, and treat the final numbers as the quiet run's.
+Final M5 numbers for the Rust port against the web engine (JS) and the single-threaded Rust engine of M3 ([PERF-M3.md](PERF-M3.md)). Targets are from [PORT-PLAN.md](PORT-PLAN.md) section 1.
+
+## Summary
+
+- The parallel engine builds fins 1.9-2.0x faster than M3 serial on the stress set (3.6-3.7x faster than JS), and 2.75x faster on the 772k-triangle private objects (JS cannot open that file).
+- Loading and welding a 1.5M-face STL takes about 55 ms (was about 535 ms); the 7.7M-triangle private 3MF parses in 1.0 s (was 8.4 s).
+- Suggest searches up to 10x more poses on curved and many-faceted parts in 2.3-71x less wall time than the web.
+- The renderer is not the limit: a 1.5M-triangle scene with 9000 fins and tines costs 1.0 ms of GPU per frame (8.33 ms budget).
+- All five targets are met on what could be measured. Open items: a 772k-triangle part during a live drag rebuilds in about 390 ms (fins trail the ring by about 10 degrees), `flat_bracket.stl` itself was not available, and the private-file Suggest row was not re-recorded.
+
+## Targets
+
+| target | measured | status |
+|---|---|---|
+| 120 fps at 1M+ triangles | 1.5M triangles, 3000 fins + 6000 tines, 2560x1600: GPU 1.02 ms mean, 1.07 ms p99, ceiling 1570 fps (orbit). Earlier measurements: 7.7M triangles 4.0 ms GPU; live app at 120 Hz on 1.2M triangles 119.9-120.0 fps | Met: the GPU uses an eighth of the 8.33 ms frame. The remaining risk is main-thread time (SwiftUI): about 1% of live-app frames slip a display tick |
+| Live Auto rebuild under ~50 ms on a typical part during a drag | One build on the app's path (re-weld, analyse, fins) under the 8 ms supersede policy: lowledge 6.0, coin 13.1, cone 17.0, needle 20.1, torus 22.2 ms; fins lag the ring by 0.3-1.5 degrees median | Met on the stress proxies. Not met on the 772k-triangle private object: 393 ms (about 120 ms of it the per-pose weld), fins trail by about 10 degrees |
+| `flat_bracket.stl` under 150 ms | Not available in this repo; worst proxy instead. Slowest now: tube X60Z30 (384 triangles) 32 ms (M3 serial 52.7, JS 88.2). Slowest in JS: cone X40 18.5 ms (M3 61.2, JS 124). Largest case: private object 336 ms median (M3 serial 935) | Met on proxies, unverified on the file: no proxy has flat_bracket's 2.4 s JS time, so this shows the stress set is far under 150 ms, not that flat_bracket is |
+| Suggest at 10x the candidates in less wall time than the web | Sphere 18 to 180 candidates, torus 14 to 156, needle 17 to 150, coupons 12 to 95-162; JS / wide wall time 3.9x, 3.9x, 5.0x, 5.6-71x. Cone, coin, cylinder, tube gain 3-4x the candidates (54-70), still 3.9-10x faster. Boxes, L-brackets, plus shapes have no more stable down-faces (6-10 stay 6-10) | Met for curved and many-faceted parts, faster than the web on 25 of 29 inputs; cube, plate and pyramid (12 or 8 triangles) take 0.1 ms against the web's 0.05-0.07 ms (pool start-up) |
+| 1.5M-face load and weld well under a second | Binary STL: read 8 + parse 7.5 + weld 37 ms, first analyze 12 ms. OBJ: parse 31 + weld 37 ms | Met: about 55 ms to a welded topology (was about 535 ms) |
+
+## Fin build
+
+`just bench-m5` (`bench_m5`): `build_fins` per case with the site's own request (Auto, PLA, tines, bed pad, threshold 45), median of 5 after a warm-up (3 for the private objects), the better of two runs per case. The JS and M3 serial columns are PERF-M3.md's. Builds run on the global Rayon pool (12 threads; a build parallelises inside a wall, since most stress parts have only 1-3 patches per pass).
+
+| set | builds | JS ms | M3 serial ms | now ms | now vs M3 serial | now vs JS | median build now |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Stress models at golden poses | 48 | 1212 | 613 | 327 | 1.87x | 3.7x | 4.5 ms |
+| Worst orientations (torus, sphere, needle, tube, coin) | 29 | 1300 | 714 | 361 | 1.98x | 3.6x | 11.6 ms |
+| Private objects (10 x 772,340 triangles) | 10 | cannot load (V8 string limit) | 9367 | 3403 | 2.75x | - | 336 ms |
+
+Builds under 5 ms gain nothing from parallelism (setup dominates). Across the 54 builds that take 5 ms or more in M3, the speed-up over M3 serial is 1.04x-4.4x, median 1.8x.
+
+The slow proxies:
+
+| case | triangles | JS ms | M3 serial ms | now ms | now vs M3 serial | now vs JS |
+|---|---:|---:|---:|---:|---:|---:|
+| tube X60Z30 | 384 | 88.2 | 52.7 | 32.1 | 1.6x | 2.7x |
+| torus X30 | 2048 | 59.8 | 34.9 | 24.5 | 1.4x | 2.4x |
+| lowledge up | 20 | 82.7 | 36.7 | 23.4 | 1.6x | 3.5x |
+| torus X45 | 2048 | 98.8 | 51.1 | 22.7 | 2.3x | 4.4x |
+| needle X30 | 384 | 97.9 | 51.6 | 19.0 | 2.7x | 5.2x |
+| cone X40 | 96 | 124 | 61.2 | 18.5 | 3.3x | 6.7x |
+| needle X40 | 384 | 94.4 | 48.7 | 18.3 | 2.7x | 5.2x |
+| ushape X40 | 28 | 80.1 | 41.3 | 18.2 | 2.3x | 4.4x |
+| needle X60Z30 | 384 | 119 | 68.0 | 18.0 | 3.8x | 6.6x |
+| needle X60 | 384 | 119 | 65.4 | 14.9 | 4.4x | 8.0x |
+| coin X40 | 256 | 72.0 | 37.1 | 12.4 | 3.0x | 5.8x |
+
+The 12 slowest builds together: JS 980 ms, M3 serial 520 ms, now 267 ms.
+
+Where the build time went (macOS `sample` plus stage timers, serial, before M5), in the order it was acted on: `bare_area` re-walked every red triangle twice (25-57% of needle and coin); Auto's judge rebuilt the same base twice when a region swapped to a downhill wall (a third of cone, torus, ushape); the finished-wall weld check and per-station probes were about 70% of a cone build; the bed pad's brim lattice was half of ushape X40; on the 772k-triangle objects half the build was `automatic_targets` (a floor probe under each excluded tiny-hole face, one surface grid per pass). Left unchanged: the per-wall corridor early-out (`inside_part` is a ray-parity test, so an empty box does not imply a clear one) and merging `station_is_clear` with `station_certified` (the second runs after `settle_top` moves the line).
+
+`just bench-m5` writes the full 87-case tables between the markers below; the figures above are the better of two such runs.
 
 <!-- bench:begin -->
-
-- **Engine threads:** 1 (machine reports 12 logical CPUs). **Rust:** rustc 1.99.1 (58cf8f9c3 2026-10-13), `cargo build --release`. **Runs:** one discarded warm-up, then the median of 5 (3 for the private objects).
-- **out verts** is the build's output vertex count, recorded so a change that alters output shows here (the parity corpus is the real gate).
-
-### Summary
-
-- Stress models at golden poses: 48 builds, total M3 serial 613 ms vs now 608 ms (1.01x), median build now 7.73 ms
-- Worst orientations: 29 builds, total M3 serial 714 ms vs now 705 ms (1.01x), median build now 14.9 ms
-- Private objects: 10 builds, total M3 serial 9367 ms vs now 9415 ms (0.99x), median build now 944 ms
-
-### Slowest 12 stress builds (the proxies)
-
-| model | pose | triangles | out verts | JS ms (M3) | Rust ms (M3 serial) | Rust ms (now) | ratio vs M3 serial |
-|---|---|---:|---:|---:|---:|---:|---:|
-| needle | X60Z30 | 384 | 8712 | 119 | 68.0 | 65.5 | 1.04x |
-| needle | X60 | 384 | 8712 | 119 | 65.4 | 63.3 | 1.03x |
-| cone | X40 | 96 | 11352 | 124 | 61.2 | 61.2 | 1.00x |
-| tube | X60Z30 | 384 | 12396 | 88.2 | 52.7 | 53.2 | 0.99x |
-| needle | X30 | 384 | 12816 | 97.9 | 51.6 | 51.1 | 1.01x |
-| torus | X45 | 2048 | 8460 | 98.8 | 51.1 | 49.7 | 1.03x |
-| needle | X40 | 384 | 11352 | 94.4 | 48.7 | 48.5 | 1.00x |
-| torus | Y45 | 2048 | 8028 | 89.8 | 48.2 | 47.4 | 1.02x |
-| torus | X45Y30 | 2048 | 4236 | 75.7 | 40.8 | 40.4 | 1.01x |
-| ushape | X40 | 28 | 9852 | 80.1 | 41.3 | 39.7 | 1.04x |
-| coin | X40 | 256 | 22980 | 72.0 | 37.1 | 37.6 | 0.99x |
-| coin | X30 | 256 | 25848 | 69.0 | 37.3 | 37.3 | 1.00x |
-
-### Stress models at golden poses
-
-| model | pose | triangles | out verts | JS ms (M3) | Rust ms (M3 serial) | Rust ms (now) | ratio vs M3 serial |
-|---|---|---:|---:|---:|---:|---:|---:|
-| cube | X20 | 12 | 9792 | 31.3 | 13.4 | 13.5 | 0.99x |
-| cube | X30 | 12 | 9312 | 26.0 | 12.2 | 12.2 | 1.00x |
-| cube | X40 | 12 | 8448 | 30.8 | 11.6 | 11.3 | 1.03x |
-| lbracket | X35 | 20 | 7788 | 30.0 | 13.5 | 13.7 | 0.99x |
-| sphere | up | 1280 | 5112 | 20.8 | 10.4 | 10.5 | 0.99x |
-| staircase | X40 | 28 | 6384 | 45.1 | 21.6 | 21.9 | 0.99x |
-| arch | up | 20 | 0 | 0.05 | 0.01 | 0.01 | 1.80x |
-| arch | X40 | 20 | 8976 | 29.4 | 15.0 | 15.3 | 0.98x |
-| bar | up | 12 | 0 | 0.04 | 0.00 | 0.00 | 0.00x |
-| bar | X40 | 12 | 2700 | 9.49 | 4.44 | 4.68 | 0.95x |
-| coin | up | 256 | 0 | 0.37 | 0.03 | 0.03 | 1.11x |
-| coin | X40 | 256 | 22980 | 72.0 | 37.1 | 37.6 | 0.99x |
-| cone | up | 96 | 0 | 0.07 | 0.01 | 0.02 | 0.57x |
-| cone | X40 | 96 | 11352 | 124 | 61.2 | 61.2 | 1.00x |
-| cube | up | 12 | 0 | 0.02 | 0.01 | 0.00 | 2.33x |
-| cylinder | up | 192 | 0 | 0.18 | 0.02 | 0.02 | 0.93x |
-| cylinder | X40 | 192 | 5184 | 14.9 | 7.81 | 7.73 | 1.01x |
-| hexprism | up | 20 | 0 | 0.02 | 0.01 | 0.01 | 1.82x |
-| hexprism | X40 | 20 | 4236 | 14.2 | 7.03 | 7.22 | 0.97x |
-| lbracket | up | 20 | 0 | 0.02 | 0.01 | 0.01 | 1.90x |
-| lbracket | X40 | 20 | 7428 | 65.8 | 31.6 | 32.1 | 0.98x |
-| lowledge | up | 20 | 12180 | 82.7 | 36.7 | 37.2 | 0.99x |
-| lowledge | X40 | 20 | 14784 | 17.0 | 7.63 | 7.71 | 0.99x |
-| needle | up | 384 | 0 | 0.53 | 0.05 | 0.05 | 1.07x |
-| needle | X40 | 384 | 11352 | 94.4 | 48.7 | 48.5 | 1.00x |
-| plate | up | 12 | 0 | 0.02 | 0.01 | 0.01 | 1.88x |
-| plate | X40 | 12 | 24960 | 50.6 | 26.8 | 26.1 | 1.03x |
-| plus | up | 44 | 0 | 0.03 | 0.01 | 0.01 | 1.23x |
-| plus | X40 | 44 | 6696 | 13.3 | 7.20 | 7.15 | 1.01x |
-| portal | up | 32 | 0 | 0.03 | 0.01 | 0.01 | 1.57x |
-| portal | X40 | 32 | 4116 | 31.8 | 16.4 | 16.3 | 1.01x |
-| pyramid | up | 8 | 0 | 0.02 | 0.00 | 0.00 | 0.00x |
-| pyramid | X40 | 8 | 7932 | 6.70 | 3.66 | 3.69 | 0.99x |
-| ramp | up | 16 | 0 | 0.02 | 0.01 | 0.00 | 2.09x |
-| ramp | X40 | 16 | 10656 | 46.5 | 25.8 | 25.4 | 1.02x |
-| sphere | X40 | 1280 | 5196 | 20.2 | 11.4 | 11.3 | 1.01x |
-| staircase | up | 28 | 0 | 0.02 | 0.01 | 0.01 | 1.60x |
-| torus | up | 2048 | 0 | 44.3 | 24.5 | 24.4 | 1.00x |
-| torus | X40 | 2048 | 8592 | 61.7 | 33.5 | 32.6 | 1.03x |
-| tshape | up | 28 | 0 | 0.02 | 0.01 | 0.01 | 1.60x |
-| tshape | X40 | 28 | 8928 | 33.6 | 18.0 | 17.4 | 1.04x |
-| tube | up | 384 | 0 | 0.14 | 0.04 | 0.04 | 1.03x |
-| tube | X40 | 384 | 3072 | 23.1 | 12.6 | 12.0 | 1.05x |
-| ushape | up | 28 | 0 | 0.03 | 0.01 | 0.01 | 1.63x |
-| ushape | X40 | 28 | 9852 | 80.1 | 41.3 | 39.7 | 1.04x |
-| wedge | up | 8 | 0 | 0.02 | 0.00 | 0.00 | 0.00x |
-| wedge | X40 | 8 | 6108 | 30.8 | 16.7 | 16.0 | 1.04x |
-| torus | X30 | 2048 | 10824 | 59.8 | 34.9 | 33.9 | 1.03x |
-
-### Worst orientations
-
-| model | pose | triangles | out verts | JS ms (M3) | Rust ms (M3 serial) | Rust ms (now) | ratio vs M3 serial |
-|---|---|---:|---:|---:|---:|---:|---:|
-| torus | X45 | 2048 | 8460 | 98.8 | 51.1 | 49.7 | 1.03x |
-| torus | X60 | 2048 | 3900 | 60.3 | 28.8 | 28.2 | 1.02x |
-| torus | Y45 | 2048 | 8028 | 89.8 | 48.2 | 47.4 | 1.02x |
-| torus | X45Y30 | 2048 | 4236 | 75.7 | 40.8 | 40.4 | 1.01x |
-| torus | X60Z30 | 2048 | 3840 | 59.3 | 28.9 | 28.9 | 1.00x |
-| sphere | X30 | 1280 | 5280 | 19.1 | 11.4 | 11.3 | 1.01x |
-| sphere | X45 | 1280 | 5436 | 24.2 | 14.3 | 14.5 | 0.99x |
-| sphere | X60 | 1280 | 1824 | 19.9 | 12.0 | 12.1 | 0.99x |
-| sphere | Y45 | 1280 | 5436 | 23.8 | 14.8 | 15.0 | 0.98x |
-| sphere | X45Y30 | 1280 | 5316 | 19.2 | 11.9 | 12.2 | 0.97x |
-| sphere | X60Z30 | 1280 | 5448 | 20.4 | 12.5 | 12.4 | 1.01x |
-| needle | X30 | 384 | 12816 | 97.9 | 51.6 | 51.1 | 1.01x |
-| needle | X45 | 384 | 720 | 6.03 | 3.12 | 3.28 | 0.95x |
-| needle | X60 | 384 | 8712 | 119 | 65.4 | 63.3 | 1.03x |
-| needle | Y45 | 384 | 720 | 5.83 | 3.23 | 3.19 | 1.01x |
-| needle | X45Y30 | 384 | 2604 | 47.1 | 23.9 | 23.6 | 1.01x |
-| needle | X60Z30 | 384 | 8712 | 119 | 68.0 | 65.5 | 1.04x |
-| tube | X30 | 384 | 4800 | 26.6 | 15.3 | 14.9 | 1.03x |
-| tube | X45 | 384 | 2832 | 10.8 | 6.29 | 6.05 | 1.04x |
-| tube | X60 | 384 | 12396 | 66.4 | 36.6 | 36.3 | 1.01x |
-| tube | Y45 | 384 | 2832 | 10.6 | 6.26 | 6.08 | 1.03x |
-| tube | X45Y30 | 384 | 10824 | 62.6 | 35.6 | 35.2 | 1.01x |
-| tube | X60Z30 | 384 | 12396 | 88.2 | 52.7 | 53.2 | 0.99x |
-| coin | X30 | 256 | 25848 | 69.0 | 37.3 | 37.3 | 1.00x |
-| coin | X45 | 256 | 1092 | 10.4 | 6.82 | 6.84 | 1.00x |
-| coin | X60 | 256 | 984 | 19.2 | 7.23 | 7.17 | 1.01x |
-| coin | Y45 | 256 | 696 | 10.1 | 7.04 | 6.93 | 1.02x |
-| coin | X45Y30 | 256 | 1044 | 10.7 | 6.81 | 6.70 | 1.02x |
-| coin | X60Z30 | 256 | 984 | 9.70 | 6.22 | 6.26 | 0.99x |
-
-### Private coin file (Earth Focus Many Vertical.3mf)
-
-Each object at the pose it has in the file; only the name, counts and timings are recorded.
-
-| object | triangles | out verts | M3 serial ms | now ms | ratio |
-|---|---:|---:|---:|---:|---:|
-| object 1 | 772340 | 576 | 959 | 956 | 1.00x |
-| object 2 | 772340 | 576 | 934 | 931 | 1.00x |
-| object 3 | 772340 | 576 | 940 | 951 | 0.99x |
-| object 4 | 772340 | 576 | 923 | 931 | 0.99x |
-| object 5 | 772340 | 576 | 933 | 944 | 0.99x |
-| object 6 | 772340 | 576 | 942 | 946 | 1.00x |
-| object 7 | 772340 | 576 | 933 | 951 | 0.98x |
-| object 8 | 772340 | 576 | 927 | 934 | 0.99x |
-| object 9 | 772340 | 576 | 936 | 942 | 0.99x |
-| object 10 | 772340 | 576 | 940 | 931 | 1.01x |
-
 <!-- bench:end -->
 
-## Where the build time goes (profile, serial, before M5)
+## Load and weld
 
-Method: macOS `sample` (1 ms call trees of 100-400 builds of one case) to find the functions, then wall-clock timers around the pipeline stages (uncommitted instrumentation; the rows are inclusive and nested, so they do not add up) on a quiet-ish machine, one build per case. The upstream spec's "60% unattributed" is attributed below.
+`just bench-load` (`bench_load`): read = `fs::read` (page-cached), parse = bytes to a position soup, weld = `build_topology`, analyze = the first `analyze` (identity pose, 45 degrees). Median of 5 after a warm-up (private file: parse median of 3; weld and analyze are the mean over its 10 objects). The 1.5M-face inputs are a generated torus under `target/bench-load/`, never committed. Better of two runs.
 
-| stage (inclusive) | cone X40 | torus X45 | coin X40 | needle X60Z30 | ushape X40 | lowledge up | private object 1 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| build_fins total ms | 62.7 | 50.9 | 37.9 | 69.3 | 41.3 | 38.4 | 973 |
-| automatic_targets (classify, tiny-hole floors) | 0% | 1% | 0% | 0% | 0% | 0% | 50% |
-| judge: downhill build | 59% | 59% | 57% | 19% | 53% | 93% | 44% |
-| judge: plain build (same base again) | 33% | 32% | - | - | 42% | - | - |
-| build_props | 91% | 90% | 57% | 18% | 46% | 93% | 25% |
-| - normal pass | 31% | 24% | 54% | 17% | 16% | 41% | 12% |
-| - raster race | 33% | 36% | 0% | 0% | 17% | 0% | 5% |
-| - rim race | 1% | 1% | 2% | 1% | 1% | 52% | 1% |
-| - downhill race | 25% | 25% | 0% | 0% | 11% | 0% | 4% |
-| per-wall: solid_clearance (finished-wall weld check) | 41% | 28% | 23% | 7% | 15% | squat bed | 1% |
-| per-wall: station_certified | 16% | 10% | 12% | 2% | 8% | squat bed | 0% |
-| per-wall: station_is_clear | 12% | 16% | 11% | 2% | 8% | 6% | 1% |
-| per-wall: part_attached (settle_top, floor_line) | 4% | 10% | 3% | 4% | 3% | 3% | 12% |
-| per-wall: emit_tines | 3% | 3% | 2% | 1% | 3% | - | 6% |
-| bed pad (brim lattice) | 0% | 0% | 0% | 1% | 50% | - | 0% |
-| bare_area (fill.rs) | 8% | 6% | 40% | 22% | 4% | 4% | 4% |
-| last_resort_walls | 0% | 0% | 0% | 0% | 0% | 0% | 12% |
-| floating_pieces | 0% | 0% | 0% | 0% | 0% | 0% | 3% |
-
-(needle X60Z30's bare_area was 15 ms of 30 ms on a quiet run: 50%. Percentages are of that case's `build_fins` time in the instrumented run.)
-
-What the profile says, in the order it was acted on:
-
-1. **`bare_area` re-walks every red triangle twice** and spends its time in `Reach::near` (SipHash grid lookups, 300k calls on needle X60Z30) and the std hasher: 57% of needle X60Z30, 25% of coin X40.
-2. **Auto's judge builds everything twice** when a region swapped to a downhill wall, and the second build recomputes the same base (normal pass, raster, rim) that the downhill flag does not touch: a third of cone/torus/ushape.
-3. **The finished-wall weld check (`inside::solid_clearance`) is the largest primitive** (41% of cone X40), then the per-station probes (`station_certified` -> `nearest_part`, `station_is_clear` -> `inside_part`): about 70% of a cone build, inside one or two walls (the stress parts have 1-3 patches per pass, so the parallelism has to be inside a wall, not across walls).
-4. **The bed pad's brim lattice** is half of ushape X40: ~42,000 `top(x, y)` calls of 17 surface lookups each.
-5. **On the 772k-triangle private objects**, half the build is `automatic_targets`: a floor probe under each of the excluded tiny-hole faces (~430 ms), five 772k-triangle surface grids (36 ms each, one per pass because `build_pass` seated its own copy of the part), and a lazily built 64x64 inside grid.
-
-Not changed (and why): the per-wall corridor early-out (strategy 2) is not exact, since `inside_part` is a ray-parity test whose answer in an empty box depends on open meshes and on rays that graze an edge; the weld-regression station and z-probe steps are untouched (strategy 6 is off the table); merging `station_is_clear` and `station_certified` (strategy 3) is not possible, since the second runs on the line after `settle_top` has moved it.
-
-## Live drag
-
-Builds are cancellable (`sf_engine::cancel`; `build_fins_cancellable`; `Builder` raises the flag of the build in flight when a newer one arrives or `cancel()` is called), so a live rebuild during a ring drag can abandon a stale pose part-way.
-
-### Cancel latency
-
-`just bench-cancel` (`bench_cancel`): each case is built on a warm topology (a drag rebuilds on one), timed three times uncancelled, then built 16 times (8 on the private objects, objects 1, 4, 7 and 10) with a helper thread raising the flag at evenly spread fractions of the build time. The latency is the time from the flag store to the return of `build_fins_cancellable` (`Err(Cancelled)`). A trial whose build finished before its flag counts as completed and is left out. Idle-ish shared machine (load 4-7), one run; the orchestrator records the quiet numbers.
-
-| case | build ms | stopped | median ms | p95 ms | max ms |
+| input | triangles | read ms | parse ms | weld ms | analyze ms |
 |---|---:|---:|---:|---:|---:|
-| needle X60Z30 | 18.3 | 12/16 | 0.41 | 1.04 | 1.17 |
-| needle X60 | 14.8 | 11/16 | 0.21 | 1.10 | 1.10 |
-| cone X40 | 18.8 | 15/16 | 0.19 | 1.56 | 2.45 |
-| tube X60Z30 | 33.6 | 15/16 | 0.45 | 2.39 | 3.74 |
-| torus X45 | 23.3 | 16/16 | 0.22 | 0.86 | 1.65 |
-| ushape X40 | 19.0 | 16/16 | 0.13 | 0.25 | 0.85 |
-| coin X40 | 12.7 | 13/16 | 0.21 | 0.49 | 0.56 |
-| lowledge up | 23.8 | 16/16 | 1.46 | 4.02 | 5.43 |
-| Earth Focus Many Vertical object 1 | 267.8 | 7/8 | 9.62 | 19.09 | 19.09 |
-| Earth Focus Many Vertical object 4 | 267.6 | 8/8 | 0.15 | 11.22 | 11.22 |
-| Earth Focus Many Vertical object 7 | 255.9 | 8/8 | 0.37 | 13.11 | 13.11 |
-| Earth Focus Many Vertical object 10 | 256.2 | 8/8 | 0.25 | 10.32 | 10.32 |
+| binary STL | 1,500,000 | 8.2 | 7.5 | 37.2 | 12.4 |
+| OBJ | 1,500,000 | 5.7 | 31.3 | 36.8 | 12.2 |
+| private 3MF (whole file; weld and analyze per object) | 7,723,400 | - | 1019 | 20.8 | 6.4 |
 
-All 87 cases together (1092 stopped builds): median 0.13 ms, p95 2.2 ms, p99 5.7 ms, max 19 ms (the private objects; the stress models stay under 6 ms).
+Before (M3 `main` at cc3b2ad, loaded machine): STL weld 478-522 ms, analyze 23 ms; OBJ parse 434 ms, weld 499 ms; private 3MF parse 8300-8500 ms, weld 217 ms and analyze 13 ms per object.
 
-What bounds the latency, found with a poll-gap profile (the longest time between two polls on the calling thread): the pad's surface probes, the part-attached and clearance checks of one wall, the wedge column and the raster race's per-region loop (all poll inside them now), and on the 772k-triangle objects the stages that are one parallel pass over every face (the first inside-grid build in `classify`, the seated-part copy, `find_wall_patches`' seed sort) which only poll between them (10-20 ms).
+What changed: the weld groups equal corners by hash bucket on all cores and recovers the serial id order from each group's first corner (480 to 40 ms); the first analyze runs its rotation and per-face passes on all cores (23 to 12 ms); the OBJ reader scans line chunks in parallel (434 to 31 ms); the 3MF model XML is a zero-allocation scanner over pieces cut at element starts, scanned in parallel (8.4 s to 1.0 s; what is left is the 0.75 s inflate of one 633 MB deflate stream, serial with zlib-rs). Topology digests are unchanged (see Method). Loading is one blocking FFI call and is not cancellable.
 
-Two design points the measurements forced:
-- A poll inside a Rayon closure must not unwind: every job that sees the raised flag would unwind separately, and a 13 ms build then took 50 ms to stop. Inside a parallel loop a raised flag makes the remaining items return a placeholder, and one poll after the loop unwinds once (cancel latency of that build: 0.09 ms median, 0.9 ms max).
-- The polls cost 0.9% of the 87-build total (median of five interleaved runs, 4249 ms before vs 4285 ms after). Output hashes of all 87 builds are identical to main's.
+## Suggest
+
+`just bench-suggest` times `suggestOrientations` (top 3, threshold 45, default config) in the web (Deno at the pin) and in Rust on the same files, median of 5 after a warm-up. Serial = one-thread pool, parallel = global pool at the web's candidate set, wide = `suggest_orientations_wide` at 10x density. One run (see Method); selected rows:
+
+| model | triangles | web cands | JS ms | Rust serial ms | Rust parallel ms | wide cands | wide ms | JS / wide |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| sphere | 1280 | 18 | 51.5 | 26.6 | 8.73 | 180 | 8.07 | 6.4x |
+| torus | 2048 | 14 | 92.8 | 46.8 | 18.1 | 180 | 23.6 | 3.9x |
+| needle | 384 | 17 | 142 | 60.7 | 12.5 | 150 | 28.5 | 5.0x |
+| cone | 96 | 17 | 46.0 | 16.4 | 4.61 | 54 | 4.55 | 10.1x |
+| coin | 256 | 16 | 97.7 | 40.9 | 12.1 | 70 | 11.6 | 8.4x |
+| torus_flat | 6144 | 14 | 146 | 69.7 | 22.4 | 156 | 27.6 | 5.3x |
+| bore-coupon | 9448 | 12 | 826 | 419 | 129 | 139 | 146 | 5.6x |
+| orient-coupon | 9614 | 12 | 3231 | 1224 | 473 | 108 | 221 | 14.6x |
+| honeycomb-coupon | 18460 | 12 | 954 | 459 | 174 | 109 | 61.6 | 15.5x |
+| cutout-coupon | 16766 | 12 | 1389 | 640 | 286 | 95 | 71.8 | 19.3x |
+| tall-coupon | 17498 | 12 | 9442 | 4343 | 1128 | 115 | 1000 | 9.4x |
+| sampler-coupon | 15538 | 12 | 17091 | 5969 | 2109 | 162 | 241 | 71.0x |
+
+Over all 29 inputs (22 stress models, 6 coupons, torus_flat) the wide search is faster than the web on 25 (22 at 2.3x or more); cube, plate and pyramid are 0.1 ms slower in absolute terms and ramp ties. Boxes, L-brackets and plus shapes keep their 6-10 candidates.
+
+Why wide costs about what the web search costs: the ranking is over 99.9% finalist `build_fins` (5 finalists), and scoring a candidate is cheap (needle: 0.1 ms for 17 candidates, 0.9 ms for 150). The parallel speed-up is bounded by the slowest finalist build (3-4x on 12 cores for the large coupons). On the large coupons wide beats the web-set parallel run because the wider pass 1 picks cheaper finalists; the scores are the web's.
+
+The private object (one object, 772,340 triangles) was timed earlier on a loaded machine: 14 web candidates, 3626 ms serial, 1428 ms parallel; 134 wide candidates in 1340 ms. It is not re-recorded: run 2 hung before reaching it (Known issues) and run 1 printed no row for it.
+
+## Rendering
+
+`just bench-render` runs `viewer-bench`, a headless release build: a generated lumpy sphere of 1.5M triangles (flat-shaded, overhang flags) with 3000 thin walls and 6000 eight-sided tines under it, drawn through the real colour pass at 2560x1600, three frames in flight, 600 frames per scenario. `fps` is the machine's ceiling (nothing waits for a display). Clean run (render-1; the second run started at load 5.9 and is not used):
+
+| scenario | CPU mean ms | GPU mean ms | GPU p99 ms | frame interval p99 ms | fps ceiling |
+|---|---:|---:|---:|---:|---:|
+| orbit | 0.012 | 1.017 | 1.071 | 0.691 | 1572 |
+| panzoom | 0.012 | 0.948 | 1.031 | 0.723 | 1602 |
+| drag (flags buffer every 4 frames) | 0.045 | 1.026 | 1.140 | 0.819 | 1569 |
+| swap (new fins every 32 frames) | 0.016 | 1.023 | 1.066 | 0.799 | 1571 |
+| liveDrag (new build every 4 frames, 30 a second) | 0.047-0.049 | 1.024-1.028 | 1.072-1.183 | 0.830-0.837 | 1567-1574 |
+
+A face pick (ID pass plus one pixel read-back) costs 0.94 ms. It runs on mouse move only, never during an orbit or a ring drag.
+
+Earlier measurements on a busy machine, not repeated: GPU time scales with triangles (990k 1.26 ms, 2.0M 1.4 ms, 4.0M 2.4 ms, 7.7M 4.0 ms); the live app on a 1.2M-triangle torus holds 119.9-120.0 fps with a frame-interval p99 of 9-13 ms (about 1% of frames slip a display tick). The Time Profiler showed the main thread, not the GPU, was the cost: 40% busy while orbiting, nearly all of it SwiftUI redrawing the view cube per camera change. Labels as Canvas symbols, asynchronous Canvases and the Home button split out of the view that reads `cameraRevision` removed about 10% of a core with identical pixels; fps is unchanged.
+
+Overhang shading during a ring drag runs one analysis at a time off the main actor (newest pose wins), so colours trail the turn by one analysis and never block a frame. A drag asks for flags only (`wantsSummary: false`), which halves the engine time per shade: 20.5 ms at 1.2M triangles, 13.2 ms for one private object (about 50 and 75 refreshes a second).
+
+## Live drag and cancellation
+
+Builds are cancellable (`build_fins_cancellable`; the `Builder` raises the flag of the build in flight when a newer one arrives). `bench_cancel` builds each case on a warm topology and raises the flag at evenly spread fractions of the build (16 trials, 8 on the private objects); latency is flag store to return. Better of two clean runs, 87 cases: 1104 stopped builds, median 0.12 ms, p95 2.2 ms, p99 5.5 ms, max 11.6 ms (the stress models stay under 6 ms; the maximum is a private object, whose parallel passes over every face poll only between passes). The polls cost 0.9% of the 87-build total.
+
+The app rebuilds during a ring drag (View > Rebuild While Dragging, on by default; off is the web's rebuild-on-release). A new pose starts a build at once; at most one build is in flight; a new pose supersedes it only while it is younger than 8 ms (`BuildController.liveLandAfter`), otherwise the build lands and the newest pose is built next. `bench_drag` simulates 60 Hz pose events over 1.5 s through the real build path (`build_part`: re-weld, analyse, build); lag is the angle between ring and fins on screen. Clean run (drag-1; the second started at load 10.6 and is not used):
+
+| model | one build ms | always supersede: landed, median / max lag deg | 8 ms: landed, median / max lag deg | never supersede: landed, median / max lag deg, last pose to final fins ms |
+|---|---:|---|---|---|
+| lowledge X30 | 6.0 | 60/90, 0.3 / 10.1 | 77/90, 0.3 / 1.0 | 78/78, 0.3 / 1.3, 6.4 |
+| coin X40 | 13.1 | 55/90, 0.4 / 16.2 | 74/77, 0.4 / 4.5 | 74/74, 0.4 / 4.5, 14.1 |
+| cone X40 | 17.0 | 3/90, 19.8 / 39.6 | 67/81, 0.9 / 2.2 | 70/70, 0.9 / 2.2, 20.2 |
+| needle X60 | 20.1 | 16/90, 14.8 / 44.5 | 66/84, 1.3 / 4.7 | 73/73, 1.3 / 4.0, 39.2 |
+| torus X45 | 22.2 | 1/90, 22.8 / 45.0 | 46/82, 1.5 / 2.5 | 53/53, 1.5 / 2.5, 25.2 |
+| private object, X30 | 393 | 1/90, 15.2 / 30.0 | 5/5, 10.4 / 16.9 | 5/5, 10.1 / 15.8, 411 |
+
+8 ms keeps the fins within 1-5 degrees of the ring on every stress proxy and the release no later than one build. On the private object a pose costs 393 ms (about 120 ms is the weld of the posed copy), so the fins trail by about 10 degrees and the release waits one build. Landing a build on the main actor is 0.2 ms.
+
+Frame time while builds land is the `liveDrag` row above. A landed build is a new immutable buffer pair (the Rust allocation wrapped without a copy, freed after the command buffers using it complete), so the swap needs no double buffering; Metal API validation at 100 swaps a second reported no errors.
+
+## Memory
+
+Peak of `bench_load 3mf` (`/usr/bin/time -l`): the whole private 3MF read, parsed to a soup, and each of its 10 objects (7.7M triangles) welded and analysed: maximum resident set 6.85 GB (6.4 GiB), peak footprint 6.86 GB, 4.8 s wall. M3's `bench_m3` process (the same file plus the stress set) peaked at 6034 MiB. `read_three_mf_unmerged` alone (the app's call) fell from 3.39 GB to 1.95 GB when the 3MF scan was rewritten. The stress models add a few MB; the one file dominates.
+
+## Method
+
+- **Machine:** Apple M2 Max, 12 cores, macOS 26.6.2, rustc 1.99.1, `cargo build --release`; Swift release build for the viewer; Deno 2.9.8 at the pin (299ef49) for JS.
+- **Two runs, better median:** each benchmark ran twice, 20-35 minutes apart, and each cell keeps the lower median. Exceptions: rendering and live drag use the run that started clean (render-1, drag-1), and suggest has one run (below). A second run's tables are not shown.
+- **Baseline-relative load:** this Mac's idle floor is about 2.7-3.5 on the 1-minute load average (WindowServer and the Claude app; measured as 3.45 and 2.73 with none of our work running). A step is clean when it started within about 1.5 of that. Load before each step:
+
+| step | run 1 | run 2 |
+|---|---:|---:|
+| fin build | 1.57 clean | 1.90 clean |
+| load | 3.83 clean | 3.18 clean |
+| suggest | 2.76 clean | not used (hung) |
+| cancel | 1.97 clean | 1.78 clean |
+| render | 1.90 clean | 5.89 flagged: GPU 1.10-1.20 ms instead of 1.02; not used |
+| drag | 1.88 clean | 10.57 flagged: private build 430-484 ms instead of 393; not used |
+| memory | 2.71 clean | - |
+
+- **Suggest:** run 1 alone. Run 2 hung on an engine deadlock (Known issues) and was abandoned.
+- **Output identity:** the 87 fin-build output hashes are identical between the two runs, and the cancellation polls changed none of them (all 87 matched main's when they were added). The topology digest of the 1.5M-face inputs is identical for STL and OBJ (b319f936ecbf89cd) and for the private file (b97ec1394e5c3e3f) in both runs, and unchanged by the load work. `bench_suggest` asserts in-process that the parallel ranking equals the one-thread ranking and that the web's candidate count equals Rust's; the default path is byte-identical to the parity corpus (`parity_orient`). The "Engine threads: 1" in the run files' header was a stale constant; builds ran on the 12-thread pool, and `bench_m5` now reports it.
+- **Private file:** `private-fixtures/Earth Focus Many Vertical.3mf` is git-ignored; only its name, counts and timings appear here. One run-1 outlier (object 10, 2086 ms against 336 for the others, same output hash) did not recur and is dropped by the better-of rule.
+
+## What didn't pay off
+
+- Load: a larger streaming inflate buffer (64 KB to 4 MB) changed nothing; overlapping the inflate with the XML scan caps at about 10% of the load for a reader that must carry elements across buffers (not built); libdeflate inflates 1.7x faster than zlib-rs but cannot report the bytes a stream used without `unsafe` FFI (not done); parallel `emit_object` shares the painter and role arena for about 13 ms per object (not done).
+- Rendering: instancing tines, indirect draws, triple-buffered uniforms, picking on demand and double-buffering the fins have nothing to remove at 1 ms of GPU and 0.03 ms of encode per frame; an incrementally updated residency set gave identical medians (interval p99 1.96 against 2.01 ms) and was not kept.
+- Live drag: "a new pose always cancels the build in flight" starves (1 build in 90 at 22 ms); "never cancel" leaves the final fins up to two builds late (needle: 39 ms against 22); a 25 ms or 100 ms threshold behaves as "always" for these builds.
+- Cancellation: an unwinding poll inside a Rayon closure made a 13 ms build take 50 ms to stop (every job unwound separately). Inside a parallel loop a raised flag now makes the remaining items return a placeholder and one poll after the loop unwinds once (0.09 ms median).
+- Fin build: builds under 5 ms do not speed up, and a part with one patch per pass cannot be parallelised across walls, only inside one; that is why the stress set gains 1.9x rather than several times that on 12 cores.
+- Suggest: only `build_fins` can lower the wall time of the large coupons; pass 1 is already negligible.
+
+### Known issues
+
+- Parallel lazy grid builds (#154) could deadlock under nested Rayon work (found in the quiet run; fixed in a follow-up PR).
