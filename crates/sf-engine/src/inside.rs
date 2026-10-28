@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use rayon::prelude::*;
 
+use crate::csr::build_csr;
 use crate::gridsize::grid_dims;
 use crate::jsnum;
 use crate::overhangs::Topology;
@@ -106,7 +107,6 @@ fn bucket_yz(
 ) -> Bucket {
     let sy = ny as f64 / jsnum::max(1e-6, max_y - min_y);
     let sz = nz as f64 / jsnum::max(1e-6, max_z - min_z);
-    let mut counts = vec![0i32; ny * nz + 1];
     let span = |f: usize| -> [usize; 4] {
         let o = f * 9;
         let y0 = jsnum::min_of(&[pos[o + 1], pos[o + 4], pos[o + 7]]);
@@ -121,31 +121,17 @@ fn bucket_yz(
         ]
     };
 
-    for f in 0..n_faces {
+    let (start, items) = build_csr(n_faces, ny * nz, |f, push| {
         let [a0, a1, b0, b1] = span(f);
         for a in a0..=a1 {
             for b in b0..=b1 {
-                counts[a * nz + b + 1] += 1;
+                push(a * nz + b);
             }
         }
-    }
-    for i in 0..ny * nz {
-        counts[i + 1] += counts[i];
-    }
-    let mut items = vec![0i32; counts[ny * nz] as usize];
-    let mut cur: Vec<i32> = counts[..ny * nz].to_vec();
-    for f in 0..n_faces {
-        let [a0, a1, b0, b1] = span(f);
-        for a in a0..=a1 {
-            for b in b0..=b1 {
-                let c = a * nz + b;
-                items[cur[c] as usize] = f as i32;
-                cur[c] += 1;
-            }
-        }
-    }
+    });
+    let items: Vec<i32> = items.into_iter().map(|f| f as i32).collect();
     Bucket {
-        start: counts,
+        start,
         items,
         min_y,
         min_z,
