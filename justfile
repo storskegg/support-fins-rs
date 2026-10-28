@@ -90,3 +90,8 @@ app-project:
 app-test: app-core app-project
     swift test --package-path app/SupportFinsViewer
     xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'
+
+# The window driven end to end (XCUITest): open a part, Add fins, change a setting, export. Needs the Accessibility
+# permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
+app-uitest: app-core app-project
+    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
