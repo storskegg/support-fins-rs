@@ -90,6 +90,11 @@ impl BuildResult {
 }
 
 impl BuildResult {
+    /// The engine's build, for the hand-placed supports that stand clear of it (`draw.rs`).
+    pub(crate) fn built(&self) -> &sf_engine::fins::build::FinsBuilt {
+        &self.built
+    }
+
     /// See [`after_removal_json`](Self::after_removal_json).
     pub fn after_removal(&self, removed: &[u64]) -> Result<Json, FfiError> {
         use sf_engine::fins::coverage::automatic_targets;
@@ -144,7 +149,7 @@ impl BuildResult {
 
 /// Interleave a flat `f32` soup (xyz per vertex, three vertices per triangle) with each triangle's
 /// unit normal, the layout of `Part::mesh`.
-fn soup_buffer(tris: &[f32]) -> Arc<GpuBuffer> {
+pub(crate) fn soup_buffer(tris: &[f32]) -> Arc<GpuBuffer> {
     let mut out = vec![0f32; tris.len() * 2];
     for (t, o) in tris
         .as_chunks::<9>()

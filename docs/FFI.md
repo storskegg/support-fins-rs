@@ -225,3 +225,56 @@ Part level:
   the count is the "midair starts" suffix, and the page draws a cone at each `x,y,z` and a line between the farthest two points.
 - `island_card(count, bare: Option<u64>, capped, markers_visible) -> String`: the card text (`renderIslandCard`), empty for no
   card. `bare` is `None` without a Full build for this pose (`islandsBuild` null), else the starts left without a wall.
+
+## M6 additions: Draw (hand-placed supports)
+
+Everything Draw computes is Rust; Swift holds the clicks, draws the markers and the cursor. The maths is
+`sf_engine::drawn` (the geometry of `web/ui/walls.js`: `sweepDrawn`, `autoSupports`, `braceAt`, `arcPoints`,
+`printTriangles`) over `sf_engine::draw::drawn_wall` and `sway::sway_at_face`; `parity/oracle/ffidraw.js` slices those
+functions out of walls.js at the pinned commit and records what they make, and `crates/sf-ffi/tests/draw.rs` checks the
+FFI against it (counts, per-wall results and reasons, a hash of every triangle).
+
+```rust
+// One per pose and settings change: analyses the pose once, then every call below is cheap. Run it off the main thread.
+#[derive(uniffi::Object)] struct DrawKit;
+impl DrawKit {
+    #[uniffi::constructor] fn new(part: Arc<Part>, rot: Vec<f64> /* 9, column-major */, threshold_deg: f64,
+                                   settings_json: String, tunables_json: String) -> Result<Arc<DrawKit>, FfiError>;
+    fn offset(&self) -> Vec<f64>;                                  // the seating offset: the part draws at rot * p + offset
+    fn local_to_world(&self, p: Vec<f64>) -> Result<Vec<f64>, FfiError>;   // part.localToWorld
+    fn world_to_local(&self, p: Vec<f64>) -> Result<Vec<f64>, FfiError>;   // part.worldToLocal
+    fn surface_hit(&self, face: u64, origin: Vec<f64>, dir: Vec<f64>) -> Result<Option<SurfaceSpot>, FfiError>;
+    fn face_takes_brace(&self, face: u64) -> bool;                // faceIsUpright
+    fn ghost(&self, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>) -> Result<Arc<DrawnGhost>, FfiError>;
+    fn check_wall(&self, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>) -> Result<Arc<DrawnGhost>, FfiError>;
+    fn sweep(&self, walls_json: String, auto: Option<Arc<BuildResult>>, removed: Vec<u64>) -> Result<Arc<DrawnSweep>, FfiError>;
+    fn brace_at(&self, face: u64, point: Vec<f64>, sweep: Option<Arc<DrawnSweep>>, auto: Option<Arc<BuildResult>>,
+                removed: Vec<u64>) -> Result<Arc<BraceSpot>, FfiError>;
+}
+#[derive(uniffi::Record)] struct SurfaceSpot { point: Vec<f64>, normal: Vec<f64>, distance: f64 }   // print space
+fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError>;   // arcPoints, flat x,y,z,... (<= 129 points)
+```
+
+- **`settings_json`** is what `sweepDrawn` and `swayOpts()` read off the page's controls, every key required:
+  `{ tines, tineDensity (0..1: the field / 100), layerHeight, plateOnly, tallRibs, sway: { gripFrom, tineSpacing, reach (0..1: Brace
+  depth % / 100), uncappedDepth, crossRise (0.1..0.9) } }`. The page divides its percent fields in JS, so a host divides them the same way
+  (`x / 100`), to get the same doubles. **`tunables_json`** is the build's (`FinSettings.tunablesJSON()`): the gap, the nozzle, the wall
+  lines, round feet, the interface material and the tall-rib height are read from it, as the page's modules hold them.
+- **Walls** (`walls_json`) are in the part's own frame, so a wall follows the part through later turns:
+  `[{ "kind": "wall", "a": [x,y,z], "b": [x,y,z], "m": [x,y,z]? }, { "kind": "sway", "a": [x,y,z], "face": n, "capped": bool }]`
+  (`m`: a curve's third click; a brace's `a` is the spot it stands at, `capped` stops it at that height).
+- **`surface_hit(face, origin, dir)`** is `pickFace`'s `hit.point` (web/ui/pose.js:264): the GPU id pass says which face is under the pointer,
+  this says where on it (the ray meets that triangle, both sides). `origin` / `dir` (unit) are in print space (`ViewerController.ray`);
+  `None` when the ray misses that triangle, the caller then keeps the last spot.
+- **`sweep`** (`sweepDrawn`) re-stands every wall for the pose: `auto` is Auto's build when its supports are on screen (hand braces and
+  tall-wall ribs stand clear of them) and `removed` its removed fin ids (`records_json` ids). `DrawnSweep`: `triangles()` (interleaved
+  position + normal, `f32`, print space, in the walls' order), `walls_json()` (one entry per wall, in order: `{ ok, triStart, triEnd, kind,
+  reason | length, height, tines, ribs | cross, stilt }`; `triStart` / `triEnd` are triangle indices), `pick(origin, dir, part_distance)`
+  (`pickSupport`: the wall under the ray if nearer than the part's own hit), `wall_triangles(i)` (the selection's highlight).
+- **`ghost`** is the live preview of the wall in progress (`updatePreview`'s `drawnWall`: `braceTall`, `through`, no tines), **`check_wall`**
+  `placeWall`'s test (`drawnWall` with `through` only). `DrawnGhost`: `ok()`, `reason()` (the web's text, e.g. "curve too tight - 3.0mm
+  radius, needs 5mm"), `triangles()`.
+- **`brace_at`** is `braceAt` (without its memo): the brace a click at `point` stands, `BraceSpot { ok(), reason(), full(), point(), key(),
+  height(), triangles() }`. `key` is the web's memo key (equal keys are the same brace); `point` is what a placed brace stores. Pass the
+  current `sweep` so the hand braces already standing are avoided.
+- **Build mode `draw`.** `opts_json` `{"mode":"draw"}` builds only the seating verdict and the bed pad (`buildFins`), as the web's Draw does.
