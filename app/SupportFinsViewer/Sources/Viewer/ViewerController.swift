@@ -316,7 +316,8 @@ public final class ViewerController {
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
                 let before = hoveringFaceToLay
                 hoverFace = face
-                renderer.setHover(face)
+                // the web lights the hovered face only while Lay a face flat is armed (`web/ui/pose.js layHover`)
+                renderer.setHover(facePicking ? face : nil)
                 if hoveringFaceToLay != before { onCursorChange?() }
             }
             pickInFlight = false
