@@ -137,6 +137,8 @@ struct BuildSummary: Codable, Equatable, Sendable {
     var floating: [Floating]
     var sway: Sway?
     var tallRibs: Int?
+    /// Walls the pose on screen stands inside a bore (the next orientation ranking's `currentBore`)
+    var boreWalls: Int?
 
     init(json: String) throws { self = try JSONDecoder().decode(Self.self, from: Data(json.utf8)) }
 }

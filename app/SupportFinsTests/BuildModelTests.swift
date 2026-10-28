@@ -85,6 +85,7 @@ struct BuildModelTests {
         let summary = try #require(model.summary)
         #expect(summary.volume > 0 && !summary.report.isEmpty && summary.stats.finTriangles > 0)
         #expect(summary.mode == "auto" && summary.offset.z.isFinite)
+        #expect(summary.boreWalls == 0, "a T shape stands in no bore, and the key is in the summary")
         let records = try #require(model.records)
         #expect(!records.fins.isEmpty)
         #expect(model.keys.count == records.fins.count)

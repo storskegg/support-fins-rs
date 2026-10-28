@@ -31,7 +31,8 @@ struct ContentView: View {
                     Badge(title: "Suggest", help: "Rank the ways this part could sit on the bed.", open: $suggestOpen) {
                         SuggestPopover(model: suggest) {
                             suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: FinSettings().optionsJSON(),
-                                         currentBore: 0, density: 1.24)
+                                         currentBore: model.wiring?.build?.summary?.boreWalls ?? 0,
+                                         density: FinReadout.materialDensity)
                         }
                     }
                     Badge(title: "Strength", help: "Strength arrow: which way is the part loaded in use?", lit: strength.isLit,
