@@ -89,4 +89,4 @@ app-project:
 # The viewer package's tests (camera maths, offscreen renders) and the app's tests.
 app-test: app-core app-project
     swift test --package-path app/SupportFinsViewer
-    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS' -quiet
+    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'

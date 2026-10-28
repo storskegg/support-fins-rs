@@ -2,8 +2,8 @@ import SwiftUI
 import Viewer
 
 /// The inspector, in the web's section order (docs/UI-MAP.md section 4): Printer, Placement, Tines, the
-/// basics, More settings. The Part block and the temporary rotation are M4a's, kept until the session owns
-/// the pose.
+/// basics, More settings. The settings are the session's (`PartSession.settings`): a change is one undoable step.
+/// The Part block is M4a's, kept until the stats card lands.
 struct InspectorView: View {
     @Bindable var controller: ViewerController
     @Binding var settings: FinSettings
