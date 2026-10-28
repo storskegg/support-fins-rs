@@ -8,6 +8,8 @@ import simd
 final class RingEdits {
     private let session: PartSession
     private var start: Pose?
+    /// Told of every event once the pose has taken it (the Rotate popover's delta and the badge's angle).
+    var onEvent: ((ViewerController.RingEvent) -> Void)?
 
     init(session: PartSession, controller: ViewerController) {
         self.session = session
@@ -15,6 +17,7 @@ final class RingEdits {
     }
 
     func handle(_ event: ViewerController.RingEvent) {
+        defer { onEvent?(event) }
         switch event {
         case .began:
             start = session.pose

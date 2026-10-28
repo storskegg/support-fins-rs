@@ -56,6 +56,7 @@ struct ContentView: View {
         .onChange(of: undoManager, initial: true) { _, m in model.session.undoManager = m }
         .focusedSceneValue(\.viewer, model.controller)
         .focusedSceneValue(\.session, model.session)
+        .focusedSceneValue(\.rotate, model.rotate)
         .focusedSceneValue(\.exporter, model.wiring?.exporter)
         .focusedSceneValue(\.removal, model.wiring?.removal)
         // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
@@ -64,6 +65,8 @@ struct ContentView: View {
     }
 
     private func registerTools() {
+        model.rotate.registry = toolbar
+        toolbar.register(.rotate) { RotatePopover(model: model.rotate) }
         guard let controller = model.controller, let suggest = model.suggest, let strength = model.strength else {
             toolbar.unregister(.suggest); toolbar.unregister(.strength); return
         }
