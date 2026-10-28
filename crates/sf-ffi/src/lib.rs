@@ -15,7 +15,9 @@ pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, build_part, export, export_file_name,
 };
 pub use gpu::GpuBuffer;
-pub use part::{AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts};
+pub use part::{
+    AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts, merge_parts,
+};
 pub use suggest::{
     LoadAlignment, StrengthAdvice, StrengthPose, SuggestContext, SuggestListener, SuggestResult,
     SuggestTier, Suggester, Suggestion, load_alignment,

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use sf_engine::overhangs::{analyze, build_topology};
-use sf_ffi::{FfiError, GpuBuffer, Part, engine_version, load_parts};
+use sf_ffi::{FfiError, GpuBuffer, Part, engine_version, load_parts, merge_parts};
 use sf_io::threemf::{ExtraPart, PartKind, PartSettings, ThreeMfOpts, write_three_mf};
 use sf_testkit::{block, models_dir, rot_x};
 
@@ -346,4 +346,52 @@ fn load_parts_keeps_modifiers_for_the_export_and_cuts_nothing_for_them() {
         i.notes,
         vec!["kept 1 modifier/support blocker for the 3MF export".to_string()]
     );
+}
+
+#[test]
+fn merge_parts_equals_loading_an_stl_of_their_triangles() {
+    let (a, b) = (load("cube"), load("lowledge"));
+    let merged = merge_parts(vec![a.clone(), b.clone()]).unwrap();
+    // the concatenated soup, in order, as a file
+    let soup: Vec<f64> = [a.topology().pos.clone(), b.topology().pos.clone()].concat();
+    let tris: Vec<[f64; 3]> = soup.as_chunks::<3>().0.to_vec();
+    let path = tmp("merged.stl");
+    std::fs::write(&path, sf_io::stl::write_binary_stl(&tris, "m")).unwrap();
+    let want = load_parts(path.to_string_lossy().into_owned())
+        .unwrap()
+        .remove(0);
+    let (mi, wi) = (merged.info(), want.info());
+    assert_eq!(mi.triangles, a.info().triangles + b.info().triangles);
+    assert_eq!(mi.triangles, wi.triangles);
+    assert_eq!(mi.size, wi.size);
+    let (mt, wt) = (merged.topology(), want.topology());
+    assert_eq!(
+        (mt.vertex_count, mt.edge_count),
+        (wt.vertex_count, wt.edge_count)
+    );
+    assert_eq!(mt.pos, wt.pos);
+    for rot in [rot_x(0.0), rot_x(40.0)] {
+        let (mut m, mut w) = (
+            merged.analyze(45.0, rot.to_vec()).unwrap(),
+            want.analyze(45.0, rot.to_vec()).unwrap(),
+        );
+        m.analyze_ms = 0.0; // a timing, not a result
+        w.analyze_ms = 0.0;
+        assert_eq!(m, w);
+    }
+    assert_eq!(merged.mesh().len_bytes(), want.mesh().len_bytes());
+    assert!(
+        mi.notes
+            .contains(&"merged 2 objects into one part".to_string())
+    );
+}
+
+#[test]
+fn merge_parts_of_one_is_itself_and_of_none_is_an_error() {
+    let a = load("cube");
+    assert!(std::sync::Arc::ptr_eq(
+        &merge_parts(vec![a.clone()]).unwrap(),
+        &a
+    ));
+    assert!(merge_parts(vec![]).is_err());
 }

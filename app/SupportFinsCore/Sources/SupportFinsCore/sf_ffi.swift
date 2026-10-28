@@ -3292,6 +3292,23 @@ public func loadParts(path: String)throws  -> [Part]  {
 })
 }
 /**
+ * Several picked objects as one part (the picker's "Merge N & load", `web/ui/io.js:140-200`, then
+ * `parseModel`, `io.js:222-286`): their triangle positions concatenated in the order given
+ * (`mergeObjectPositions`, `io.js:120`) and welded as one soup, like any single loaded object. The colours
+ * are merged by triangle (`mergeColors`); a slicer's parts ride along with the uncut positions of every
+ * object, extras in order, as `io.js:252-258` keeps them. The merged part is named after the file
+ * (`stem`), and its notes are the objects' own plus a "merged N objects into one part" line (the web's
+ * "N of TOTAL" needs the file's object count, which a `Part` does not know). One part comes back as itself.
+ */
+public func mergeParts(parts: [Part])throws  -> Part  {
+    return try  FfiConverterTypePart_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_func_merge_parts(
+        FfiConverterSequenceTypePart.lower(parts),uniffiCallStatus
+    )
+})
+}
+/**
  * `loadAlignment` for a load direction in the seated print frame (world +Z is the build axis).
  */
 public func loadAlignment(dirWorld: [Double])throws  -> LoadAlignment?  {
@@ -3331,6 +3348,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_func_load_parts() != 14593) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_func_merge_parts() != 43040) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_func_load_alignment() != 64003) {

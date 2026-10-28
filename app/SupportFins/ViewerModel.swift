@@ -69,10 +69,26 @@ final class ViewerModel {
             picker.onLoad = { [weak self] chosen in
                 guard let self else { return }
                 self.picker = nil
-                guard chosen.count == 1 else { self.status = MergeUnavailable().localizedDescription; return }
-                self.show([parts[chosen[0]]], url: url)
+                guard chosen.count > 1 else { self.show([parts[chosen[0]]], url: url); return }
+                Task { await self.showMerged(chosen.map { parts[$0] }, url: url) }
             }
             self.picker = picker
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    /// "Merge N & load": the chosen objects as one part (`merge_parts`; `mergeObjectPositions`, `ui/io.js:120`).
+    private func showMerged(_ chosen: [LoadedPart], url: URL?) async {
+        guard let controller else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let cores = chosen.compactMap { ($0.mesh as? CorePart)?.part }
+            guard cores.count == chosen.count else { status = "These objects cannot be merged."; return }
+            let merged = try await Task.detached(priority: .userInitiated) { try mergeParts(parts: cores) }.value
+            guard let core = CorePart(part: merged, device: controller.renderer.device) else { status = "The merged mesh could not be shared with the GPU."; return }
+            show([LoadedPart(name: core.info.name, mesh: core)], url: url)
         } catch {
             status = error.localizedDescription
         }

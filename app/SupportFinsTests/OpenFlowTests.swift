@@ -64,14 +64,19 @@ struct OpenFlowTests {
         #expect(model.hasPart && model.session.parts[0].info.name == "open-flow-one")
     }
 
-    @Test func severalChoicesNeedAnEngineMergeAndSayWhy() async throws {
+    @Test func severalChoicesLoadOneMergedPart() async throws {
         let model = ViewerModel()
         await model.load(url: try Self.threeObjects())
         let picker = try #require(model.picker)
         picker.set(picker.entries[1].id, true)
         #expect(picker.loadTitle == "Merge 2 & load" && picker.hint == "2 selected — merged into one part")
         picker.load()
-        #expect(model.picker == nil && !model.hasPart && model.status == MergeUnavailable().localizedDescription)
+        #expect(await eventually { model.hasPart })
+        #expect(model.picker == nil && model.status == nil)
+        // small (10 mm) and big (20 mm) cubes at the origin: 12 + 12 triangles, one part, the union's box
+        #expect(model.session.parts.count == 1)
+        #expect(model.session.parts[0].info.triangles == 24 && model.controller?.faceCount == 24)
+        #expect(model.controller?.size == SIMD3<Float>(20, 20, 20))
     }
 
     @Test func aSingleObjectFileSkipsThePicker() async throws {
