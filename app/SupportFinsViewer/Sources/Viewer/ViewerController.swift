@@ -25,6 +25,11 @@ public final class ViewerController {
     /// The load of the Strength view, as a unit direction in the part's own frame (it turns with the part), or nil.
     public var loadDirection: SIMD3<Float>? { didSet { if loadDirection != oldValue { refreshHUD() } } }
     /// Show the layer frames around the part (View > Show layers).
+    /// The midair starts of the current pose and whether Show midair starts is on (`web/ui/islands.js`). The cones
+    /// are hidden while a ring turns the part: the starts are found after a drag, not during it.
+    public var islandMarkers: [IslandMarker] = [] { didSet { if islandMarkers != oldValue { refreshIslands() } } }
+    public var showsIslands = false { didSet { if showsIslands != oldValue { refreshIslands() } } }
+
     public var showsLayers = false { didSet { if showsLayers != oldValue { refreshHUD() } } }
     /// The posed part's size: the engine's when a single part has been analysed, else the rotated bounds.
     public private(set) var posedSize = SIMD3<Float>.zero
@@ -73,7 +78,7 @@ public final class ViewerController {
     /// The rings fade back while a sway brace is aimed (`ringfade.js`); 1 = fully shown.
     public var ringFade: Float = 1 { didSet { updateGizmo() } }
     public private(set) var ringHover: GizmoHandle? { didSet { updateGizmo() } }
-    public private(set) var ringDragging: GizmoHandle? { didSet { updateGizmo() } }
+    public private(set) var ringDragging: GizmoHandle? { didSet { updateGizmo(); refreshIslands() } }
     /// The degrees turned so far by the ring drag in progress.
     public private(set) var ringDegrees: Double = 0
     @ObservationIgnored public var onRing: ((RingEvent) -> Void)?
@@ -196,7 +201,13 @@ public final class ViewerController {
 
     /// The load arrow through the middle of the part and the layer frames around the posed part
     /// (`ui/strength.js` `updateLoadArrowMesh`, `updateLayerView`).
+    func refreshIslands() {
+        let on = showsIslands && ringDragging == nil && !renderer.meshes.isEmpty
+        renderer.setIslandMarkers(on ? islandMarkers : [], extent: max(posedSize.x, posedSize.y, posedSize.z))
+    }
+
     func refreshHUD() {
+        refreshIslands()
         guard !renderer.meshes.isEmpty else {
             renderer.clearLoadArrow()
             renderer.clearLayerFrames()

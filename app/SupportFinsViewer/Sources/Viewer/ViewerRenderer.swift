@@ -81,6 +81,9 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public private(set) var highlightedFinRanges: [Range<Int>] = []
     /// The load arrow (model space) and the layer frames (print space) of the Strength view; see `HUD.swift`.
     var loadArrow: (buffer: MTLBuffer, vertices: Int)?
+    /// Show midair starts: the red cones and the lines along level edges (see `IslandMarkers.swift`).
+    var islandCones: (buffer: MTLBuffer, vertices: Int)?
+    var islandLines: (buffer: MTLBuffer, vertices: Int)?
     var layerFrames: (buffer: MTLBuffer, vertices: Int)?
 
     private var plate: PlateGeometry
@@ -358,6 +361,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         draw(lines: plateBuffers[3], count: plate.box.count, color: a(Palette.volumeBox, 0.55), with: enc)
         if let g = gizmo, g.visible { drawGizmo(g, uniforms: &u, with: enc) }
         encodeHUD(into: enc)
+        encodeIslandMarkers(into: enc)
     }
 
     private func drawGizmo(_ g: GizmoDisplay, uniforms u: inout Uniforms, with enc: MTLRenderCommandEncoder) {

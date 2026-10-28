@@ -13,6 +13,7 @@ struct RotatePopover: View {
                 Text("Rotate 90°")
                 ForEach(Pose.Axis.allCases, id: \.self) { axis in
                     Button(axis.label) { model.rotate90(about: axis) }
+                        .help("Rotate 90 degrees about \(axis.label)")
                         .accessibilityLabel("Rotate 90 degrees about \(axis.label)")
                         .accessibilityIdentifier("rot-\(axis.label.lowercased())")
                 }

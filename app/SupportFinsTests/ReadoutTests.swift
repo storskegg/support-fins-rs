@@ -118,6 +118,16 @@ struct PartReadoutTests {
         if case .swatch(let help) = r.overhangs[2] { #expect(help == "Amber: overhangs under 12 mm², too small for a fin") } else { Issue.record("no swatch") }
     }
 
+    @Test func theOverhangsRowCountsMidairStartsAndStopsBeingGreen() {
+        var r = PartReadout.make(input { $0.regionCount = 0; $0.rawRegionCount = 0; $0.islandCount = 1 })
+        #expect(text(r.overhangs) == "none (+●1 midair start)" && !r.overhangsGood) // islands.js:114-126
+        r = PartReadout.make(input { $0.regionCount = 2; $0.rawRegionCount = 3; $0.smallHoleCount = 1; $0.islandCount = 3 })
+        #expect(text(r.overhangs) == "2 regions (+●1 sliver) (●1 small hole left for bridging) (+●3 midair starts)")
+        if case .redSwatch(let help) = r.overhangs[r.overhangs.count - 2] { #expect(help == "Spots that start in midair") } else { Issue.record("no red swatch") }
+        r = PartReadout.make(input { $0.regionCount = 0; $0.rawRegionCount = 0; $0.islandCount = 0 })
+        #expect(r.overhangsGood)
+    }
+
     @Test func areaBedSizeAndTrianglesAreRoundedAsTheWebRoundsThem() {
         let r = PartReadout.make(input { $0.overArea = 1234.5; $0.bedArea = 0.5; $0.triangles = 1_234_567 })
         #expect(r.area == "1235 mm²" && r.bed == "1 mm²") // toFixed(0): a tie takes the larger (part.js:366-367)

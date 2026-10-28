@@ -36,6 +36,8 @@ struct InspectorView: View {
         .onChange(of: settings) { _, new in SettingsStore().save(new) }
         // Highlight small overhangs paints the part, never rebuilds the fins (`web/ui/settings.js:386-392`)
         .onChange(of: settings.highlightSmall, initial: true) { _, on in controller.highlightSmall = on }
+        // Show midair starts draws the red cones only (`web/ui/islands.js:30-34`)
+        .onChange(of: settings.showIslands, initial: true) { _, on in controller.showsIslands = on }
         #if DEBUG
         .safeAreaInset(edge: .bottom) {
             Toggle("Benchmark orbit", isOn: Binding(get: { controller.benchmarking }, set: { controller.setBenchmark($0) }))

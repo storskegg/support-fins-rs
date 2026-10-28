@@ -11,6 +11,20 @@ struct ContentView: View {
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
+        main
+            .focusedSceneValue(\.viewer, model.controller)
+            .focusedSceneValue(\.session, model.session)
+            .focusedSceneValue(\.layFace, model.layFace)
+            .focusedSceneValue(\.rotate, model.rotate)
+            .focusedSceneValue(\.toolbar, toolbar)
+            .focusedSceneValue(\.exporter, model.wiring?.exporter)
+            .focusedSceneValue(\.removal, model.wiring?.removal)
+            // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
+            .onExitCommand { model.layFace.cancel(); model.wiring?.escape() }
+            .environment(model.session)
+    }
+
+    private var main: some View {
         ZStack(alignment: .topLeading) {
             if let controller = model.controller {
                 ViewerViewport(controller: controller)
@@ -74,15 +88,6 @@ struct ContentView: View {
         .onChange(of: model.session.settings.threshold, initial: true) { _, t in model.controller?.thresholdDegrees = t }
         .onChange(of: model.session.pose) { _, pose in model.controller?.rotation = pose.float3x3 }
         .onChange(of: undoManager, initial: true) { _, m in model.session.undoManager = m }
-        .focusedSceneValue(\.viewer, model.controller)
-        .focusedSceneValue(\.session, model.session)
-        .focusedSceneValue(\.layFace, model.layFace)
-        .focusedSceneValue(\.rotate, model.rotate)
-        .focusedSceneValue(\.exporter, model.wiring?.exporter)
-        .focusedSceneValue(\.removal, model.wiring?.removal)
-        // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
-        .onExitCommand { model.layFace.cancel(); model.wiring?.escape() }
-        .environment(model.session)
     }
 
     private func registerTools() {
