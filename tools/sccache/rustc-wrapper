@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Cargo's build.rustc-wrapper (see .cargo/config.toml): rustc through sccache, so every worktree
+# on this machine shares one compile cache. Falls back to plain rustc when sccache is not
+# installed (`brew install sccache`), so a fresh clone still builds.
+#
+# Settings are exported here, not left to the environment, so whichever worktree starts the
+# sccache server gives it the same ones. Override any of them in the environment.
+#   SCCACHE_CACHE_SIZE  cap on the shared cache (default 30G; sccache evicts least-recently-used)
+#   SCCACHE_DIR         where it lives (sccache's default, ~/Library/Caches/Mozilla.sccache)
+#   SFRS_NO_SCCACHE=1   bypass the cache (e.g. to time a truly cold build)
+rustc="$1"
+shift
+if [ -z "${SFRS_NO_SCCACHE:-}" ] && command -v sccache >/dev/null 2>&1; then
+    export SCCACHE_CACHE_SIZE="${SCCACHE_CACHE_SIZE:-30G}"
+    exec sccache "$rustc" "$@"
+fi
+exec "$rustc" "$@"
