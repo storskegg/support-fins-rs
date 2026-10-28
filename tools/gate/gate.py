@@ -63,11 +63,12 @@ def test_count(name):
         n = sum(int(m) for m in re.findall(r"test result: \w+\. (\d+) passed", text))
         return f"{n} tests"
     if name == "app-test":
-        # swift test: "Executed N tests"; xcodebuild: "Executed N tests" too -- one figure per run, summed per tool
-        runs = re.findall(r"Test Suite '(?:All tests|Selected tests)' (?:passed|failed).*\n\s*Executed (\d+) tests?", text)
-        swift = re.findall(r"Executed (\d+) tests?", text)
-        n = [int(x) for x in runs] or [int(x) for x in swift]
-        return f"{sum(n)} tests ({', '.join(map(str, n))})" if n else "0 tests counted"
+        # Swift Testing ("Test run with N tests") and XCTest ("Executed N tests" after the All/Selected tests suite),
+        # summed over the viewer package, the app's unit tests and whatever else ran
+        st = [int(x) for x in re.findall(r"Test run with (\d+) tests?", text)]
+        xc = [int(x) for x in re.findall(r"Test Suite '(?:All tests|Selected tests)' (?:passed|failed).*\n\s*Executed (\d+) tests?", text)]
+        n = sum(st) + sum(xc)
+        return f"{n} tests (swift-testing {sum(st)}, xctest {sum(xc)})"
     return ""
 
 
