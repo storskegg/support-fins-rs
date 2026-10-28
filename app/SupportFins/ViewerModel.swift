@@ -13,30 +13,21 @@ final class ViewerModel {
     var status: String?
     /// The fins: builds, removal and export for the first object of the file.
     private(set) var wiring: BuildWiring?
-    /// The Suggest and Strength popovers' models, once a single part is on show (a file of several objects is
-    /// turned as a whole, so it has no ranking or load arrow of its own yet).
-    private(set) var suggest: SuggestModel?
-    private(set) var strength: StrengthModel?
     @ObservationIgnored private let loader: any PartLoading
-    @ObservationIgnored private var ringEdits: RingEdits?
-    /// Lay a face flat (`ui/pose.js`).
-    let layFace: LayFaceModel
-    /// The Rotate popover's model (`ui/pose.js`).
-    let rotate: RotateModel
-    /// The View popover's Mouse preset (`ui/navigation.js`).
-    let view: ViewSettings
+    /// The floating toolbar's badge slots; features register their popovers here.
+    let toolbar = ToolbarRegistry()
+    /// The window's features (`Features.all`): each owns its models and contributes to the window and the menus.
+    @ObservationIgnored private(set) var features: FeatureSet!
 
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
         controller = ViewerController()
-        layFace = LayFaceModel(session: session, controller: controller)
-        let rotate = RotateModel(session: session, controller: controller)
-        self.rotate = rotate
-        view = ViewSettings(controller: controller)
         if controller == nil { status = "This Mac has no usable Metal device." }
-        wiring = controller.map { [view] in BuildWiring(session: session, controller: $0, liveDrag: { view.rebuildWhileDragging }) }
-        ringEdits = controller.map { RingEdits(session: session, controller: $0) }
-        ringEdits?.onEvent = { rotate.ring($0) }
+        wiring = controller.map { [session] in
+            BuildWiring(session: session, controller: $0,
+                        liveDrag: { [weak self] in self?.features[ViewFeature.self]?.settings.rebuildWhileDragging ?? true })
+        }
+        features = FeatureSet(host: self)
     }
 
     /// The object picker, while a file with several objects waits for a choice (`pickObjects`, `ui/io.js:140`).
@@ -96,26 +87,13 @@ final class ViewerModel {
 
     private func show(_ parts: [LoadedPart], url: URL?) {
         guard let controller, let first = parts.first else { return }
-        layFace.cancel()
+        features.partWillShow()
         session.replaceParts(parts.compactMap { $0.mesh as? CorePart })
         controller.rotation = session.pose.float3x3
         wiring?.attach()
         controller.show(parts.map(\.mesh), name: first.name)
         openedName = url?.lastPathComponent ?? first.name
         status = nil
-        makeTools(parts, controller: controller)
-    }
-}
-
-extension ViewerModel {
-    /// The tools that act on the part's pose (`ui/suggest.js`, `ui/strength.js`).
-    fileprivate func makeTools(_ parts: [LoadedPart], controller: ViewerController) {
-        let part = parts.count == 1 ? (parts[0].mesh as? CorePart)?.part : nil
-        let pose = PoseAccess.session(session)
-        suggest = SuggestModel(part: part, pose: pose)
-        let strength = StrengthModel(part: part, pose: pose)
-        strength.threshold = controller.thresholdDegrees
-        strength.loadChanged = { [weak controller] in controller?.loadDirection = $0.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } }
-        self.strength = strength
+        features.partDidShow(parts)
     }
 }

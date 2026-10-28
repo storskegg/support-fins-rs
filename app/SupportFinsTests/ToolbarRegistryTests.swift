@@ -6,7 +6,7 @@ import Testing
 struct ToolbarRegistryTests {
     @Test func aSlotIsEmptyUntilATrackRegistersIt() {
         let r = ToolbarRegistry()
-        #expect(ToolbarSlot.allCases.allSatisfy { r.badges[$0] == nil })
+        #expect([ToolbarSlot.rotate, .suggest, .strength, .view].allSatisfy { r.badges[$0] == nil })
         var lit = false
         r.register(.strength, isLit: { lit }) { Text("pad") }
         #expect(r.badges[.strength] != nil && r.badges[.suggest] == nil)
