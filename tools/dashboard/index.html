@@ -225,10 +225,8 @@ function renderChart(hist, cores) {
     `<text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="var(--muted)">collecting samples…</text>`}`;
 }
 
-async function refresh() {
+function render(s) {
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
-    const s = await r.json();
     const plan = s.plan || {};
     $("verdict").className = "verdict " + s.verdict.level;
     $("verdict-text").textContent = s.verdict.text;
@@ -240,11 +238,16 @@ async function refresh() {
     $("loadnow").textContent = `now: load ${s.load.one.toFixed(1)} / ${s.load.five.toFixed(1)} / ${s.load.fifteen.toFixed(1)} on ${s.load.cores} cores`;
   } catch (e) {
     $("verdict").className = "verdict warn";
-    $("verdict-text").textContent = "Dashboard server not responding: " + e;
+    $("verdict-text").textContent = "Dashboard render failed: " + e;
   }
 }
-refresh();
-setInterval(refresh, 15000);
+// live: the server pushes state every 2 s; EventSource reconnects by itself if the server restarts
+const stream = new EventSource("/api/stream");
+stream.onmessage = ev => render(JSON.parse(ev.data));
+stream.onerror = () => {
+  $("verdict").className = "verdict warn";
+  $("verdict-text").textContent = "Dashboard server not responding: reconnecting…";
+};
 </script>
 </body>
 </html>

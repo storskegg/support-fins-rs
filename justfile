@@ -120,6 +120,6 @@ bench-load *inputs:
 bench-render *args:
     swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
 
-# Local port dashboard at http://127.0.0.1:8787: milestones, tasks and agents (tools/dashboard/state.json) beside live load, build/test processes, worktree activity, PRs and commits; refreshes every 15 s.
+# Local port dashboard at http://127.0.0.1:8787: milestones, tasks and agents (tools/dashboard/state.json) beside live load, build/test processes, worktree activity, PRs and commits; pushed live every 2 s.
 dashboard:
     python3 tools/dashboard/server.py
