@@ -46,6 +46,9 @@ pub struct PartInfo {
     /// What import did, in the page's words (`web/ui/io.js` `renderImportNote`): the negative parts cut
     /// out of it, and why any were not. Empty for a part without negative parts.
     pub notes: Vec<String>,
+    /// How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
+    /// (`web/ui/part.js` `analysisTiming`).
+    pub weld_ms: f64,
 }
 
 /// `analyze`'s numbers (web/overhangs.js `analyze`), for the readout.
@@ -55,10 +58,81 @@ pub struct AnalysisSummary {
     pub bed_area: f64,
     pub over_face_count: u64,
     pub region_count: u64,
+    /// Regions before the sliver filter: the sliver warning compares it with `region_count`.
+    pub raw_region_count: u64,
+    /// How long this `analyze` took, ms (`analysisTiming`).
+    pub analyze_ms: f64,
     /// The seating offset x, y, z.
     pub offset: Vec<f64>,
     /// The posed part's size x, y, z.
     pub size: Vec<f64>,
+}
+
+/// One spot whose first layer starts in midair (`web/islands.js` `findIslands`).
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct Island {
+    /// The start: where the page puts a red cone's tip.
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    /// Its points, flat `x, y, z, ...` (a level edge runs along several: the page draws the line between the
+    /// farthest two).
+    pub points: Vec<f64>,
+}
+
+/// The midair-starts card (`web/ui/islands.js` `renderIslandCard`): what the starts are and how many nothing
+/// holds. `count` is the number of starts; `bare` is `None` when there is no Full build for this pose (the
+/// summary's `islandsBuild` is null), else how many Full coverage left without a wall; `capped` that its
+/// island pass stopped on its budget; `markers_visible` whether "Show midair starts" is ticked. An empty
+/// string means no card.
+#[uniffi::export]
+pub fn island_card(count: u64, bare: Option<u64>, capped: bool, markers_visible: bool) -> String {
+    let n = count as usize;
+    if n == 0 || bare == Some(0) {
+        return String::new();
+    }
+    let where_ = if markers_visible {
+        "red cones"
+    } else {
+        "tick Show midair starts in Settings › Display to see them"
+    };
+    let one = n == 1;
+    match bare {
+        None => {
+            if one {
+                format!(
+                    "⚠ {n} spot starts in midair ({where_}): its first layer has nothing under it, though no face there is steep enough to show red. Full coverage puts a wall under it if it can reach it; in Auto or Draw, add a wall by hand under it or tilt the part."
+                )
+            } else {
+                format!(
+                    "⚠ {n} spots start in midair ({where_}): their first layer has nothing under it, though no face there is steep enough to show red. Full coverage puts a wall under each one it can reach; in Auto or Draw, add a wall by hand under each or tilt the part."
+                )
+            }
+        }
+        Some(b) => {
+            let b = b as usize;
+            let one_b = b == 1;
+            if capped {
+                if one_b {
+                    format!(
+                        "⚠ {b} of {n} spots that start in midair got no wall: Full coverage ran out of walls before it ({where_}). Add a wall by hand under it, or tilt the part."
+                    )
+                } else {
+                    format!(
+                        "⚠ {b} of {n} spots that start in midair got no wall: Full coverage ran out of walls before them ({where_}). Add a wall by hand under each, or tilt the part."
+                    )
+                }
+            } else if one_b {
+                format!(
+                    "⚠ {b} of {n} spots that start in midair got no wall: Full coverage couldn’t fit one under it ({where_}). Add a wall by hand under it, or tilt the part."
+                )
+            } else {
+                format!(
+                    "⚠ {b} of {n} spots that start in midair got no wall: Full coverage couldn’t fit one under them ({where_}). Add a wall by hand under each, or tilt the part."
+                )
+            }
+        }
+    }
 }
 
 /// A slicer's parts with the uncut positions they were cut from (`readPart`'s `slicer`).
@@ -76,6 +150,7 @@ pub struct Part {
     topo: Arc<Topology>,
     size: [f64; 3],
     notes: Vec<String>,
+    weld_ms: f64,
 }
 
 impl Part {
@@ -99,13 +174,17 @@ impl Part {
         } else {
             [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
         };
+        let started = std::time::Instant::now();
+        let topo = build_topology(positions);
+        let weld_ms = started.elapsed().as_secs_f64() * 1e3;
         Part {
             name,
             stem,
             slicer: slicer.map(Arc::new),
-            topo: Arc::new(build_topology(positions)),
+            topo: Arc::new(topo),
             size,
             notes,
+            weld_ms,
         }
     }
 
@@ -155,6 +234,7 @@ impl Part {
             triangles: self.topo.n_faces as u64,
             size: self.size.to_vec(),
             notes: self.notes.clone(),
+            weld_ms: self.weld_ms,
         }
     }
 
@@ -180,15 +260,38 @@ impl Part {
 
     /// `rot`: nine numbers, column-major (the engine's `Rot3`).
     pub fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError> {
+        let started = std::time::Instant::now();
         let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
+        let analyze_ms = started.elapsed().as_secs_f64() * 1e3;
         Ok(AnalysisSummary {
             over_area: a.over_area,
             bed_area: a.bed_area,
             over_face_count: a.over_face_count as u64,
             region_count: a.regions.len() as u64,
+            raw_region_count: a.raw_region_count as u64,
+            analyze_ms,
             offset: vec![a.offset.x, a.offset.y, a.offset.z],
             size: vec![a.size.x, a.size.y, a.size.z],
         })
+    }
+
+    /// The spots whose first layer starts in midair in this pose (`findIslands`, `web/ui/islands.js`
+    /// `updateIslands`): no face there is red, so the readout counts them and the viewer marks them.
+    pub fn islands(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Vec<Island>, FfiError> {
+        let rot = rot9(&rot)?;
+        let cfg = sf_engine::config::Config::default();
+        let a = analyze(&self.topo, threshold(threshold_deg)?, &rot);
+        let found =
+            sf_engine::islands::find_islands(&self.topo, &a, &rot, &Default::default(), &cfg);
+        Ok(found
+            .into_iter()
+            .map(|i| Island {
+                x: i.x,
+                y: i.y,
+                z: i.z,
+                points: i.points.iter().flatten().copied().collect(),
+            })
+            .collect())
     }
 
     /// One byte per face: bit 0 `over`, bit 1 `kept`, bit 2 `on_bed`.

@@ -5,7 +5,10 @@
 //! a fill-pass wall has **no `region`** (JS has `undefined`; here `PropRecord.region` is `None`, #23).
 
 use sf_cli::entry::{Stats, report_line};
+use sf_engine::config::Config;
 use sf_engine::fins::build::{FinKind, FinRecord, FinsBuilt};
+use sf_engine::fins::fill::fill_reach;
+use sf_engine::fins::pad::PadStyle;
 use sf_engine::fins::seating::SeatingKind;
 use sf_engine::prop::build::PropRecord;
 use sf_engine::types::Xyz;
@@ -167,13 +170,106 @@ pub fn summary(b: &FinsBuilt, stats: &Stats, offset: Xyz) -> Json {
             ]),
         ),
         ("hasPad", Json::Bool(b.pad.is_some())),
+        // the pad's details (web/ui/readout.js padStatus / padNote)
+        (
+            "pad",
+            b.pad.as_ref().map_or(Json::Null, |p| {
+                obj(vec![
+                    (
+                        "style",
+                        Json::Str(
+                            match p.style {
+                                PadStyle::Auto => "auto",
+                                PadStyle::Light => "light",
+                                PadStyle::Sure => "sure",
+                                PadStyle::Custom => "custom",
+                            }
+                            .into(),
+                        ),
+                    ),
+                    ("autoSure", Json::Bool(p.auto_sure == Some(true))),
+                    ("smallFoot", Json::Bool(p.small_foot == Some(true))),
+                    ("outline", p.outline.map_or(Json::Null, n)),
+                ])
+            }),
+        ),
+        // Full coverage / curved walls (readout.js updateFinReadout)
+        (
+            "fill",
+            b.fill.as_ref().map_or(Json::Null, |f| {
+                obj(vec![
+                    ("walls", u(f.walls)),
+                    ("bareBefore", n(f.bare_before)),
+                    ("unservedArea", n(f.unserved_area)),
+                    ("capped", Json::Bool(f.capped)),
+                    ("islandsBare", u(f.islands_bare)),
+                    ("islandsCapped", Json::Bool(f.islands_capped)),
+                ])
+            }),
+        ),
+        (
+            "curvedFill",
+            b.curved_fill.as_ref().map_or(Json::Null, |f| {
+                obj(vec![
+                    ("walls", u(f.walls)),
+                    ("unservedArea", n(f.unserved_area)),
+                    ("capped", Json::Bool(f.capped)),
+                ])
+            }),
+        ),
+        ("curvedDropped", Json::Bool(b.curved_dropped)),
+        // `fillReach(built.bare.coverage)`: how far a wall holds the red (the "more than {reach} mm" note)
+        (
+            "fillReach",
+            b.bare.as_ref().map_or(Json::Null, |x| {
+                n(fill_reach(x.coverage, &Config::default()))
+            }),
+        ),
+        // ui/readout.js: `built.fill ? { bare: islandsBare, capped: islandsCapped } : { all: true }` for a Full
+        // build, else null: what the midair-starts card is told
+        (
+            "islandsBuild",
+            if b.mode == "full" {
+                match &b.fill {
+                    Some(f) => obj(vec![
+                        ("bare", u(f.islands_bare)),
+                        ("capped", Json::Bool(f.islands_capped)),
+                    ]),
+                    None => obj(vec![("all", Json::Bool(true))]),
+                }
+            } else {
+                Json::Null
+            },
+        ),
+        // the fins and the pad's extent (ui/part.js updateFit: "does not fit (with fins)")
+        (
+            "addedBounds",
+            bounds(b.triangles.iter().chain(&b.pad_triangles)),
+        ),
         ("finVolumeMm3", n(mesh_volume(&b.triangles))),
         ("padVolumeMm3", n(mesh_volume(&b.pad_triangles))),
     ])
 }
 
+/// `{ min: [x,y,z], max: [x,y,z] }` over these vertices, `null` when there are none.
+pub fn bounds<'a>(vs: impl Iterator<Item = &'a sf_engine::types::V4>) -> Json {
+    let (mut lo, mut hi) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
+    let mut any = false;
+    for p in vs {
+        any = true;
+        for k in 0..3 {
+            lo[k] = lo[k].min(p[k]);
+            hi[k] = hi[k].max(p[k]);
+        }
+    }
+    if !any {
+        return Json::Null;
+    }
+    obj(vec![("min", v3(lo)), ("max", v3(hi))])
+}
+
 /// `meshVolumeMM3` (web/ui/readout.js): the volume of a closed triangle soup, mm^3.
-fn mesh_volume(tris: &[sf_engine::types::V4]) -> f64 {
+pub fn mesh_volume(tris: &[sf_engine::types::V4]) -> f64 {
     let mut v = 0.0;
     for t in tris.as_chunks::<3>().0 {
         let (a, b, c) = (t[0], t[1], t[2]);
@@ -181,6 +277,14 @@ fn mesh_volume(tris: &[sf_engine::types::V4]) -> f64 {
             + a[2] * (b[0] * c[1] - b[1] * c[0]);
     }
     v.abs() / 6.0
+}
+
+pub fn bare_json(area: f64, total: f64, coverage: f64) -> Json {
+    obj(vec![
+        ("area", n(area)),
+        ("total", n(total)),
+        ("coverage", n(coverage)),
+    ])
 }
 
 fn kind(k: FinKind) -> &'static str {
@@ -228,6 +332,7 @@ fn fin(f: &FinRecord) -> Json {
 }
 
 fn prop(q: &PropRecord) -> Json {
+    // (a fill-pass wall has no real id in JS; the number here is the engine's placeholder, and `fill` says so)
     let mut kv = vec![("id", u(q.id))];
     // a fill-pass wall has no region
     if let Some(r) = q.region {
@@ -252,5 +357,32 @@ pub fn records(b: &FinsBuilt) -> Json {
     obj(vec![
         ("fins", Json::Arr(b.fins.iter().map(fin).collect())),
         ("props", Json::Arr(b.props.iter().map(prop).collect())),
+        (
+            "crestRanges",
+            Json::Arr(
+                crest_ranges(&b.triangles)
+                    .into_iter()
+                    .map(|[a, z]| Json::Arr(vec![u(a), u(z)]))
+                    .collect(),
+            ),
+        ),
     ])
+}
+
+/// The interface crest as the page draws it (`meshFrom` in ui/scene.js: "one geometry group per run"): the
+/// `[from, to)` vertex ranges of the runs of consecutive tagged triangles of the fin soup, a triangle
+/// being the crest when its first vertex is tagged (`splitInterface`, prop/crest.js).
+fn crest_ranges(tris: &[sf_engine::types::V4]) -> Vec<[usize; 2]> {
+    let mut runs: Vec<[usize; 2]> = Vec::new();
+    for (t, v) in tris.as_chunks::<3>().0.iter().enumerate() {
+        if v[0][3] != 1.0 {
+            continue;
+        }
+        let (from, to) = (t * 3, t * 3 + 3);
+        match runs.last_mut() {
+            Some(last) if last[1] == from => last[1] = to,
+            _ => runs.push([from, to]),
+        }
+    }
+    runs
 }

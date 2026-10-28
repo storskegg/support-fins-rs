@@ -596,6 +596,15 @@ fileprivate struct FfiConverterString: FfiConverter {
 public protocol BuildResultProtocol: AnyObject, Sendable {
     
     /**
+     * The readouts that change when fins are removed by hand (`ui/remove.js`, `ui/readout.js`,
+     * `ui/part.js`): `{ removed, bare: { area, total, coverage } | null, addedBounds, addedVolumeMm3 }`.
+     * `removed_ids` are `records_json` fin `id`s. `bare` is the area of overhang the walls left
+     * *kept* still bare, measured again against them (`bareArea` with the kept fins), as the page does;
+     * `addedBounds` and `addedVolumeMm3` are the kept fins plus the pad (`activeAdded`).
+     */
+    func afterRemovalJson(removedIds: [UInt64]) throws  -> String
+    
+    /**
      * The fins (walls, wedges, sway braces): interleaved position xyz + face normal xyz, `f32`, three
      * vertices per triangle, in print space.
      */
@@ -675,6 +684,23 @@ open class BuildResult: BuildResultProtocol, @unchecked Sendable {
 
     
 
+    
+    /**
+     * The readouts that change when fins are removed by hand (`ui/remove.js`, `ui/readout.js`,
+     * `ui/part.js`): `{ removed, bare: { area, total, coverage } | null, addedBounds, addedVolumeMm3 }`.
+     * `removed_ids` are `records_json` fin `id`s. `bare` is the area of overhang the walls left
+     * *kept* still bare, measured again against them (`bareArea` with the kept fins), as the page does;
+     * `addedBounds` and `addedVolumeMm3` are the kept fins plus the pad (`activeAdded`).
+     */
+open func afterRemovalJson(removedIds: [UInt64])throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_buildresult_after_removal_json(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceUInt64.lower(removedIds),uniffiCallStatus
+    )
+})
+}
     
     /**
      * The fins (walls, wedges, sway braces): interleaved position xyz + face normal xyz, `f32`, three
@@ -787,7 +813,7 @@ public protocol BuilderProtocol: AnyObject, Sendable {
     /**
      * Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
      */
-    func build(rot: [Double], optsJson: String, listener: BuildListener)  -> UInt64
+    func build(rot: [Double], optsJson: String, tunablesJson: String, listener: BuildListener)  -> UInt64
     
 }
 /**
@@ -860,13 +886,14 @@ public convenience init(part: Part) {
     /**
      * Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
      */
-open func build(rot: [Double], optsJson: String, listener: BuildListener) -> UInt64  {
+open func build(rot: [Double], optsJson: String, tunablesJson: String, listener: BuildListener) -> UInt64  {
     return try!  FfiConverterUInt64.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_sf_ffi_fn_method_builder_build(
             self.uniffiCloneHandle(),
         FfiConverterSequenceDouble.lower(rot),
         FfiConverterString.lower(optsJson),
+        FfiConverterString.lower(tunablesJson),
         FfiConverterCallbackInterfaceBuildListener_lower(listener),uniffiCallStatus
     )
 })
@@ -1114,6 +1141,12 @@ public protocol PartProtocol: AnyObject, Sendable {
     func info()  -> PartInfo
     
     /**
+     * The spots whose first layer starts in midair in this pose (`findIslands`, `web/ui/islands.js`
+     * `updateIslands`): no face there is red, so the readout counts them and the viewer marks them.
+     */
+    func islands(thresholdDeg: Double, rot: [Double]) throws  -> [Island]
+    
+    /**
      * Interleaved position xyz + normal xyz (`f32`, 24-byte vertex), three vertices per face in the
      * model frame, the normal being the face normal repeated at each vertex.
      */
@@ -1221,6 +1254,21 @@ open func info() -> PartInfo  {
         uniffiCallStatus in
     uniffi_sf_ffi_fn_method_part_info(
             self.uniffiCloneHandle(),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The spots whose first layer starts in midair in this pose (`findIslands`, `web/ui/islands.js`
+     * `updateIslands`): no face there is red, so the readout counts them and the viewer marks them.
+     */
+open func islands(thresholdDeg: Double, rot: [Double])throws  -> [Island]  {
+    return try  FfiConverterSequenceTypeIsland.lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_part_islands(
+            self.uniffiCloneHandle(),
+        FfiConverterDouble.lower(thresholdDeg),
+        FfiConverterSequenceDouble.lower(rot),uniffiCallStatus
     )
 })
 }
@@ -1492,6 +1540,14 @@ public struct AnalysisSummary: Equatable, Hashable {
     public var overFaceCount: UInt64
     public var regionCount: UInt64
     /**
+     * Regions before the sliver filter: the sliver warning compares it with `region_count`.
+     */
+    public var rawRegionCount: UInt64
+    /**
+     * How long this `analyze` took, ms (`analysisTiming`).
+     */
+    public var analyzeMs: Double
+    /**
      * The seating offset x, y, z.
      */
     public var offset: [Double]
@@ -1504,6 +1560,12 @@ public struct AnalysisSummary: Equatable, Hashable {
     // declare one manually.
     public init(overArea: Double, bedArea: Double, overFaceCount: UInt64, regionCount: UInt64, 
         /**
+         * Regions before the sliver filter: the sliver warning compares it with `region_count`.
+         */rawRegionCount: UInt64, 
+        /**
+         * How long this `analyze` took, ms (`analysisTiming`).
+         */analyzeMs: Double, 
+        /**
          * The seating offset x, y, z.
          */offset: [Double], 
         /**
@@ -1513,6 +1575,8 @@ public struct AnalysisSummary: Equatable, Hashable {
         self.bedArea = bedArea
         self.overFaceCount = overFaceCount
         self.regionCount = regionCount
+        self.rawRegionCount = rawRegionCount
+        self.analyzeMs = analyzeMs
         self.offset = offset
         self.size = size
     }
@@ -1537,6 +1601,8 @@ public struct FfiConverterTypeAnalysisSummary: FfiConverterRustBuffer {
                 bedArea: FfiConverterDouble.read(from: &buf), 
                 overFaceCount: FfiConverterUInt64.read(from: &buf), 
                 regionCount: FfiConverterUInt64.read(from: &buf), 
+                rawRegionCount: FfiConverterUInt64.read(from: &buf), 
+                analyzeMs: FfiConverterDouble.read(from: &buf), 
                 offset: FfiConverterSequenceDouble.read(from: &buf), 
                 size: FfiConverterSequenceDouble.read(from: &buf)
         )
@@ -1547,6 +1613,8 @@ public struct FfiConverterTypeAnalysisSummary: FfiConverterRustBuffer {
         FfiConverterDouble.write(value.bedArea, into: &buf)
         FfiConverterUInt64.write(value.overFaceCount, into: &buf)
         FfiConverterUInt64.write(value.regionCount, into: &buf)
+        FfiConverterUInt64.write(value.rawRegionCount, into: &buf)
+        FfiConverterDouble.write(value.analyzeMs, into: &buf)
         FfiConverterSequenceDouble.write(value.offset, into: &buf)
         FfiConverterSequenceDouble.write(value.size, into: &buf)
     }
@@ -1565,6 +1633,85 @@ public func FfiConverterTypeAnalysisSummary_lift(_ buf: RustBuffer) throws -> An
 #endif
 public func FfiConverterTypeAnalysisSummary_lower(_ value: AnalysisSummary) -> RustBuffer {
     return FfiConverterTypeAnalysisSummary.lower(value)
+}
+
+
+/**
+ * One spot whose first layer starts in midair (`web/islands.js` `findIslands`).
+ */
+public struct Island: Equatable, Hashable {
+    /**
+     * The start: where the page puts a red cone's tip.
+     */
+    public var x: Double
+    public var y: Double
+    public var z: Double
+    /**
+     * Its points, flat `x, y, z, ...` (a level edge runs along several: the page draws the line between the
+     * farthest two).
+     */
+    public var points: [Double]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The start: where the page puts a red cone's tip.
+         */x: Double, y: Double, z: Double, 
+        /**
+         * Its points, flat `x, y, z, ...` (a level edge runs along several: the page draws the line between the
+         * farthest two).
+         */points: [Double]) {
+        self.x = x
+        self.y = y
+        self.z = z
+        self.points = points
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Island: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeIsland: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Island {
+        return
+            try Island(
+                x: FfiConverterDouble.read(from: &buf), 
+                y: FfiConverterDouble.read(from: &buf), 
+                z: FfiConverterDouble.read(from: &buf), 
+                points: FfiConverterSequenceDouble.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Island, into buf: inout [UInt8]) {
+        FfiConverterDouble.write(value.x, into: &buf)
+        FfiConverterDouble.write(value.y, into: &buf)
+        FfiConverterDouble.write(value.z, into: &buf)
+        FfiConverterSequenceDouble.write(value.points, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIsland_lift(_ buf: RustBuffer) throws -> Island {
+    return try FfiConverterTypeIsland.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeIsland_lower(_ value: Island) -> RustBuffer {
+    return FfiConverterTypeIsland.lower(value)
 }
 
 
@@ -1654,6 +1801,11 @@ public struct PartInfo: Equatable, Hashable {
      * out of it, and why any were not. Empty for a part without negative parts.
      */
     public var notes: [String]
+    /**
+     * How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
+     * (`web/ui/part.js` `analysisTiming`).
+     */
+    public var weldMs: Double
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1664,11 +1816,16 @@ public struct PartInfo: Equatable, Hashable {
         /**
          * What import did, in the page's words (`web/ui/io.js` `renderImportNote`): the negative parts cut
          * out of it, and why any were not. Empty for a part without negative parts.
-         */notes: [String]) {
+         */notes: [String], 
+        /**
+         * How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
+         * (`web/ui/part.js` `analysisTiming`).
+         */weldMs: Double) {
         self.name = name
         self.triangles = triangles
         self.size = size
         self.notes = notes
+        self.weldMs = weldMs
     }
 
     
@@ -1690,7 +1847,8 @@ public struct FfiConverterTypePartInfo: FfiConverterRustBuffer {
                 name: FfiConverterString.read(from: &buf), 
                 triangles: FfiConverterUInt64.read(from: &buf), 
                 size: FfiConverterSequenceDouble.read(from: &buf), 
-                notes: FfiConverterSequenceString.read(from: &buf)
+                notes: FfiConverterSequenceString.read(from: &buf), 
+                weldMs: FfiConverterDouble.read(from: &buf)
         )
     }
 
@@ -1699,6 +1857,7 @@ public struct FfiConverterTypePartInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.triangles, into: &buf)
         FfiConverterSequenceDouble.write(value.size, into: &buf)
         FfiConverterSequenceString.write(value.notes, into: &buf)
+        FfiConverterDouble.write(value.weldMs, into: &buf)
     }
 }
 
@@ -2697,6 +2856,30 @@ public func FfiConverterCallbackInterfaceSuggestListener_lower(_ v: SuggestListe
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionUInt64: FfiConverterRustBuffer {
+    typealias SwiftType = UInt64?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterUInt64.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterUInt64.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
     typealias SwiftType = String?
 
@@ -2763,6 +2946,31 @@ fileprivate struct FfiConverterOptionTypeStrengthPose: FfiConverterRustBuffer {
         case 1: return try FfiConverterTypeStrengthPose.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceUInt64: FfiConverterRustBuffer {
+    typealias SwiftType = [UInt64]
+
+    public static func write(_ value: [UInt64], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterUInt64.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UInt64] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UInt64]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterUInt64.read(from: &buf))
+        }
+        return seq
     }
 }
 
@@ -2869,6 +3077,31 @@ fileprivate struct FfiConverterSequenceTypePart: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeIsland: FfiConverterRustBuffer {
+    typealias SwiftType = [Island]
+
+    public static func write(_ value: [Island], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeIsland.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Island] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Island]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeIsland.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeSuggestion: FfiConverterRustBuffer {
     typealias SwiftType = [Suggestion]
 
@@ -2917,6 +3150,24 @@ public func export(path: String, parts: [Part], builds: [BuildResult], optionsJs
 }
 }
 /**
+ * The midair-starts card (`web/ui/islands.js` `renderIslandCard`): what the starts are and how many nothing
+ * holds. `count` is the number of starts; `bare` is `None` when there is no Full build for this pose (the
+ * summary's `islandsBuild` is null), else how many Full coverage left without a wall; `capped` that its
+ * island pass stopped on its budget; `markers_visible` whether "Show midair starts" is ticked. An empty
+ * string means no card.
+ */
+public func islandCard(count: UInt64, bare: UInt64?, capped: Bool, markersVisible: Bool) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_func_island_card(
+        FfiConverterUInt64.lower(count),
+        FfiConverterOptionUInt64.lower(bare),
+        FfiConverterBool.lower(capped),
+        FfiConverterBool.lower(markersVisible),uniffiCallStatus
+    )
+})
+}
+/**
  * STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
  * the CLI's `readPart` gets it). A 3MF object's negative parts are cut out at import, as the page does
  * (`web/ui/io.js`), through `sf-cut`; `PartInfo.notes` says what was cut and why anything was not.
@@ -2962,10 +3213,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_func_export() != 44033) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_sf_ffi_checksum_func_island_card() != 45558) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_sf_ffi_checksum_func_load_parts() != 14593) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_func_load_alignment() != 64003) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_buildresult_after_removal_json() != 24820) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_buildresult_fins() != 49288) {
@@ -2980,7 +3237,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_method_buildresult_summary_json() != 3251) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sf_ffi_checksum_method_builder_build() != 27591) {
+    if (uniffi_sf_ffi_checksum_method_builder_build() != 47952) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_gpubuffer_address() != 23806) {
@@ -3002,6 +3259,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_part_info() != 5285) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_part_islands() != 41900) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_part_mesh() != 22805) {

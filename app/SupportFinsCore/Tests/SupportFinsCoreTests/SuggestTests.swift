@@ -105,7 +105,7 @@ private final class BuildCollector: BuildListener, @unchecked Sendable {
     let collector = BuildCollector()
     _ = Builder(part: part).build(
         rot: [1, 0, 0, 0, 0.8660254037844387, 0.49999999999999994, 0, -0.49999999999999994, 0.8660254037844387],
-        optsJson: "{}", listener: collector)
+        optsJson: "{}", tunablesJson: "{}", listener: collector)
     var built: BuildResult?
     for await result in collector.stream { built = result; break }
     let result = try #require(built)
@@ -115,4 +115,26 @@ private final class BuildCollector: BuildListener, @unchecked Sendable {
     let seating = try #require(summary["seating"] as? [String: Any])
     #expect(["face", "edge", "point"].contains(seating["kind"] as? String ?? ""))
     #expect(summary["hasPad"] is Bool)
+}
+
+@Test func theReadoutNumbersReachSwift() async throws {
+    let part = try #require(try loadParts(path: try modelPath("sphere")).first)
+    let rot = [1, 0, 0, 0, 0.8660254037844387, 0.49999999999999994, 0, -0.49999999999999994, 0.8660254037844387]
+    let a = try part.analyze(thresholdDeg: 45, rot: rot)
+    #expect(a.rawRegionCount >= a.regionCount && a.analyzeMs >= 0)
+    #expect(part.info().weldMs > 0)
+    _ = try part.islands(thresholdDeg: 45, rot: rot)
+    #expect(islandCard(count: 0, bare: nil, capped: false, markersVisible: true) == "")
+    #expect(islandCard(count: 2, bare: nil, capped: false, markersVisible: true).hasPrefix("⚠ 2 spots start in midair (red cones)"))
+
+    let collector = BuildCollector()
+    _ = Builder(part: part).build(rot: rot, optsJson: "{}", tunablesJson: "{}", listener: collector)
+    var built: BuildResult?
+    for await result in collector.stream { built = result; break }
+    let result = try #require(built)
+    let summary = try #require(try JSONSerialization.jsonObject(with: Data(result.summaryJson().utf8)) as? [String: Any])
+    #expect(summary["addedBounds"] != nil && summary["fillReach"] != nil)
+    let removalText = try result.afterRemovalJson(removedIds: [])
+    let removal = try #require(try JSONSerialization.jsonObject(with: Data(removalText.utf8)) as? [String: Any])
+    #expect(removal["removed"] as? Double == 0)
 }
