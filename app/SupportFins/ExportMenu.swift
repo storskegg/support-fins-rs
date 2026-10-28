@@ -21,7 +21,7 @@ struct ExportItems: View {
                 .disabled(!(available?.enabled.contains(format) ?? false))
                 .help(format.help)
         }
-        if let note = available?.note ?? model?.multiObjectNote {
+        if let note = available?.note {
             Divider()
             Text(note)
         }
