@@ -95,3 +95,8 @@ app-test: app-core app-project
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 app-uitest: app-core app-project
     xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+
+# M5 timing: the Rust fin build per case beside the M3 serial numbers, written into docs/PERF-M5.md (Rust only, no Deno). `just bench-m5 needle` times matching cases and prints only. Skips private-fixtures/ cases when the file is absent.
+bench-m5 filter="":
+    cargo build --release -q -p sf-testkit --example bench_m5
+    target/release/examples/bench_m5 {{filter}}
