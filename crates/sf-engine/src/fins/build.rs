@@ -272,7 +272,7 @@ use crate::planes::find_wall_patches;
 use crate::prop::build::{BuildOpts, PropsPass, RasterVeto, build_props, no_props};
 use crate::prop::config::Iface;
 use crate::prop::crest::{Crest, crest_on};
-use crate::prop::ctx::{BuildCtx, TineSeed};
+use crate::prop::ctx::{BaseMemo, BuildCtx, TineSeed};
 use crate::prop::curved::bends;
 use crate::sway::{Avoid, SwayOpts, build_sway_braces};
 use crate::types::Rot3;
@@ -890,19 +890,33 @@ fn build_fins_core(
                     ctx,
                 );
             }
-            return judge_downhill(
+            // The two builds share everything `build_props` does before the downhill race: the
+            // first records it, the second replays it (prop/ctx.rs `BaseMemo`).
+            let mut memo: Option<(PropsPass, Option<Vec<TineSeed>>)> = None;
+            let judged = judge_downhill(
                 topo,
                 res.a,
                 rot,
                 |downhill, ctx| {
                     let mut o = with(opts);
                     o.downhill = Some(downhill);
-                    build_fins_core(topo, res, rot, &o, ctx)
+                    *ctx.base_memo.borrow_mut() = match (downhill, memo.take()) {
+                        (true, _) => BaseMemo::Record(None),
+                        (false, Some((base, cap))) => BaseMemo::Replay(base, cap),
+                        (false, None) => BaseMemo::Off,
+                    };
+                    let built = build_fins_core(topo, res, rot, &o, ctx);
+                    if let BaseMemo::Record(Some(m)) = ctx.base_memo.take() {
+                        memo = Some(m);
+                    }
+                    built
                 },
                 Slack::Fixed(0.0),
                 cls,
                 ctx,
             );
+            *ctx.base_memo.borrow_mut() = BaseMemo::Off;
+            return judged;
         }
         let with_tines = opts.tines.unwrap_or(true);
         // Wide-face coverage (0 sparse .. 1 dense) drives how densely a broad face is lined --

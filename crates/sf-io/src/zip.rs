@@ -222,7 +222,41 @@ fn find_extra(view: &View, start: usize, len: usize, id: u16) -> Result<Option<u
 /// ships it. Its behaviour, which this reproduces: a stream that ends early gives the bytes
 /// decoded so far with no error; bytes after the end of the stream throw "failed to write
 /// whole buffer"; invalid data throws "corrupt deflate stream".
-fn inflate_raw(bytes: &[u8]) -> Result<Vec<u8>, String> {
+///
+/// The common case (a well-formed stream that ends where the entry does) goes through zlib-rs,
+/// about twice as fast as miniz_oxide; every other outcome (truncated or corrupt data, bytes
+/// after the end of the stream) is re-run through the miniz_oxide code below, which defines
+/// those behaviours, so they cannot differ.
+fn inflate_raw(bytes: &[u8], size_hint: usize) -> Result<Vec<u8>, String> {
+    inflate_fast(bytes, size_hint).map_or_else(|| inflate_raw_miniz(bytes), Ok)
+}
+
+/// A clean inflate of the whole of `bytes`, or `None`.
+fn inflate_fast(bytes: &[u8], size_hint: usize) -> Option<Vec<u8>> {
+    use flate2::{Decompress, FlushDecompress, Status};
+    // deflate cannot expand more than 1032:1, so the hint can't make this reserve absurd
+    let want = size_hint.min(bytes.len().saturating_mul(1032));
+    let mut out: Vec<u8> = Vec::with_capacity(want.max(64 * 1024));
+    let mut d = Decompress::new(false);
+    let mut input = bytes;
+    loop {
+        if out.len() == out.capacity() {
+            out.reserve(out.len().max(64 * 1024));
+        }
+        let (in0, out0) = (d.total_in(), out.len());
+        let status = d.decompress_vec(input, &mut out, FlushDecompress::None);
+        let consumed = (d.total_in() - in0) as usize;
+        input = &input[consumed..];
+        match status {
+            Ok(Status::StreamEnd) => return input.is_empty().then_some(out),
+            Ok(_) if consumed > 0 || out.len() > out0 => {}
+            _ => return None,
+        }
+    }
+}
+
+/// `inflate_raw` as miniz_oxide runs it: the definition of the edge-case behaviour.
+fn inflate_raw_miniz(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let mut state = InflateState::new_boxed(DataFormat::Raw);
     let mut out: Vec<u8> = Vec::new();
     let mut buf = vec![0u8; 64 * 1024];
@@ -300,6 +334,7 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
             decode(&bytes[s..e])
         };
         let mut comp_size = view.u32(o + 20)? as usize;
+        let uncomp_hint = view.u32(o + 24)? as usize; // 0xffffffff when ZIP64: only a hint
         let mut local_off = view.u32(o + 42)? as usize;
 
         // Any 0xffffffff field is really in the entry's ZIP64 extended-information
@@ -348,7 +383,7 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
         if method == 0 {
             out.insert(name, data.to_vec());
         } else if method == 8 {
-            out.insert(name, inflate_raw(data)?);
+            out.insert(name, inflate_raw(data, uncomp_hint)?);
         } else {
             return Err(format!(
                 "unsupported ZIP compression method {method} for {name}"
@@ -643,5 +678,75 @@ impl ProjectZip {
         }
         out.extend_from_slice(&end);
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod inflate_tests {
+    use super::*;
+
+    struct Lcg(u64);
+    impl Lcg {
+        fn next(&mut self) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            self.0 >> 33
+        }
+    }
+
+    fn data(r: &mut Lcg, len: usize) -> Vec<u8> {
+        // runs, a small alphabet and noise: stored, fixed and dynamic blocks all come up
+        (0..len)
+            .map(|i| match (r.next() % 4, i % 97) {
+                (0, _) => r.next() as u8,
+                (_, 0..=40) => b"<vertex x=\"1.5\" y=\"2\"/>"[i % 23],
+                _ => (r.next() % 5) as u8 + b'a',
+            })
+            .collect()
+    }
+
+    /// The zlib-rs path agrees with the miniz_oxide definition on good streams, and every bad
+    /// one (truncated, corrupted, trailing bytes) gives the same result because it is re-run there.
+    #[test]
+    fn fast_inflate_equals_miniz() {
+        let mut r = Lcg(99);
+        for case in 0..120 {
+            let len = [0usize, 1, 10, 1000, 70_000, 400_000][case % 6] + (r.next() % 50) as usize;
+            let raw = data(&mut r, len);
+            let level = [0u8, 1, 6, 9][case % 4];
+            let packed = miniz_oxide::deflate::compress_to_vec(&raw, level);
+            let hint = [raw.len(), 0, 5, usize::MAX, raw.len() * 2][case % 5];
+            let want = inflate_raw_miniz(&packed);
+            assert_eq!(want.as_ref().ok(), Some(&raw), "case {case}");
+            assert_eq!(inflate_raw(&packed, hint), want, "case {case}");
+
+            let mut trailing = packed.clone();
+            trailing.extend_from_slice(b"junk");
+            assert_eq!(
+                inflate_raw(&trailing, hint),
+                inflate_raw_miniz(&trailing),
+                "trailing, case {case}"
+            );
+            for _ in 0..6 {
+                let cut = (r.next() as usize) % (packed.len() + 1);
+                assert_eq!(
+                    inflate_raw(&packed[..cut], hint),
+                    inflate_raw_miniz(&packed[..cut]),
+                    "cut {cut}, case {case}"
+                );
+                let mut bad = packed.clone();
+                if !bad.is_empty() {
+                    let at = (r.next() as usize) % bad.len();
+                    bad[at] ^= 1 << (r.next() % 8);
+                }
+                assert_eq!(
+                    inflate_raw(&bad, hint),
+                    inflate_raw_miniz(&bad),
+                    "flipped, case {case}"
+                );
+            }
+        }
     }
 }
