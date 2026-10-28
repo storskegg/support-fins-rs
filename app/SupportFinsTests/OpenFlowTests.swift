@@ -93,6 +93,7 @@ struct OpenFlowTests {
         let lines = StatusCard.lines(importNote: "OBJ: imported “b” of 2 objects.", flat: "flat", flatGood: true,
                                      fin: "fin", overWarn: "over", island: "island")
         #expect(lines.map(\.text) == ["OBJ: imported “b” of 2 objects.", "flat", "fin", "over", "island"])
+        #expect(lines.map(\.bar) == [nil, nil, nil, StatusCard.amber, StatusCard.red], "the warning cards' bars")
         #expect(StatusCard.lines(importNote: "", flat: "", flatGood: false, fin: "", overWarn: "", island: nil).isEmpty)
     }
 
