@@ -51,11 +51,20 @@ final class CorePart: MeshSource {
     }
 
     func analysis(thresholdDegrees: Double, rotation: simd_float3x3) async -> MeshAnalysis {
+        await analysis(thresholdDegrees: thresholdDegrees, rotation: rotation, wantsSummary: true)
+    }
+
+    /// `face_flags` and `analyze` each run the engine's analysis; a ring drag reads only the flags (the pivot and
+    /// the box are the drag's own), so it skips the second one: half the time per shade.
+    func analysis(thresholdDegrees: Double, rotation: simd_float3x3, wantsSummary: Bool) async -> MeshAnalysis {
         let part = self.part, device = self.device
         let rot = Self.columnMajor(rotation)
         return await Task.detached(priority: .userInitiated) {
-            guard let flags = try? part.faceFlags(thresholdDeg: thresholdDegrees, rot: rot).metalBuffer(device: device),
-                  let summary = try? part.analyze(thresholdDeg: thresholdDegrees, rot: rot) else {
+            guard let flags = try? part.faceFlags(thresholdDeg: thresholdDegrees, rot: rot).metalBuffer(device: device) else {
+                return MeshAnalysis(flags: device.makeBuffer(length: 4, options: .storageModeShared)!)
+            }
+            guard wantsSummary else { return MeshAnalysis(flags: flags) }
+            guard let summary = try? part.analyze(thresholdDeg: thresholdDegrees, rot: rot) else {
                 return MeshAnalysis(flags: device.makeBuffer(length: 4, options: .storageModeShared)!)
             }
             let o = summary.offset
