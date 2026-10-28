@@ -261,6 +261,7 @@ fn build_pad_inner(
 
     let (mut e1, mut e2) = (0.0, 0.0);
     for p in contact {
+        cfg.cancel.check();
         let dx = p[0] - cx;
         let dy = p[1] - cy;
         e1 = jsnum::max(e1, jsnum::abs(dx * ax + dy * ay));
@@ -517,6 +518,7 @@ fn brim_pad(
     };
     let mut i = 0;
     while i < outline.len() {
+        cfg.cancel.check();
         let (x0, y0, x1, y1) = (outline[i], outline[i + 1], outline[i + 2], outline[i + 3]);
         let mut bi = jsnum::floor((jsnum::min(x0, x1) - reach) / b);
         while bi <= jsnum::floor((jsnum::max(x0, x1) + reach) / b) {
@@ -658,6 +660,7 @@ fn brim_pad(
     let n_rb = rb.len() - 1;
     let mut row_block = vec![0usize; n_r];
     for bl in 0..n_rb {
+        cfg.cancel.check();
         for rr in rb[bl]..=rb[bl + 1] {
             row_block[rr] = bl.min(n_rb - 1);
         }
@@ -794,6 +797,7 @@ fn brim_pad(
         want(at(-r1, 0.0));
         want(at(r1, 0.0));
         for a in 0..n_cb {
+            cfg.cancel.check();
             for bl in 0..n_rb {
                 if fine_blk[a * n_rb + bl] != 0 {
                     for i in cb[a]..=cb[a + 1] {
@@ -818,7 +822,16 @@ fn brim_pad(
                 }
             }
         }
-        let zs: Vec<f64> = pts.par_iter().map(|p| top(p[0], p[1])).collect();
+        let zs: Vec<f64> = pts
+            .par_iter()
+            .map(|p| {
+                if cfg.cancel.is_cancelled() {
+                    return 0.0; // unused: the poll below unwinds
+                }
+                top(p[0], p[1])
+            })
+            .collect();
+        cfg.cancel.check();
         pts.iter()
             .zip(zs)
             .map(|(p, z)| ([p[0].to_bits(), p[1].to_bits()], z))
@@ -866,6 +879,7 @@ fn brim_pad(
     // Backstop: a coarse block whose corners and centre do not share one top height
     // is not flat after all -- mesh it fine.
     for a in 0..n_cb {
+        cfg.cancel.check();
         for bl in 0..n_rb {
             if fine_blk[a * n_rb + bl] != 0 {
                 continue;
@@ -1002,6 +1016,7 @@ fn brim_pad(
     while changed {
         changed = false;
         for a in 0..n_cb {
+            cfg.cancel.check();
             for bl in 0..n_rb {
                 if fine_blk[a * n_rb + bl] != 1 {
                     let t = coarse(a, bl, &fine_blk, &mut verts, &mut vv);
@@ -1022,6 +1037,7 @@ fn brim_pad(
     };
     let mut quads = 0usize;
     for a in 0..n_cb {
+        cfg.cancel.check();
         for bl in 0..n_rb {
             if is_fine(&fine_blk, a as i64, bl as i64) {
                 // wound like the tip fans, side wall and bottom (it once ran the other way:

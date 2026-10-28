@@ -11,6 +11,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 use rayon::prelude::*;
 
+use crate::cancel::Cancel;
 use crate::fins::seating::seated_part_tris;
 use crate::fxhash::FxHashMap;
 use crate::jsnum;
@@ -117,6 +118,16 @@ impl Reach {
 /// `classify(topo, res, rot)` (web/fins/coverage.js:64-188). JS returns `res.coverageClasses`
 /// when the result already carries it: use [`classify_targets`] for that case.
 pub fn classify(topo: &Topology, res: &Analysis, rot: &Rot3) -> Vec<u8> {
+    classify_cancellable(topo, res, rot, &Cancel::default())
+}
+
+/// [`classify`] that polls `cancel` (unwinding to [`crate::cancel::catch`] when it is raised).
+pub fn classify_cancellable(
+    topo: &Topology,
+    res: &Analysis,
+    rot: &Rot3,
+    cancel: &Cancel,
+) -> Vec<u8> {
     let pos = &topo.pos;
     let n_faces = topo.n_faces;
     let (adj_a, adj_b) = (&topo.adj_a, &topo.adj_b);
@@ -142,6 +153,9 @@ pub fn classify(topo: &Topology, res: &Analysis, rot: &Rot3) -> Vec<u8> {
         i
     }
     for k in 0..adj_a.len() {
+        if k & 0xfff == 0 {
+            cancel.check();
+        }
         let (a, b) = (adj_a[k], adj_b[k]);
         if res.over[a as usize] != 0 && res.over[b as usize] != 0 {
             let ra = find(&mut parent, a);
@@ -151,6 +165,9 @@ pub fn classify(topo: &Topology, res: &Analysis, rot: &Rot3) -> Vec<u8> {
     }
     let mut patches: IndexMap<i32, Vec<usize>> = IndexMap::new();
     for f in 0..n_faces {
+        if f & 0xfff == 0 {
+            cancel.check();
+        }
         if res.over[f] != 0 {
             let r = find(&mut parent, f as i32);
             patches.entry(r).or_default().push(f);
@@ -188,6 +205,7 @@ pub fn classify(topo: &Topology, res: &Analysis, rot: &Rot3) -> Vec<u8> {
         (crossings & 1) == 1
     };
     for faces in patches.values() {
+        cancel.check();
         // plan extent across the patch's minor axis (2D PCA of its vertices)
         let mut pts: Vec<[f64; 3]> = Vec::new();
         let mut top = f64::NEG_INFINITY;
@@ -355,7 +373,17 @@ pub fn classify_targets(res: &Targets) -> Vec<u8> {
 ///
 /// `automaticTargets(topo, result, rot)` (web/fins/coverage.js:197-228).
 pub fn automatic_targets(topo: &Topology, result: &Analysis, rot: &Rot3) -> Targets {
-    let coverage_classes = classify(topo, result, rot);
+    automatic_targets_cancellable(topo, result, rot, &Cancel::default())
+}
+
+/// [`automatic_targets`] that polls `cancel`.
+pub fn automatic_targets_cancellable(
+    topo: &Topology,
+    result: &Analysis,
+    rot: &Rot3,
+    cancel: &Cancel,
+) -> Targets {
+    let coverage_classes = classify_cancellable(topo, result, rot, cancel);
     let excluded_support_faces: Vec<u8> = coverage_classes
         .iter()
         .map(|&c| u8::from(c == HOLE))
@@ -369,7 +397,9 @@ pub fn automatic_targets(topo: &Topology, result: &Analysis, rot: &Rot3) -> Targ
     let mut tris_out: Vec<f64> = Vec::new();
     let mut volumes: Vec<[f64; 3]> = Vec::new();
     if excluded_support_faces.iter().any(|&e| e != 0) {
+        cancel.check();
         let tris = seated_part_tris(topo, rot, &result.offset);
+        cancel.check();
         let excluded: Vec<usize> = (0..topo.n_faces)
             .filter(|&f| excluded_support_faces[f] != 0)
             .collect();
@@ -385,6 +415,9 @@ pub fn automatic_targets(topo: &Topology, result: &Analysis, rot: &Rot3) -> Targ
             .par_chunks(256)
             .map(|fs| {
                 let mut out = Vec::new();
+                if cancel.is_cancelled() {
+                    return out; // unused: the poll below unwinds
+                }
                 for &f in fs {
                     let a = [tris.v[f * 9], tris.v[f * 9 + 1], tris.v[f * 9 + 2]];
                     let b = [tris.v[f * 9 + 3], tris.v[f * 9 + 4], tris.v[f * 9 + 5]];
@@ -413,10 +446,12 @@ pub fn automatic_targets(topo: &Topology, result: &Analysis, rot: &Rot3) -> Targ
                 out
             })
             .collect();
+        cancel.check();
         for c in chunks {
             volumes.extend(c);
         }
     }
+    cancel.check();
     let small_hole_regions = result.regions.len() - regions.len();
     let mut analysis = result.clone();
     analysis.regions = regions;

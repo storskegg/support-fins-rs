@@ -174,3 +174,34 @@ What the profile says, in the order it was acted on:
 5. **On the 772k-triangle private objects**, half the build is `automatic_targets`: a floor probe under each of the excluded tiny-hole faces (~430 ms), five 772k-triangle surface grids (36 ms each, one per pass because `build_pass` seated its own copy of the part), and a lazily built 64x64 inside grid.
 
 Not changed (and why): the per-wall corridor early-out (strategy 2) is not exact, since `inside_part` is a ray-parity test whose answer in an empty box depends on open meshes and on rays that graze an edge; the weld-regression station and z-probe steps are untouched (strategy 6 is off the table); merging `station_is_clear` and `station_certified` (strategy 3) is not possible, since the second runs on the line after `settle_top` has moved it.
+
+## Live drag
+
+Builds are cancellable (`sf_engine::cancel`; `build_fins_cancellable`; `Builder` raises the flag of the build in flight when a newer one arrives or `cancel()` is called), so a live rebuild during a ring drag can abandon a stale pose part-way.
+
+### Cancel latency
+
+`just bench-cancel` (`bench_cancel`): each case is built on a warm topology (a drag rebuilds on one), timed three times uncancelled, then built 16 times (8 on the private objects, objects 1, 4, 7 and 10) with a helper thread raising the flag at evenly spread fractions of the build time. The latency is the time from the flag store to the return of `build_fins_cancellable` (`Err(Cancelled)`). A trial whose build finished before its flag counts as completed and is left out. Idle-ish shared machine (load 4-7), one run; the orchestrator records the quiet numbers.
+
+| case | build ms | stopped | median ms | p95 ms | max ms |
+|---|---:|---:|---:|---:|---:|
+| needle X60Z30 | 18.3 | 12/16 | 0.41 | 1.04 | 1.17 |
+| needle X60 | 14.8 | 11/16 | 0.21 | 1.10 | 1.10 |
+| cone X40 | 18.8 | 15/16 | 0.19 | 1.56 | 2.45 |
+| tube X60Z30 | 33.6 | 15/16 | 0.45 | 2.39 | 3.74 |
+| torus X45 | 23.3 | 16/16 | 0.22 | 0.86 | 1.65 |
+| ushape X40 | 19.0 | 16/16 | 0.13 | 0.25 | 0.85 |
+| coin X40 | 12.7 | 13/16 | 0.21 | 0.49 | 0.56 |
+| lowledge up | 23.8 | 16/16 | 1.46 | 4.02 | 5.43 |
+| Earth Focus Many Vertical object 1 | 267.8 | 7/8 | 9.62 | 19.09 | 19.09 |
+| Earth Focus Many Vertical object 4 | 267.6 | 8/8 | 0.15 | 11.22 | 11.22 |
+| Earth Focus Many Vertical object 7 | 255.9 | 8/8 | 0.37 | 13.11 | 13.11 |
+| Earth Focus Many Vertical object 10 | 256.2 | 8/8 | 0.25 | 10.32 | 10.32 |
+
+All 87 cases together (1092 stopped builds): median 0.13 ms, p95 2.2 ms, p99 5.7 ms, max 19 ms (the private objects; the stress models stay under 6 ms).
+
+What bounds the latency, found with a poll-gap profile (the longest time between two polls on the calling thread): the pad's surface probes, the part-attached and clearance checks of one wall, the wedge column and the raster race's per-region loop (all poll inside them now), and on the 772k-triangle objects the stages that are one parallel pass over every face (the first inside-grid build in `classify`, the seated-part copy, `find_wall_patches`' seed sort) which only poll between them (10-20 ms).
+
+Two design points the measurements forced:
+- A poll inside a Rayon closure must not unwind: every job that sees the raised flag would unwind separately, and a 13 ms build then took 50 ms to stop. Inside a parallel loop a raised flag makes the remaining items return a placeholder, and one poll after the loop unwinds once (cancel latency of that build: 0.09 ms median, 0.9 ms max).
+- The polls cost 0.9% of the 87-build total (median of five interleaved runs, 4249 ms before vs 4285 ms after). Output hashes of all 87 builds are identical to main's.

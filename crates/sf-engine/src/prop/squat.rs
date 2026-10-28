@@ -202,7 +202,7 @@ pub fn build_squat_bed(
     let height_of = |p: &V3| (p[2] - prop.gap) - z_bed;
     // (each station's verdict is a pure function of the station: the stations are probed in
     // parallel and collected in order)
-    let usable: Vec<bool> = station_verdicts(line.len(), |k| {
+    let usable: Vec<bool> = station_verdicts(line.len(), &cfg.cancel, |k| {
         let h = height_of(&line[k]);
         h >= prop.min_height_squat
             && h < prop.min_height
@@ -238,7 +238,7 @@ pub fn build_squat_bed(
         // a full wall. Keep only what is still squat-height and measurably clear.
         // (`settleTop`'s defaults: step 0.25, band Infinity.)
         settle_top(&mut raw, region_tris, 0.25, f64::INFINITY, cfg);
-        let avail: Vec<bool> = station_verdicts(raw.len(), |i| {
+        let avail: Vec<bool> = station_verdicts(raw.len(), &cfg.cancel, |i| {
             let h = height_of(&raw[i]);
             h >= prop.min_height_squat
                 && h < prop.min_height

@@ -303,7 +303,6 @@ fn face_points(
     f: usize,
     put: &mut dyn FnMut(f64, f64, f64, f64),
 ) {
-    cfg.cancel.check();
     let pos = &topo.pos;
     let off = &result.analysis.offset;
     let seat = |o: usize| -> V3 {
@@ -363,6 +362,7 @@ fn each_leftover_point(
     put: &mut dyn FnMut(f64, f64, f64, f64),
 ) {
     for f in leftover_faces(topo, result, cls, regions) {
+        cfg.cancel.check();
         face_points(topo, result, rot, cfg, f, put);
     }
 }
@@ -386,6 +386,9 @@ fn bare_sums(
     let block = |fs: &[usize]| -> Vec<[f64; 5]> {
         let mut pts = Vec::new();
         for &f in fs {
+            if cfg.cancel.is_cancelled() {
+                break; // unused: the poll below unwinds
+            }
             face_points(topo, result, rot, cfg, f, &mut |x, y, z, a| {
                 if z < PLATE_Z {
                     return;
@@ -401,6 +404,7 @@ fn bare_sums(
     } else {
         faces.par_chunks(4).map(block).collect()
     };
+    cfg.cancel.check();
     for p in blocks.iter().flatten() {
         all.put(cfg.fill.sample, p[0], p[1], p[2], p[3]);
         if p[4] != 0.0 {

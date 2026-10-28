@@ -1,5 +1,6 @@
 //! Port of `web/pieces.js`. Read `docs/AGENTS.md` before changing anything here.
 
+use crate::cancel::Cancel;
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
@@ -40,6 +41,16 @@ fn find(parent: &mut [i32], mut x: i32) -> i32 {
 /// `floatingPieces(topo, result, rot = IDENTITY3)` (web/pieces.js:29-125); callers pass
 /// `IDENTITY3` for the default.
 pub fn floating_pieces(topo: &Topology, result: &Analysis, rot: &Rot3) -> Vec<FloatingPiece> {
+    floating_pieces_cancellable(topo, result, rot, &Cancel::default())
+}
+
+/// [`floating_pieces`] that polls `cancel`.
+pub fn floating_pieces_cancellable(
+    topo: &Topology,
+    result: &Analysis,
+    rot: &Rot3,
+    cancel: &Cancel,
+) -> Vec<FloatingPiece> {
     let pos = &topo.pos;
     let n_faces = topo.n_faces;
     let (adj_a, adj_b) = (&topo.adj_a, &topo.adj_b);
@@ -47,6 +58,9 @@ pub fn floating_pieces(topo: &Topology, result: &Analysis, rot: &Rot3) -> Vec<Fl
     let off = &result.offset;
     let mut parent: Vec<i32> = (0..n_faces as i32).collect();
     for e in 0..adj_a.len() {
+        if e & 0xfff == 0 {
+            cancel.check();
+        }
         let ra = find(&mut parent, adj_a[e]);
         let rb = find(&mut parent, adj_b[e]);
         if ra != rb {
@@ -57,6 +71,9 @@ pub fn floating_pieces(topo: &Topology, result: &Analysis, rot: &Rot3) -> Vec<Fl
     let mut pp = vec![0.0f64; n_faces * 9];
     let mut p = 0;
     while p < n_faces * 9 {
+        if p & 0x3fff == 0 {
+            cancel.check();
+        }
         pp[p] = rot[0] * pos[p] + rot[3] * pos[p + 1] + rot[6] * pos[p + 2] + off.x;
         pp[p + 1] = rot[1] * pos[p] + rot[4] * pos[p + 1] + rot[7] * pos[p + 2] + off.y;
         pp[p + 2] = rot[2] * pos[p] + rot[5] * pos[p + 1] + rot[8] * pos[p + 2] + off.z;
@@ -65,6 +82,9 @@ pub fn floating_pieces(topo: &Topology, result: &Analysis, rot: &Rot3) -> Vec<Fl
     let mut root = vec![0i32; n_faces];
     let mut pieces: IndexMap<i32, Piece> = IndexMap::new();
     for f in 0..n_faces {
+        if f & 0xfff == 0 {
+            cancel.check();
+        }
         let r = find(&mut parent, f as i32);
         root[f] = r;
         let g = pieces.entry(r).or_insert(Piece {

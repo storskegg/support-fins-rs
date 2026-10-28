@@ -804,9 +804,10 @@ public func FfiConverterTypeBuildResult_lower(_ value: BuildResult) -> UInt64 {
 
 
 /**
- * One per part: builds on its own worker thread. Each `build` bumps the generation; a job that is no
- * longer the latest when it starts or finishes is dropped without being delivered. (Stopping one
- * partway needs cooperative checks in the engine: M5.)
+ * One per part: builds on its own worker thread. Each `build` bumps the generation and raises the
+ * cancel flag of the build in flight, which the engine polls (`sf_engine::cancel`), so a stale build
+ * stops part-way (within a few milliseconds on a typical part) instead of running to the end. A job
+ * that is no longer the latest when it starts or finishes is dropped without being delivered.
  */
 public protocol BuilderProtocol: AnyObject, Sendable {
     
@@ -815,11 +816,18 @@ public protocol BuilderProtocol: AnyObject, Sendable {
      */
     func build(rot: [Double], optsJson: String, tunablesJson: String, listener: BuildListener)  -> UInt64
     
+    /**
+     * Abandon the build in flight (and any queued one) without starting another: nothing of it is
+     * delivered. A later `build` is unaffected.
+     */
+    func cancel() 
+    
 }
 /**
- * One per part: builds on its own worker thread. Each `build` bumps the generation; a job that is no
- * longer the latest when it starts or finishes is dropped without being delivered. (Stopping one
- * partway needs cooperative checks in the engine: M5.)
+ * One per part: builds on its own worker thread. Each `build` bumps the generation and raises the
+ * cancel flag of the build in flight, which the engine polls (`sf_engine::cancel`), so a stale build
+ * stops part-way (within a few milliseconds on a typical part) instead of running to the end. A job
+ * that is no longer the latest when it starts or finishes is dropped without being delivered.
  */
 open class Builder: BuilderProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -897,6 +905,18 @@ open func build(rot: [Double], optsJson: String, tunablesJson: String, listener:
         FfiConverterCallbackInterfaceBuildListener_lower(listener),uniffiCallStatus
     )
 })
+}
+    
+    /**
+     * Abandon the build in flight (and any queued one) without starting another: nothing of it is
+     * delivered. A later `build` is unaffected.
+     */
+open func cancel()  {try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_method_builder_cancel(
+            self.uniffiCloneHandle(),uniffiCallStatus
+    )
+}
 }
     
 
@@ -3434,6 +3454,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_builder_build() != 47952) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_method_builder_cancel() != 38757) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_gpubuffer_address() != 23806) {

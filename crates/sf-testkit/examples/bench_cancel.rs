@@ -12,15 +12,13 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use sf_engine::config::Config;
 use sf_engine::cancel::Cancel;
+use sf_engine::config::Config;
 use sf_engine::fins::build::{FinsOpts, build_fins, build_fins_cancellable};
 use sf_engine::overhangs::{analyze, build_topology};
 use sf_engine::three::site_pose;
 use sf_testkit::{models_dir, site_opts};
 
-const BEGIN: &str = "<!-- bench:begin -->";
-const END: &str = "<!-- bench:end -->";
 const PRIVATE: &str = "Earth Focus Many Vertical";
 
 #[derive(Clone, Copy, PartialEq)]
@@ -30,6 +28,7 @@ enum Group {
     Private,
 }
 
+#[allow(dead_code)]
 struct Case {
     group: Group,
     model: String,
@@ -129,11 +128,11 @@ fn pose_rot(group: Group, pose: &str) -> [f64; 9] {
     site_pose(deg, 0.0)
 }
 
+#[allow(dead_code)]
 fn median(mut a: Vec<f64>) -> f64 {
     a.sort_by(|x, y| x.partial_cmp(y).unwrap());
     a[a.len() / 2]
 }
-
 
 const TRIALS: usize = 16;
 
@@ -169,12 +168,20 @@ fn build_cancelled_at(
     let end = Instant::now();
     h.join().unwrap();
     match r {
-        Err(_) => Some(end.duration_since(raised.lock().unwrap().expect("raised before it stopped"))),
+        Err(_) => {
+            Some(end.duration_since(raised.lock().unwrap().expect("raised before it stopped")))
+        }
         Ok(_) => None,
     }
 }
 
-fn probe(pos: &[f64], rot: &[f64; 9], opts: &FinsOpts, cfg: &Config, trials: usize) -> (f64, Vec<f64>, usize) {
+fn probe(
+    pos: &[f64],
+    rot: &[f64; 9],
+    opts: &FinsOpts,
+    cfg: &Config,
+    trials: usize,
+) -> (f64, Vec<f64>, usize) {
     let topo = Arc::new(build_topology(pos.to_vec()));
     let res = analyze(&topo, 45.0, rot);
     let _ = build_fins(&topo, &res, rot, opts, cfg); // warm
@@ -191,7 +198,14 @@ fn probe(pos: &[f64], rot: &[f64; 9], opts: &FinsOpts, cfg: &Config, trials: usi
     let mut done = 0;
     for i in 0..trials {
         let frac = (i as f64 + 0.5) / trials as f64;
-        match build_cancelled_at(&topo, &res, rot, opts, cfg, Duration::from_secs_f64(t_ms * frac / 1e3)) {
+        match build_cancelled_at(
+            &topo,
+            &res,
+            rot,
+            opts,
+            cfg,
+            Duration::from_secs_f64(t_ms * frac / 1e3),
+        ) {
             Some(d) => lat.push(d.as_secs_f64() * 1e3),
             None => done += 1,
         }
@@ -208,7 +222,6 @@ fn pct(v: &mut [f64], q: f64) -> f64 {
 }
 
 fn main() {
-    if let Ok(v) = std::env::var("GAPMS") { sf_engine::cancel::GAPMS.store(v.parse().unwrap(), Ordering::Relaxed); }
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let filter = std::env::args().nth(1);
     let perf_m3 = std::fs::read_to_string(root.join("docs/PERF-M3.md")).expect("docs/PERF-M3.md");
@@ -227,7 +240,9 @@ fn main() {
         .collect();
     let mut private_objects = None;
     let mut all: Vec<f64> = vec![];
-    println!("| case | build ms | stopped | median ms | p95 ms | max ms |\n|---|---:|---:|---:|---:|---:|");
+    println!(
+        "| case | build ms | stopped | median ms | p95 ms | max ms |\n|---|---:|---:|---:|---:|---:|"
+    );
     for c in cases {
         let (t_ms, mut lat, done);
         if c.group == Group::Private {
@@ -237,11 +252,22 @@ fn main() {
             let model = private_objects.get_or_insert_with(|| {
                 sf_io::threemf::read_three_mf(&std::fs::read(&private_path).unwrap()).unwrap()
             });
-            let i: usize = c.pose.trim_start_matches("object ").parse::<usize>().unwrap() - 1;
-            if i % 3 != 0 {
+            let i: usize = c
+                .pose
+                .trim_start_matches("object ")
+                .parse::<usize>()
+                .unwrap()
+                - 1;
+            if !i.is_multiple_of(3) {
                 continue; // objects 1, 4, 7, 10 are enough
             }
-            (t_ms, lat, done) = probe(&model.objects[i].positions, &pose_rot(c.group, "flat"), &opts, &cfg, 8);
+            (t_ms, lat, done) = probe(
+                &model.objects[i].positions,
+                &pose_rot(c.group, "flat"),
+                &opts,
+                &cfg,
+                8,
+            );
         } else {
             let bytes = std::fs::read(models_dir().join(format!("{}.stl", c.model))).unwrap();
             let pos = sf_io::stl::read_stl(&bytes).unwrap();

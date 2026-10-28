@@ -12,7 +12,8 @@ mod records;
 mod suggest;
 
 pub use builder::{
-    BuildListener, BuildResult, Builder, ExportKind, build_part, export, export_file_name,
+    BuildListener, BuildResult, Builder, ExportKind, build_part, build_part_cancellable, export,
+    export_file_name,
 };
 pub use gpu::GpuBuffer;
 pub use part::{

@@ -45,9 +45,7 @@ impl Cancel {
 
     /// The poll: unwinds to [`catch`] when the flag is raised.
     #[inline]
-    #[track_caller]
     pub fn check(&self) {
-        gaplog(std::panic::Location::caller());
         if self.is_cancelled() {
             resume_unwind(Box::new(Cancelled));
         }
@@ -104,21 +102,4 @@ mod tests {
     fn other_panics_pass_through() {
         let _ = catch(|| panic!("boom"));
     }
-}
-
-pub static LAST: std::sync::Mutex<Option<(std::time::Instant, &'static std::panic::Location<'static>)>> = std::sync::Mutex::new(None);
-pub static GAPMS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-fn gaplog(here: &'static std::panic::Location<'static>) {
-    let thr = GAPMS.load(Ordering::Relaxed);
-    if thr == 0 { return; }
-    if rayon::current_thread_index().is_some() { return; }
-    let now = std::time::Instant::now();
-    let mut g = LAST.lock().unwrap();
-    if let Some((t, loc)) = *g {
-        let d = now.duration_since(t).as_micros() as u64;
-        if d >= thr * 1000 {
-            eprintln!("GAP {:.1} ms: {}:{} -> {}:{}", d as f64 / 1e3, loc.file(), loc.line(), here.file(), here.line());
-        }
-    }
-    *g = Some((now, here));
 }

@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use sf_cli::cli::{pose, rotation_matrix};
 use sf_cli::entry::{EngineOptions, compute_fins};
-use sf_ffi::{BuildListener, BuildResult, Builder, FfiError, Part, build_part, load_parts};
+use sf_ffi::{
+    BuildListener, BuildResult, Builder, FfiError, Part, build_part, build_part_cancellable,
+    load_parts,
+};
 use sf_io::json::{Json, parse};
 use sf_testkit::models_dir;
 
@@ -201,4 +204,59 @@ fn patch_stats_omit_zero_counters_and_fill_walls_have_no_region() {
 }
 fn num_of(j: &Json) -> f64 {
     if let Json::Num(n) = j { *n } else { panic!() }
+}
+
+#[test]
+fn a_raised_cancel_gives_cancelled_on_both_build_paths() {
+    let part = load("torus");
+    let rot = rotation_matrix([45.0, 0.0, 0.0]);
+    let flag = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let cancel = sf_engine::cancel::Cancel::new(flag);
+    // the CLI's path, and the page's (a tunable or a page-level key)
+    for (opts, tunables) in [("{}", "{}"), ("{}", "{\"wallLines\":4}")] {
+        let r = build_part_cancellable(&part, &rot, opts, tunables, &cancel);
+        assert!(matches!(r, Err(FfiError::Cancelled)), "{tunables}");
+    }
+    // unraised, it is build_part
+    let calm = sf_engine::cancel::Cancel::default();
+    let a = build_part_cancellable(&part, &rot, "{}", "{}", &calm).unwrap();
+    let b = build_part(&part, &rot, "{}", "{}").unwrap();
+    assert_eq!(a.fins().count(), b.fins().count());
+    assert_eq!(a.summary_json(), b.summary_json());
+}
+
+#[test]
+fn a_newer_build_cancels_the_one_in_flight_and_cancel_drops_everything() {
+    let b = Builder::new(load("torus"));
+    let rot = rotation_matrix([45.0, 0.0, 0.0]).to_vec();
+    let (l1, rx1) = listener();
+    let (l2, rx2) = listener();
+    b.build(rot.clone(), "{}".into(), "{}".into(), l1);
+    // let the first one start, then supersede it
+    std::thread::sleep(Duration::from_millis(3));
+    let g2 = b.build(rot.clone(), "{}".into(), "{}".into(), l2);
+    let Event::Done(g, _) = wait(&rx2) else {
+        panic!("failed")
+    };
+    assert_eq!(g, g2);
+    assert!(matches!(
+        rx1.recv_timeout(Duration::from_millis(100)),
+        Err(mpsc::RecvTimeoutError::Disconnected)
+    ));
+    // cancel(): the build in flight is dropped, a later build is unaffected
+    let (l3, rx3) = listener();
+    let (l4, rx4) = listener();
+    b.build(rot.clone(), "{}".into(), "{}".into(), l3);
+    std::thread::sleep(Duration::from_millis(3));
+    b.cancel();
+    assert!(matches!(
+        rx3.recv_timeout(Duration::from_millis(500)),
+        Err(mpsc::RecvTimeoutError::Disconnected)
+    ));
+    let g4 = b.build(rot, "{}".into(), "{}".into(), l4);
+    let Event::Done(g, r) = wait(&rx4) else {
+        panic!("failed")
+    };
+    assert_eq!(g, g4);
+    assert!(r.fins().count() > 0);
 }

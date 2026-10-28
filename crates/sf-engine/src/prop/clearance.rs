@@ -7,6 +7,7 @@
 //! A line is `&[[f64; 3]]` stations `[x, y, z]`; `k` indexes a station. None of these reads the
 //! crest state or the tine capture, so they take `cfg: &Config`, not a `BuildCtx`.
 
+use crate::cancel::Cancel;
 use crate::config::Config;
 use crate::inside::{Nearest, inside_part, nearest_part};
 use crate::jsnum;
@@ -21,11 +22,29 @@ const PAR_MIN_STATIONS: usize = 16;
 
 /// `f(k)` for each station `k` of `0..n`, in order: the stations of a long line are probed in
 /// parallel (each verdict is a pure function of its station) and collected in station order.
-pub fn station_verdicts(n: usize, f: impl Fn(usize) -> bool + Sync + Send) -> Vec<bool> {
+///
+/// Polls `cancel` per station. Inside the parallel loop a raised flag makes the remaining stations
+/// answer `false` without probing (an unwind from every Rayon job would cost far more than the
+/// probes it saves); the poll after the loop then unwinds once, and the verdicts are never used.
+pub fn station_verdicts(
+    n: usize,
+    cancel: &Cancel,
+    f: impl Fn(usize) -> bool + Sync + Send,
+) -> Vec<bool> {
     if n < PAR_MIN_STATIONS {
-        (0..n).map(f).collect()
+        (0..n)
+            .map(|k| {
+                cancel.check();
+                f(k)
+            })
+            .collect()
     } else {
-        (0..n).into_par_iter().map(f).collect()
+        let v = (0..n)
+            .into_par_iter()
+            .map(|k| !cancel.is_cancelled() && f(k))
+            .collect();
+        cancel.check();
+        v
     }
 }
 
@@ -66,7 +85,6 @@ pub fn station_is_clear(
     offset: &Xyz,
     cfg: &Config,
 ) -> bool {
-    cfg.cancel.check();
     let p = line[k];
     let Some((sx, sy)) = across(line, k) else {
         return true;
@@ -117,7 +135,6 @@ pub fn station_certified(
     offset: &Xyz,
     cfg: &Config,
 ) -> bool {
-    cfg.cancel.check();
     let p = line[k];
     let Some((sx, sy)) = across(line, k) else {
         return true;

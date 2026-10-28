@@ -106,6 +106,11 @@ bench-m5 filter="":
     cargo build --release -q -p sf-testkit --example bench_m5
     target/release/examples/bench_m5 {{filter}}
 
+# M5 cancel latency: how long after the flag is raised a build returns (docs/PERF-M5.md, "Live drag"). Prints a table; `just bench-cancel needle` runs matching cases.
+bench-cancel filter="":
+    cargo build --release -q -p sf-testkit --example bench_cancel
+    target/release/examples/bench_cancel {{filter}}
+
 # M5 load / weld timing: a generated 1.5M-face STL and OBJ (under target/bench-load/, never committed) and the private 3MF when present. Prints a table; `just bench-load stl` runs one input.
 bench-load *inputs:
     cargo build --release -q -p sf-testkit --example bench_load

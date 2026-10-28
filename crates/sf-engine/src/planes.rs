@@ -2,6 +2,7 @@
 //!
 //! Wall sites: the flat, near-upright patches of the part that a fin can stand against.
 
+use crate::cancel::Cancel;
 use crate::jsnum;
 use crate::overhangs::Topology;
 use crate::types::{Rot3, Xyz};
@@ -80,8 +81,20 @@ pub fn find_wall_patches(
     topo: &Topology,
     rot: &Rot3,
     offset: &Xyz,
+    stats: Option<&mut PatchStats>,
+    excluded_faces: Option<&[u8]>,
+) -> Vec<Patch> {
+    find_wall_patches_cancellable(topo, rot, offset, stats, excluded_faces, &Cancel::default())
+}
+
+/// [`find_wall_patches`] that polls `cancel`.
+pub fn find_wall_patches_cancellable(
+    topo: &Topology,
+    rot: &Rot3,
+    offset: &Xyz,
     mut stats: Option<&mut PatchStats>,
     excluded_faces: Option<&[u8]>,
+    cancel: &Cancel,
 ) -> Vec<Patch> {
     let pos = &topo.pos;
     let n_faces = topo.n_faces;
@@ -96,6 +109,9 @@ pub fn find_wall_patches(
     let mut rn = vec![0.0f64; n_faces * 3];
     let mut upright = vec![0u8; n_faces];
     for f in 0..n_faces {
+        if f & 0xfff == 0 {
+            cancel.check();
+        }
         if let Some(ex) = excluded_faces
             && ex.get(f).copied().unwrap_or(0) != 0
         {
@@ -133,6 +149,7 @@ pub fn find_wall_patches(
     let mut queue: Vec<usize> = Vec::new();
 
     for &seed in &seeds {
+        cancel.check();
         if taken[seed] != 0 {
             continue;
         }
@@ -151,7 +168,12 @@ pub fn find_wall_patches(
         queue.clear();
         queue.push(seed);
 
+        let mut popped = 0u32;
         while let Some(f) = queue.pop() {
+            popped += 1;
+            if popped & 0xfff == 0 {
+                cancel.check();
+            }
             for e in start[f]..start[f + 1] {
                 let g = nbr[e as usize] as usize;
                 if taken[g] != 0 || upright[g] == 0 {

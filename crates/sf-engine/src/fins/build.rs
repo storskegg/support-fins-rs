@@ -256,7 +256,7 @@ use indexmap::IndexSet;
 
 use crate::cancel::{Cancel, Cancelled};
 use crate::config::{Config, Tunables, apply_tunables};
-use crate::fins::coverage::{Targets, automatic_targets};
+use crate::fins::coverage::{Targets, automatic_targets_cancellable};
 use crate::fins::downhill::{Slack, judge_downhill};
 use crate::fins::fill::{FillOpts, bare_area, fill_coverage};
 use crate::fins::pad::build_pad;
@@ -268,8 +268,8 @@ use crate::fins::wedges::{
 };
 use crate::islands::{Island, IslandOpts, find_islands};
 use crate::overhangs::{Analysis, Topology};
-use crate::pieces::floating_pieces;
-use crate::planes::find_wall_patches;
+use crate::pieces::floating_pieces_cancellable;
+use crate::planes::find_wall_patches_cancellable;
 use crate::prop::build::{BuildOpts, PropsPass, RasterVeto, build_props, no_props};
 use crate::prop::config::Iface;
 use crate::prop::crest::{Crest, crest_on};
@@ -475,7 +475,12 @@ fn build_fins_inner(
 ) -> (FinsBuilt, Vec<TineSeed>) {
     cfg.cancel.check();
     let targets = if opts.mode.as_deref() != Some("draw") {
-        Some(automatic_targets(topo, result, rot))
+        Some(automatic_targets_cancellable(
+            topo,
+            result,
+            rot,
+            &cfg.cancel,
+        ))
     } else {
         None
     };
@@ -512,7 +517,7 @@ fn build_fins_inner(
     cfg.cancel.check();
     // A piece of the part that starts in mid-air (a cut clean through, a loose body) needs saying
     // no matter what was placed: see floatingPieces.
-    built.floating = floating_pieces(topo, res.a, rot);
+    built.floating = floating_pieces_cancellable(topo, res.a, rot, &cfg.cancel);
     // How much red the walls leave bare (fins/fill.js bareArea), so the readout can say it: Auto
     // measures its own walls; Full already knows its leftover, and only the total is added.
     // Draw's walls are placed on the page, so it has none. `coverage` rides along so the page can
@@ -960,15 +965,20 @@ fn build_fins_core(
         let t = res.targets();
         // The wedge candidates: broad down-facing patches. Found before the props so a raster
         // wall can be kept off the ones the normal pass leaves to a wedge (wedgeVeto).
-        let wedgeable: Vec<_> =
-            find_wall_patches(topo, rot, &offset, None, Some(&t.excluded_support_faces))
-                .into_iter()
-                .filter(|p| {
-                    p.n.z < -0.05
-                        && p.area >= cfg.perp.min_area
-                        && (p.u1 - p.u0) >= cfg.perp.min_width
-                })
-                .collect();
+        let wedgeable: Vec<_> = find_wall_patches_cancellable(
+            topo,
+            rot,
+            &offset,
+            None,
+            Some(&t.excluded_support_faces),
+            &cfg.cancel,
+        )
+        .into_iter()
+        .filter(|p| {
+            p.n.z < -0.05 && p.area >= cfg.perp.min_area && (p.u1 - p.u0) >= cfg.perp.min_width
+        })
+        .collect();
+        cfg.cancel.check();
         let wedge_opts = WedgeOpts {
             pitch: Some(cov_pitch),
             tines: Some(with_tines),
@@ -1199,8 +1209,11 @@ fn build_fins_core(
 
     // Prop (and any other mode) is its own support, built by its own module -- a wall UNDER each
     // overhang with no tines.
+    cfg.cancel.check();
     let contact = bed_contact(topo, res.a, rot);
+    cfg.cancel.check();
     let seating = seating_of(res.a, &contact.pts, cfg);
+    cfg.cancel.check();
     let pad = if opts.bed_pad.unwrap_or(true) && res.a.bed_area < cfg.fin.pad_min_area {
         build_pad(
             &contact.pts,
@@ -1222,6 +1235,7 @@ fn build_fins_core(
     // advice the printed evidence contradicts. Refuse only when the user has turned the pad off.
     // Draw builds no walls here: it exports only the pad and hand-placed walls, so a full prop
     // pass would be thrown away (1 s+ on a big part).
+    cfg.cancel.check();
     let built: PropsPass =
         if mode == "draw" || (seating.kind == SeatingKind::Point && pad.is_none()) {
             no_props()
