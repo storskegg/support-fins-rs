@@ -128,7 +128,7 @@ struct FeatureSetTests {
         expected.insert("frame-time", at: 0)
         #endif
         #expect(model.features.overlays.map(\.id) == expected)
-        #expect(model.toolbar.slots.map(\.id) == ["rotate", "suggest", "strength", "view"])
+        #expect(model.toolbar.slots.map(\.id) == ["rotate", "scale-badge", "suggest", "strength", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["remove-fins"])
@@ -152,7 +152,7 @@ struct FeatureSetTests {
         #endif
         view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]"]
         let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
-                     "  Lay a Face Flat", "  -", "  Suggest Orientation", "  Strength Arrow…"]
+                     "  Lay a Face Flat", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]"]
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file)

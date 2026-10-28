@@ -18,6 +18,7 @@ pub use builder::{
 pub use gpu::GpuBuffer;
 pub use part::{
     AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts, merge_parts,
+    scale_from_percent_text, scale_percent_text,
 };
 pub use suggest::{
     LoadAlignment, StrengthAdvice, StrengthPose, SuggestContext, SuggestListener, SuggestResult,

@@ -85,14 +85,22 @@ final class ViewerModel {
         }
     }
 
-    private func show(_ parts: [LoadedPart], url: URL?) {
+    /// The part on show again at another size (Scale, `ui/scale.js setScale`): `setPart` with the pose kept. Like a
+    /// new file, the walls, removed fins, section cut and undo start over.
+    func reshow(_ core: CorePart) {
+        show([LoadedPart(name: core.info.name, mesh: core)], url: nil, keepingPose: true)
+    }
+
+    private func show(_ parts: [LoadedPart], url: URL?, keepingPose: Bool = false) {
         guard let controller, let first = parts.first else { return }
+        let pose = session.pose
         features.partWillShow()
         session.replaceParts(parts.compactMap { $0.mesh as? CorePart })
+        if keepingPose { session.pose = pose }
         controller.rotation = session.pose.float3x3
         wiring?.attach()
         controller.show(parts.map(\.mesh), name: first.name)
-        openedName = url?.lastPathComponent ?? first.name
+        if !keepingPose { openedName = url?.lastPathComponent ?? first.name }
         status = nil
         features.partDidShow(parts)
     }
