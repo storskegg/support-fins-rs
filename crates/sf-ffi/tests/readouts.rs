@@ -274,7 +274,7 @@ fn the_bare_area_is_measured_again_against_the_fins_that_are_left() {
         }
     }
     tris.extend_from_slice(&b.pad_triangles);
-    for t in tris.chunks_exact(3) {
+    for t in tris.as_chunks::<3>().0 {
         let (a, b, c) = (t[0], t[1], t[2]);
         vol += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
             + a[2] * (b[0] * c[1] - b[1] * c[0]);
