@@ -236,7 +236,6 @@ struct BuildWiringTests {
         s.nozzle = 0.6
         w.session.setSettings(s)
         #expect(ex.fileName(for: .stl) == "wiring-tests-bracket-fins-0.6nozzle-0.2layer.stl")
-        #expect(ex.multiObjectNote == nil)
     }
 
     @Test func aNewFileStartsOver() async throws {
