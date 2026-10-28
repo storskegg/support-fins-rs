@@ -38,6 +38,8 @@ struct ContentView: View {
             await model.load(url: configuration?.fileURL)
             await Benchmark.runIfRequested(model.controller)
         }
+        // the overhang threshold is a session setting; the viewer re-analyses at it (`web/ui/part.js:503`)
+        .onChange(of: model.session.settings.threshold, initial: true) { _, t in model.controller?.thresholdDegrees = t }
         .onChange(of: model.session.pose) { _, pose in model.controller?.rotation = pose.float3x3 }
         .onChange(of: undoManager, initial: true) { _, m in model.session.undoManager = m }
         .focusedSceneValue(\.viewer, model.controller)
