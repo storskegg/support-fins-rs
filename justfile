@@ -95,3 +95,8 @@ app-test: app-core app-project
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 app-uitest: app-core app-project
     xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+
+# M5 load / weld timing: a generated 1.5M-face STL and OBJ (under target/bench-load/, never committed) and the private 3MF when present. Prints a table; `just bench-load stl` runs one input.
+bench-load *inputs:
+    cargo build --release -q -p sf-testkit --example bench_load
+    target/release/examples/bench_load {{inputs}}

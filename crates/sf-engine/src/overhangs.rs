@@ -123,8 +123,19 @@ fn table_size(n: usize) -> usize {
 }
 
 /// `buildTopology(geometry)` (web/overhangs.js:62-157). Takes the position array
-/// (`geometry.getAttribute('position').array`).
+/// (`geometry.getAttribute('position').array`). Large meshes weld on all cores
+/// (`weld::build_topology_par`); the result is identical to `build_topology_serial`.
 pub fn build_topology(pos: Vec<f64>) -> Topology {
+    if pos.len() / 9 >= crate::weld::PAR_MIN_FACES {
+        crate::weld::build_topology_par(pos)
+    } else {
+        build_topology_serial(pos)
+    }
+}
+
+/// The single-threaded `buildTopology`: the port of the JS, and the reference the parallel weld
+/// is tested against.
+pub fn build_topology_serial(pos: Vec<f64>) -> Topology {
     let n_faces = pos.len() / 9;
 
     // float64: normals are compared against a threshold that real parts land
