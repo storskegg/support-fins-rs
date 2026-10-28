@@ -26,8 +26,11 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     let meshPipeline: MTLRenderPipelineState
     let idPipeline: MTLRenderPipelineState
     let linePipeline: MTLRenderPipelineState
+    let supportPipeline: MTLRenderPipelineState
+    let overlayPipeline: MTLRenderPipelineState
     let depthState: MTLDepthStencilState
     let lineDepthState: MTLDepthStencilState
+    let overlayDepthState: MTLDepthStencilState
 
     public var camera = OrbitCamera.home() { didSet { changeCount += 1 } }
     /// Takes model coordinates to print coordinates (a pure rotation).
@@ -49,6 +52,15 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public var totalFaces: Int { faceBases.last ?? 0 }
     public private(set) var volume = PrinterVolume.standard
     public let stats = FrameStats()
+
+    /// The fins and bed pad of the latest build (print space), or nil.
+    public private(set) var supports: SupportLayer?
+    /// Vertex ranges of the fin buffer not drawn (removed fins).
+    public private(set) var hiddenFinRanges: [Range<Int>] = []
+    /// Vertex ranges of the fin buffer drawn as interface material.
+    public private(set) var crestFinRanges: [Range<Int>] = []
+    /// Vertex ranges of the fin buffer under a removal click's pointer, drawn red over the fins.
+    public private(set) var highlightedFinRanges: [Range<Int>] = []
 
     private var plate: PlateGeometry
     private var plateBuffers: [MTLBuffer?] = [nil, nil, nil, nil]
@@ -92,6 +104,26 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             ca.destinationAlphaBlendFactor = .oneMinusSourceAlpha
             line.depthAttachmentPixelFormat = Self.depthFormat
             linePipeline = try device.makeRenderPipelineState(descriptor: line)
+
+            let support = MTLRenderPipelineDescriptor()
+            support.vertexFunction = lib.makeFunction(name: "support_vertex")
+            support.fragmentFunction = lib.makeFunction(name: "mesh_fragment")
+            support.colorAttachments[0].pixelFormat = Self.colorFormat
+            support.depthAttachmentPixelFormat = Self.depthFormat
+            supportPipeline = try device.makeRenderPipelineState(descriptor: support)
+
+            let overlay = MTLRenderPipelineDescriptor()
+            overlay.vertexFunction = lib.makeFunction(name: "support_vertex")
+            overlay.fragmentFunction = lib.makeFunction(name: "support_overlay_fragment")
+            let oa = overlay.colorAttachments[0]!
+            oa.pixelFormat = Self.colorFormat
+            oa.isBlendingEnabled = true
+            oa.sourceRGBBlendFactor = .sourceAlpha
+            oa.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            oa.sourceAlphaBlendFactor = .one
+            oa.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            overlay.depthAttachmentPixelFormat = Self.depthFormat
+            overlayPipeline = try device.makeRenderPipelineState(descriptor: overlay)
         } catch {
             return nil
         }
@@ -103,10 +135,39 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         l.depthCompareFunction = .lessEqual
         l.isDepthWriteEnabled = false
         lineDepthState = device.makeDepthStencilState(descriptor: l)!
+        let o = MTLDepthStencilDescriptor()
+        o.depthCompareFunction = .lessEqual
+        o.isDepthWriteEnabled = false
+        overlayDepthState = device.makeDepthStencilState(descriptor: o)!
         readback = device.makeBuffer(length: 4, options: .storageModeShared)!
         plate = PlateGeometry(volume: .standard)
         super.init()
         uploadPlate()
+    }
+
+    // MARK: supports
+
+    /// Show the fins and pad of a build (nil clears them). The masks reset: a new build has new ranges.
+    public func setSupports(_ layer: SupportLayer?) {
+        supports = layer
+        hiddenFinRanges = []
+        crestFinRanges = []
+        highlightedFinRanges = []
+        rebuildResidency()
+        changeCount += 1
+    }
+
+    /// Which fins are hidden (removed) and which vertices are interface material. See `SupportSegments`.
+    public func setFinMask(hidden: [Range<Int>], crest: [Range<Int>]) {
+        hiddenFinRanges = hidden
+        crestFinRanges = crest
+        changeCount += 1
+    }
+
+    public func setFinHighlight(_ ranges: [Range<Int>]) {
+        guard ranges != highlightedFinRanges else { return }
+        highlightedFinRanges = ranges
+        changeCount += 1
     }
 
     // MARK: state
@@ -145,12 +206,14 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     private func rebuildResidency() {
         if let old = residency { queue.removeResidencySet(old) }
         residency = nil
-        guard !meshes.isEmpty else { return }
+        guard !meshes.isEmpty || supports != nil else { return }
         let d = MTLResidencySetDescriptor()
-        d.initialCapacity = meshes.count * 2
+        d.initialCapacity = meshes.count * 2 + 2
         guard let set = try? device.makeResidencySet(descriptor: d) else { return }
         for m in meshes { set.addAllocation(m.vertexBuffer) }
         for f in flagBuffers { set.addAllocation(f) }
+        if let b = supports?.fins { set.addAllocation(b) }
+        if let b = supports?.pad { set.addAllocation(b) }
         set.commit()
         queue.addResidencySet(set)
         residency = set
@@ -231,6 +294,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             }
             enc.setDepthBias(0, slopeScale: 0, clamp: 0)
         }
+        if let supports { encodeSupports(supports, into: enc) }
         u.params.w = 0
         enc.setRenderPipelineState(linePipeline)
         enc.setDepthStencilState(lineDepthState)
@@ -240,6 +304,44 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         draw(lines: plateBuffers[1], count: plate.major.count, color: a(Palette.gridMajor, 1), with: enc)
         draw(lines: plateBuffers[2], count: plate.edge.count, color: a(Palette.plateEdge, 1), with: enc)
         draw(lines: plateBuffers[3], count: plate.box.count, color: a(Palette.volumeBox, 0.55), with: enc)
+    }
+
+    /// The fins (minus the removed ones, the crest in its own colour), the pad, and the removal highlight.
+    /// Supports are print-space: no model matrix. Both sides are drawn, as the web does.
+    private func encodeSupports(_ s: SupportLayer, into enc: MTLRenderCommandEncoder) {
+        var u = Uniforms(viewProj: camera.viewProjection, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1),
+                         params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0))
+        enc.setRenderPipelineState(supportPipeline)
+        enc.setDepthStencilState(depthState)
+        enc.setFrontFacing(.counterClockwise)
+        enc.setCullMode(.none)
+        func draw(_ buffer: MTLBuffer?, _ range: Range<Int>, _ color: SIMD3<Float>) {
+            guard let buffer, !range.isEmpty else { return }
+            var c = SIMD4(color, 1)
+            enc.setVertexBuffer(buffer, offset: 0, index: 0)
+            enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+            enc.setVertexBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
+            enc.drawPrimitives(type: .triangle, vertexStart: range.lowerBound, vertexCount: range.count)
+        }
+        for seg in SupportSegments.fins(total: s.finVertices, hidden: hiddenFinRanges, crest: crestFinRanges) {
+            draw(s.fins, seg.range, seg.kind == .crest ? Palette.crest : Palette.fin)
+        }
+        draw(s.pad, 0..<s.padVertices, Palette.pad)
+        if !highlightedFinRanges.isEmpty {
+            enc.setRenderPipelineState(overlayPipeline)
+            enc.setDepthStencilState(overlayDepthState)
+            enc.setDepthBias(-4, slopeScale: -4, clamp: 0)
+            for r in SupportSegments.merged(highlightedFinRanges, within: s.finVertices) {
+                guard let buffer = s.fins else { break }
+                var c = SIMD4(Palette.removeHover, 0.55)
+                enc.setVertexBuffer(buffer, offset: 0, index: 0)
+                enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+                enc.setVertexBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
+                enc.setFragmentBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
+                enc.drawPrimitives(type: .triangle, vertexStart: r.lowerBound, vertexCount: r.count)
+            }
+            enc.setDepthBias(0, slopeScale: 0, clamp: 0)
+        }
     }
 
     func makeDepth(width: Int, height: Int) -> MTLTexture {

@@ -12,6 +12,12 @@ public enum Palette {
     public static let small = hex(0xffb454)
     public static let bed = hex(0x3f7fd0)
     public static let hover = hex(0x4da3ff)
+    /// The fins, the bed pad, the interface crest and the fin a removal click would drop (`web/ui/finbuild.js`
+    /// finMaterial / padMaterial, `web/ui/remove.js` hoverFinMaterial).
+    public static let fin = hex(0x59d98e)
+    public static let pad = hex(0xe8b64c)
+    public static let crest = hex(0x9b6bff)
+    public static let removeHover = hex(0xff4d4d)
     public static let gridMinor = hex(0x2b303a)
     public static let gridMajor = hex(0x3d4552)
     public static let plateEdge = hex(0x5b6472)
