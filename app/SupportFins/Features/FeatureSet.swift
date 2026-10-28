@@ -54,7 +54,7 @@ final class FeatureSet {
     static func menuIDs(_ types: [any Feature.Type] = Features.all) -> [MenuID] {
         var seen = Set<String>(), ids: [MenuID] = []
         for section in types.flatMap({ sections($0, nil) }) where seen.insert(section.menu.title).inserted { ids.append(section.menu) }
-        return ids.sorted { $0.order < $1.order }
+        return sorted(ids, by: \.order)
     }
 
     /// One menu's entries: the sections of every feature, in section order, for the focused window's `set` (nil when
@@ -89,21 +89,34 @@ extension FocusedValues {
     }
 }
 
-/// The menu bar, composed from `Features.all`: View and Model, the items after File > New, and room for a few menus a
-/// feature names itself (`MenuID(title:order:)` with an order past Model's). SwiftUI cannot build `Commands` from a
-/// list, hence the fixed slots.
+/// The menu bar, composed from `Features.all`: the items after File > New, then every menu the features name in
+/// `MenuID.order` (View, Model, then any a feature adds), so the bar shows what `FeatureSet.menuSnapshot` lists.
+/// SwiftUI cannot build `Commands` from a list, hence the fixed slots: `FeatureSetTests` checks there are enough.
 struct FeatureCommands: Commands {
+    /// How many menus the bar can show (View and Model take two).
+    static let menuSlots = 5
+
     @FocusedValue(\.features) private var features
 
-    private func menu(_ id: MenuID) -> some View { MenuEntriesView(entries: FeatureSet.entries(of: id, in: features)) }
-    private static var extras: [MenuID] { FeatureSet.menuIDs().filter { ![MenuID.view, .model, .fileExport].contains($0) } }
+    /// The entries are made in a view's body, not here, so what they read (the exporter, the badges) is observed
+    /// by that view: the focused value (the window's `FeatureSet`) does not change when they do.
+    private func menu(_ id: MenuID) -> some View { FeatureMenuContent(menu: id, features: features) }
+    private static var menus: [MenuID] { FeatureSet.menuIDs().filter { !$0.isFileGroup } }
 
     var body: some Commands {
-        CommandMenu(MenuID.view.title) { menu(.view) }
-        CommandMenu(MenuID.model.title) { menu(.model) }
+        let menus = Self.menus
         CommandGroup(after: .newItem) { menu(.fileExport) }
-        if let m = Self.extras.first { CommandMenu(m.title) { menu(m) } }
-        if Self.extras.count > 1 { CommandMenu(Self.extras[1].title) { menu(Self.extras[1]) } }
-        if Self.extras.count > 2 { CommandMenu(Self.extras[2].title) { menu(Self.extras[2]) } }
+        if menus.count > 0 { CommandMenu(menus[0].title) { menu(menus[0]) } }
+        if menus.count > 1 { CommandMenu(menus[1].title) { menu(menus[1]) } }
+        if menus.count > 2 { CommandMenu(menus[2].title) { menu(menus[2]) } }
+        if menus.count > 3 { CommandMenu(menus[3].title) { menu(menus[3]) } }
+        if menus.count > 4 { CommandMenu(menus[4].title) { menu(menus[4]) } }
     }
+}
+
+/// One menu of the menu bar for the focused window's features.
+private struct FeatureMenuContent: View {
+    let menu: MenuID
+    let features: FeatureSet?
+    var body: some View { MenuEntriesView(entries: FeatureSet.entries(of: menu, in: features)) }
 }

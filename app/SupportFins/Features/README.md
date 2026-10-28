@@ -19,5 +19,8 @@ What a feature may register (`Features/Contributions.swift`): `overlays` (alignm
 `static func menus(_:)` (`MenuSection`s for `.view`, `.model`, `.fileExport`, or your own `MenuID`; items come
 in section `order`, so a feature's items sit where the menu has them).
 
-Ties in `order` keep the `Features.all` order. A menu of your own is shown by `FeatureCommands`, which has room for three.
+Ties in `order` keep the `Features.all` order. Menus come in `MenuID.order` (View 0, Model 10), so a menu of your own
+sits where its order puts it; `FeatureCommands` has room for `menuSlots` menus (a test fails when they run out).
+A contribution's content is called in a view of its own (`ContributionView`, and each menu in its own view), so what it reads from
+`host` is observed there: read the models inside the content closure, not before it.
 `FeatureSetTests` pins the overlay, menu-item and Esc orders; a change to a menu changes its snapshot there.

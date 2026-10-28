@@ -46,7 +46,7 @@ struct ContentView: View {
             ToolbarItem { if let controller = model.controller { VolumePicker(controller: controller) } }
             ToolbarItem { OverhangSlider(session: model.session) }
             ToolbarItem { FinsToggle(session: model.session) }
-            ForEach(features.windowToolbarItems) { item in ToolbarItem { item.content() } }
+            ForEach(features.windowToolbarItems) { item in ToolbarItem { ContributionView(content: item.content) } }
             ToolbarItem { Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector) }
         }
         .navigationTitle(model.openedName ?? document.filename)

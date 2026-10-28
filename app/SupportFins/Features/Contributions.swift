@@ -180,6 +180,14 @@ indirect enum MenuEntry {
     }
 }
 
+/// A contribution's content, called in a body of its own. What the content reads (`host.wiring?.exporter`, ...) is
+/// then observed by this view, which updates wherever SwiftUI hosts it: a toolbar item or a menu is not rebuilt with
+/// the window's body, so content called there would keep what it showed first (an Export menu disabled for good).
+struct ContributionView: View {
+    let content: () -> AnyView
+    var body: some View { content() }
+}
+
 /// Renders entries as menu content, in the menu bar and in the window toolbar's Export menu.
 struct MenuEntriesView: View {
     var entries: [MenuEntry]
