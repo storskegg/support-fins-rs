@@ -196,12 +196,12 @@ private struct MenuEntryView: View {
         switch entry {
         case .button(let b):
             Button(b.title, action: b.action)
-                .modifier(OptionalShortcut(shortcut: b.shortcut))
-                .modifier(OptionalHelp(help: b.help))
+                .keyboardShortcut(b.shortcut.map { KeyboardShortcut($0) })
+                .help(b.help ?? "")
                 .disabled(!b.enabled)
         case .toggle(let t):
             Toggle(t.title, isOn: t.isOn)
-                .modifier(OptionalHelp(help: t.help))
+                .help(t.help ?? "")
                 .disabled(!t.enabled)
         case .divider:
             Divider()
@@ -210,19 +210,5 @@ private struct MenuEntryView: View {
         case .submenu(let title, let entries):
             Menu(title) { MenuEntriesView(entries: entries) }
         }
-    }
-}
-
-private struct OptionalShortcut: ViewModifier {
-    var shortcut: KeyEquivalent?
-    func body(content: Content) -> some View {
-        if let shortcut { content.keyboardShortcut(shortcut) } else { content }
-    }
-}
-
-private struct OptionalHelp: ViewModifier {
-    var help: String?
-    func body(content: Content) -> some View {
-        if let help { content.help(help) } else { content }
     }
 }

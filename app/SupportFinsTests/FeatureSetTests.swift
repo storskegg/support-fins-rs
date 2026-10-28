@@ -125,6 +125,17 @@ struct FeatureSetTests {
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
-        #expect(FeatureSet.menuSnapshot(in: ViewerModel().features) == view + model + file)
+        let window = ViewerModel()
+        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file)
+    }
+
+    /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.
+    @Test func menusReadAClosedWindowsFeaturesWithoutCrashing() {
+        var window: ViewerModel? = ViewerModel()
+        let features = window!.features!
+        #expect(features[RotateFeature.self] != nil)
+        window = nil
+        #expect(features[RotateFeature.self] == nil)
+        #expect(FeatureSet.menuSnapshot(in: features) == FeatureSet.menuSnapshot(in: nil))
     }
 }
