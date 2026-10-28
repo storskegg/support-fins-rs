@@ -14,6 +14,7 @@ pub mod inside;
 pub mod islands;
 pub mod jsnum;
 pub mod kiss;
+pub mod lazy;
 pub mod materials;
 pub mod nozzle;
 pub mod orient;

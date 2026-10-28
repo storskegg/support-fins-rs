@@ -59,7 +59,7 @@ pub fn part_anchors<'a>(
     rot: &Rot3,
     cache: &'a JudgeCache,
 ) -> &'a [[f64; 3]] {
-    cache.anchors.get_or_init(|| {
+    crate::lazy::get_or_build(&cache.anchors, |_par| {
         let (pos, adj_a, adj_b) = (&topo.pos, &topo.adj_a, &topo.adj_b);
         let off = &result.offset;
         let s = |o: usize| seat(pos, o, rot, off);

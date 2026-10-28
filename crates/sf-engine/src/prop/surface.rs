@@ -97,7 +97,7 @@ fn tri_span(
 /// `surface_z_at` scans only the triangles whose footprint covers the query column instead of
 /// the whole mesh. JS caches it on the array object; here it lives on the [`Tris`].
 fn build_z_grid(tris: &Tris) -> &ZGrid {
-    tris.z_grid.get_or_init(|| {
+    crate::lazy::get_or_build(&tris.z_grid, |par| {
         let t = &tris.v;
         let (mut min_x, mut min_y, mut max_x, mut max_y) = (
             f64::INFINITY,
@@ -128,14 +128,19 @@ fn build_z_grid(tris: &Tris) -> &ZGrid {
         let sy = ny as f64 / jsnum::max(1e-6, max_y - min_y);
         let cx = |x: f64| clamp_cell((x - min_x) * sx, nx);
         let cy = |y: f64| clamp_cell((y - min_y) * sy, ny);
-        let (start, ids) = build_csr(t.len() / 9, nx * ny, |i, push| {
-            let (a0, a1, b0, b1) = tri_span(t, i * 9, &cx, &cy);
-            for a in span_range(a0, a1) {
-                for b in span_range(b0, b1) {
-                    push(a * ny + b);
+        let (start, ids) = build_csr(
+            t.len() / 9,
+            nx * ny,
+            |i, push| {
+                let (a0, a1, b0, b1) = tri_span(t, i * 9, &cx, &cy);
+                for a in span_range(a0, a1) {
+                    for b in span_range(b0, b1) {
+                        push(a * ny + b);
+                    }
                 }
-            }
-        });
+            },
+            par,
+        );
         // (offsets into `tris`, 9 floats a triangle)
         let items: Vec<usize> = ids.into_iter().map(|i| i as usize * 9).collect();
         ZGrid {
