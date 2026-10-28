@@ -26,7 +26,7 @@ private func tShapeSTL() throws -> String {
         for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
         data.append(contentsOf: [0, 0])
     }
-    let path = NSTemporaryDirectory() + "build-model-tests-tshape.stl"
+    let path = try Scratch.file("build-model-tests-tshape.stl").path(percentEncoded: false)
     try data.write(to: URL(fileURLWithPath: path))
     return path
 }

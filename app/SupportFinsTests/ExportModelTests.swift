@@ -14,7 +14,7 @@ private func box(_ x0: Float, _ x1: Float, _ y0: Float, _ y1: Float, _ z0: Float
     return faces.map { f in f.flatMap { v[$0] } }
 }
 
-private func writeSTL(_ name: String, _ tris: [[Float]]) throws -> String {
+private func writeSTL(_ name: String, _ tris: [[Float]], in dir: URL) throws -> String {
     var data = Data(count: 80)
     var count = UInt32(tris.count)
     withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
@@ -22,7 +22,7 @@ private func writeSTL(_ name: String, _ tris: [[Float]]) throws -> String {
         for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
         data.append(contentsOf: [0, 0])
     }
-    let path = NSTemporaryDirectory() + name
+    let path = dir.appending(path: name).path(percentEncoded: false)
     try data.write(to: URL(fileURLWithPath: path))
     return path
 }
@@ -83,12 +83,18 @@ struct ExportNameTests {
 
 @MainActor
 @Suite("ExportModel")
-struct ExportModelTests {
+final class ExportModelTests {
+    /// This test's own directory (a suite instance is made per test): its parts and the files it exports.
+    let dir: URL
+
+    init() throws { dir = try Scratch.directory() }
+    deinit { Scratch.remove(dir) }
+
     func tShape() throws -> Part {
-        try #require(try loadParts(path: try writeSTL("export-tests-t.stl", box(-5, 5, -5, 5, 0, 20) + box(-20, 20, -20, 20, 20, 24))).first)
+        try #require(try loadParts(path: try writeSTL("export-tests-t.stl", box(-5, 5, -5, 5, 0, 20) + box(-20, 20, -20, 20, 20, 24), in: dir)).first)
     }
     func cube() throws -> Part {
-        try #require(try loadParts(path: try writeSTL("export-tests-cube.stl", box(0, 20, 0, 20, 0, 20))).first)
+        try #require(try loadParts(path: try writeSTL("export-tests-cube.stl", box(0, 20, 0, 20, 0, 20), in: dir)).first)
     }
 
     func rig(_ part: Part, finsOn: Bool = true, panel: any SavePanel = StubPanel(), objects: Int = 1) -> (ExportModel, BuildModel) {
@@ -99,7 +105,7 @@ struct ExportModelTests {
         return (model, build)
     }
 
-    func tmp(_ name: String) -> URL { URL(fileURLWithPath: NSTemporaryDirectory() + "export-model-\(name)") }
+    func tmp(_ name: String) -> URL { dir.appending(path: name) }
 
     @Test func nothingIsOfferedUntilTheFinsAreBuilt() async throws {
         let (model, build) = rig(try tShape(), finsOn: false)
