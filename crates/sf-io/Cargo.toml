@@ -11,6 +11,7 @@ publish.workspace = true
 sf-engine.workspace = true
 indexmap.workspace = true
 miniz_oxide.workspace = true
+flate2.workspace = true
 
 [dev-dependencies]
 parity = { path = "../../parity" }
