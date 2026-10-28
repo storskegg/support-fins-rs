@@ -425,6 +425,7 @@ pub fn race_against_counted(
     ctx: &BuildCtx,
 ) -> (PropsPass, Option<usize>) {
     let cfg = ctx.cfg;
+    cfg.cancel.check();
     let faces = overhang_faces(topo, result, rot);
     let default_ruler = |f: &[OverFace], t: &[[f64; 3]]| held_by(f, t, cfg);
     let ruler: Ruler = args.ruler.unwrap_or(&default_ruler);
@@ -511,6 +512,7 @@ fn raster_wanted(
     let tops = wall_tops(&all);
     let mut want = IndexSet::new();
     for ri in 0..result.regions.len() {
+        cfg.cancel.check();
         let own: Vec<OverFace> = faces
             .iter()
             .filter(|f| f[4] == ri as f64)
@@ -700,6 +702,7 @@ fn race_regions(
     // wall an earlier group swapped in is dropped, the rest stand
     let mut forced: Vec<&PropRecord> = Vec::new();
     for ri in 0..result.regions.len() {
+        cfg.cancel.check();
         let group = members.get(&ri);
         if b.leader_of.as_ref().is_some_and(|l| l.contains_key(&ri)) && group.is_none() {
             continue; // raced with its group's leader

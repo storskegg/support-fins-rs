@@ -676,6 +676,7 @@ pub fn build_perp_fins(
     let mut part_tris: Option<Arc<Tris>> = None; // seated part, built on the first foot that needs it
 
     for uc in perp_columns(p, lo, hi, opts.pitch.unwrap_or(perp.pitch), cfg) {
+        cfg.cancel.check();
         // contact profile up the face at this u (stop at the first hole after starting)
         let mut contact: Vec<[f64; 3]> = Vec::new();
         let n_t = jsnum::max(2.0, jsnum::ceil((p.t1 - p.t0) / perp.t_step));

@@ -254,8 +254,9 @@ use std::sync::Arc;
 
 use indexmap::IndexSet;
 
+use crate::cancel::{Cancel, Cancelled};
 use crate::config::{Config, Tunables, apply_tunables};
-use crate::fins::coverage::{Targets, automatic_targets};
+use crate::fins::coverage::{Targets, automatic_targets_cancellable};
 use crate::fins::downhill::{Slack, judge_downhill};
 use crate::fins::fill::{FillOpts, bare_area, fill_coverage};
 use crate::fins::pad::build_pad;
@@ -267,8 +268,8 @@ use crate::fins::wedges::{
 };
 use crate::islands::{Island, IslandOpts, find_islands};
 use crate::overhangs::{Analysis, Topology};
-use crate::pieces::floating_pieces;
-use crate::planes::find_wall_patches;
+use crate::pieces::floating_pieces_cancellable;
+use crate::planes::find_wall_patches_cancellable;
 use crate::prop::build::{BuildOpts, PropsPass, RasterVeto, build_props, no_props};
 use crate::prop::config::Iface;
 use crate::prop::crest::{Crest, crest_on};
@@ -429,6 +430,27 @@ pub fn build_fins(
     build_fins_inner(topo, result, rot, opts, cfg, false).0
 }
 
+/// [`build_fins`] that stops soon after `cancel`'s flag is raised and then returns `Err(Cancelled)`
+/// (never a partial build; nothing of the abandoned build is kept). Unraised, the result is
+/// byte-identical to [`build_fins`]'s.
+pub fn build_fins_cancellable(
+    topo: &Arc<Topology>,
+    result: &Analysis,
+    rot: &Rot3,
+    opts: &FinsOpts,
+    cfg: &Config,
+    cancel: &Cancel,
+) -> Result<FinsBuilt, Cancelled> {
+    let mut cfg = cfg.clone();
+    cfg.cancel = cancel.clone();
+    let built = crate::cancel::catch(|| build_fins_inner(topo, result, rot, opts, &cfg, false).0);
+    if built.is_err() {
+        // the seated part is cached on the topology for one build only
+        forget_seated(topo);
+    }
+    built
+}
+
 /// `buildFins` run the way the JS tests run it with `globalThis.__TINECAP = []` set around the
 /// call (web/prop/tines.js, web/prop.js:141): the build's tine capture is seeded with an outer,
 /// empty capture, and the seeds it holds afterwards come back with the build. A downhill judge
@@ -451,8 +473,14 @@ fn build_fins_inner(
     cfg: &Config,
     capture: bool,
 ) -> (FinsBuilt, Vec<TineSeed>) {
+    cfg.cancel.check();
     let targets = if opts.mode.as_deref() != Some("draw") {
-        Some(automatic_targets(topo, result, rot))
+        Some(automatic_targets_cancellable(
+            topo,
+            result,
+            rot,
+            &cfg.cancel,
+        ))
     } else {
         None
     };
@@ -466,7 +494,9 @@ fn build_fins_inner(
     if capture {
         *ctx.tine_cap.borrow_mut() = Some(Vec::new());
     }
+    cfg.cancel.check();
     let mut built = build_fins_and_braces(topo, res, rot, opts, &mut ctx);
+    cfg.cancel.check();
     built.small_hole_regions = targets.as_ref().map_or(0, |t| t.small_hole_regions);
     // Face indices stay in the caller's input order. Reuse the generation's mask for
     // highlighting; rendering must not reclassify during a pose drag. Draw is an explicit
@@ -484,13 +514,15 @@ fn build_fins_inner(
     // crestPart(null): the crest's part is only for this build (a Worker keeps no mesh)
     // forgetSeated(topo): nor the seated part: a page building inline would hold it
     forget_seated(topo);
+    cfg.cancel.check();
     // A piece of the part that starts in mid-air (a cut clean through, a loose body) needs saying
     // no matter what was placed: see floatingPieces.
-    built.floating = floating_pieces(topo, res.a, rot);
+    built.floating = floating_pieces_cancellable(topo, res.a, rot, &cfg.cancel);
     // How much red the walls leave bare (fins/fill.js bareArea), so the readout can say it: Auto
     // measures its own walls; Full already knows its leftover, and only the total is added.
     // Draw's walls are placed on the page, so it has none. `coverage` rides along so the page can
     // re-measure after fins are removed by hand.
+    cfg.cancel.check();
     let coverage = opts.coverage.unwrap_or(0.5);
     let fill_opts = fill_opts_of(opts, &[]);
     let mode = opts.mode.as_deref();
@@ -918,6 +950,7 @@ fn build_fins_core(
             *ctx.base_memo.borrow_mut() = BaseMemo::Off;
             return judged;
         }
+        cfg.cancel.check();
         let with_tines = opts.tines.unwrap_or(true);
         // Wide-face coverage (0 sparse .. 1 dense) drives how densely a broad face is lined --
         // the prop rows (buildProps reads opts.coverage, forwarded below) and the wedge row pitch
@@ -932,15 +965,20 @@ fn build_fins_core(
         let t = res.targets();
         // The wedge candidates: broad down-facing patches. Found before the props so a raster
         // wall can be kept off the ones the normal pass leaves to a wedge (wedgeVeto).
-        let wedgeable: Vec<_> =
-            find_wall_patches(topo, rot, &offset, None, Some(&t.excluded_support_faces))
-                .into_iter()
-                .filter(|p| {
-                    p.n.z < -0.05
-                        && p.area >= cfg.perp.min_area
-                        && (p.u1 - p.u0) >= cfg.perp.min_width
-                })
-                .collect();
+        let wedgeable: Vec<_> = find_wall_patches_cancellable(
+            topo,
+            rot,
+            &offset,
+            None,
+            Some(&t.excluded_support_faces),
+            &cfg.cancel,
+        )
+        .into_iter()
+        .filter(|p| {
+            p.n.z < -0.05 && p.area >= cfg.perp.min_area && (p.u1 - p.u0) >= cfg.perp.min_width
+        })
+        .collect();
+        cfg.cancel.check();
         let wedge_opts = WedgeOpts {
             pitch: Some(cov_pitch),
             tines: Some(with_tines),
@@ -974,6 +1012,7 @@ fn build_fins_core(
         let mut wedge_tines = 0usize;
         let mut wedged_patches = 0usize;
         for p in &wedgeable {
+            cfg.cancel.check();
             // downward, broad faces only
             if prop_serves_patch(p, &base.props, cfg) {
                 continue; // a prop already stands under it
@@ -1003,6 +1042,7 @@ fn build_fins_core(
         // strut lattice). Only bare regions, so a served part is unchanged. `lastResort: false`
         // skips it, like `raster: false` (the tests' baselines). A point-seated part with the pad
         // off gets no walls (the prop-mode gate below); the last resort must not build them back.
+        cfg.cancel.check();
         let point_no_pad = base.seating.kind == SeatingKind::Point && base.pad.is_none();
         let no_short = opts.last_resort == Some(false) || point_no_pad;
         let short = if no_short {
@@ -1169,8 +1209,11 @@ fn build_fins_core(
 
     // Prop (and any other mode) is its own support, built by its own module -- a wall UNDER each
     // overhang with no tines.
+    cfg.cancel.check();
     let contact = bed_contact(topo, res.a, rot);
+    cfg.cancel.check();
     let seating = seating_of(res.a, &contact.pts, cfg);
+    cfg.cancel.check();
     let pad = if opts.bed_pad.unwrap_or(true) && res.a.bed_area < cfg.fin.pad_min_area {
         build_pad(
             &contact.pts,
@@ -1192,6 +1235,7 @@ fn build_fins_core(
     // advice the printed evidence contradicts. Refuse only when the user has turned the pad off.
     // Draw builds no walls here: it exports only the pad and hand-placed walls, so a full prop
     // pass would be thrown away (1 s+ on a big part).
+    cfg.cancel.check();
     let built: PropsPass =
         if mode == "draw" || (seating.kind == SeatingKind::Point && pad.is_none()) {
             no_props()

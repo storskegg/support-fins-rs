@@ -139,6 +139,7 @@ pub fn judge_downhill(
     };
     let a = run(true, guard.ctx);
     let mut keep = a;
+    guard.ctx.cfg.cancel.check();
     if used_downhill(&keep.b) {
         let n = run(false, guard.ctx);
         let cfg = guard.ctx.cfg;

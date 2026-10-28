@@ -76,6 +76,8 @@ pub struct Config {
     pub rows: RowsConfig,
     /// `nozzle` (web/nozzle.js:42), the module `let` that `applyNozzle` sets.
     pub nozzle: crate::nozzle::NozzleState,
+    /// Not a JS tunable: the build's cancel flag (see `crate::cancel`). Unset = never cancelled.
+    pub cancel: crate::cancel::Cancel,
 }
 
 /// `opts.tunables` as `applyTunables` reads it (web/fins.js:93-141). `None` = the key is absent

@@ -16,9 +16,14 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   logic, and every build goes through `sf_engine::fins::build::build_fins` exactly as the CLI does.
 - **Off the main thread.** Builds run as jobs on a Rust worker thread. Results come back through a
   UniFFI callback interface on that thread, and the Swift layer hops to the main actor.
-- **Cancellation (M4): by generation number.** Each new build for a part bumps a counter, and a
-  finished job whose generation is stale is dropped without being delivered. Stopping a build partway
-  needs cooperative checks inside the engine. That's M5, alongside parallelism.
+- **Cancellation: by generation number, and the build in flight stops (M5).** Each new build for a part
+  bumps a counter and raises the cancel flag of the build in flight; the engine polls that flag
+  (`sf_engine::cancel`, carried in the build's `Config`) between passes, regions, walls and stations and
+  inside its Rayon loops, so a stale build stops part-way (a few milliseconds on a typical part, under
+  ~20 ms on a 772k-triangle object: `just bench-cancel`) and a cancelled build returns a distinct result,
+  never a partial one. A finished job whose generation is stale is still dropped without being
+  delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
+  build is byte-identical to one that was never cancellable.
 - **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled}`) carrying the JS-identical
   message where one exists.
 
@@ -45,7 +50,7 @@ impl Part {
 // M4b:
 #[uniffi::export(callback_interface)] trait BuildListener: Send + Sync { fn done(&self, generation: u64, result: Arc<BuildResult>); fn failed(&self, generation: u64, err: FfiError); }
 #[derive(uniffi::Object)] struct Builder;                    // one per part; owns the generation counter + worker
-impl Builder { fn new(part: Arc<Part>) -> Arc<Self>; fn build(&self, rot: Vec<f64>, opts_json: String, tunables_json: String, listener: Box<dyn BuildListener>) -> u64; }
+impl Builder { fn new(part: Arc<Part>) -> Arc<Self>; fn build(&self, rot: Vec<f64>, opts_json: String, tunables_json: String, listener: Box<dyn BuildListener>) -> u64; fn cancel(&self); }
 #[derive(uniffi::Object)] struct BuildResult;                // FinsBuilt + the seated part
 impl BuildResult { fn fins(&self) -> Arc<GpuBuffer>; fn pad(&self) -> Arc<GpuBuffer>; fn summary_json(&self) -> String; fn records_json(&self) -> String; }
 fn export(path: String, parts: Vec<Arc<Part>>, builds: Vec<Arc<BuildResult>>, options_json: String) -> Result<(), FfiError>; // STL/3MF as the CLI writes them

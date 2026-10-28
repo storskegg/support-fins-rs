@@ -87,6 +87,7 @@ pub fn last_resort_walls(
     ctx: &BuildCtx,
 ) -> ShortWalls {
     let cfg = ctx.cfg;
+    cfg.cancel.check();
     let served_set: IndexSet<usize> = served_regions.iter().copied().collect();
     let bare = bare_after_wedges(topo, rot, result, &served_set, wedge_tris, cfg);
     if bare.is_empty() {
@@ -109,6 +110,7 @@ pub fn last_resort_walls(
     let mut served: IndexSet<usize> = IndexSet::new();
     let mut tines = 0usize;
     for p in &built.props {
+        cfg.cancel.check();
         let ranges = &p.tri_ranges;
         let mut b = [
             f64::INFINITY,

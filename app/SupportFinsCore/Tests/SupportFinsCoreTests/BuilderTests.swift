@@ -99,6 +99,26 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     #expect(staleEvents == 0)
 }
 
+@Test func cancelDropsTheBuildInFlightAndALaterBuildStillArrives() async throws {
+    let part = try #require(try loadParts(path: try modelPath("torus")).first)
+    let builder = Builder(part: part)
+    let dropped = Collector(), kept = Collector()
+    _ = builder.build(rot: rotation(45, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: dropped)
+    builder.cancel()
+    let g = builder.build(rot: rotation(45, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: kept)
+    var arrived: UInt64?
+    for await event in kept.stream {
+        if case .done(let gen, _) = event { arrived = gen }
+        break
+    }
+    #expect(arrived == g)
+    try await Task.sleep(for: .milliseconds(200))
+    dropped.finish()
+    var events = 0
+    for await _ in dropped.stream { events += 1 }
+    #expect(events == 0)
+}
+
 @Test func buildErrorsArriveAsFailures() async throws {
     let part = try #require(try loadParts(path: try modelPath("cube")).first)
     let builder = Builder(part: part)

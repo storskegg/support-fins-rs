@@ -573,6 +573,7 @@ pub(crate) fn build_pass(
     ctx: &BuildCtx,
 ) -> PropsPass {
     let cfg = ctx.cfg;
+    cfg.cancel.check();
     let prop = &cfg.prop;
     let pos = &topo.pos;
     let step = opts.step.unwrap_or(prop.station_step);
@@ -656,6 +657,7 @@ pub(crate) fn build_pass(
     // absence of output recorded as success is exactly how M5's scoreboard lied.
     let mut patches: Vec<Patch> = Vec::new();
     for ri in 0..result.regions.len() {
+        cfg.cancel.check();
         if only.is_some_and(|o| !o.contains(&ri)) {
             continue;
         }
@@ -920,6 +922,7 @@ pub(crate) fn build_pass(
     let mut rims: IndexMap<usize, Vec<Vec<[f64; 3]>>> = IndexMap::new(); // region -> its rim tracks (prop/rim.js)
     let mut pi = 0;
     while pi < patches.len() {
+        cfg.cancel.check();
         let patch = patches[pi].clone();
         pi += 1;
         let i = pi - 1;
@@ -1044,6 +1047,7 @@ pub(crate) fn build_pass(
         // to `lines` mid-loop (rasterRest).
         let mut li = 0;
         while li < lines.lines.len() {
+            cfg.cancel.check();
             let mut line = lines.lines[li].pts.clone();
             let line_rim = lines.lines[li].rim;
             li += 1;
@@ -1121,6 +1125,7 @@ fn place_line(
     z_bed: f64,
 ) {
     let (topo, rot, off, cfg, ctx) = (env.topo, env.rot, env.off, env.cfg, env.ctx);
+    cfg.cancel.check();
     let prop = &cfg.prop;
     // PART-ATTACHED first: if solid part sits below this overhang, a support must stand on THAT
     // floor, not stilt to the plate through the part (the bug Matthew hit on a real hub).
@@ -1131,6 +1136,7 @@ fn place_line(
     // wall is built and flagged inBore. Works on a COPY so the plate path's own `line` is
     // untouched.
     let tri0 = acc.out.len();
+    cfg.cancel.check();
     let mut pa = build_part_attached(line, env.part_tris, topo, rot, off, &mut acc.out, ctx);
     // (Plate only: undo it and take the plate path, as a bed overhang would)
     if plate_only_hits(opts.plate_only, &pa) {
@@ -1260,7 +1266,7 @@ fn place_line(
     // over a local problem. See `longestRun`.
     // (each station's verdict is a pure function of the station: the stations are probed in
     // parallel and collected in order)
-    let clear: Vec<bool> = station_verdicts(line.len(), |k| {
+    let clear: Vec<bool> = station_verdicts(line.len(), &cfg.cancel, |k| {
         line[k][2] - prop.gap >= prop.min_height_squat
             && station_is_clear(line, k, topo, rot, off, cfg)
     });
@@ -1326,7 +1332,7 @@ fn place_line(
     // prevent, reintroduced one step later. Re-trim against the settled line: on height, and on
     // the measured clearance to everything settleTop could not see (stationCertified). Tall
     // stations carry the wall; low ones may only extend it as its tail.
-    let mut low_a: Vec<bool> = station_verdicts(sub.len(), |k| {
+    let mut low_a: Vec<bool> = station_verdicts(sub.len(), &cfg.cancel, |k| {
         sub[k][2] - prop.gap >= prop.min_height_squat
             && station_certified(&sub, k, topo, rot, off, cfg)
     });
@@ -1346,6 +1352,7 @@ fn place_line(
     let mut reason: Option<&str> = None;
     let mut tries = 0;
     while tries < 4 && !placed {
+        cfg.cancel.check();
         tries += 1;
         let run2 = longest_run(&with_low_tails(&tall_a, &low_a));
         let Some(run2) = run2.filter(|r| ((r[1] - r[0]) as f64) >= prop.min_stations) else {
@@ -1372,6 +1379,7 @@ fn place_line(
         }
 
         let before = acc.out.len();
+        cfg.cancel.check();
         if !sweep(&settled, z_bed, &mut acc.out, prop.min_height_squat, ctx) {
             acc.out.truncate(before);
             reason = Some("degenerate");
@@ -1380,6 +1388,7 @@ fn place_line(
 
         // 0.25 reach: the tightest threshold below is 0.205, and every extra tenth of reach
         // widens the broad phase for nothing
+        cfg.cancel.check();
         let hit = clearance_of(topo, rot, off, &acc.out, before);
         // Same acceptance as stationCertified: an approach from above is the breakaway interface,
         // anything else is a flank. Interpenetration measures 0 and fails the flank test, which
@@ -1523,11 +1532,13 @@ pub fn build_props(
     ctx: &BuildCtx,
 ) -> PropsPass {
     let cfg = ctx.cfg;
+    cfg.cancel.check();
     let judge_cache = JudgeCache::default();
     let circular_cache = CircularCache::new();
     let mut o = opts.clone();
     o.circular_frames = Some(circular_regions(topo, result, rot, &circular_cache, cfg));
     let opts = &o;
+    cfg.cancel.check();
     let cap_from = ctx.cap_len().unwrap_or(0); // tests' tine capture: see withRaster
     // Auto's judge builds with and without downhill walls: everything up to the race the flag gates
     // is the same in both, so the second build replays what the first recorded (fins/downhill.js).
@@ -1648,6 +1659,7 @@ pub fn build_props(
             }
         };
         let base = compute_base();
+        cfg.cancel.check();
         if let BaseMemo::Record(slot @ None) = &mut *ctx.base_memo.borrow_mut() {
             *slot = Some((base.clone(), ctx.tine_cap.borrow().clone()));
         }

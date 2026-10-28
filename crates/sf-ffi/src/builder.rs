@@ -7,15 +7,17 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, mpsc};
 
 use sf_cli::cli::pose_matrix;
 use sf_cli::entry::{
-    PageRequest, build_stats, compute_fins_detail, engine_request, options_from_dialog,
+    BuildStop, PageRequest, build_stats, compute_fins_detail_cancellable, engine_request,
+    options_from_dialog,
 };
+use sf_engine::cancel::Cancel;
 use sf_engine::config::Config;
-use sf_engine::fins::build::build_fins;
+use sf_engine::fins::build::build_fins_cancellable;
 use sf_engine::overhangs::analyze;
 use sf_engine::prop::crest::split_interface;
 use sf_engine::types::{IDENTITY3, Xyz};
@@ -257,6 +259,18 @@ pub fn build_part(
     opts_json: &str,
     tunables_json: &str,
 ) -> Result<BuildResult, FfiError> {
+    build_part_cancellable(part, rot, opts_json, tunables_json, &Cancel::default())
+}
+
+/// [`build_part`] that stops soon after `cancel`'s flag is raised and then returns
+/// `Err(FfiError::Cancelled)`; never a partial result. Unraised, the result is byte-identical.
+pub fn build_part_cancellable(
+    part: &Part,
+    rot: &[f64],
+    opts_json: &str,
+    tunables_json: &str,
+    cancel: &Cancel,
+) -> Result<BuildResult, FfiError> {
     let rot = rot9(rot)?;
     let mut page = PageRequest::default();
     let (dialog, extras) = split_options(opts_json, &mut page)?;
@@ -266,7 +280,11 @@ pub fn build_part(
     let rot = (rot != IDENTITY3).then_some(rot);
     if !web {
         let posed = pose_matrix(&part.topology().pos, rot);
-        let (result, built) = compute_fins_detail(&posed, &options).map_err(engine)?;
+        let (result, built) =
+            compute_fins_detail_cancellable(&posed, &options, cancel).map_err(|e| match e {
+                BuildStop::Failed(m) => engine(m),
+                BuildStop::Cancelled => FfiError::Cancelled,
+            })?;
         let s = &result.stats;
         let request = engine_request(&options, None).map_err(engine)?;
         let ctx = Context {
@@ -287,8 +305,19 @@ pub fn build_part(
     let request = engine_request(&options, Some(&page)).map_err(engine)?;
     let topo = part.topology();
     let matrix = rot.unwrap_or(IDENTITY3);
+    if cancel.is_cancelled() {
+        return Err(FfiError::Cancelled);
+    }
     let analysis = analyze(topo, request.threshold, &matrix);
-    let built = build_fins(topo, &analysis, &matrix, &request.opts, &Config::default());
+    let built = build_fins_cancellable(
+        topo,
+        &analysis,
+        &matrix,
+        &request.opts,
+        &Config::default(),
+        cancel,
+    )
+    .map_err(|_| FfiError::Cancelled)?;
     let stats = build_stats(&built, analysis.regions.len(), request.pins);
     fn to_f32(v: &[sf_engine::types::V4]) -> impl Iterator<Item = f32> + '_ {
         v.iter()
@@ -345,18 +374,23 @@ fn finish(
 
 struct Job {
     generation: u64,
+    /// raised when a newer `build` supersedes this one
+    cancel: Arc<AtomicBool>,
     rot: Vec<f64>,
     opts_json: String,
     tunables_json: String,
     listener: Box<dyn BuildListener>,
 }
 
-/// One per part: builds on its own worker thread. Each `build` bumps the generation; a job that is no
-/// longer the latest when it starts or finishes is dropped without being delivered. (Stopping one
-/// partway needs cooperative checks in the engine: M5.)
+/// One per part: builds on its own worker thread. Each `build` bumps the generation and raises the
+/// cancel flag of the build in flight, which the engine polls (`sf_engine::cancel`), so a stale build
+/// stops part-way (within a few milliseconds on a typical part) instead of running to the end. A job
+/// that is no longer the latest when it starts or finishes is dropped without being delivered.
 #[derive(uniffi::Object)]
 pub struct Builder {
     generation: Arc<AtomicU64>,
+    /// the newest job's cancel flag
+    current: Mutex<Arc<AtomicBool>>,
     jobs: mpsc::Sender<Job>,
 }
 
@@ -375,8 +409,15 @@ impl Builder {
                     if latest.load(Ordering::SeqCst) != job.generation {
                         continue; // superseded before it started
                     }
+                    let cancel = Cancel::new(job.cancel.clone());
                     let built = catch_unwind(AssertUnwindSafe(|| {
-                        build_part(&part, &job.rot, &job.opts_json, &job.tunables_json)
+                        build_part_cancellable(
+                            &part,
+                            &job.rot,
+                            &job.opts_json,
+                            &job.tunables_json,
+                            &cancel,
+                        )
                     }))
                     .unwrap_or_else(|_| Err(engine("the engine panicked")));
                     if latest.load(Ordering::SeqCst) != job.generation {
@@ -389,7 +430,11 @@ impl Builder {
                 }
             })
             .expect("spawn the build worker");
-        Arc::new(Builder { generation, jobs })
+        Arc::new(Builder {
+            generation,
+            current: Mutex::new(Arc::new(AtomicBool::new(false))),
+            jobs,
+        })
     }
 
     /// Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
@@ -400,16 +445,32 @@ impl Builder {
         tunables_json: String,
         listener: Box<dyn BuildListener>,
     ) -> u64 {
+        let cancel = Arc::new(AtomicBool::new(false));
+        // under the lock, so two racing `build`s cannot each cancel the other's newer flag
+        let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        // the build in flight is stale now: tell it to stop
+        current.store(true, Ordering::SeqCst);
+        *current = cancel.clone();
         // the worker only goes away with the Builder, so a send cannot fail while `self` lives
         let _ = self.jobs.send(Job {
             generation,
+            cancel,
             rot,
             opts_json,
             tunables_json,
             listener,
         });
         generation
+    }
+
+    /// Abandon the build in flight (and any queued one) without starting another: nothing of it is
+    /// delivered. A later `build` is unaffected.
+    pub fn cancel(&self) {
+        let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        current.store(true, Ordering::SeqCst);
+        *current = Arc::new(AtomicBool::new(false));
     }
 }
 

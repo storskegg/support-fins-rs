@@ -362,6 +362,7 @@ fn each_leftover_point(
     put: &mut dyn FnMut(f64, f64, f64, f64),
 ) {
     for f in leftover_faces(topo, result, cls, regions) {
+        cfg.cancel.check();
         face_points(topo, result, rot, cfg, f, put);
     }
 }
@@ -385,6 +386,9 @@ fn bare_sums(
     let block = |fs: &[usize]| -> Vec<[f64; 5]> {
         let mut pts = Vec::new();
         for &f in fs {
+            if cfg.cancel.is_cancelled() {
+                break; // unused: the poll below unwinds
+            }
             face_points(topo, result, rot, cfg, f, &mut |x, y, z, a| {
                 if z < PLATE_Z {
                     return;
@@ -400,6 +404,7 @@ fn bare_sums(
     } else {
         faces.par_chunks(4).map(block).collect()
     };
+    cfg.cancel.check();
     for p in blocks.iter().flatten() {
         all.put(cfg.fill.sample, p[0], p[1], p[2], p[3]);
         if p[4] != 0.0 {
@@ -1346,6 +1351,7 @@ fn brace_fill(
         RefCell::new((0..props.len()).map(|_| None).collect());
     let mut n = 0;
     for k in 0..props.len() {
+        cfg.cancel.check();
         let Some(floor) = &floors[k] else { continue };
         let mut out: Vec<V4> = Vec::new();
         let built = {
@@ -1893,6 +1899,7 @@ impl Fill<'_> {
     /// group gets a try.
     fn wall_for(&mut self, live: &[Pt], g: &[usize], local: bool, ctx: &mut BuildCtx) -> WallRes {
         let cfg = self.cfg;
+        cfg.cancel.check();
         let red_pts: Vec<Pt> = g.iter().map(|&i| live[i]).collect();
         let red_at = RedGrid::new(&red_pts, cfg);
         let mut st = WallState {

@@ -13,9 +13,10 @@
 
 use std::sync::Arc;
 
+use sf_engine::cancel::Cancel;
 use sf_engine::config::{Config, TunableValue, Tunables};
 use sf_engine::cutout::CUTOUT_PATTERNS;
-use sf_engine::fins::build::{FinKind, FinsBuilt, FinsOpts, SwayRequest, build_fins};
+use sf_engine::fins::build::{FinKind, FinsBuilt, FinsOpts, SwayRequest, build_fins_cancellable};
 use sf_engine::jsnum;
 use sf_engine::materials::PLA;
 use sf_engine::overhangs::{analyze, build_topology};
@@ -592,12 +593,52 @@ pub fn compute_fins_detail(
     positions: &[f64],
     options: &EngineOptions,
 ) -> Result<(FinsResult, FinsBuilt), String> {
-    let request = engine_request(options, None)?;
-    let (pos, shift) = seat_soup(positions)?;
+    compute_fins_detail_cancellable(positions, options, &Cancel::default())
+        .map_err(|e| e.to_string())
+}
+
+/// Why a cancellable build gave no result.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BuildStop {
+    /// The request or the part is unusable.
+    Failed(String),
+    /// The cancel flag was raised; nothing of the build is kept.
+    Cancelled,
+}
+
+impl std::fmt::Display for BuildStop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuildStop::Failed(m) => f.write_str(m),
+            BuildStop::Cancelled => f.write_str("cancelled"),
+        }
+    }
+}
+
+/// [`compute_fins_detail`] that stops soon after `cancel`'s flag is raised and then returns
+/// [`BuildStop::Cancelled`]. Unraised, the result is byte-identical to [`compute_fins_detail`]'s.
+pub fn compute_fins_detail_cancellable(
+    positions: &[f64],
+    options: &EngineOptions,
+    cancel: &Cancel,
+) -> Result<(FinsResult, FinsBuilt), BuildStop> {
+    let stop = |e: String| BuildStop::Failed(e);
+    let request = engine_request(options, None).map_err(stop)?;
+    let (pos, shift) = seat_soup(positions).map_err(stop)?;
+    if cancel.is_cancelled() {
+        return Err(BuildStop::Cancelled);
+    }
     let topo = Arc::new(build_topology(pos));
+    if cancel.is_cancelled() {
+        return Err(BuildStop::Cancelled);
+    }
     let result = analyze(&topo, request.threshold, &IDENTITY3);
+    if cancel.is_cancelled() {
+        return Err(BuildStop::Cancelled);
+    }
     let cfg = Config::default();
-    let built = build_fins(&topo, &result, &IDENTITY3, &request.opts, &cfg);
+    let built = build_fins_cancellable(&topo, &result, &IDENTITY3, &request.opts, &cfg, cancel)
+        .map_err(|_| BuildStop::Cancelled)?;
 
     let to_f32 = |v: &[[f64; 4]]| -> Vec<f32> {
         v.iter()
