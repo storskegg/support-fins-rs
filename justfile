@@ -95,3 +95,7 @@ app-test: app-core app-project
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 app-uitest: app-core app-project
     xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+
+# Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5-rendering.md); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
+bench-render *args:
+    swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
