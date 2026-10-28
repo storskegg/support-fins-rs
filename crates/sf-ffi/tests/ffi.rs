@@ -351,7 +351,7 @@ fn load_parts_keeps_modifiers_for_the_export_and_cuts_nothing_for_them() {
 #[test]
 fn merge_parts_equals_loading_an_stl_of_their_triangles() {
     let (a, b) = (load("cube"), load("lowledge"));
-    let merged = merge_parts(vec![a.clone(), b.clone()]).unwrap();
+    let merged = merge_parts(vec![a.clone(), b.clone()], 5).unwrap();
     // the concatenated soup, in order, as a file
     let soup: Vec<f64> = [a.topology().pos.clone(), b.topology().pos.clone()].concat();
     let tris: Vec<[f64; 3]> = soup.as_chunks::<3>().0.to_vec();
@@ -382,7 +382,7 @@ fn merge_parts_equals_loading_an_stl_of_their_triangles() {
     assert_eq!(merged.mesh().len_bytes(), want.mesh().len_bytes());
     assert!(
         mi.notes
-            .contains(&"merged 2 objects into one part".to_string())
+            .contains(&"merged 2 of 5 objects into one part".to_string())
     );
 }
 
@@ -390,8 +390,8 @@ fn merge_parts_equals_loading_an_stl_of_their_triangles() {
 fn merge_parts_of_one_is_itself_and_of_none_is_an_error() {
     let a = load("cube");
     assert!(std::sync::Arc::ptr_eq(
-        &merge_parts(vec![a.clone()]).unwrap(),
+        &merge_parts(vec![a.clone()], 1).unwrap(),
         &a
     ));
-    assert!(merge_parts(vec![]).is_err());
+    assert!(merge_parts(vec![], 0).is_err());
 }
