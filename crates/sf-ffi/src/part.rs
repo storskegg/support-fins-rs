@@ -8,7 +8,7 @@ use sf_engine::overhangs::{Topology, analyze, build_topology};
 use sf_io::obj::read_obj;
 use sf_io::stl::read_stl;
 use sf_io::threemf::{
-    MergeItem, PartColors, PartKind, ReadExtra, ThreeMfObject, merge_colors, read_three_mf,
+    MergeItem, PartColors, PartKind, ReadExtra, ThreeMfObject, merge_colors, read_three_mf_unmerged,
 };
 
 use crate::gpu::GpuBuffer;
@@ -546,7 +546,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
             parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Obj)));
         }
     } else if lower.ends_with(".3mf") {
-        let m = read_three_mf(&bytes).map_err(format)?;
+        let m = read_three_mf_unmerged(&bytes).map_err(format)?;
         drop(bytes);
         let objects = m.objects;
         let (skipped, unit) = (m.skipped, m.unit);
@@ -564,7 +564,6 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
                 file(ImportMeta::new(Kind::ThreeMf)),
             ));
         } else {
-            drop(m.positions); // the merged soup of every object: not needed beside them
             parts.extend(
                 objects
                     .into_iter()

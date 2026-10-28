@@ -106,6 +106,11 @@ bench-m5 filter="":
     cargo build --release -q -p sf-testkit --example bench_m5
     target/release/examples/bench_m5 {{filter}}
 
+# M5 load / weld timing: a generated 1.5M-face STL and OBJ (under target/bench-load/, never committed) and the private 3MF when present. Prints a table; `just bench-load stl` runs one input.
+bench-load *inputs:
+    cargo build --release -q -p sf-testkit --example bench_load
+    target/release/examples/bench_load {{inputs}}
+
 # Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5-rendering.md); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
 bench-render *args:
     swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
