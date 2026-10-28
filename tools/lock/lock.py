@@ -19,6 +19,9 @@ runs. The result is printed when the command ends and written to
 target/bench-load/NAME.txt; while it runs the same line (running mean so far) is kept in the file
 named by $SFRS_BENCH_LOAD_FILE, so a benchmark that writes a report can include it.
 
+Why it matters for the UI tests: FinsLoopUITests is flaky under heavy machine load (a hit-point failure while
+scrolling, FinsLoopUITests.swift:51). Running app-uitest alone on the machine, behind this lock, is the fix.
+
 A COMMAND started while this process already holds the lock (`just gate` calling `just app-test`)
 passes straight through (SFRS_LOCK_HELD).
 
