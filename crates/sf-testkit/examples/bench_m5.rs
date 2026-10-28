@@ -290,7 +290,7 @@ fn main() {
             (ms, out, hash) = time_case(&pos, &pose_rot(c.group, &c.pose), runs, &opts, &cfg);
         }
         println!(
-            "{} {}: {triangles} tris, build {} ms",
+            "{} {}: {triangles} tris, build {} ms, out {hash:016x}",
             c.model,
             c.pose,
             f(ms)
