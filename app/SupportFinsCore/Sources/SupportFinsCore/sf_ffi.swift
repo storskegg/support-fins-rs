@@ -1802,6 +1802,11 @@ public struct PartInfo: Equatable, Hashable {
      */
     public var notes: [String]
     /**
+     * `renderImportNote` (`web/ui/io.js:26`): `notes` as the Status card's line, "3MF: a; b." or "OBJ: ...",
+     * empty when there is nothing to say (an STL, a lone object).
+     */
+    public var importNote: String
+    /**
      * How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
      * (`web/ui/part.js` `analysisTiming`).
      */
@@ -1818,6 +1823,10 @@ public struct PartInfo: Equatable, Hashable {
          * out of it, and why any were not. Empty for a part without negative parts.
          */notes: [String], 
         /**
+         * `renderImportNote` (`web/ui/io.js:26`): `notes` as the Status card's line, "3MF: a; b." or "OBJ: ...",
+         * empty when there is nothing to say (an STL, a lone object).
+         */importNote: String, 
+        /**
          * How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
          * (`web/ui/part.js` `analysisTiming`).
          */weldMs: Double) {
@@ -1825,6 +1834,7 @@ public struct PartInfo: Equatable, Hashable {
         self.triangles = triangles
         self.size = size
         self.notes = notes
+        self.importNote = importNote
         self.weldMs = weldMs
     }
 
@@ -1848,6 +1858,7 @@ public struct FfiConverterTypePartInfo: FfiConverterRustBuffer {
                 triangles: FfiConverterUInt64.read(from: &buf), 
                 size: FfiConverterSequenceDouble.read(from: &buf), 
                 notes: FfiConverterSequenceString.read(from: &buf), 
+                importNote: FfiConverterString.read(from: &buf), 
                 weldMs: FfiConverterDouble.read(from: &buf)
         )
     }
@@ -1857,6 +1868,7 @@ public struct FfiConverterTypePartInfo: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.triangles, into: &buf)
         FfiConverterSequenceDouble.write(value.size, into: &buf)
         FfiConverterSequenceString.write(value.notes, into: &buf)
+        FfiConverterString.write(value.importNote, into: &buf)
         FfiConverterDouble.write(value.weldMs, into: &buf)
     }
 }

@@ -197,7 +197,7 @@ state is remembered (`sf.sections`, `ui/settings.js:363-380`) and whose collapse
 | `draw-remove` | button | Remove selected |  |  | Remove the support you clicked (Delete or Backspace also works). | index.html:449; ui/walls.js:348 | Inspector > Draw controls: button | M6 |
 | `draw-clear` | button | Clear all |  |  |  | index.html:451; ui/walls.js:628 | Inspector > Draw controls: button | M6 |
 
-**Placement notes** (`ui/settings.js:79-115`, mode note text per mode): Auto "places supports for me" / Full coverage "every overhang" (Auto, plus walls under the red Auto left bare; reports what it could not reach) / Draw "place them by hand". The legacy "Combined fin" mode was dropped (`index.html:332-340` comment).
+**Placement notes** (`ui/settings.js:75-77`, `MODE_NOTES`): Auto "Places supports for you." / Full "Auto, plus walls under every overhang it leaves bare. More plastic." / Draw "You place each wall: click two points across an overhang." (The phrases "place supports for me", "every overhang" and "place them by hand" are the `<select>` option labels, `index.html:350-352`.) The legacy "Combined fin" mode was dropped (`index.html:332-340` comment).
 
 **Draw hint text** (`#draw-hint`, `index.html:442`, set per mode in `ui/walls.js:601-611` `syncDrawControls`): "Click two points across an overhang - straight onto the red faces - to lay a breakaway wall along that line. Hover an upright side to preview a sway brace: its top follows the cursor, and near the top of the side it runs full height. Click to stand it. Esc or right-click cancels." (Curve: two ends, then a point it runs through.)
 

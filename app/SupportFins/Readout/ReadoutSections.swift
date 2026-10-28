@@ -91,7 +91,8 @@ struct ReadoutSections: View {
         let fins = FinReadout.make(built, context(settings, built, regions))
         Group {
             StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins)
-            StatusCard(part: part, fins: fins, importNotes: islandCard(built, count: analysis?.islands ?? 0).map { [$0] } ?? [])
+            StatusCard(part: part, fins: fins, importNote: session.parts.first?.info.importNote ?? "",
+                       islandCard: islandCard(built, count: analysis?.islands ?? 0))
         }
         .task(id: RemovalKey(removed: session.removedFins, generation: build?.readoutResult.map(ObjectIdentifier.init))) { await measureRemoval() }
         .task(id: Key(pose: session.pose, threshold: session.settings.threshold,
