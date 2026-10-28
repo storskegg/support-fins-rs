@@ -7,6 +7,7 @@
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::csr::build_csr;
 use crate::gridsize::grid_dims;
 use crate::jsnum;
 use crate::tris::Tris;
@@ -127,36 +128,18 @@ fn build_z_grid(tris: &Tris) -> &ZGrid {
         let sy = ny as f64 / jsnum::max(1e-6, max_y - min_y);
         let cx = |x: f64| clamp_cell((x - min_x) * sx, nx);
         let cy = |y: f64| clamp_cell((y - min_y) * sy, ny);
-        let mut counts = vec![0i32; nx * ny + 1];
-        let mut f = 0;
-        while f < t.len() {
-            let (a0, a1, b0, b1) = tri_span(t, f, &cx, &cy);
+        let (start, ids) = build_csr(t.len() / 9, nx * ny, |i, push| {
+            let (a0, a1, b0, b1) = tri_span(t, i * 9, &cx, &cy);
             for a in span_range(a0, a1) {
                 for b in span_range(b0, b1) {
-                    counts[a * ny + b + 1] += 1;
+                    push(a * ny + b);
                 }
             }
-            f += 9;
-        }
-        for i in 0..nx * ny {
-            counts[i + 1] += counts[i];
-        }
-        let mut items = vec![0usize; counts[nx * ny] as usize];
-        let mut cur: Vec<i32> = counts[..nx * ny].to_vec();
-        let mut f = 0;
-        while f < t.len() {
-            let (a0, a1, b0, b1) = tri_span(t, f, &cx, &cy);
-            for a in span_range(a0, a1) {
-                for b in span_range(b0, b1) {
-                    let c = a * ny + b;
-                    items[cur[c] as usize] = f;
-                    cur[c] += 1;
-                }
-            }
-            f += 9;
-        }
+        });
+        // (offsets into `tris`, 9 floats a triangle)
+        let items: Vec<usize> = ids.into_iter().map(|i| i as usize * 9).collect();
         ZGrid {
-            start: counts,
+            start,
             items,
             min_x,
             min_y,

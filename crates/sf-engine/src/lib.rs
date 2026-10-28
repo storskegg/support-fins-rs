@@ -2,6 +2,7 @@
 //! `UPSTREAM`. Read `docs/AGENTS.md` before changing anything here.
 
 pub mod config;
+pub mod csr;
 pub mod cutout;
 pub mod draw;
 pub mod drawarc;
