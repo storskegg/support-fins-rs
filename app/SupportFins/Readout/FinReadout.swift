@@ -27,6 +27,12 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
         }
         private enum CodingKeys: String, CodingKey { case style, autoSure, smallFoot, outline }
     }
+    /// `islandsBuild`: what the midair-starts card is told. `all` is a Full build with no fill pass (every start is unwalled).
+    struct IslandsBuild: Decodable, Equatable, Sendable {
+        var bare: Int?
+        var capped: Bool?
+        var all: Bool?
+    }
     struct Bounds: Decodable, Equatable, Sendable {
         var min: [Double], max: [Double]
     }
@@ -77,6 +83,8 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
     var fillReach: Double?
     /// The extent of the fin and pad vertices in print space; nil when there are none
     var addedBounds: Bounds?
+    /// nil unless the mode is Full
+    var islandsBuild: IslandsBuild?
 
     init() {}
 
@@ -90,7 +98,7 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
     private enum Key: String, CodingKey {
         case mode, fins, propCount, braceCount, tines, tallRibs, sway, seating, pad, floating, sagRisk, fill, curvedFill
         case curvedDropped, bare, unserved, smallHoleRegions, skipped, patchStats, patchCount, rejected
-        case hasPad, finVolumeMm3, padVolumeMm3, fillReach, addedBounds
+        case hasPad, finVolumeMm3, padVolumeMm3, fillReach, addedBounds, islandsBuild
     }
 
     /// A key missing from the JSON takes its default, as `undefined` reads in the JS (`built.skipped?.onPart`).
@@ -124,6 +132,7 @@ struct ReadoutBuilt: Decodable, Equatable, Sendable {
         padVolumeMm3 = try c.decodeIfPresent(Double.self, forKey: .padVolumeMm3) ?? 0
         fillReach = try c.decodeIfPresent(Double.self, forKey: .fillReach)
         addedBounds = try c.decodeIfPresent(Bounds.self, forKey: .addedBounds)
+        islandsBuild = try c.decodeIfPresent(IslandsBuild.self, forKey: .islandsBuild)
     }
 }
 

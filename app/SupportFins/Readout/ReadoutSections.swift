@@ -12,11 +12,17 @@ protocol ReadoutBuildSource: AnyObject {
     var readoutFinCount: Int { get }
     /// Some wall top got an interface crest: `records_json().crestRanges` is not empty.
     var readoutHasCrest: Bool { get }
+    /// The newest build, for `after_removal_json`.
+    var readoutResult: BuildResult? { get }
+    /// The record ids of `removed` fins this build matches (`matchRemoved`).
+    func readoutRemovedIDs(_ removed: Set<FinKey>) -> [UInt64]
 }
 
 extension BuildModel: ReadoutBuildSource {
     var readoutSummaryJSON: String? { latest?.summaryJson() }
     var readoutFinCount: Int { records?.fins.count ?? 0 }
+    var readoutResult: BuildResult? { latest }
+    func readoutRemovedIDs(_ removed: Set<FinKey>) -> [UInt64] { matchedRemovals(of: removed).keys.map { UInt64($0) }.sorted() }
     var readoutHasCrest: Bool {
         guard let text = latest?.recordsJson(),
               let o = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { return false }
@@ -37,6 +43,15 @@ struct ReadoutSections: View {
     var build: (any ReadoutBuildSource)?
 
     @State private var analysis: Analysis?
+    @State private var afterRemoval: AfterRemoval?
+
+    /// `after_removal_json`: what the readouts re-measure when fins are removed by hand (`ui/remove.js`).
+    struct AfterRemoval: Decodable, Equatable {
+        var removed: Int
+        var bare: ReadoutBuilt.Bare?
+        var addedBounds: ReadoutBuilt.Bounds?
+        var addedVolumeMm3: Double
+    }
 
     struct Analysis: Equatable {
         var summary: AnalysisSummary
@@ -53,7 +68,7 @@ struct ReadoutSections: View {
 
     var body: some View {
         let settings = session.settings
-        let built = build?.readoutSummaryJSON.flatMap { try? ReadoutBuilt(summaryJSON: $0, finCount: build?.readoutFinCount ?? 0) }
+        let built = effectiveBuilt()
         let size = analysis?.summary.size ?? []
         let dims = size.count == 3 ? (x: size[0], y: size[1], z: size[2]) : (x: 0.0, y: 0.0, z: 0.0)
         let regions = Int(analysis?.summary.regionCount ?? 0)
@@ -70,10 +85,44 @@ struct ReadoutSections: View {
         let fins = FinReadout.make(built, context(settings, built, regions))
         Group {
             StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins)
-            StatusCard(part: part, fins: fins)
+            StatusCard(part: part, fins: fins, importNotes: islandCard(built, count: analysis?.islands ?? 0).map { [$0] } ?? [])
         }
+        .task(id: RemovalKey(removed: session.removedFins, generation: build?.readoutResult.map(ObjectIdentifier.init))) { await measureRemoval() }
         .task(id: Key(pose: session.pose, threshold: session.settings.threshold,
                       parts: session.parts.map { ObjectIdentifier($0) })) { await analyse() }
+    }
+
+    /// The build's numbers, with the bare area, the extent and the volume measured again when fins are removed by hand.
+    private func effectiveBuilt() -> ReadoutBuilt? {
+        guard var b = build?.readoutSummaryJSON.flatMap({ try? ReadoutBuilt(summaryJSON: $0, finCount: build?.readoutFinCount ?? 0) })
+        else { return nil }
+        if let r = afterRemoval, !session.removedFins.isEmpty, r.removed > 0 {
+            b.bare = r.bare
+            b.addedBounds = r.addedBounds
+            b.finVolumeMm3 = r.addedVolumeMm3 - b.padVolumeMm3
+        }
+        return b
+    }
+
+    /// The midair-starts card (`renderIslandCard`): nil when there is none to show.
+    private func islandCard(_ built: ReadoutBuilt?, count: Int) -> String? {
+        let full = built?.islandsBuild
+        let bare: UInt64? = full.map { $0.all == true ? UInt64(count) : UInt64($0.bare ?? 0) }
+        let text = SupportFinsCore.islandCard(count: UInt64(count), bare: bare, capped: full?.capped ?? false,
+                                              markersVisible: session.settings.showIslands)
+        return text.isEmpty ? nil : text
+    }
+
+    private struct RemovalKey: Equatable {
+        var removed: Set<FinKey>
+        var generation: ObjectIdentifier?
+    }
+
+    private func measureRemoval() async {
+        guard let build, let result = build.readoutResult, !session.removedFins.isEmpty else { afterRemoval = nil; return }
+        let ids = build.readoutRemovedIDs(session.removedFins)
+        let text = await Task.detached(priority: .userInitiated) { try? result.afterRemovalJson(removedIds: ids) }.value
+        if !Task.isCancelled { afterRemoval = text.flatMap { try? JSONDecoder().decode(AfterRemoval.self, from: Data($0.utf8)) } }
     }
 
     private func context(_ s: FinSettings, _ built: ReadoutBuilt?, _ regions: Int) -> ReadoutContext {

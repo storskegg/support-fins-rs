@@ -243,6 +243,51 @@ struct ReadoutFromEngineTests {
         #expect(!fit.text.isEmpty)
     }
 
+    @Test func flatContactsGiveTheWallTopsACrest() async throws {
+        let part = try #require(try loadParts(path: try tShapePath()).first)
+        let model = BuildModel(part: part)
+        var s = FinSettings()
+        s.interfaceMaterial = .flat
+        model.build(rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], optionsJSON: s.optionsJSON(), tunablesJSON: s.tunablesJSON())
+        await model.settled()
+        #expect(model.error == nil, "\(model.error ?? "")")
+        #expect(model.readoutHasCrest, "crestRanges is not empty with Flat contacts on")
+        s.interfaceMaterial = .off
+        model.build(rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1], optionsJSON: s.optionsJSON(), tunablesJSON: s.tunablesJSON())
+        await model.settled()
+        #expect(!model.readoutHasCrest)
+    }
+
+    @Test func removingAFinRemeasuresTheReadoutsAndFullBuildsTellTheIslandCard() async throws {
+        let part = try #require(try loadParts(path: try tShapePath()).first)
+        let identity: [Double] = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+        let model = BuildModel(part: part)
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
+        await model.settled()
+        let all = try ReadoutBuilt(summaryJSON: try #require(model.latest).summaryJson(), finCount: model.records?.fins.count ?? 0)
+        #expect(all.islandsBuild == nil, "an Auto build tells the card nothing")
+        // one fin removed: the ids come from the keys, the numbers from the engine
+        let key = try #require(model.keys.first?.sig)
+        let ids = model.readoutRemovedIDs([key])
+        #expect(ids.count == 1)
+        let text = try #require(model.readoutResult).afterRemovalJson(removedIds: ids)
+        let after = try JSONDecoder().decode(ReadoutSections.AfterRemoval.self, from: Data(text.utf8))
+        #expect(after.removed == 1)
+        #expect(after.addedVolumeMm3 < all.finVolumeMm3 + all.padVolumeMm3, "the kept fins hold less")
+        // a Full build reports islandsBuild, which the card reads
+        var s = FinSettings()
+        s.mode = .full
+        model.build(rotation: identity, optionsJSON: s.optionsJSON(), tunablesJSON: s.tunablesJSON())
+        await model.settled()
+        #expect(model.error == nil, "\(model.error ?? "")")
+        let full = try ReadoutBuilt(summaryJSON: try #require(model.latest).summaryJson(), finCount: model.records?.fins.count ?? 0)
+        #expect(full.islandsBuild != nil, "a Full build carries islandsBuild")
+        let bare = full.islandsBuild.map { $0.all == true ? UInt64(2) : UInt64($0.bare ?? 0) }
+        // two starts: a card unless Full walled every one; without a Full build it always warns
+        #expect(islandCard(count: 2, bare: bare, capped: false, markersVisible: true).isEmpty == (bare == 0))
+        #expect(!islandCard(count: 2, bare: nil, capped: false, markersVisible: true).isEmpty)
+    }
+
     @Test func theEnginesSummaryReadsAsFinsAndGrams() async throws {
         let part = try #require(try loadParts(path: try tShapePath()).first)
         let model = BuildModel(part: part)
