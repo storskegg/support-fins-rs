@@ -166,3 +166,26 @@ The port is accepted when it passes the ported JS tests. See `docs/PORT-PLAN.md`
 The orchestrator reads your diff side by side with the JS. Review comments name the file and
 line, what JS does, and what to change. If a ticket fails review twice, it is reassigned to
 another agent. A third attempt isn't yours to make.
+
+## Merging and `Cargo.lock`
+
+`Cargo.lock` is generated, so two branches that both touch it never merge by hand. `.gitattributes`
+marks it `merge=ours`: a local `git merge` or `git rebase` takes one side whole instead of leaving
+conflict markers. That needs a driver, which a repo cannot ship, so run this once per clone (worktrees
+share it):
+
+```sh
+git config merge.ours.driver true
+```
+
+After any merge or rebase that touched `Cargo.lock` (or a `Cargo.toml`), whoever did it regenerates the
+lock from the manifests and commits the result:
+
+```sh
+cargo update -w        # or: cargo metadata --format-version 1 > /dev/null
+git add Cargo.lock && git commit -m "Cargo.lock: regenerate after merge"
+```
+
+`cargo update -w` only re-resolves the workspace's own entries and keeps every locked version of an
+external crate. GitHub's merge button ignores `.gitattributes`: when a PR shows a `Cargo.lock`
+conflict, merge `origin/main` into the branch locally, regenerate, and push.
