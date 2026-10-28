@@ -12,6 +12,17 @@ struct ViewSettingsTests {
         return d
     }
 
+    @Test func rebuildWhileDraggingIsOnByDefaultAndRemembered() {
+        let d = defaults()
+        let s = ViewSettings(controller: nil, defaults: d)
+        #expect(s.rebuildWhileDragging)
+        s.rebuildWhileDragging = false
+        #expect(d.bool(forKey: "sf.rebuildWhileDragging") == false)
+        #expect(!ViewSettings(controller: nil, defaults: d).rebuildWhileDragging)
+        s.rebuildWhileDragging = true
+        #expect(ViewSettings(controller: nil, defaults: d).rebuildWhileDragging)
+    }
+
     @Test func theMousePresetStartsAsDefault() {
         let s = ViewSettings(controller: nil, defaults: defaults())
         #expect(s.navPreset == .default)

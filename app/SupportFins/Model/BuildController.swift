@@ -42,6 +42,12 @@ extension BuildModel: BuildDriving {}
 /// - **The spinner** (`armSpinner`, `ui/finbuild.js:101-106`) shows 300 ms after a build starts, only if it is
 ///   still running, and goes the moment the build lands, fails or is dropped. The fins on screen stay (greyed
 ///   by the view, `building`) until the fresh build lands.
+/// - **Live rebuild while a ring is dragged** (a native improvement; the web rebuilds when the drag ends, and
+///   "Rebuild While Dragging" off keeps that): `refreshLive()` per new pose builds at once, with no debounce, and
+///   a newer pose supersedes a build in flight that is younger than `liveLandAfter` (the engine stops the stale
+///   one part-way). An older build is let land instead, so a build slower than the pose events still shows
+///   (the fins are drawn pale while they lag the pose); the newest pose is then built next. `endLive()` on the
+///   release does the final build at the released pose.
 ///
 /// Time comes from the injected `sleep`, so tests drive it by hand.
 @MainActor
@@ -51,6 +57,13 @@ final class BuildController {
     static let debounce = Duration.milliseconds(180)
     /// `ui/finbuild.js:105`
     static let spinnerDelay = Duration.milliseconds(300)
+    /// How long a live build may run before a newer pose stops superseding it and waits for it to land. A build
+    /// younger than this has done little, and its pose is already stale, so the newer pose replaces it; an older
+    /// one is let finish, or a build slower than the pose events (60 Hz, 17 ms; a 22 ms torus) would be superseded
+    /// every time and the fins would not move until the ring paused. Measured with `bench_drag` on 8, 25 and 100 ms
+    /// and never / always: at 8 ms the fins trail the ring by 1-5 degrees on the stress proxies; always (or 25 /
+    /// 100 ms, which are the same for builds under that) lands 1 build in 90 and trails by 15-23 degrees.
+    static let liveLandAfter = Duration.milliseconds(8)
 
     /// The "Add fins" toggle (`fins-toggle`).
     private(set) var enabled = false
@@ -63,6 +76,15 @@ final class BuildController {
     @ObservationIgnored private var pending: Task<Void, Never>?
     @ObservationIgnored private var spinner: Task<Void, Never>?
     @ObservationIgnored private var watcher: Task<Void, Never>?
+    /// Called after a live build starts without the window having asked (a newer pose waited for the last one to
+    /// land), so the window can restyle the fins.
+    @ObservationIgnored var onLiveBuild: (@MainActor () -> Void)?
+    @ObservationIgnored private var liveActive = false
+    @ObservationIgnored private var liveMayLand = false
+    @ObservationIgnored private var livePending = false
+    @ObservationIgnored private var liveTimer: Task<Void, Never>?
+    @ObservationIgnored private var liveChain: Task<Void, Never>?
+    @ObservationIgnored private var lastRequest: BuildRequest?
 
     /// - Parameters:
     ///   - request: the pose and options to build *now*, or nil when there is no part to build.
@@ -98,15 +120,72 @@ final class BuildController {
     func refresh() {
         pending?.cancel()
         pending = nil
+        stopLive()
         guard enabled, let req = request() else {
             // no build wanted now: drop any in flight one so it can't re-add fins (finbuild.js:200-216)
             stopSpinner()
+            lastRequest = nil
             driver.cancel()
             driver.clear()
             return
         }
+        lastRequest = req
         let g = driver.build(rotation: req.rotation, optionsJSON: req.optionsJSON, tunablesJSON: req.tunablesJSON)
         armSpinner(for: g)
+    }
+
+    // MARK: live drag
+
+    /// A new pose while a ring is dragged: build it now. A build in flight is superseded (the engine stops it)
+    /// unless it has already run `liveLandAfter`; that one is allowed to land, and the newest pose is built then.
+    func refreshLive() {
+        pending?.cancel()
+        pending = nil
+        guard enabled else { return }
+        liveActive = true
+        if driver.building, liveMayLand {
+            livePending = true
+            return
+        }
+        guard let req = request() else { return }
+        livePending = false
+        liveMayLand = false
+        lastRequest = req
+        let g = driver.build(rotation: req.rotation, optionsJSON: req.optionsJSON, tunablesJSON: req.tunablesJSON)
+        armSpinner(for: g)
+        let sleep = self.sleep
+        liveTimer?.cancel()
+        liveTimer = Task { [weak self] in
+            do { try await sleep(Self.liveLandAfter) } catch { return }
+            guard !Task.isCancelled, let self, self.driver.generation == g else { return }
+            self.liveMayLand = true
+        }
+        liveChain?.cancel()
+        liveChain = Task { [weak self] in
+            guard let self else { return }
+            await self.driver.settled()
+            guard !Task.isCancelled, self.driver.generation == g, self.livePending, self.liveActive else { return }
+            self.refreshLive()
+        }
+        onLiveBuild?()
+    }
+
+    /// The ring was released: the final build at the released pose, at once. The live build in flight is that
+    /// build when it was made for the same request; otherwise the pose moved on after it, and it is superseded.
+    func endLive() {
+        let wasLive = liveActive
+        stopLive()
+        guard enabled, let req = request() else { refresh(); return }
+        if wasLive, driver.building, lastRequest == req { return }
+        refresh()
+    }
+
+    private func stopLive() {
+        liveActive = false
+        livePending = false
+        liveMayLand = false
+        liveTimer?.cancel(); liveTimer = nil
+        liveChain?.cancel(); liveChain = nil
     }
 
     // MARK: spinner

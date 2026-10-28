@@ -22,6 +22,9 @@ final class BuildModel {
     private(set) var records: BuildRecords?
     /// Each of `records.fins`' key (`FinKey.assign`), in the same order.
     private(set) var keys: [FinKey.Assigned] = []
+    /// The pose (nine numbers, column-major) `latest` was built in: the fins lag the pose while it differs from the
+    /// session's (a live rebuild while a ring is dragged).
+    private(set) var latestRotation: [Double]?
     /// A build is outstanding.
     private(set) var building = false
     /// The newest request's failure (the engine's JS-identical message), or nil.
@@ -37,6 +40,7 @@ final class BuildModel {
     @ObservationIgnored private var listener: Listener!
     /// The generation whose delivery is still wanted; nil after `cancel()` / `clear()`.
     @ObservationIgnored private var wanted: UInt64?
+    @ObservationIgnored private var wantedRotation: [Double]?
     @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
 
     init(part: Part) {
@@ -57,6 +61,7 @@ final class BuildModel {
         let g = builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: tunablesJSON, listener: listener)
         generation = g
         wanted = g
+        wantedRotation = rotation
         return g
     }
 
@@ -73,6 +78,7 @@ final class BuildModel {
         cancel()
         error = nil
         latest = nil
+        latestRotation = nil
         summary = nil
         records = nil
         keys = []
@@ -110,6 +116,7 @@ final class BuildModel {
                 self.records = records
                 keys = FinKey.assign(records.fins)
                 latest = result
+                latestRotation = wantedRotation
                 error = nil
             } catch {
                 // the engine's JSON is the contract (docs/FFI.md): a mismatch is a bug to see, not to hide

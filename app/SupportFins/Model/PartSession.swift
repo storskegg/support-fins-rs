@@ -29,6 +29,12 @@ final class PartSession {
     /// Are the fins on (the toolbar's Add fins)?
     var finsOn = false
     private(set) var history = History<SessionSnapshot>()
+    /// A rotate ring is being dragged (set by `RingEdits`). Not part of the history: the drag is one step, taken
+    /// when it ends. The window rebuilds the fins live while this is true (`BuildWiring`).
+    var ringDragging = false
+    /// How many ring drags have begun: a drag that began and ended between two reactions still shows.
+    private(set) var ringDrags = 0
+    func ringDragBegan() { ringDragging = true; ringDrags += 1 }
     /// Counts undo / redo restores, so a view can tell "the pose is back" from "the pose never left".
     private(set) var restores = 0
 

@@ -16,6 +16,7 @@ struct ContentView: View {
             .focusedSceneValue(\.session, model.session)
             .focusedSceneValue(\.layFace, model.layFace)
             .focusedSceneValue(\.rotate, model.rotate)
+            .focusedSceneValue(\.viewSettings, model.view)
             .focusedSceneValue(\.toolbar, toolbar)
             .focusedSceneValue(\.exporter, model.wiring?.exporter)
             .focusedSceneValue(\.removal, model.wiring?.removal)

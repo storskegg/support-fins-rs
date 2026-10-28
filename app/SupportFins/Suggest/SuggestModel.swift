@@ -44,15 +44,20 @@ final class SuggestModel {
     /// The button's label (`Ranking…` while it runs, as the page's).
     var buttonTitle: String { isRanking ? "Ranking…" : "Suggest orientation" }
 
+    /// The wide search's candidate density: ten times the web's candidate poses, in less wall time than the web
+    /// (docs/PERF-M5-suggest.md).
+    static let searchDensity = 10.0
+
     /// Rank the part's poses. `currentBore` is `summary_json`'s `boreWalls` for the pose on screen; `density` the
     /// material's g/cm³.
     func rank(thresholdDegrees: Double, optionsJSON: String, currentBore: Int, density: Double) {
         guard let suggester, !isRanking else { return }
         state = .ranking
         picked = nil
-        wanted = suggester.suggest(
+        wanted = suggester.suggestWide(
             thresholdDeg: thresholdDegrees, optsJson: optionsJSON,
-            context: SuggestContext(currentBore: UInt64(max(0, currentBore)), density: density), listener: sink)
+            context: SuggestContext(currentBore: UInt64(max(0, currentBore)), density: density),
+            density: Self.searchDensity, listener: sink)
     }
 
     /// A click on row `index`: turn the part to its pose (one undo step once `PartSession` holds the pose).

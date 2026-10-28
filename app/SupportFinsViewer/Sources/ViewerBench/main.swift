@@ -7,7 +7,7 @@ import simd
 import Viewer
 
 // Headless frame-time benchmark: `swift run -c release viewer-bench [--tris N] [--fins N] [--tines N]
-// [--frames N] [--size WxH] [--scenario orbit|panzoom|drag|all] [--no-supports] [--json]`.
+// [--frames N] [--size WxH] [--scenario orbit|panzoom|drag|swap|liveDrag|all] [--no-supports] [--json]`.
 // Renders offscreen through the viewer's own colour pass; prints one JSON line a scenario.
 @MainActor
 func run() async {

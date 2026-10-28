@@ -17,6 +17,15 @@ struct SuggestModelTests {
         #expect(model.buttonTitle == "Suggest orientation")
     }
 
+    @Test func theAppRunsTheWideSearch() async throws {
+        #expect(SuggestModel.searchDensity == 10, "ten times the web's candidate poses")
+        let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
+        model.rank(thresholdDegrees: 45, optionsJSON: "{}", currentBore: 0, density: 1.24)
+        #expect(await eventually { !model.isRanking })
+        guard case .ready = model.state else { Issue.record("the wide ranking did not finish: \(model.state)"); return }
+        #expect(!model.rows.isEmpty)
+    }
+
     @Test func aPartThatNeedsNoFinsGetsTheGreenRowAndTheWinAsTheNote() async throws {
         let model = SuggestModel(part: try TestParts.cube(), pose: FakePose().access)
         model.rank(thresholdDegrees: 45, optionsJSON: "{}", currentBore: 0, density: 1.24)
