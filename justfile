@@ -64,8 +64,9 @@ bench-suggest:
     deno run -A bench/suggest.js
     cargo run --release -q -p sf-testkit --example bench_suggest
 
-# Build sf-ffi and generate the SupportFinsCore Swift package: the UniFFI Swift source (committed) and the
-# XCFramework around the static library (gitignored, rebuilt here).
+# Build sf-ffi and generate the SupportFinsCore Swift package: the UniFFI Swift source and the
+# XCFramework around the static library. Both are generated and gitignored, never committed: a fresh clone runs
+# `just app-core app-project` (or any recipe that depends on them) before it can build the app.
 swift-bindings:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -82,6 +83,14 @@ swift-bindings:
     cp "$gen/sf_ffiFFI.modulemap" "$gen/headers/module.modulemap"
     rm -rf "$pkg/sf_ffiFFI.xcframework"
     xcodebuild -create-xcframework -library "$lib" -headers "$gen/headers" -output "$pkg/sf_ffiFFI.xcframework"
+
+# Generate the Swift bindings only when they are missing (a fresh clone), for recipes that need them but not a rebuild.
+_bindings-present:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f app/SupportFinsCore/Sources/SupportFinsCore/sf_ffi.swift ] || [ ! -d app/SupportFinsCore/sf_ffiFFI.xcframework ]; then
+        just swift-bindings
+    fi
 
 # Regenerate the Swift package and run its tests.
 app-core: swift-bindings
@@ -117,7 +126,7 @@ bench-load *inputs:
     target/release/examples/bench_load {{inputs}}
 
 # Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5.md, "Rendering"); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
-bench-render *args:
+bench-render *args: _bindings-present
     swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
 
 # Local port dashboard at http://127.0.0.1:8787: milestones, tasks and agents (tools/dashboard/state.json) beside live load, build/test processes, worktree activity, PRs and commits; pushed live every 2 s.
