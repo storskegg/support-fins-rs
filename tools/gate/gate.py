@@ -6,7 +6,9 @@
 Always: fmt, clippy, test (cargo test --workspace), deno (the oracle library tests), cli-parity.
 When app/ or the bindings (crates/sf-ffi/) differ from origin/main (committed or not), also:
 app-core (regenerate the Swift bindings, swift test), app-project (XcodeGen), app-test (the viewer
-package's `swift test`, then the app's xcodebuild tests; takes the machine lock).
+package's `swift test`, then the app's xcodebuild tests; takes the machine lock). app-core and app-project
+always run before app-test (even with --only), because the generated Xcode project goes stale when Swift files
+are added; the table prints the test count so a silent skip shows.
 `--all` forces the app gates, `--no-app` skips them, `--only` runs just the named ones.
 
 Every gate runs even when an earlier one fails, with its output live and also in
@@ -50,6 +52,25 @@ def app_changed():
     return any(p.startswith(APP_PATHS) for p in committed + dirty)
 
 
+def test_count(name):
+    """Tests run, read from the gate's log, so a silently skipped file shows as a lower number."""
+    import re
+    try:
+        text = open(f"target/gate/{name}.log", errors="replace").read()
+    except OSError:
+        return ""
+    if name == "test":
+        n = sum(int(m) for m in re.findall(r"test result: \w+\. (\d+) passed", text))
+        return f"{n} tests"
+    if name == "app-test":
+        # swift test: "Executed N tests"; xcodebuild: "Executed N tests" too -- one figure per run, summed per tool
+        runs = re.findall(r"Test Suite '(?:All tests|Selected tests)' (?:passed|failed).*\n\s*Executed (\d+) tests?", text)
+        swift = re.findall(r"Executed (\d+) tests?", text)
+        n = [int(x) for x in runs] or [int(x) for x in swift]
+        return f"{sum(n)} tests ({', '.join(map(str, n))})" if n else "0 tests counted"
+    return ""
+
+
 def fmt_time(s):
     return f"{int(s // 60)}m{int(s % 60):02d}s" if s >= 60 else f"{s:.1f}s"
 
@@ -68,6 +89,12 @@ def main(argv):
         print("gate: app/ and the bindings are unchanged vs origin/main; app gates skipped", flush=True)
     if only is not None:
         gates = [g for g in BASE + APP if g[0] in only]
+    if any(g[0] == "app-test" for g in gates):
+        # the Xcode project is generated and gitignored: a stale one silently skips test files added since it was
+        # made (201 tests run of 211). So the app tests are always preceded by a fresh bindings + project generation.
+        have = [g[0] for g in gates]
+        gates = [g for g in APP if g[0] != "app-test" and g[0] not in have] + gates
+        gates.sort(key=lambda g: [n for n, _ in BASE + APP].index(g[0]))
     os.makedirs("target/gate", exist_ok=True)
     results = []
     for name, cmd in gates:
@@ -83,11 +110,11 @@ def main(argv):
         results.append((name, code == 0, time.time() - t))
         print(f"=== gate: {name}: {'pass' if code == 0 else f'FAIL (exit {code}), log target/gate/{name}.log'}", flush=True)
     w = max(len(r[0]) for r in results) if results else 4
-    print("\n" + "gate".ljust(w) + "  result  time")
-    print("-" * (w + 16))
+    print("\n" + "gate".ljust(w) + "  result  time    tests")
+    print("-" * (w + 26))
     for name, ok, secs in results:
-        print(f"{name.ljust(w)}  {'pass' if ok else 'FAIL'}    {fmt_time(secs)}")
-    print("-" * (w + 16))
+        print(f"{name.ljust(w)}  {'pass' if ok else 'FAIL'}    {fmt_time(secs).ljust(7)} {test_count(name)}")
+    print("-" * (w + 26))
     total = sum(r[2] for r in results)
     failed = [r[0] for r in results if not r[1]]
     print(f"{'total'.ljust(w)}  {'FAIL' if failed else 'pass'}    {fmt_time(total)}")
