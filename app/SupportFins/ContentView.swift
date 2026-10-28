@@ -6,6 +6,7 @@ struct ContentView: View {
     @Environment(\.documentConfiguration) private var configuration
     @State private var model = ViewerModel()
     @State private var inspector = true
+    @State private var settings = SettingsStore().load()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -22,7 +23,7 @@ struct ContentView: View {
         }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
-                InspectorView(controller: controller)
+                InspectorView(controller: controller, settings: $settings)
                     .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
             }
         }
