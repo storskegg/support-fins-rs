@@ -1,0 +1,7 @@
+[build]
+# Every worktree compiles through one shared sccache (tools/sccache/rustc-wrapper; 30 GB cap).
+# The path is relative to the directory that holds .cargo/, so it is the worktree's own copy.
+rustc-wrapper = "tools/sccache/rustc-wrapper"
+# sccache cannot cache incremental compilations, and with incremental on the workspace crates
+# (the ones that change) would never hit the cache.
+incremental = false
