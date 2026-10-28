@@ -51,7 +51,7 @@ final class BuildModel {
     func build(rotation: [Double], optionsJSON: String) -> UInt64 {
         error = nil
         building = true
-        let g = builder.build(rot: rotation, optsJson: optionsJSON, listener: listener)
+        let g = builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: "{}", listener: listener)
         generation = g
         wanted = g
         return g
