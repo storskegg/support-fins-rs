@@ -7,7 +7,7 @@ use std::sync::Arc;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
 use sf_io::obj::read_obj;
 use sf_io::stl::read_stl;
-use sf_io::threemf::{PartKind, ReadExtra, ThreeMfObject, read_three_mf};
+use sf_io::threemf::{PartColors, PartKind, ReadExtra, ThreeMfObject, read_three_mf};
 
 use crate::gpu::GpuBuffer;
 
@@ -136,7 +136,12 @@ pub fn island_card(count: u64, bare: Option<u64>, capped: bool, markers_visible:
 }
 
 /// A slicer's parts with the uncut positions they were cut from (`readPart`'s `slicer`).
-pub(crate) type Slicer = (Vec<f64>, Vec<ReadExtra>);
+pub(crate) struct Slicer {
+    /// the object's positions before the negative parts were cut out of it
+    pub(crate) positions: Vec<f64>,
+    pub(crate) colors: Option<PartColors>,
+    pub(crate) extras: Vec<ReadExtra>,
+}
 
 /// One object of a file: its welded topology (which owns the source soup in the model frame).
 #[derive(uniffi::Object)]
@@ -147,6 +152,8 @@ pub struct Part {
     /// A 3MF object that carries a slicer's own parts: its uncut positions and those parts, which a 3MF
     /// export writes back beside the part (cli.js `readPart`).
     slicer: Option<Arc<Slicer>>,
+    /// a painted 3MF's colours by triangle of the (cut) part, written back by a 3MF export
+    colors: Option<PartColors>,
     topo: Arc<Topology>,
     size: [f64; 3],
     notes: Vec<String>,
@@ -159,6 +166,7 @@ impl Part {
         stem: String,
         positions: Vec<f64>,
         slicer: Option<Slicer>,
+        colors: Option<PartColors>,
         notes: Vec<String>,
     ) -> Part {
         let mut lo = [f64::INFINITY; 3];
@@ -181,6 +189,7 @@ impl Part {
             name,
             stem,
             slicer: slicer.map(Arc::new),
+            colors,
             topo: Arc::new(topo),
             size,
             notes,
@@ -201,6 +210,11 @@ impl Part {
     /// See the field.
     pub(crate) fn slicer(&self) -> Option<&Slicer> {
         self.slicer.as_deref()
+    }
+
+    /// See the field.
+    pub(crate) fn colors(&self) -> Option<&PartColors> {
+        self.colors.as_ref()
     }
 }
 
@@ -328,7 +342,13 @@ fn plural(n: usize, one: &str, other: &str) -> String {
 }
 
 /// An object read from a file: name, positions, its slicer's parts, import notes.
-type Loaded = (String, Vec<f64>, Option<Slicer>, Vec<String>);
+type Loaded = (
+    String,
+    Vec<f64>,
+    Option<Slicer>,
+    Option<PartColors>,
+    Vec<String>,
+);
 
 /// A 3MF object with a slicer's negative parts cut out of it, as `web/ui/io.js` does at import
 /// (`cutChosen`), and the notes `renderImportNote` writes for it (the cut ones, and the kept
@@ -340,10 +360,14 @@ fn cut_object(o: ThreeMfObject) -> Loaded {
         .iter()
         .filter(|e| e.kind != PartKind::Negative)
         .count();
-    let slicer = (!o.extras.is_empty()).then(|| (o.positions.clone(), o.extras.clone()));
+    let slicer = (!o.extras.is_empty()).then(|| Slicer {
+        positions: o.positions.clone(),
+        colors: o.colors.clone(),
+        extras: o.extras.clone(),
+    });
     let mut notes = Vec::new();
-    let positions = if has_negative {
-        let c = sf_cut::cut_negatives(&o.positions, None, &o.extras);
+    let (positions, colors) = if has_negative {
+        let c = sf_cut::cut_negatives(&o.positions, o.colors.as_ref(), &o.extras);
         if c.cut > 0 {
             notes.push(format!(
                 "cut out {}",
@@ -369,9 +393,9 @@ fn cut_object(o: ThreeMfObject) -> Loaded {
             )),
             _ => {}
         }
-        c.positions
+        (c.positions, c.colors)
     } else {
-        o.positions
+        (o.positions, o.colors)
     };
     if kept > 0 {
         notes.push(format!(
@@ -383,7 +407,7 @@ fn cut_object(o: ThreeMfObject) -> Loaded {
             )
         ));
     }
-    (o.name, positions, slicer, notes)
+    (o.name, positions, slicer, colors, notes)
 }
 
 /// STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
@@ -402,18 +426,19 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
             stem(&path),
             read_stl(&bytes).map_err(|e| format(e.0))?,
             None,
+            None,
             vec![],
         ));
     } else if lower.ends_with(".obj") {
         for o in read_obj(&bytes).map_err(format)?.objects {
-            parts.push((o.name, o.positions, None, vec![]));
+            parts.push((o.name, o.positions, None, None, vec![]));
         }
     } else if lower.ends_with(".3mf") {
         let m = read_three_mf(&bytes).map_err(format)?;
         drop(bytes);
         let objects = m.objects;
         if objects.is_empty() {
-            parts.push((stem(&path), m.positions, None, vec![]));
+            parts.push((stem(&path), m.positions, None, None, vec![]));
         } else {
             drop(m.positions); // the merged soup of every object: not needed beside them
             parts.extend(objects.into_iter().map(cut_object));
@@ -421,7 +446,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     } else {
         return Err(format("reads .stl, .3mf and .obj only".into()));
     }
-    parts.retain(|(_, p, _, _)| !p.is_empty());
+    parts.retain(|(_, p, _, _, _)| !p.is_empty());
     if parts.is_empty() {
         return Err(format("no triangles in the file".into()));
     }
@@ -429,13 +454,13 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     Ok(parts
         .into_iter()
         .enumerate()
-        .map(|(i, (name, pos, slicer, notes))| {
+        .map(|(i, (name, pos, slicer, colors, notes))| {
             let name = if name.is_empty() {
                 format!("{base} {}", i + 1)
             } else {
                 name
             };
-            Arc::new(Part::new(name, base.clone(), pos, slicer, notes))
+            Arc::new(Part::new(name, base.clone(), pos, slicer, colors, notes))
         })
         .collect())
 }
