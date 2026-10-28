@@ -83,7 +83,10 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   sagRisk, smallHoleRegions, patchCount, patchStats, skipped, rejected, servedRegions, bare, floating, sway,
   tallRibs }`. `stats` and `report` are the CLI's `--json` stats and one-line report; **`patchStats` and
   `skipped` carry only the counters that counted anything** (JS leaves the others absent, #23).
-- **`records_json()`**: `{ fins: [...], props: [...] }`. A `fins` entry is `{ id, kind (prop|wedge|sway), height,
+- **`records_json()`**: `{ fins: [...], props: [...], crestRanges: [[from, to), ...] }`. `crestRanges` are the vertex ranges
+  (into the `fins()` buffer) of the interface crest, the runs of consecutive tagged triangles the page draws in the
+  second material (`ui/scene.js` `meshFrom`; a triangle is crest when its first vertex is tagged, `splitInterface`):
+  they are empty unless the interface material (`iface`) is on. A `fins` entry is `{ id, kind (prop|wedge|sway), height,
   length, tines, rows, stilt, lean, bearing, span, short, fill, joined, braces?, ribs?, triRanges, line }`;
   `triRanges` are `[from, to)` **vertex** ranges into the `fins()` buffer (what per-fin removal cuts out). A
   `props` entry is `{ id?, region?, tines, span, height, fill, squat, rimWall, inBore? }`: **a fill-pass wall has no

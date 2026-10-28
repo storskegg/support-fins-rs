@@ -255,5 +255,32 @@ pub fn records(b: &FinsBuilt) -> Json {
     obj(vec![
         ("fins", Json::Arr(b.fins.iter().map(fin).collect())),
         ("props", Json::Arr(b.props.iter().map(prop).collect())),
+        (
+            "crestRanges",
+            Json::Arr(
+                crest_ranges(&b.triangles)
+                    .into_iter()
+                    .map(|[a, z]| Json::Arr(vec![u(a), u(z)]))
+                    .collect(),
+            ),
+        ),
     ])
+}
+
+/// The interface crest as the page draws it (`meshFrom` in ui/scene.js: "one geometry group per run"): the
+/// `[from, to)` vertex ranges of the runs of consecutive tagged triangles of the fin soup, a triangle
+/// being the crest when its first vertex is tagged (`splitInterface`, prop/crest.js).
+fn crest_ranges(tris: &[sf_engine::types::V4]) -> Vec<[usize; 2]> {
+    let mut runs: Vec<[usize; 2]> = Vec::new();
+    for (t, v) in tris.chunks_exact(3).enumerate() {
+        if v[0][3] != 1.0 {
+            continue;
+        }
+        let (from, to) = (t * 3, t * 3 + 3);
+        match runs.last_mut() {
+            Some(last) if last[1] == from => last[1] = to,
+            _ => runs.push([from, to]),
+        }
+    }
+    runs
 }

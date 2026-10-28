@@ -187,3 +187,66 @@ fn the_tunables_change_the_build() {
     assert!(build_part(&part, &rot, "{}", "[1]").is_err());
     assert!(build_part(&part, &rot, "{\"tallRibs\":\"yes\"}", "{}").is_err());
 }
+
+#[test]
+fn crest_ranges_cover_exactly_the_tagged_triangles() {
+    use sf_cli::entry::{PageRequest, engine_request, options_from_dialog};
+    use sf_engine::config::Config;
+    use sf_engine::fins::build::build_fins;
+    use sf_engine::overhangs::analyze;
+
+    let part = part_of(&parse("{\"model\":\"sphere\"}").unwrap(), "crest");
+    let rot = sf_testkit::rot_x(30.0);
+    let tunables = "{\"iface\":\"all\"}";
+    let rec = parse(
+        &build_part(&part, &rot, "{}", tunables)
+            .unwrap()
+            .records_json(),
+    )
+    .unwrap();
+    let ranges: Vec<(usize, usize)> = arr(field(&rec, "crestRanges"))
+        .iter()
+        .map(|r| (num(&arr(r)[0]) as usize, num(&arr(r)[1]) as usize))
+        .collect();
+    assert!(!ranges.is_empty(), "interface 'all' tags the crest");
+
+    // the same build, straight from the engine: which triangles carry the tag
+    let page = PageRequest {
+        tunables: sf_io::fins_opts::tunables_from_json(&parse(tunables).unwrap()),
+        ..Default::default()
+    };
+    let req = engine_request(&options_from_dialog(&[]).unwrap(), Some(&page)).unwrap();
+    let a = analyze(part.topology(), req.threshold, &rot);
+    let built = build_fins(part.topology(), &a, &rot, &req.opts, &Config::default());
+    let tagged: Vec<usize> = built
+        .triangles
+        .chunks_exact(3)
+        .enumerate()
+        .filter(|(_, v)| v[0][3] == 1.0)
+        .map(|(t, _)| t)
+        .collect();
+    assert!(!tagged.is_empty());
+    let covered: Vec<usize> = ranges.iter().flat_map(|&(a, z)| (a / 3)..(z / 3)).collect();
+    assert_eq!(
+        covered, tagged,
+        "the ranges are exactly the tagged triangles"
+    );
+    // maximal runs, whole triangles, in order
+    assert!(
+        ranges
+            .iter()
+            .all(|&(a, z)| a % 3 == 0 && z % 3 == 0 && a < z)
+    );
+    assert!(
+        ranges.windows(2).all(|w| w[0].1 < w[1].0),
+        "adjacent runs are merged"
+    );
+    // without the interface material there is no crest
+    let none = parse(
+        &build_part(&part, &rot, "{}", "{\"wallLines\":2}")
+            .unwrap()
+            .records_json(),
+    )
+    .unwrap();
+    assert!(arr(field(&none, "crestRanges")).is_empty());
+}
