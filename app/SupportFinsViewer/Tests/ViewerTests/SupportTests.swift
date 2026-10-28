@@ -119,6 +119,18 @@ struct SupportRenderTests {
         #expect(count(render(r), isRed) == 0)
     }
 
+    @Test func staleFinsArePalerWhileARebuildIsOut() throws {
+        let r = try #require(ViewerRenderer(), "no Metal device")
+        r.setSupports(layer(r, finQuads: [(0, 0)]))
+        let fresh = count(render(r), isFin)
+        r.dimSupports = true
+        let dim = render(r)
+        #expect(fresh > 100 && count(dim, isFin) < fresh / 4, "the same fins, paler: they stay on screen")
+        #expect(count(dim) { r, g, b in g > b && g > r && g > 60 } > 100, "still green-ish, just toward the background")
+        r.dimSupports = false
+        #expect(count(render(r), isFin) == fresh)
+    }
+
     @Test func aNewBuildResetsTheMasks() throws {
         let r = try #require(ViewerRenderer(), "no Metal device")
         r.setSupports(layer(r, finQuads: [(0, 0)]))
