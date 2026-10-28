@@ -38,7 +38,7 @@ struct ContentView: View {
                           open: $strengthOpen) { StrengthPopover(model: strength) }
                 }
                 .padding(.bottom, 14)
-                .onChange(of: controller.rotationDegrees) {
+                .onChange(of: model.session.pose) {
                     suggest.poseChanged()
                     strength.poseChanged()
                 }

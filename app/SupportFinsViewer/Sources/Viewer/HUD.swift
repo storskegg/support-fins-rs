@@ -134,20 +134,3 @@ extension ViewerRenderer {
     public var hasLoadArrow: Bool { loadArrow != nil }
     public var hasLayerFrames: Bool { layerFrames != nil }
 }
-
-/// The matrix that undoes `rotationMatrix(degrees:)`, as the three.js XYZ Euler angles that make `m`
-/// (`Matrix4.makeRotationFromEuler`'s inverse, `Euler.setFromRotationMatrix`), in degrees: how a pose held as
-/// nine numbers (the engine's `Rot3`) is applied to a view that holds Euler degrees.
-public func eulerDegrees(columnMajor e: [Double]) -> SIMD3<Float> {
-    precondition(e.count == 9, "a rotation is nine numbers")
-    let (m11, m12, m13, m22, m23, m32, m33) = (e[0], e[3], e[6], e[4], e[7], e[5], e[8])
-    let y = asin(min(1, max(-1, m13)))
-    var x = 0.0, z = 0.0
-    if abs(m13) < 0.9999999 {
-        x = atan2(-m23, m33)
-        z = atan2(-m12, m11)
-    } else {
-        x = atan2(m32, m22)
-    }
-    return SIMD3(Float(x), Float(y), Float(z)) * 180 / .pi
-}

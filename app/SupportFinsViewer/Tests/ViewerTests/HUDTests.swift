@@ -48,22 +48,6 @@ struct HUDTests {
         #expect(LoadArrowGeometry.length(extent: 5) == 10)
     }
 
-    @Test func aPoseHeldAsNineNumbersTurnsTheViewByTheSameEulerAngles() {
-        for deg in [SIMD3<Float>(0, 0, 0), SIMD3(30, 0, 0), SIMD3(45, 20, -10), SIMD3(-70, 33, 120), SIMD3(10, -80, 5)] {
-            let m = rotationMatrix(degrees: deg)
-            let nine = [m.columns.0, m.columns.1, m.columns.2].flatMap { [Double($0.x), Double($0.y), Double($0.z)] }
-            let back = eulerDegrees(columnMajor: nine)
-            let again = rotationMatrix(degrees: back)
-            #expect(simd_length(again.columns.0 - m.columns.0) < 1e-4 && simd_length(again.columns.1 - m.columns.1) < 1e-4
-                    && simd_length(again.columns.2 - m.columns.2) < 1e-4, "\(deg) -> \(back)")
-        }
-        // looking straight along an axis (gimbal): still the same rotation
-        let m = rotationMatrix(degrees: SIMD3(20, 90, 30))
-        let nine = [m.columns.0, m.columns.1, m.columns.2].flatMap { [Double($0.x), Double($0.y), Double($0.z)] }
-        let again = rotationMatrix(degrees: eulerDegrees(columnMajor: nine))
-        #expect(simd_length(again.columns.0 - m.columns.0) < 1e-3)
-    }
-
     // MARK: offscreen pixels
 
     let size = 256

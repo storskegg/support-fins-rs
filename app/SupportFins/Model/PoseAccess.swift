@@ -1,9 +1,8 @@
-import Viewer
 import simd
 
 /// How the Suggest and Strength models read and turn the part's pose. The pose is the engine's `Rot3`: nine
-/// numbers, column-major, taking model coordinates to print coordinates. `PartSession` (track A) will hold the
-/// pose and make this one undo step; until it lands the controller's Euler angles stand in for it.
+/// numbers, column-major, taking model coordinates to print coordinates. `PartSession` holds the pose and makes
+/// a turn one undo step.
 @MainActor
 struct PoseAccess {
     var rotation: @MainActor () -> [Double]
@@ -13,15 +12,12 @@ struct PoseAccess {
 }
 
 extension PoseAccess {
-    /// The viewer's pose: `rotationDegrees` turned into the matrix `rotationMatrix(degrees:)` makes, and a
-    /// matrix applied as the Euler angles that make it (`eulerDegrees`).
-    static func controller(_ c: ViewerController) -> PoseAccess {
+    /// The window's `PartSession`: the pose it holds, and a turn applied as one undo step (`applySuggestion`
+    /// does `histPush()` then turns the part, `ui/suggest.js:20`).
+    static func session(_ s: PartSession, name: String = "Turn Part") -> PoseAccess {
         PoseAccess(
-            rotation: {
-                let m = rotationMatrix(degrees: c.rotationDegrees)
-                return [m.columns.0, m.columns.1, m.columns.2].flatMap { [Double($0.x), Double($0.y), Double($0.z)] }
-            },
-            apply: { c.rotationDegrees = eulerDegrees(columnMajor: $0) })
+            rotation: { s.pose.columnMajor },
+            apply: { nine in if let pose = Pose(columnMajor: nine) { s.setPose(pose, name: name) } })
     }
 }
 

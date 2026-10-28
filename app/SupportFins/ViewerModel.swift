@@ -47,7 +47,7 @@ extension ViewerModel {
     /// The tools that act on the part's pose (`ui/suggest.js`, `ui/strength.js`).
     fileprivate func makeTools(_ parts: [LoadedPart], controller: ViewerController) {
         let part = parts.count == 1 ? (parts[0].mesh as? CorePart)?.part : nil
-        let pose = PoseAccess.controller(controller)
+        let pose = PoseAccess.session(session)
         suggest = SuggestModel(part: part, pose: pose)
         let strength = StrengthModel(part: part, pose: pose)
         strength.threshold = controller.thresholdDegrees
