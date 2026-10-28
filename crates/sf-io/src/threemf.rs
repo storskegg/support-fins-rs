@@ -970,10 +970,6 @@ pub enum XmlEvent<'a> {
     Close(&'a str),
 }
 
-fn char_at(s: &str, p: usize) -> Option<char> {
-    s.get(p..).and_then(|r| r.chars().next())
-}
-
 /// Port of `scanXML` (web/threemf.js:476-526): walk XML, calling `f` for every open and close
 /// tag. Attribute parsing honours quotes, so a value containing '>' (legal, and Bambu writes
 /// object names verbatim) does not cut the tag short. JS has two callbacks sharing state; here
@@ -986,116 +982,20 @@ pub fn scan_xml(
     xml: &str,
     f: &mut dyn FnMut(XmlEvent) -> Result<(), String>,
 ) -> Result<(), String> {
-    let n = xml.len();
-    let mut i = 0;
-    while i < n {
-        let Some(lt) = xml[i..].find('<').map(|x| i + x) else {
-            break;
-        };
-        // Declarations, comments, CDATA: skip wholesale, none carry geometry.
-        if xml[lt..].starts_with("<!--") {
-            i = xml[lt..].find("-->").map_or(n, |x| lt + x + 3);
-            continue;
-        }
-        if xml[lt..].starts_with("<![CDATA[") {
-            i = xml[lt..].find("]]>").map_or(n, |x| lt + x + 3);
-            continue;
-        }
-        if xml[lt..].starts_with("<?") || xml[lt..].starts_with("<!") {
-            i = xml[lt..].find('>').map_or(n, |x| lt + x + 1);
-            continue;
-        }
-        if xml[lt + 1..].starts_with('/') {
-            let Some(gt) = xml[lt..].find('>').map(|x| lt + x) else {
-                break;
-            };
-            // gt < lt + 2 cannot happen: "</" is followed by the first '>'
-            f(XmlEvent::Close(js_trim(&xml[lt + 2..gt])))?;
-            i = gt + 1;
-            continue;
-        }
-
-        // Element name, then attributes up to an unquoted '>' or '/>'.
-        let mut p = lt + 1;
-        while p < n {
-            let c = char_at(xml, p).unwrap();
-            if is_js_space(c) || c == '/' || c == '>' {
-                break;
-            }
-            p += c.len_utf8();
-        }
-        let name = &xml[lt + 1..p];
-        let mut attrs = Attrs::new();
-        let mut self_closing = false;
-        while p < n {
-            while p < n && is_js_space(char_at(xml, p).unwrap()) {
-                p += char_at(xml, p).unwrap().len_utf8();
-            }
-            if xml[p..].starts_with("/>") {
-                self_closing = true;
-                p += 2;
-                break;
-            }
-            if xml[p..].starts_with('>') {
-                p += 1;
-                break;
-            }
-            let name_start = p;
-            while p < n {
-                let c = char_at(xml, p).unwrap();
-                if is_js_space(c) || c == '=' || c == '/' || c == '>' {
-                    break;
-                }
-                p += c.len_utf8();
-            }
-            let attr = &xml[name_start..p];
-            while p < n && is_js_space(char_at(xml, p).unwrap()) {
-                p += char_at(xml, p).unwrap().len_utf8();
-            }
-            if !xml[p..].starts_with('=') {
-                if !attr.is_empty() {
-                    attrs.insert(attr.to_string(), String::new());
-                } else if p < n {
-                    // DIVERGENCE: JS `continue`s here without advancing `p` (a stray `/` not
-                    // followed by `>`, as in `<a / b>`) and never terminates. No input JS
-                    // finishes on reaches this branch.
-                    return Err("3MF: malformed XML tag".to_string());
-                }
-                continue;
-            }
-            p += 1;
-            while p < n && is_js_space(char_at(xml, p).unwrap()) {
-                p += char_at(xml, p).unwrap().len_utf8();
-            }
-            let value;
-            match char_at(xml, p) {
-                Some(q @ ('"' | '\'')) => {
-                    let end = xml[p + 1..].find(q).map(|x| p + 1 + x);
-                    value = &xml[p + 1..end.unwrap_or(n)];
-                    p = end.map_or(n, |e| e + 1);
-                }
-                _ => {
-                    let start = p;
-                    while p < n {
-                        let c = char_at(xml, p).unwrap();
-                        if is_js_space(c) || c == '/' || c == '>' {
-                            break;
-                        }
-                        p += c.len_utf8();
-                    }
-                    value = &xml[start..p];
-                }
-            }
-            attrs.insert(attr.to_string(), value.to_string());
-        }
-        f(XmlEvent::Open {
+    use crate::xmlscan::{RawEvent, scan_raw};
+    scan_raw(xml, &mut |ev| match ev {
+        RawEvent::Open {
             name,
-            attrs: &attrs,
+            attrs,
             self_closing,
-        })?;
-        i = p;
-    }
-    Ok(())
+        } => f(XmlEvent::Open {
+            name,
+            attrs: &attrs.to_map(),
+            self_closing,
+        }),
+        RawEvent::Close(name) => f(XmlEvent::Close(name)),
+    })
+    .map(|_| ())
 }
 
 /// `local` (web/threemf.js:530-533): strip any namespace prefix: a writer may emit <m:object>,
@@ -1226,31 +1126,93 @@ fn is_safe_integer(n: f64) -> bool {
     n.is_finite() && jsnum::trunc(n) == n && jsnum::abs(n) <= 9007199254740991.0
 }
 
-/// Parse one 3D/*.model part into { objects, items, unit } (web/threemf.js:589-690). `strict`
-/// (the CLI's single-item read) throws on malformed ids, vertices, triangles and transforms.
-fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
-    let mut objects: IndexMap<String, ObjectDef> = IndexMap::new();
-    let mut items: Vec<Item> = Vec::new();
-    let mut groups: IndexMap<String, Vec<String>> = IndexMap::new(); // material/colour group id -> colours
-    let mut codes: IndexMap<String, Arc<Paint>> = IndexMap::new(); // paint string -> its own copy
-    let mut unit = "millimeter".to_string();
-    let mut cur: Option<String> = None; // key of the object being filled
-    let mut group: Option<String> = None; // key of the <basematerials>/<colorgroup> being filled
-    let mut in_vertices = false;
-    // the object `cur` names: JS holds the object itself, and a later object with the same id
-    // replaces the map entry while `cur` keeps filling the one it opened
-    let transform = |s: Option<&String>| -> Result<Option<Matrix>, String> {
+/// The state of a model part's parse: one XML event at a time (`event`), or the bulk of a mesh in
+/// batches (`vertices`, `triangles`) when the chunked scan has already read the numbers.
+struct ModelParser {
+    strict: bool,
+    objects: IndexMap<String, ObjectDef>,
+    items: Vec<Item>,
+    /// material/colour group id -> colours
+    groups: IndexMap<String, Vec<String>>,
+    /// paint string -> its own copy
+    codes: IndexMap<String, Arc<Paint>>,
+    unit: String,
+    /// key of the object being filled
+    cur: Option<String>,
+    /// key of the <basematerials>/<colorgroup> being filled
+    group: Option<String>,
+    in_vertices: bool,
+}
+
+impl ModelParser {
+    fn new(strict: bool) -> Self {
+        ModelParser {
+            strict,
+            objects: IndexMap::new(),
+            items: Vec::new(),
+            groups: IndexMap::new(),
+            codes: IndexMap::new(),
+            unit: "millimeter".to_string(),
+            cur: None,
+            group: None,
+            in_vertices: false,
+        }
+    }
+
+    fn finish(self) -> ModelPart {
+        ModelPart {
+            objects: self.objects,
+            items: self.items,
+            unit: self.unit,
+        }
+    }
+
+    fn transform(&self, s: Option<&String>) -> Result<Option<Matrix>, String> {
         let m = parse_matrix(s.map(|s| s.as_str()));
-        if strict && s.is_some() {
+        if self.strict && s.is_some() {
             let d = m.map(|m| det(&m));
             if m.is_none() || !d.is_some_and(f64::is_finite) || jsnum::abs(d.unwrap()) < 1e-12 {
                 return Err("invalid component/build transform".to_string());
             }
         }
         Ok(m)
-    };
+    }
 
-    scan_xml(xml, &mut |ev| {
+    /// A run of plain `<vertex>` elements (`x y z` already read as `+x || 0`).
+    fn vertices(&mut self, xyz: &[f64]) {
+        // Guard on inVertices: the beam-lattice extension has its own <v> refs,
+        // and only <vertices> children are mesh points.
+        if let (Some(c), true) = (&self.cur, self.in_vertices) {
+            self.objects[c].verts.extend_from_slice(xyz);
+        }
+    }
+
+    /// A run of `<triangle>`s that carry no attribute but v1, v2, v3 (lenient parse only).
+    fn triangles(&mut self, refs: &[f64]) {
+        let Some(c) = &self.cur else { return };
+        let o = &mut self.objects[c];
+        let first = o.tris.len() / 3;
+        o.tris.extend_from_slice(refs);
+        // no pid/p1 of their own: the object's pid and pindex give the colour
+        if let Some(pid) = &o.pid
+            && let Some(g) = self.groups.get(pid.as_str())
+        {
+            let n = o
+                .pindex
+                .as_ref()
+                .map_or(0.0, |s| jsnum::string_to_number(s));
+            if n >= 0.0 && jsnum::trunc(n) == n && n < g.len() as f64 {
+                let col = &g[n as usize];
+                if !col.is_empty() {
+                    for t in first..first + refs.len() / 3 {
+                        set_at(&mut o.rgb, t, col.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    fn event(&mut self, ev: XmlEvent) -> Result<(), String> {
         match ev {
             XmlEvent::Open {
                 name: tag,
@@ -1259,7 +1221,7 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
             } => match local(tag) {
                 "model" => {
                     if let Some(u) = a.get("unit").filter(|u| !u.is_empty()) {
-                        unit = u.clone();
+                        self.unit = u.clone();
                     }
                 }
                 // Colour as the core spec states it (a material table and an index per
@@ -1267,22 +1229,22 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                 // colour resolves as it is read. Ids are per part file, like object ids.
                 "basematerials" | "colorgroup" => {
                     let key = js_string(a.get("id"));
-                    groups.insert(key.clone(), Vec::new());
-                    group = if self_closing { None } else { Some(key) };
+                    self.groups.insert(key.clone(), Vec::new());
+                    self.group = if self_closing { None } else { Some(key) };
                 }
                 "base" => {
-                    if let Some(g) = &group {
-                        groups[g].push(a.get("displaycolor").cloned().unwrap_or_default());
+                    if let Some(g) = &self.group {
+                        self.groups[g].push(a.get("displaycolor").cloned().unwrap_or_default());
                     }
                 }
                 "color" => {
-                    if let Some(g) = &group {
-                        groups[g].push(a.get("color").cloned().unwrap_or_default());
+                    if let Some(g) = &self.group {
+                        self.groups[g].push(a.get("color").cloned().unwrap_or_default());
                     }
                 }
                 "object" => {
-                    if strict
-                        && (objects.contains_key(&js_string(a.get("id")))
+                    if self.strict
+                        && (self.objects.contains_key(&js_string(a.get("id")))
                             || !a
                                 .get("id")
                                 .is_some_and(|id| is_digits(id) && !id.starts_with('0')))
@@ -1290,7 +1252,7 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                         return Err("duplicate or invalid mesh object ID".to_string());
                     }
                     let key = js_string(a.get("id"));
-                    objects.insert(
+                    self.objects.insert(
                         key.clone(),
                         ObjectDef {
                             typ: a
@@ -1308,14 +1270,14 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                             rgb: Vec::new(),
                         },
                     );
-                    cur = if self_closing { None } else { Some(key) };
+                    self.cur = if self_closing { None } else { Some(key) };
                 }
-                "vertices" => in_vertices = true,
+                "vertices" => self.in_vertices = true,
                 "vertex" => {
                     // Guard on inVertices: the beam-lattice extension has its own <v> refs,
                     // and only <vertices> children are mesh points.
-                    if let (Some(c), true) = (&cur, in_vertices) {
-                        if strict
+                    if let (Some(c), true) = (&self.cur, self.in_vertices) {
+                        if self.strict
                             && ["x", "y", "z"].iter().any(|k| {
                                 a.get(*k).is_none_or(|v| {
                                     js_trim(v).is_empty() || !jsnum::string_to_number(v).is_finite()
@@ -1324,15 +1286,15 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                         {
                             return Err("invalid mesh vertex".to_string());
                         }
-                        let o = &mut objects[c];
+                        let o = &mut self.objects[c];
                         o.verts.push(num_or0(a.get("x")));
                         o.verts.push(num_or0(a.get("y")));
                         o.verts.push(num_or0(a.get("z")));
                     }
                 }
                 "triangle" => {
-                    let Some(c) = &cur else { return Ok(()) };
-                    if strict
+                    let Some(c) = &self.cur else { return Ok(()) };
+                    if self.strict
                         && ["v1", "v2", "v3"].iter().any(|k| {
                             !a.get(*k).is_some_and(|v| is_digits(v))
                                 || !is_safe_integer(jsnum::string_to_number(a.get(*k).unwrap()))
@@ -1340,7 +1302,7 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                     {
                         return Err("invalid triangle references".to_string());
                     }
-                    let o = &mut objects[c];
+                    let o = &mut self.objects[c];
                     let t = o.tris.len() / 3;
                     for k in ["v1", "v2", "v3"] {
                         o.tris
@@ -1353,7 +1315,8 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                         let Some(v) = a.get(name).filter(|v| !v.is_empty()) else {
                             continue;
                         };
-                        let own = codes
+                        let own = self
+                            .codes
                             .entry(v.clone())
                             .or_insert_with(|| {
                                 Arc::new(Paint {
@@ -1368,7 +1331,7 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                     let pid = a.get("pid").or(o.pid.as_ref());
                     let pi = a.get("p1").or(o.pindex.as_ref());
                     if let Some(pid) = pid
-                        && let Some(g) = groups.get(pid.as_str())
+                        && let Some(g) = self.groups.get(pid.as_str())
                     {
                         // groups.get(String(pid))?.[+(pi ?? 0)]
                         let n = pi.map_or(0.0, |s| jsnum::string_to_number(s));
@@ -1376,7 +1339,7 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                             let c = &g[n as usize];
                             if !c.is_empty() {
                                 let c = c.clone();
-                                set_at(&mut objects[cur.as_ref().unwrap()].rgb, t, c);
+                                set_at(&mut self.objects[self.cur.as_ref().unwrap()].rgb, t, c);
                             }
                         }
                     }
@@ -1384,40 +1347,124 @@ fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
                 "component" => {
                     // p:path (production extension) points the objectid at a DIFFERENT part
                     // file; absent, the objectid resolves within this same file.
-                    if let Some(c) = &cur {
+                    if let Some(c) = &self.cur {
                         let comp = Component {
                             objectid: js_string(a.get("objectid")),
                             path: attr_local(a, "path")
                                 .filter(|p| !p.is_empty())
                                 .map(String::from),
-                            transform: transform(a.get("transform"))?,
+                            transform: self.transform(a.get("transform"))?,
                         };
-                        objects[c].components.push(comp);
+                        self.objects[c].components.push(comp);
                     }
                 }
                 "item" => {
-                    items.push(Item {
+                    self.items.push(Item {
                         objectid: js_string(a.get("objectid")),
-                        transform: transform(a.get("transform"))?,
+                        transform: self.transform(a.get("transform"))?,
                     });
                 }
                 _ => {}
             },
             XmlEvent::Close(tag) => match local(tag) {
-                "object" => cur = None,
-                "vertices" => in_vertices = false,
-                "basematerials" | "colorgroup" => group = None,
+                "object" => self.cur = None,
+                "vertices" => self.in_vertices = false,
+                "basematerials" | "colorgroup" => self.group = None,
                 _ => {}
             },
         }
         Ok(())
-    })?;
+    }
+}
 
-    Ok(ModelPart {
-        objects,
-        items,
-        unit,
-    })
+/// Parse one 3D/*.model part into { objects, items, unit } (web/threemf.js:589-690). `strict`
+/// (the CLI's single-item read) throws on malformed ids, vertices, triangles and transforms.
+fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
+    let mut p = ModelParser::new(strict);
+    scan_xml(xml, &mut |ev| p.event(ev))?;
+    Ok(p.finish())
+}
+
+/// Model parts below this many bytes are parsed in one piece.
+const PAR_XML_MIN: usize = 4 << 20;
+
+/// `parse_model_xml` on a part's bytes: a big part is scanned in parallel pieces (`xmlscan`), and
+/// everything else, or anything the pieces cannot be shown to reproduce, in one sequential scan.
+/// `pieces` forces the piece count (tests).
+fn parse_model_bytes(
+    data: &[u8],
+    strict: bool,
+    pieces: Option<usize>,
+) -> Result<ModelPart, String> {
+    use crate::xmlscan::{Item as Chunked, scan_chunks};
+    let n = pieces.unwrap_or_else(|| {
+        if data.len() < PAR_XML_MIN {
+            1
+        } else {
+            (data.len() / (2 << 20)).clamp(8, 256)
+        }
+    });
+    if !strict
+        && (n > 1 || pieces.is_some())
+        && let Some(chunks) = scan_chunks(data, n)
+    {
+        let mut p = ModelParser::new(false);
+        for c in chunks {
+            let (mut v, mut t) = (0, 0);
+            for item in &c.items {
+                match item {
+                    Chunked::Vertices(k) => {
+                        p.vertices(&c.verts[v..v + 3 * k]);
+                        v += 3 * k;
+                    }
+                    Chunked::Triangles(k) => {
+                        p.triangles(&c.tris[t..t + 3 * k]);
+                        t += 3 * k;
+                    }
+                    Chunked::Open {
+                        name,
+                        attrs,
+                        self_closing,
+                    } => p.event(XmlEvent::Open {
+                        name,
+                        attrs,
+                        self_closing: *self_closing,
+                    })?,
+                    Chunked::Close(name) => p.event(XmlEvent::Close(name))?,
+                }
+            }
+        }
+        return Ok(p.finish());
+    }
+    parse_model_xml(&decode(data), strict)
+}
+
+/// Whether the chunked scan accepts `data` cut into `pieces` (it gives up on anything it cannot
+/// show equal to one scan); for the tests.
+#[doc(hidden)]
+pub fn model_scan_chunks_accepts(data: &[u8], pieces: usize) -> bool {
+    crate::xmlscan::scan_chunks(data, pieces).is_some()
+}
+
+/// `parse_model_bytes` with the piece count forced, for the tests that diff it against
+/// `parse_model_xml`: the two give the same objects, items and unit.
+#[doc(hidden)]
+pub fn model_parse_digest(
+    data: &[u8],
+    pieces: Option<usize>,
+    chunked: bool,
+) -> Result<String, String> {
+    let part = if chunked {
+        parse_model_bytes(data, false, pieces)?
+    } else {
+        parse_model_xml(&decode(data), false)?
+    };
+    Ok(format!(
+        "{:?} {:?} {:?}",
+        part.objects.iter().collect::<Vec<_>>(),
+        part.items,
+        part.unit
+    ))
 }
 
 /// `String(x)` of an attribute that may be absent.
@@ -1898,7 +1945,7 @@ impl Emit<'_> {
             return Ok(p.clone());
         }
         let p = match self.parts.get(name) {
-            Some(data) => Some(Rc::new(parse_model_xml(&decode(data), self.strict)?)),
+            Some(data) => Some(Rc::new(parse_model_bytes(data, self.strict, None)?)),
             None => None,
         };
         self.parsed.insert(name.to_string(), p.clone());
@@ -2018,6 +2065,10 @@ fn emit_object(
         };
     }
     let mirrored = orient && m.is_some_and(|m| det(&m) < 0.0);
+    if ranges.is_none() && role.is_none() {
+        // the whole mesh lands in the main soup: size it once instead of doubling it
+        e.main.out.reserve(tris.len() / 3 * 9);
+    }
     let mut part_tris = 0usize;
     let mut t = 0;
     while t < tris.len() {
@@ -2130,22 +2181,34 @@ fn emit_object(
     Ok(())
 }
 
-/// `bbox` (web/threemf.js:969-977).
+/// `bbox` (web/threemf.js:969-977). Min and max do not depend on the order they are taken in (a NaN
+/// never replaces a bound), so a big soup is reduced in parallel with the same result.
 fn bbox(positions: &[f64]) -> ObjBbox {
-    let mut lo = [f64::INFINITY; 3];
-    let mut hi = [f64::NEG_INFINITY; 3];
-    let mut i = 0;
-    while i < positions.len() {
-        for k in 0..3 {
-            if positions[i + k] < lo[k] {
-                lo[k] = positions[i + k];
-            }
-            if positions[i + k] > hi[k] {
-                hi[k] = positions[i + k];
+    use rayon::prelude::*;
+    let part = |ch: &[f64]| {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for p in ch.as_chunks::<3>().0 {
+            for k in 0..3 {
+                if p[k] < lo[k] {
+                    lo[k] = p[k];
+                }
+                if p[k] > hi[k] {
+                    hi[k] = p[k];
+                }
             }
         }
-        i += 3;
-    }
+        (lo, hi)
+    };
+    let (lo, hi) = positions.par_chunks(3 * 32768).map(part).reduce(
+        || ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]),
+        |(l1, h1), (l2, h2)| {
+            (
+                std::array::from_fn(|k| if l2[k] < l1[k] { l2[k] } else { l1[k] }),
+                std::array::from_fn(|k| if h2[k] > h1[k] { h2[k] } else { h1[k] }),
+            )
+        },
+    );
     ObjBbox {
         lo,
         hi,
@@ -2259,8 +2322,28 @@ pub struct ThreeMf {
 /// Port of `readThreeMF` (web/threemf.js:1056-1059): read a .3mf package into per-object
 /// triangle soups in millimetres. JS is `async` only for `unzip`'s inflate.
 pub fn read_three_mf(bytes: &[u8]) -> Result<ThreeMf, String> {
-    let parts = unzip(bytes)?;
-    read_three_mf_parts(&parts, &ReadOpts::default())
+    read_package(bytes, true)
+}
+
+/// `read_three_mf` without the merged soup: `positions` is left empty (a caller that takes the
+/// objects one by one has no use for the second copy of every triangle).
+pub fn read_three_mf_unmerged(bytes: &[u8]) -> Result<ThreeMf, String> {
+    read_package(bytes, false)
+}
+
+fn read_package(bytes: &[u8], merge: bool) -> Result<ThreeMf, String> {
+    let mut parts = unzip(bytes)?;
+    // The root model part is by far the biggest thing in the package (633 MB of XML for a plate
+    // of 7.7M triangles). Parse it now and let go of its bytes before the soups are built.
+    let pre = match find_root_part(&parts) {
+        Some(name) if parts.contains_key(&name) => {
+            let data = std::mem::take(parts.get_mut(&name).unwrap());
+            let part = parse_model_bytes(&data, false, None)?;
+            Some((name, part))
+        }
+        _ => None,
+    };
+    read_three_mf_core(&parts, &ReadOpts::default(), pre, merge)
 }
 
 /// The options object of `readThreeMFParts`; `Default` is the JS defaults.
@@ -2283,9 +2366,21 @@ pub fn read_three_mf_parts(
     parts: &IndexMap<String, Vec<u8>>,
     opts: &ReadOpts,
 ) -> Result<ThreeMf, String> {
+    read_three_mf_core(parts, opts, None, true)
+}
+
+/// `read_three_mf_parts`, with the root model part optionally parsed already (`pre`: its name and
+/// parse); its bytes in `parts` are then never read.
+fn read_three_mf_core(
+    parts: &IndexMap<String, Vec<u8>>,
+    opts: &ReadOpts,
+    pre: Option<(String, ModelPart)>,
+    merge: bool,
+) -> Result<ThreeMf, String> {
     let strict = opts.build_index.is_some();
-    let root_name = match find_root_part(parts) {
-        Some(n) if parts.contains_key(&n) => n,
+    let root_name = match (&pre, find_root_part(parts)) {
+        (Some((n, _)), _) => n.clone(),
+        (None, Some(n)) if parts.contains_key(&n) => n,
         _ => return Err("no 3D model part found in this 3MF".to_string()),
     };
 
@@ -2304,6 +2399,9 @@ pub fn read_three_mf_parts(
         },
         extra: IndexMap::new(),
     };
+    if let Some((name, part)) = pre {
+        e.parsed.insert(name, Some(Rc::new(part)));
+    }
     let root = e.get_part(&root_name)?.unwrap();
     let unit = root.unit.clone();
     let scale = unit_mm(&unit).unwrap_or(1.0);
@@ -2347,7 +2445,9 @@ pub fn read_three_mf_parts(
     };
 
     let to_mm = |out: &[f64]| -> Vec<f64> {
-        out.iter()
+        use rayon::prelude::*;
+        out.par_iter()
+            .with_min_len(1 << 15)
             .map(|&v| {
                 let p = v * scale;
                 if opts.double_precision {
@@ -2464,7 +2564,9 @@ pub fn read_three_mf_parts(
         return Err("this 3MF contains no printable mesh geometry".to_string());
     }
 
-    let positions = if opts.build_index.is_some() {
+    let positions = if !merge {
+        Vec::new()
+    } else if opts.build_index.is_some() {
         objects[0].positions.clone()
     } else {
         merge_positions(&objects)
@@ -2495,8 +2597,23 @@ fn read_session(parts: &IndexMap<String, Vec<u8>>) -> Option<Json> {
 /// `mergePositions` (web/threemf.js:1210-1217): concatenate the per-object position arrays into
 /// one merged `Float32Array` soup.
 fn merge_positions(objects: &[ThreeMfObject]) -> Vec<f64> {
-    objects
-        .iter()
-        .flat_map(|o| o.positions.iter().map(|&v| (v as f32) as f64))
-        .collect()
+    use rayon::prelude::*;
+    let mut out = vec![0.0f64; objects.iter().map(|o| o.positions.len()).sum()];
+    let mut rest: &mut [f64] = &mut out;
+    let mut parts: Vec<(&mut [f64], &[f64])> = Vec::with_capacity(objects.len());
+    for o in objects {
+        let (mine, tail) = rest.split_at_mut(o.positions.len());
+        rest = tail;
+        parts.push((mine, &o.positions));
+    }
+    parts.into_par_iter().for_each(|(dst, src)| {
+        dst.par_chunks_mut(1 << 15)
+            .zip(src.par_chunks(1 << 15))
+            .for_each(|(d, s)| {
+                for (d, &v) in d.iter_mut().zip(s) {
+                    *d = (v as f32) as f64;
+                }
+            });
+    });
+    out
 }
