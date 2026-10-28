@@ -149,7 +149,7 @@ def system():
         f = df[1].split()
         used, avail = int(f[2]), int(f[3])
         pct = 100 * used / max(1, used + avail)
-        if pct > 90:
+        if pct > 80:
             found.append({"kind": "system", "key": "disk", "level": int(pct),
                           "msg": f"disk {pct:.0f}% full, {avail // 1024 // 1024} GB free"})
     load = [float(x) for x in sh(["sysctl", "-n", "vm.loadavg"]).strip("{} \n").split()[:3]] or [0, 0, 0]
