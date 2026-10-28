@@ -6,9 +6,9 @@ struct ContentView: View {
     @Environment(\.documentConfiguration) private var configuration
     @State private var model = ViewerModel()
     @State private var inspector = true
+    /// The floating toolbar's badge slots; tracks register their popovers through the environment.
+    @State private var toolbar = ToolbarRegistry()
     @Environment(\.undoManager) private var undoManager
-    @State private var suggestOpen = false
-    @State private var strengthOpen = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -24,28 +24,15 @@ struct ContentView: View {
             }
             if let w = model.wiring, w.spinnerVisible { BuildSpinner() }
         }
-        // the Suggest and Strength badges: a stand-in for the view toolbar's slots (Toolbar/BadgeBar.swift)
-        .overlay(alignment: .bottom) {
-            if let controller = model.controller, let suggest = model.suggest, let strength = model.strength {
-                BadgeBar {
-                    Badge(title: "Suggest", help: "Rank the ways this part could sit on the bed.", open: $suggestOpen) {
-                        SuggestPopover(model: suggest) {
-                            suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: FinSettings().optionsJSON(),
-                                         currentBore: model.wiring?.build?.summary?.boreWalls ?? 0,
-                                         density: FinReadout.materialDensity)
-                        }
-                    }
-                    Badge(title: "Strength", help: "Strength arrow: which way is the part loaded in use?", lit: strength.isLit,
-                          open: $strengthOpen) { StrengthPopover(model: strength) }
-                }
-                .padding(.bottom, 14)
-                .onChange(of: model.session.pose) {
-                    suggest.poseChanged()
-                    strength.poseChanged()
-                }
-                .onChange(of: controller.thresholdDegrees) { strength.threshold = controller.thresholdDegrees }
-            }
+        .overlay(alignment: .bottom) { if model.controller != nil { ViewToolbar(session: model.session, registry: toolbar) } }
+        .environment(toolbar)
+        // track D's popovers plug into the toolbar's Suggest and Strength slots once a single part is on show
+        .onChange(of: model.suggest.map(ObjectIdentifier.init), initial: true) { _, _ in registerTools() }
+        .onChange(of: model.session.pose) {
+            model.suggest?.poseChanged()
+            model.strength?.poseChanged()
         }
+        .onChange(of: model.controller?.thresholdDegrees) { _, t in if let t { model.strength?.threshold = t } }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
                 InspectorView(controller: controller, settings: model.session.settingsBinding,
@@ -74,5 +61,19 @@ struct ContentView: View {
         // Esc ends Remove fins mode wherever the focus is (the viewer handles it too when it has the keys)
         .onExitCommand { model.wiring?.escape() }
         .environment(model.session)
+    }
+
+    private func registerTools() {
+        guard let controller = model.controller, let suggest = model.suggest, let strength = model.strength else {
+            toolbar.unregister(.suggest); toolbar.unregister(.strength); return
+        }
+        toolbar.register(.suggest) {
+            SuggestPopover(model: suggest) {
+                suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: FinSettings().optionsJSON(),
+                             currentBore: model.wiring?.build?.summary?.boreWalls ?? 0,
+                             density: FinReadout.materialDensity)
+            }
+        }
+        toolbar.register(.strength, isLit: { strength.isLit }) { StrengthPopover(model: strength) }
     }
 }
