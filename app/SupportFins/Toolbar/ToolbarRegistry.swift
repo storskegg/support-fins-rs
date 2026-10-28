@@ -1,35 +1,20 @@
 import SwiftUI
 
-/// The badges of the floating view toolbar that other tracks fill in (`ui/toolbar.js`, UI-MAP section 5).
-/// Order is fixed: Undo, Redo, |, Rotate, Suggest, Strength, View. A slot nobody has registered shows dimmed and inert.
-enum ToolbarSlot: String, CaseIterable, Identifiable {
-    case rotate, suggest, strength, view
-    var id: String { rawValue }
-    var title: LocalizedStringKey {
-        switch self {
-        case .rotate: "Rotate"
-        case .suggest: "Suggest"
-        case .strength: "Strength"
-        case .view: "View"
-        }
-    }
-    var systemImage: String {
-        switch self {
-        case .rotate: "rotate.3d"
-        case .suggest: "wand.and.stars"
-        case .strength: "arrow.up.and.down.and.arrow.left.and.right"
-        case .view: "eye"
-        }
-    }
-    var help: LocalizedStringKey {
-        switch self {
-        case .rotate: "Turn the part: 90° steps, Reset, Lay a face flat and the rotate rings."
-        case .suggest: "Rank the ways this part could sit on the bed."
-        case .strength: "Strength arrow: which way is the part loaded in use?"
-        case .view: "Camera views, the mouse preset and the print layers around the part."
-        }
-    }
+/// A badge slot of the floating view toolbar (`ui/toolbar.js`, UI-MAP section 5). A feature declares its slots with
+/// `Feature.toolbarSlots` (and a static `ToolbarSlot` of its own); the bar shows them after Undo, Redo and the
+/// divider in `order`. A slot nobody has registered a badge for shows dimmed and inert.
+struct ToolbarSlot: Hashable, Identifiable {
+    let id: String
+    var title: LocalizedStringKey
+    var systemImage: String
+    var help: LocalizedStringKey
+    var order: Int
+
+    static func == (a: ToolbarSlot, b: ToolbarSlot) -> Bool { a.id == b.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
+
+extension ToolbarSlot: @unchecked Sendable {}   // immutable text and numbers
 
 /// What a track registers for one slot: whether the badge is lit (e.g. a load is set) and its popover.
 struct ToolbarBadge {
@@ -42,15 +27,20 @@ struct ToolbarBadge {
     }
 }
 
-/// The badge-slot API. Track D plugs its Suggest and Strength popovers in with
-/// `registry.register(.suggest) { SuggestPopover(...) }`; one popover is open at a time.
+/// The badge-slot API. A feature plugs its popover in with `registry.register(.suggest) { SuggestPopover(...) }`
+/// (from `Feature.registerTools`); one popover is open at a time.
 @MainActor @Observable
 final class ToolbarRegistry {
     private(set) var badges: [ToolbarSlot: ToolbarBadge] = [:]
+    /// The slots the bar shows, in order (`declare`).
+    private(set) var slots: [ToolbarSlot] = []
     /// The slot whose popover is open, if any. Setting it folds the others.
     var open: ToolbarSlot?
     /// Short text shown over a badge for a moment (the web's `#drag-angle` over Rotate).
     var flash: (slot: ToolbarSlot, text: String)?
+
+    /// Show these slots, in the given order (the features' `toolbarSlots`, sorted).
+    func declare(_ slots: [ToolbarSlot]) { self.slots = slots }
 
     func register(_ slot: ToolbarSlot, badge: ToolbarBadge) { badges[slot] = badge }
 
