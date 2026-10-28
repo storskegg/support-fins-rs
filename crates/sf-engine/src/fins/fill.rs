@@ -62,7 +62,7 @@ use crate::config::Config;
 use crate::draw::{DRAW_MIN_LEN, DrawOpts, DrawnOk, DrawnWall, drawn_line, drawn_wall};
 use crate::fins::build::{FinKind, FinsBuilt};
 use crate::fins::coverage::{
-    MUST, PLATE_Z, Targets, classify_targets, reach_of, touches_small_hole,
+    MUST, PLATE_Z, Reach, Targets, classify_targets, reach_of, touches_small_hole,
 };
 use crate::fins::field::heading_field;
 use crate::fins::rows::{RowWallsArgs, row_walls};
@@ -227,6 +227,57 @@ fn leftover_points(
     regions: Option<&IndexSet<usize>>,
     cfg: &Config,
 ) -> Vec<[f64; 4]> {
+    let mut cells = Cells::default();
+    each_leftover_point(topo, result, rot, cls, regions, cfg, &mut |x, y, z, a| {
+        if z < PLATE_Z || near(x, y, z) {
+            return;
+        }
+        cells.put(cfg.fill.sample, x, y, z, a);
+    });
+    cells.points()
+}
+
+/// `leftoverPoints`' FILL.sample cells: the points of one cell merged into their area-weighted
+/// centroid, cells in first-touched order.
+#[derive(Default)]
+struct Cells(IndexMap<[u64; 3], [f64; 4], crate::fxhash::FxBuild>);
+
+impl Cells {
+    fn put(&mut self, s: f64, x: f64, y: f64, z: f64, a: f64) {
+        let k = [
+            kb(jsnum::floor(x / s)),
+            kb(jsnum::floor(y / s)),
+            kb(jsnum::floor(z / s)),
+        ];
+        if let Some(c) = self.0.get_mut(&k) {
+            c[0] += x * a;
+            c[1] += y * a;
+            c[2] += z * a;
+            c[3] += a;
+        } else {
+            self.0.insert(k, [x * a, y * a, z * a, a]);
+        }
+    }
+    fn points(&self) -> Vec<[f64; 4]> {
+        self.0
+            .values()
+            .map(|c| [c[0] / c[3], c[1] / c[3], c[2] / c[3], c[3]])
+            .collect()
+    }
+}
+
+/// The sub-triangle centroids of `leftoverPoints` (web/fins/fill.js:104-137), as `f(x, y, z, area)`
+/// in the order JS visits them: the leftover MUST red faces (`regions`: only those regions'), each
+/// subdivided into n x n sub-triangles.
+fn each_leftover_point(
+    topo: &Topology,
+    result: &Targets,
+    rot: &Rot3,
+    cls: &[u8],
+    regions: Option<&IndexSet<usize>>,
+    cfg: &Config,
+    put: &mut dyn FnMut(f64, f64, f64, f64),
+) {
     let pos = &topo.pos;
     let off = &result.analysis.offset;
     let seat = |o: usize| -> V3 {
@@ -237,7 +288,6 @@ fn leftover_points(
         ]
     };
     let s = cfg.fill.sample;
-    let mut cells: IndexMap<[u64; 3], [f64; 4]> = IndexMap::new();
     let only: Option<Vec<bool>> = regions.map(|rs| {
         let mut only = vec![false; topo.n_faces];
         for &ri in rs {
@@ -249,24 +299,6 @@ fn leftover_points(
         }
         only
     });
-    let mut put = |x: f64, y: f64, z: f64, a: f64| {
-        if z < PLATE_Z || near(x, y, z) {
-            return;
-        }
-        let k = [
-            kb(jsnum::floor(x / s)),
-            kb(jsnum::floor(y / s)),
-            kb(jsnum::floor(z / s)),
-        ];
-        if let Some(c) = cells.get_mut(&k) {
-            c[0] += x * a;
-            c[1] += y * a;
-            c[2] += z * a;
-            c[3] += a;
-        } else {
-            cells.insert(k, [x * a, y * a, z * a, a]);
-        }
-    };
     for f in 0..topo.n_faces {
         if result.analysis.over[f] == 0 || cls[f] != MUST || only.as_ref().is_some_and(|o| !o[f]) {
             continue;
@@ -288,15 +320,11 @@ fn leftover_points(
             let mut j = 0;
             while i + j < n {
                 let (fi, fj) = (i as f64, j as f64);
-                let uv: Vec<[f64; 2]> = if i + j < n - 1 {
-                    vec![
-                        [fi + 1.0 / 3.0, fj + 1.0 / 3.0],
-                        [fi + 2.0 / 3.0, fj + 2.0 / 3.0],
-                    ]
-                } else {
-                    vec![[fi + 1.0 / 3.0, fj + 1.0 / 3.0]]
-                };
-                for [u, v] in uv {
+                let uv = [
+                    [fi + 1.0 / 3.0, fj + 1.0 / 3.0],
+                    [fi + 2.0 / 3.0, fj + 2.0 / 3.0],
+                ];
+                for &[u, v] in &uv[..if i + j < n - 1 { 2 } else { 1 }] {
                     let bu = u / n as f64;
                     let bv = v / n as f64;
                     let bw = 1.0 - bu - bv;
@@ -311,10 +339,37 @@ fn leftover_points(
             }
         }
     }
-    cells
-        .values()
-        .map(|c| [c[0] / c[3], c[1] / c[3], c[2] / c[3], c[3]])
-        .collect()
+}
+
+/// `bareArea`'s two `leftoverPoints` sums in one walk of the faces: (the area the near set leaves
+/// bare, all the MUST red). Each is the sum of its cells' areas in first-touched order, exactly as
+/// two separate passes would fold them (the near pass keeps a subset of the points, in order).
+fn bare_sums(
+    topo: &Topology,
+    result: &Targets,
+    rot: &Rot3,
+    near: Option<&Reach>,
+    cls: &[u8],
+    cfg: &Config,
+) -> (f64, f64) {
+    let (mut all, mut far) = (Cells::default(), Cells::default());
+    each_leftover_point(topo, result, rot, cls, None, cfg, &mut |x, y, z, a| {
+        if z < PLATE_Z {
+            return;
+        }
+        all.put(cfg.fill.sample, x, y, z, a);
+        if let Some(near) = near
+            && near.near(x, y, z)
+        {
+            return;
+        }
+        if near.is_some() {
+            far.put(cfg.fill.sample, x, y, z, a);
+        }
+    });
+    let sum = |c: &Cells| c.points().iter().fold(0.0, |s, p| s + p[3]);
+    let total = sum(&all);
+    (if near.is_some() { sum(&far) } else { total }, total)
 }
 
 /// Port of `islandPoints` (web/fins/fill.js:143-155): the island starts (findIslands) not yet held,
@@ -2242,28 +2297,14 @@ pub fn bare_area(
         ),
     );
     let cls = classify_targets(result);
-    let sum = |pts: &[[f64; 4]]| pts.iter().fold(0.0, |s, p| s + p[3]);
-    let total = sum(&leftover_points(
+    // (no walls: nothing is near, and the area is the total)
+    let (area, total) = bare_sums(
         topo,
         result,
         rot,
-        &|_, _, _| false,
+        if tops.is_empty() { None } else { Some(&near) },
         &cls,
-        None,
         cfg,
-    ));
-    let area = if tops.is_empty() {
-        total
-    } else {
-        sum(&leftover_points(
-            topo,
-            result,
-            rot,
-            &|x, y, z| near.near(x, y, z),
-            &cls,
-            None,
-            cfg,
-        ))
-    };
+    );
     (area, total)
 }
