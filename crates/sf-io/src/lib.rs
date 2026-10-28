@@ -10,4 +10,5 @@ pub mod scale;
 pub mod stl;
 mod text;
 pub mod threemf;
+mod xmlscan;
 pub mod zip;
