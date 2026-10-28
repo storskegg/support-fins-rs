@@ -38,6 +38,9 @@ struct ViewCommands: Commands {
     var body: some Commands {
         CommandMenu("View") {
             Button("Frame Part") { viewer?.frame() }.keyboardShortcut("0")
+            // `show-layers` (ui/strength.js): the horizontal print layers around the part
+            Toggle("Show Print Layers", isOn: Binding(get: { viewer?.showsLayers ?? false }, set: { viewer?.showsLayers = $0 }))
+                .help("Show the horizontal print layers around the part.")
             Divider()
             ForEach(Array(CameraView.allCases.enumerated()), id: \.offset) { i, v in
                 Button(v.label) { viewer?.apply(v) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")))

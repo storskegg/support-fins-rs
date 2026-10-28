@@ -18,6 +18,9 @@ public enum Palette {
     public static let pad = hex(0xe8b64c)
     public static let crest = hex(0x9b6bff)
     public static let removeHover = hex(0xff4d4d)
+    /// The load arrow (`web/ui/strength.js` `0xffb454`) and the layer frames (`0x9ecbf5`).
+    public static let loadArrow = hex(0xffb454)
+    public static let layers = hex(0x9ecbf5)
     public static let gridMinor = hex(0x2b303a)
     public static let gridMajor = hex(0x3d4552)
     public static let plateEdge = hex(0x5b6472)

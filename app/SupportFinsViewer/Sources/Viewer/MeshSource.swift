@@ -39,10 +39,13 @@ public struct MeshAnalysis: @unchecked Sendable {
     public var flags: MTLBuffer
     /// `Analysis.offset`: seats the rotated part on the plate. Nil: the viewer seats it from the bounds.
     public var offset: SIMD3<Float>?
+    /// `Analysis.size`: the posed part's size, for the layer frames. Nil: the rotated bounds.
+    public var size: SIMD3<Float>?
 
-    public init(flags: MTLBuffer, offset: SIMD3<Float>? = nil) {
+    public init(flags: MTLBuffer, offset: SIMD3<Float>? = nil, size: SIMD3<Float>? = nil) {
         self.flags = flags
         self.offset = offset
+        self.size = size
     }
 }
 

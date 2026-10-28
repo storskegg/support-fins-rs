@@ -49,7 +49,9 @@ final class CorePart: MeshSource {
                 return MeshAnalysis(flags: device.makeBuffer(length: 4, options: .storageModeShared)!)
             }
             let o = summary.offset
-            return MeshAnalysis(flags: flags, offset: o.count == 3 ? SIMD3(Float(o[0]), Float(o[1]), Float(o[2])) : nil)
+            let z = summary.size
+            return MeshAnalysis(flags: flags, offset: o.count == 3 ? SIMD3(Float(o[0]), Float(o[1]), Float(o[2])) : nil,
+                                size: z.count == 3 ? SIMD3(Float(z[0]), Float(z[1]), Float(z[2])) : nil)
         }.value
     }
 

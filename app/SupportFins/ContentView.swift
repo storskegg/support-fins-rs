@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var model = ViewerModel()
     @State private var inspector = true
     @Environment(\.undoManager) private var undoManager
+    @State private var suggestOpen = false
+    @State private var strengthOpen = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -21,6 +23,27 @@ struct ContentView: View {
                 Text(status).padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
             }
             if let w = model.wiring, w.spinnerVisible { BuildSpinner() }
+        }
+        // the Suggest and Strength badges: a stand-in for the view toolbar's slots (Toolbar/BadgeBar.swift)
+        .overlay(alignment: .bottom) {
+            if let controller = model.controller, let suggest = model.suggest, let strength = model.strength {
+                BadgeBar {
+                    Badge(title: "Suggest", help: "Rank the ways this part could sit on the bed.", open: $suggestOpen) {
+                        SuggestPopover(model: suggest) {
+                            suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: FinSettings().optionsJSON(),
+                                         currentBore: 0, density: 1.24)
+                        }
+                    }
+                    Badge(title: "Strength", help: "Strength arrow: which way is the part loaded in use?", lit: strength.isLit,
+                          open: $strengthOpen) { StrengthPopover(model: strength) }
+                }
+                .padding(.bottom, 14)
+                .onChange(of: model.session.pose) {
+                    suggest.poseChanged()
+                    strength.poseChanged()
+                }
+                .onChange(of: controller.thresholdDegrees) { strength.threshold = controller.thresholdDegrees }
+            }
         }
         .inspector(isPresented: $inspector) {
             if let controller = model.controller {
