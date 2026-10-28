@@ -220,7 +220,9 @@ fn crest_ranges_cover_exactly_the_tagged_triangles() {
     let built = build_fins(part.topology(), &a, &rot, &req.opts, &Config::default());
     let tagged: Vec<usize> = built
         .triangles
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .enumerate()
         .filter(|(_, v)| v[0][3] == 1.0)
         .map(|(t, _)| t)

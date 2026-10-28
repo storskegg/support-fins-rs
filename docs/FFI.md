@@ -159,3 +159,39 @@ the page writes, so the row strings, badges and notes cannot drift from `ui/sugg
 `boreWalls` (props standing in a bore: the `SuggestContext.current_bore` of the next ranking), `seating`
 (`{ kind: face|edge|point, span, bedArea }`), `hasPad`, `finVolumeMm3` and `padVolumeMm3` (the grams receipt's
 volumes, `readout.js meshVolumeMM3`). `records_json()` props also carry `inBore`.
+
+### Readout data for the status panel (`ui/readout.js`, `ui/part.js`, `ui/islands.js`, `ui/remove.js`)
+
+Every number below is the engine value the page reads; Swift only formats it. Each is checked against the engine call
+in `crates/sf-ffi/tests/readouts.rs`.
+
+`summary_json()` also carries:
+- `pad`: `null` (no pad) or `{ style: auto|light|sure|custom, autoSure, smallFoot, outline }`, `built.pad` as `padStatus`
+  and `padNote` read it (`outline` is mm of first-layer edge, or `null`).
+- `fill`: `null`, or Full coverage's `{ walls, bareBefore, unservedArea, capped, islandsBare, islandsCapped }`;
+  `curvedFill`: `null`, or Auto's curved-walls fill `{ walls, unservedArea, capped }`; `curvedDropped`: Full kept the
+  straight walls over the curves.
+- `bare`: `null` or `{ area, total, coverage }`, and `fillReach`: `fillReach(bare.coverage)` in mm (the "more than {reach} mm
+  from a wall" note); `null` with `bare`.
+- `islandsBuild`: what the midair-starts card is told: `null` unless the mode is Full, else `{ bare, capped }` (the Full fill
+  pass's `islandsBare`, `islandsCapped`) or `{ all: true }` (a Full build with no fill pass: every start is unwalled).
+- `addedBounds`: `{ min: [x,y,z], max: [x,y,z] }` of the fin and pad vertices in print space (`null` if none). The page's
+  `updateFit` merges it with the posed part (`analyze().size`, centred on the origin, `z` from 0) to say "does not fit (with
+  fins)"; `after_removal_json` gives the same extent for the fins that are left.
+- the interface crest: `records_json().crestRanges` (above); the "Flat contacts is on but no wall top got a crest" note
+  (`ifaceNote`) is `crestRanges` empty with walls present.
+
+`BuildResult.after_removal_json(removed_ids: Vec<u64>) -> String`: what changes when fins are removed by hand
+(`ui/remove.js`; ids are `records_json` fin `id`s): `{ removed, bare, addedBounds, addedVolumeMm3 }`. `bare` is
+`{ area, total, coverage }` measured again against the fins that are left (`bareArea` with the kept fins; the build's own
+number when none are removed; `null` when the build has none); `addedBounds` is the extent and `addedVolumeMm3` the volume
+(`meshVolumeMM3`, the grams receipt) of the kept fins plus the pad (`activeAdded`).
+
+Part level:
+- `AnalysisSummary` gains `raw_region_count` (regions before the sliver filter: the sliver warning compares it with
+  `region_count`) and `analyze_ms`; `PartInfo` gains `weld_ms`, how long welding took at load. Together they are the
+  readout's `analysisTiming` (`{analyze_ms} ms · weld {weld_ms} ms`).
+- `Part.islands(threshold_deg, rot) -> Vec<Island>` (`findIslands`): `Island { x, y, z, points }`, `points` flat `x,y,z,...`;
+  the count is the "midair starts" suffix, and the page draws a cone at each `x,y,z` and a line between the farthest two points.
+- `island_card(count, bare: Option<u64>, capped, markers_visible) -> String`: the card text (`renderIslandCard`), empty for no
+  card. `bare` is `None` without a Full build for this pose (`islandsBuild` null), else the starts left without a wall.

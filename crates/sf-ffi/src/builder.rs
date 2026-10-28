@@ -44,6 +44,12 @@ pub struct BuildResult {
     offset: Xyz,
     /// `None` for the identity pose, which the CLI leaves unposed
     rot: Option<[f64; 9]>,
+    /// what a re-measure after a removal needs: the build, the part's topology, the overhang threshold and
+    /// the tunables the build ran under
+    built: sf_engine::fins::build::FinsBuilt,
+    topo: Arc<sf_engine::overhangs::Topology>,
+    threshold: f64,
+    tunables: Option<sf_engine::config::Tunables>,
 }
 
 #[uniffi::export]
@@ -62,6 +68,15 @@ impl BuildResult {
     pub fn summary_json(&self) -> String {
         self.summary.clone()
     }
+    /// The readouts that change when fins are removed by hand (`ui/remove.js`, `ui/readout.js`,
+    /// `ui/part.js`): `{ removed, bare: { area, total, coverage } | null, addedBounds, addedVolumeMm3 }`.
+    /// `removed_ids` are `records_json` fin `id`s. `bare` is the area of overhang the walls left
+    /// *kept* still bare, measured again against them (`bareArea` with the kept fins), as the page does;
+    /// `addedBounds` and `addedVolumeMm3` are the kept fins plus the pad (`activeAdded`).
+    pub fn after_removal_json(&self, removed_ids: Vec<u64>) -> Result<String, FfiError> {
+        Ok(self.after_removal(&removed_ids)?.stringify())
+    }
+
     /// `{ fins: [...], props: [...] }`: the per-fin records (`triRanges` are vertex ranges into the
     /// `fins()` buffer) and the walls with their `region` (absent on a fill-pass wall).
     pub fn records_json(&self) -> String {
@@ -70,6 +85,52 @@ impl BuildResult {
 }
 
 impl BuildResult {
+    /// See [`after_removal_json`](Self::after_removal_json).
+    pub fn after_removal(&self, removed: &[u64]) -> Result<Json, FfiError> {
+        use sf_engine::fins::coverage::automatic_targets;
+        use sf_engine::fins::fill::{FillOpts, bare_area};
+        let kept: Vec<sf_engine::fins::build::FinRecord> = self
+            .built
+            .fins
+            .iter()
+            .filter(|f| !removed.contains(&(f.id as u64)))
+            .cloned()
+            .collect();
+        let mut added: Vec<sf_engine::types::V4> = Vec::new();
+        for f in &kept {
+            for &[lo, hi] in &f.tri_ranges {
+                added.extend_from_slice(&self.built.triangles[lo..hi]);
+            }
+        }
+        added.extend_from_slice(&self.built.pad_triangles);
+        let bare = match &self.built.bare {
+            None => Json::Null,
+            Some(b) if removed.is_empty() => records::bare_json(b.area, b.total, b.coverage),
+            Some(b) => {
+                let mut cfg = Config::default();
+                sf_engine::config::apply_tunables(&mut cfg, self.tunables.as_ref());
+                let rot = self.rot.unwrap_or(IDENTITY3);
+                let analysis = analyze(&self.topo, self.threshold, &rot);
+                let targets = automatic_targets(&self.topo, &analysis, &rot);
+                let opts = FillOpts {
+                    coverage: Some(b.coverage),
+                    ..Default::default()
+                };
+                let (area, total) = bare_area(&self.topo, &targets, &rot, &opts, &kept, &cfg);
+                records::bare_json(area, total, b.coverage)
+            }
+        };
+        Ok(Json::Obj(vec![
+            ("removed".into(), Json::Num(removed.len() as f64)),
+            ("bare".into(), bare),
+            ("addedBounds".into(), records::bounds(added.iter())),
+            (
+                "addedVolumeMm3".into(),
+                Json::Num(records::mesh_volume(&added)),
+            ),
+        ]))
+    }
+
     /// The fin soup then the pad as `computeFins` returns them (`f32`, xyz per vertex): what an export writes.
     pub fn triangles(&self) -> &[f32] {
         &self.triangles
@@ -204,7 +265,20 @@ pub fn build_part(
         let posed = pose_matrix(&part.topology().pos, rot);
         let (result, built) = compute_fins_detail(&posed, &options).map_err(engine)?;
         let s = &result.stats;
-        return Ok(finish(&built, s, &result.triangles, result.offset, rot));
+        let request = engine_request(&options, None).map_err(engine)?;
+        let ctx = Context {
+            topo: part.topology().clone(),
+            threshold: request.threshold,
+            tunables: request.opts.tunables,
+        };
+        return Ok(finish(
+            &built,
+            s,
+            &result.triangles,
+            result.offset,
+            rot,
+            ctx,
+        ));
     }
     page.tunables = tunables.unwrap_or_default();
     let request = engine_request(&options, Some(&page)).map_err(engine)?;
@@ -220,7 +294,25 @@ pub fn build_part(
     let triangles: Vec<f32> = to_f32(&built.triangles)
         .chain(to_f32(&built.pad_triangles))
         .collect();
-    Ok(finish(&built, &stats, &triangles, analysis.offset, rot))
+    let ctx = Context {
+        topo: topo.clone(),
+        threshold: request.threshold,
+        tunables: request.opts.tunables,
+    };
+    Ok(finish(
+        &built,
+        &stats,
+        &triangles,
+        analysis.offset,
+        rot,
+        ctx,
+    ))
+}
+
+struct Context {
+    topo: Arc<sf_engine::overhangs::Topology>,
+    threshold: f64,
+    tunables: Option<sf_engine::config::Tunables>,
 }
 
 fn finish(
@@ -229,6 +321,7 @@ fn finish(
     triangles: &[f32],
     offset: Xyz,
     rot: Option<[f64; 9]>,
+    ctx: Context,
 ) -> BuildResult {
     let fin_floats = (s.fin_triangles + s.sway_triangles) * 9;
     let (fins, pad) = triangles.split_at(fin_floats);
@@ -240,6 +333,10 @@ fn finish(
         triangles: triangles.to_vec(),
         offset,
         rot,
+        built: built.clone(),
+        topo: ctx.topo,
+        threshold: ctx.threshold,
+        tunables: ctx.tunables,
     }
 }
 
