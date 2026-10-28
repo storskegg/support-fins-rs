@@ -20,6 +20,8 @@ struct StatsCard: View {
             }
             LabeledContent("Overhangs") {
                 overhangsText.foregroundStyle(part.overhangsGood ? Color.green : Color.primary)
+                    .help(swatchHelp)
+                    .accessibilityIdentifier("stat-overhangs")
             }
             LabeledContent("Area", value: part.area)
             LabeledContent("Bed contact") { Text(part.bed).foregroundStyle(part.bedWarn ? Color.orange : Color.primary) }
@@ -44,12 +46,23 @@ struct StatsCard: View {
         }
     }
 
+    /// The swatches' tooltips, one a line (a `Text` cannot carry one tooltip per swatch).
+    private var swatchHelp: String {
+        part.overhangs.compactMap { seg -> String? in
+            switch seg {
+            case .swatch(let h), .redSwatch(let h): h
+            case .text: nil
+            }
+        }.joined(separator: "\n")
+    }
+
     /// The row with its amber swatches (`<i class="sw sw-small">`, `ui/part.js:316-324`).
     private var overhangsText: Text {
         part.overhangs.reduce(Text("")) { acc, seg in
             switch seg {
             case .text(let s): acc + Text(s)
             case .swatch: acc + Text(Image(systemName: "circle.fill")).foregroundStyle(Color.orange).font(.caption2)
+            case .redSwatch: acc + Text(Image(systemName: "circle.fill")).foregroundStyle(Color(red: 1, green: 0.353, blue: 0.302)).font(.caption2)
             }
         }
     }

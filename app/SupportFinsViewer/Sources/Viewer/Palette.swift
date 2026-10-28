@@ -21,6 +21,8 @@ public enum Palette {
     /// The load arrow (`web/ui/strength.js` `0xffb454`) and the layer frames (`0x9ecbf5`).
     public static let loadArrow = hex(0xffb454)
     public static let layers = hex(0x9ecbf5)
+    /// The midair-start cones (`web/ui/islands.js:21`).
+    public static let islandRed = hex(0xff5a4d)
     public static let gridMinor = hex(0x2b303a)
     public static let gridMajor = hex(0x3d4552)
     public static let plateEdge = hex(0x5b6472)
