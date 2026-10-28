@@ -82,7 +82,10 @@ you start a ticket, and again whenever a review sends you back.
    ask. For every other function you port, derive the signature from the JS with the type
    mapping below. List each new `pub` signature in the PR's **New signatures** section, and the
    review will check it.
-10. **No new dependencies** beyond `[workspace.dependencies]` and the ones your ticket names.
+10. **New dependencies need a reason.** Beyond `[workspace.dependencies]` and the ones your ticket names, add a
+   crate or package only when it clearly pays (measured, or a real capability gap), add it to
+   `[workspace.dependencies]`, and say why in the PR body. The orchestrator approves it in review (the user
+   delegated this on 2026-10-28). Dev tooling (profilers, linters) may be installed as needed.
 
 ## Type mapping (JS → Rust)
 

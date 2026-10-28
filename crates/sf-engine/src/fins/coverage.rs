@@ -6,13 +6,13 @@
 //! face is MUST.
 
 use std::cell::OnceCell;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 
 use crate::fins::seating::seated_part_tris;
+use crate::fxhash::FxHashMap;
 use crate::jsnum;
 use crate::overhangs::{Analysis, Region, Topology};
 use crate::prop::surface::surface_hits_at;
@@ -40,7 +40,7 @@ const LOW_Z: f64 = 0.82;
 pub struct Reach {
     r: f64,
     cell: f64,
-    grid: HashMap<i64, Vec<[f64; 3]>>,
+    grid: FxHashMap<i64, Vec<[f64; 3]>>,
 }
 
 /// `key(i, j)` (web/fins/coverage.js:26).
@@ -54,7 +54,7 @@ pub fn reach_of(tops: &[[f64; 3]], r: f64) -> Reach {
     let mut reach = Reach {
         r,
         cell: jsnum::max(r, 1.0),
-        grid: HashMap::new(),
+        grid: FxHashMap::default(),
     };
     for p in tops {
         reach.add(*p);
@@ -74,18 +74,33 @@ impl Reach {
 
     /// `near(cx, cy, cz)`.
     pub fn near(&self, cx: f64, cy: f64, cz: f64) -> bool {
+        if self.grid.is_empty() {
+            return false;
+        }
         let gi = jsnum::floor(cx / self.cell);
         let gj = jsnum::floor(cy / self.cell);
+        // `hypot(dx, dy) <= r`, decided on dx^2 + dy^2 unless it is within a hair of r^2 (hypot is
+        // correct to an ulp or two, the margin is 1e-9): the exact `hypot` settles the rest
+        let lim = self.r * self.r;
+        let (far, close) = if self.r >= 0.0 && self.r.is_finite() {
+            (lim * (1.0 + 1e-9), lim * (1.0 - 1e-9))
+        } else {
+            (f64::INFINITY, f64::NEG_INFINITY)
+        };
         for di in -1..=1 {
             for dj in -1..=1 {
                 if let Some(cell) = self.grid.get(&cell_key(gi + di as f64, gj + dj as f64)) {
                     for p in cell {
                         let dz = cz - p[2];
-                        if dz >= -0.05
-                            && dz <= 1.5
-                            && jsnum::hypot(&[cx - p[0], cy - p[1]]) <= self.r
-                        {
-                            return true;
+                        if dz >= -0.05 && dz <= 1.5 {
+                            let (dx, dy) = (cx - p[0], cy - p[1]);
+                            let d2 = dx * dx + dy * dy;
+                            if d2 > far {
+                                continue;
+                            }
+                            if d2 < close || jsnum::hypot(&[dx, dy]) <= self.r {
+                                return true;
+                            }
                         }
                     }
                 }
