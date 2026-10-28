@@ -472,10 +472,10 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
 /// (`mergeObjectPositions`, `io.js:120`) and welded as one soup, like any single loaded object. The colours
 /// are merged by triangle (`mergeColors`); a slicer's parts ride along with the uncut positions of every
 /// object, extras in order, as `io.js:252-258` keeps them. The merged part is named after the file
-/// (`stem`), and its notes are the objects' own plus a "merged N objects into one part" line (the web's
-/// "N of TOTAL" needs the file's object count, which a `Part` does not know). One part comes back as itself.
+/// (`stem`), and its notes are the objects' own plus the web's "merged N of TOTAL objects into one part"
+/// line (`io.js:34`, `:267`), `TOTAL` being the file's object count, which a `Part` does not know, so the caller passes it. One part comes back as itself.
 #[uniffi::export]
-pub fn merge_parts(parts: Vec<Arc<Part>>) -> Result<Arc<Part>, FfiError> {
+pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError> {
     match parts.len() {
         0 => {
             return Err(FfiError::Engine {
@@ -529,7 +529,11 @@ pub fn merge_parts(parts: Vec<Arc<Part>>) -> Result<Arc<Part>, FfiError> {
         None
     };
     let mut notes: Vec<String> = parts.iter().flat_map(|p| p.notes.iter().cloned()).collect();
-    notes.push(format!("merged {} objects into one part", parts.len()));
+    notes.push(format!(
+        "merged {} of {} objects into one part",
+        parts.len(),
+        object_count.max(parts.len() as u64)
+    ));
     let stem = parts[0].stem.clone();
     Ok(Arc::new(Part::new(
         stem.clone(),

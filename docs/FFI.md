@@ -33,7 +33,7 @@ impl GpuBuffer { fn address(&self) -> u64; fn len_bytes(&self) -> u64; fn stride
 #[derive(uniffi::Record)] struct PartInfo { name: String, triangles: u64, size: [f64; 3] /* as Vec<f64> */, notes: Vec<String> /* import notes, ui/io.js */ }
 #[derive(uniffi::Object)] struct Part;                       // Arc<Topology> + source soup
 fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF (one Part per object, negative parts cut out as ui/io.js does); STEP in M6
-fn merge_parts(parts: Vec<Arc<Part>>) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; one part returns itself
+fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; note "merged N of TOTAL objects into one part" (TOTAL = object_count, the file's); one part returns itself
 impl Part {
   fn info(&self) -> PartInfo;
   fn mesh(&self) -> Arc<GpuBuffer>;                          // interleaved position+normal, f32, model frame

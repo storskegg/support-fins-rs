@@ -3297,14 +3297,15 @@ public func loadParts(path: String)throws  -> [Part]  {
  * (`mergeObjectPositions`, `io.js:120`) and welded as one soup, like any single loaded object. The colours
  * are merged by triangle (`mergeColors`); a slicer's parts ride along with the uncut positions of every
  * object, extras in order, as `io.js:252-258` keeps them. The merged part is named after the file
- * (`stem`), and its notes are the objects' own plus a "merged N objects into one part" line (the web's
- * "N of TOTAL" needs the file's object count, which a `Part` does not know). One part comes back as itself.
+ * (`stem`), and its notes are the objects' own plus the web's "merged N of TOTAL objects into one part"
+ * line (`io.js:34`, `:267`), `TOTAL` being the file's object count, which a `Part` does not know, so the caller passes it. One part comes back as itself.
  */
-public func mergeParts(parts: [Part])throws  -> Part  {
+public func mergeParts(parts: [Part], objectCount: UInt64)throws  -> Part  {
     return try  FfiConverterTypePart_lift(try rustCallWithError(FfiConverterTypeFfiError_lift) {
         uniffiCallStatus in
     uniffi_sf_ffi_fn_func_merge_parts(
-        FfiConverterSequenceTypePart.lower(parts),uniffiCallStatus
+        FfiConverterSequenceTypePart.lower(parts),
+        FfiConverterUInt64.lower(objectCount),uniffiCallStatus
     )
 })
 }
@@ -3350,7 +3351,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_func_load_parts() != 14593) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sf_ffi_checksum_func_merge_parts() != 43040) {
+    if (uniffi_sf_ffi_checksum_func_merge_parts() != 16677) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_func_load_alignment() != 64003) {

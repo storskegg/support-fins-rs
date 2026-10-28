@@ -75,6 +75,7 @@ struct OpenFlowTests {
         #expect(model.picker == nil && model.status == nil)
         // small (10 mm) and big (20 mm) cubes at the origin: 12 + 12 triangles, one part, the union's box
         #expect(model.session.parts.count == 1)
+        #expect(model.session.parts[0].info.notes.contains("merged 2 of 3 objects into one part"))
         #expect(model.session.parts[0].info.triangles == 24 && model.controller?.faceCount == 24)
         #expect(model.controller?.size == SIMD3<Float>(20, 20, 20))
     }
