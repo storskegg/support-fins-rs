@@ -11,7 +11,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 
 use sf_cli::cli::{output_bytes, pose_matrix};
-use sf_cli::entry::{compute_fins_detail, options_from_dialog};
+use sf_cli::entry::{
+    PageRequest, build_stats, compute_fins_detail, engine_request, options_from_dialog,
+};
+use sf_engine::config::Config;
+use sf_engine::fins::build::build_fins;
+use sf_engine::overhangs::analyze;
 use sf_engine::types::{IDENTITY3, Xyz};
 use sf_io::json::{Json, parse};
 
@@ -61,6 +66,13 @@ impl BuildResult {
     /// `fins()` buffer) and the walls with their `region` (absent on a fill-pass wall).
     pub fn records_json(&self) -> String {
         self.records.clone()
+    }
+}
+
+impl BuildResult {
+    /// The fin soup then the pad as `computeFins` returns them (`f32`, xyz per vertex): what an export writes.
+    pub fn triangles(&self) -> &[f32] {
+        &self.triangles
     }
 }
 
@@ -115,31 +127,127 @@ pub(crate) fn dialog_values(text: &str) -> Result<Vec<(String, Json)>, FfiError>
     }
 }
 
-/// One build of `part` in the pose `rot` (9 numbers, column-major) with `opts_json`'s options.
-pub fn build_part(part: &Part, rot: &[f64], opts_json: &str) -> Result<BuildResult, FfiError> {
+/// The request-level keys of the page's build that `options.json` lacks (`finOpts()`/`swayOpts()` in
+/// ui/finbuild.js). They ride in `opts_json` and are taken out before the dialog parser sees it.
+const PAGE_KEYS: [&str; 4] = [
+    "tallRibs",
+    "curvedWalls",
+    "sway.uncappedDepth",
+    "sway.crossRise",
+];
+
+fn json_bool(v: &Json, key: &str) -> Result<bool, FfiError> {
+    match v {
+        Json::Bool(b) => Ok(*b),
+        _ => Err(engine(format!("{key} must be true or false"))),
+    }
+}
+
+/// Split `opts_json` into the dialog's `options.json` keys and the page's request-level extras.
+fn split_options(
+    opts_json: &str,
+    page: &mut PageRequest,
+) -> Result<(Vec<(String, Json)>, bool), FfiError> {
+    let mut dialog = Vec::new();
+    let mut extras = false;
+    for (k, v) in dialog_values(opts_json)? {
+        if !PAGE_KEYS.contains(&k.as_str()) {
+            dialog.push((k, v));
+            continue;
+        }
+        extras = true;
+        match k.as_str() {
+            "tallRibs" => page.tall_ribs = Some(json_bool(&v, &k)?),
+            "curvedWalls" => page.curved_walls = Some(json_bool(&v, &k)?),
+            "sway.uncappedDepth" => page.uncapped_depth = Some(json_bool(&v, &k)?),
+            _ => match v {
+                Json::Num(n) if n.is_finite() => page.cross_rise = Some(n),
+                _ => return Err(engine("sway.crossRise must be a number")),
+            },
+        }
+    }
+    Ok((dialog, extras))
+}
+
+/// The page's `tunables` object (`{}` or empty text: none). Unknown keys are ignored, as `applyTunables` does.
+fn page_tunables(tunables_json: &str) -> Result<Option<sf_engine::config::Tunables>, FfiError> {
+    if tunables_json.trim().is_empty() {
+        return Ok(None);
+    }
+    match parse(tunables_json) {
+        Some(j @ Json::Obj(_)) => Ok(Some(sf_io::fins_opts::tunables_from_json(&j))),
+        _ => Err(engine("tunables must be a JSON object")),
+    }
+}
+
+/// One build of `part` in the pose `rot` (9 numbers, column-major).
+///
+/// With neither `tunables_json` nor any page extras it is the CLI's build: the posed part is seated
+/// by `computeFins` (`sf_cli::entry::compute_fins_detail`) and its output is what `export` writes.
+/// Otherwise it is the page's: `buildFins` on the part's own topology in this pose with the options
+/// `finOpts()` makes (`ui/finbuild.js`, `finworker.js`), the `tunables` applied as `applyTunables`
+/// does inside `buildFins`.
+pub fn build_part(
+    part: &Part,
+    rot: &[f64],
+    opts_json: &str,
+    tunables_json: &str,
+) -> Result<BuildResult, FfiError> {
     let rot = rot9(rot)?;
-    let options = options_from_dialog(&dialog_values(opts_json)?).map_err(engine)?;
+    let mut page = PageRequest::default();
+    let (dialog, extras) = split_options(opts_json, &mut page)?;
+    let options = options_from_dialog(&dialog).map_err(engine)?;
+    let tunables = page_tunables(tunables_json)?;
+    let web = extras || tunables.as_ref().is_some_and(|t| *t != Default::default());
     let rot = (rot != IDENTITY3).then_some(rot);
-    let posed = pose_matrix(&part.topology().pos, rot);
-    let (result, built) = compute_fins_detail(&posed, &options).map_err(engine)?;
-    let s = &result.stats;
+    if !web {
+        let posed = pose_matrix(&part.topology().pos, rot);
+        let (result, built) = compute_fins_detail(&posed, &options).map_err(engine)?;
+        let s = &result.stats;
+        return Ok(finish(&built, s, &result.triangles, result.offset, rot));
+    }
+    page.tunables = tunables.unwrap_or_default();
+    let request = engine_request(&options, Some(&page)).map_err(engine)?;
+    let topo = part.topology();
+    let matrix = rot.unwrap_or(IDENTITY3);
+    let analysis = analyze(topo, request.threshold, &matrix);
+    let built = build_fins(topo, &analysis, &matrix, &request.opts, &Config::default());
+    let stats = build_stats(&built, analysis.regions.len(), request.pins);
+    fn to_f32(v: &[sf_engine::types::V4]) -> impl Iterator<Item = f32> + '_ {
+        v.iter()
+            .flat_map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
+    }
+    let triangles: Vec<f32> = to_f32(&built.triangles)
+        .chain(to_f32(&built.pad_triangles))
+        .collect();
+    Ok(finish(&built, &stats, &triangles, analysis.offset, rot))
+}
+
+fn finish(
+    built: &sf_engine::fins::build::FinsBuilt,
+    s: &sf_cli::entry::Stats,
+    triangles: &[f32],
+    offset: Xyz,
+    rot: Option<[f64; 9]>,
+) -> BuildResult {
     let fin_floats = (s.fin_triangles + s.sway_triangles) * 9;
-    let (fins, pad) = result.triangles.split_at(fin_floats);
-    Ok(BuildResult {
+    let (fins, pad) = triangles.split_at(fin_floats);
+    BuildResult {
         fins: soup_buffer(fins),
         pad: soup_buffer(pad),
-        summary: records::summary(&built, s, result.offset).stringify(),
-        records: records::records(&built).stringify(),
-        triangles: result.triangles.clone(),
-        offset: result.offset,
+        summary: records::summary(built, s, offset).stringify(),
+        records: records::records(built).stringify(),
+        triangles: triangles.to_vec(),
+        offset,
         rot,
-    })
+    }
 }
 
 struct Job {
     generation: u64,
     rot: Vec<f64>,
     opts_json: String,
+    tunables_json: String,
     listener: Box<dyn BuildListener>,
 }
 
@@ -168,7 +276,7 @@ impl Builder {
                         continue; // superseded before it started
                     }
                     let built = catch_unwind(AssertUnwindSafe(|| {
-                        build_part(&part, &job.rot, &job.opts_json)
+                        build_part(&part, &job.rot, &job.opts_json, &job.tunables_json)
                     }))
                     .unwrap_or_else(|_| Err(engine("the engine panicked")));
                     if latest.load(Ordering::SeqCst) != job.generation {
@@ -185,13 +293,20 @@ impl Builder {
     }
 
     /// Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
-    pub fn build(&self, rot: Vec<f64>, opts_json: String, listener: Box<dyn BuildListener>) -> u64 {
+    pub fn build(
+        &self,
+        rot: Vec<f64>,
+        opts_json: String,
+        tunables_json: String,
+        listener: Box<dyn BuildListener>,
+    ) -> u64 {
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         // the worker only goes away with the Builder, so a send cannot fail while `self` lives
         let _ = self.jobs.send(Job {
             generation,
             rot,
             opts_json,
+            tunables_json,
             listener,
         });
         generation

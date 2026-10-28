@@ -45,7 +45,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("lbracket")).first)
     let builder = Builder(part: part)
     let collector = Collector()
-    let generation = builder.build(rot: rotation(35, 0, 0), optsJson: "{}", listener: collector)
+    let generation = builder.build(rot: rotation(35, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: collector)
     #expect(generation == 1)
 
     var delivered: BuildResult?
@@ -80,8 +80,8 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let builder = Builder(part: part)
     let first = Collector(), second = Collector()
-    let g1 = builder.build(rot: rotation(30, 0, 0), optsJson: "{}", listener: first)
-    let g2 = builder.build(rot: rotation(30, 0, 0), optsJson: #"{"mode":"full"}"#, listener: second)
+    let g1 = builder.build(rot: rotation(30, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: first)
+    let g2 = builder.build(rot: rotation(30, 0, 0), optsJson: #"{"mode":"full"}"#, tunablesJson: "{}", listener: second)
     #expect(g2 == g1 + 1)
 
     var latest: UInt64?
@@ -103,7 +103,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("cube")).first)
     let builder = Builder(part: part)
     let collector = Collector()
-    let g = builder.build(rot: rotation(0, 0, 0), optsJson: #"{"mode":"bogus"}"#, listener: collector)
+    let g = builder.build(rot: rotation(0, 0, 0), optsJson: #"{"mode":"bogus"}"#, tunablesJson: "{}", listener: collector)
     for await event in collector.stream {
         guard case .failed(let fg, let error) = event else { Issue.record("expected a failure"); return }
         #expect(fg == g)
@@ -116,7 +116,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let builder = Builder(part: part)
     let collector = Collector()
-    _ = builder.build(rot: rotation(0, 0, 0), optsJson: "{}", listener: collector)
+    _ = builder.build(rot: rotation(0, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: collector)
     var built: BuildResult?
     for await event in collector.stream {
         if case .done(_, let r) = event { built = r }
@@ -130,4 +130,27 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     // a binary STL: 80-byte header, a count, 50 bytes a triangle -- the part's plus the fins'
     #expect(size == 84 + 50 * (Int(part.info().triangles) + Int(result.fins().count() + result.pad().count()) / 3))
     #expect(throws: FfiError.self) { try export(path: path + ".obj", parts: [part], builds: [result], optionsJson: "{}") }
+}
+
+@Test func thePagesTunablesReachTheBuild() async throws {
+    let part = try #require(try loadParts(path: try modelPath("sphere")).first)
+    let rot = rotation(30, 0, 0)
+    func fins(optsJson: String, tunablesJson: String) async throws -> (UInt32, Data) {
+        let collector = Collector()
+        _ = Builder(part: part).build(rot: rot, optsJson: optsJson, tunablesJson: tunablesJson, listener: collector)
+        for await event in collector.stream {
+            guard case .done(_, let result) = event else { Issue.record("the build failed"); break }
+            let fins = result.fins()
+            let bytes = UnsafeRawBufferPointer(
+                start: UnsafeRawPointer(bitPattern: UInt(fins.address())), count: Int(fins.lenBytes()))
+            return (fins.count(), Data(bytes))
+        }
+        throw CancellationError()
+    }
+    let plain = try await fins(optsJson: "{}", tunablesJson: "{}")
+    let tuned = try await fins(optsJson: "{}", tunablesJson: #"{"wallLines":4,"roundFeet":true,"tallRibsHeight":40}"#)
+    #expect(plain.1 != tuned.1, "wall lines and rounded feet change the supports")
+    // the request-level extras ride in the options
+    let noRibs = try await fins(optsJson: #"{"tallRibs":false}"#, tunablesJson: "{}")
+    #expect(noRibs.0 > 0)
 }

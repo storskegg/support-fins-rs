@@ -787,7 +787,7 @@ public protocol BuilderProtocol: AnyObject, Sendable {
     /**
      * Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
      */
-    func build(rot: [Double], optsJson: String, listener: BuildListener)  -> UInt64
+    func build(rot: [Double], optsJson: String, tunablesJson: String, listener: BuildListener)  -> UInt64
     
 }
 /**
@@ -860,13 +860,14 @@ public convenience init(part: Part) {
     /**
      * Queue a build and return its generation (1, 2, ...). `rot`: nine numbers, column-major.
      */
-open func build(rot: [Double], optsJson: String, listener: BuildListener) -> UInt64  {
+open func build(rot: [Double], optsJson: String, tunablesJson: String, listener: BuildListener) -> UInt64  {
     return try!  FfiConverterUInt64.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_sf_ffi_fn_method_builder_build(
             self.uniffiCloneHandle(),
         FfiConverterSequenceDouble.lower(rot),
         FfiConverterString.lower(optsJson),
+        FfiConverterString.lower(tunablesJson),
         FfiConverterCallbackInterfaceBuildListener_lower(listener),uniffiCallStatus
     )
 })
@@ -2980,7 +2981,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_method_buildresult_summary_json() != 3251) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sf_ffi_checksum_method_builder_build() != 27591) {
+    if (uniffi_sf_ffi_checksum_method_builder_build() != 47952) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_method_gpubuffer_address() != 23806) {

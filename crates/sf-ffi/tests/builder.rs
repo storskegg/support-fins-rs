@@ -62,7 +62,12 @@ fn num(v: &Json, k: &str) -> f64 {
 fn a_build_is_delivered_on_the_worker_thread_with_its_generation() {
     let b = Builder::new(load("lbracket"));
     let (l, rx) = listener();
-    let g = b.build(rotation_matrix([35.0, 0.0, 0.0]).to_vec(), "{}".into(), l);
+    let g = b.build(
+        rotation_matrix([35.0, 0.0, 0.0]).to_vec(),
+        "{}".into(),
+        "{}".into(),
+        l,
+    );
     assert_eq!(g, 1);
     let Event::Done(gen_, r) = wait(&rx) else {
         panic!("failed")
@@ -81,8 +86,8 @@ fn a_stale_generation_is_dropped_never_delivered() {
     let rot = rotation_matrix([30.0, 0.0, 0.0]).to_vec();
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = b.build(rot.clone(), "{}".into(), l1);
-    let g2 = b.build(rot, "{\"mode\":\"full\"}".into(), l2);
+    let g1 = b.build(rot.clone(), "{}".into(), "{}".into(), l1);
+    let g2 = b.build(rot, "{\"mode\":\"full\"}".into(), "{}".into(), l2);
     assert_eq!((g1, g2), (1, 2));
     let Event::Done(g, _) = wait(&rx2) else {
         panic!("failed")
@@ -106,7 +111,7 @@ fn bad_options_and_poses_are_reported_as_engine_errors_with_their_generation() {
         (vec![1.0; 8], "{}"),
     ] {
         let (l, rx) = listener();
-        let g = b.build(rot, opts.into(), l);
+        let g = b.build(rot, opts.into(), "{}".into(), l);
         match wait(&rx) {
             Event::Failed(fg, FfiError::Engine { message }) => {
                 assert_eq!(fg, g);
@@ -122,7 +127,7 @@ fn a_build_equals_the_cli_engine_on_the_same_pose() {
     for (name, deg) in [("cube", 40.0), ("sphere", 0.0), ("lbracket", 35.0)] {
         let part = load(name);
         let m = rotation_matrix([deg, 0.0, 0.0]);
-        let r = build_part(&part, &m, "{}").unwrap();
+        let r = build_part(&part, &m, "{}", "{}").unwrap();
         let want = compute_fins(
             &pose(&part.topology().pos, Some([deg, 0.0, 0.0])),
             &EngineOptions::default(),
@@ -159,6 +164,7 @@ fn patch_stats_omit_zero_counters_and_fill_walls_have_no_region() {
         &part,
         &rotation_matrix([30.0, 0.0, 0.0]),
         "{\"mode\":\"full\"}",
+        "{}",
     )
     .unwrap();
     let s = json(&r.summary_json());
@@ -231,7 +237,7 @@ fn cli(input: &str, output: &str, flags: &[&str]) -> Vec<u8> {
 fn ffi(input: &str, output: &str, rot: Option<[f64; 3]>, opts: &str, export_opts: &str) -> Vec<u8> {
     let part = load_parts(input.into()).unwrap().remove(0);
     let m = rot.map_or(ID, rotation_matrix);
-    let build = Arc::new(build_part(&part, &m, opts).unwrap());
+    let build = Arc::new(build_part(&part, &m, opts, "{}").unwrap());
     export(output.into(), vec![part], vec![build], export_opts.into()).unwrap();
     std::fs::read(output).unwrap()
 }
@@ -367,7 +373,7 @@ fn export_of_a_3mf_with_a_slicers_parts_writes_the_cli_bytes() {
 #[test]
 fn export_refuses_what_the_cli_refuses_and_what_it_cannot_do() {
     let part = load("cube");
-    let build = Arc::new(build_part(&part, &ID, "{}").unwrap());
+    let build = Arc::new(build_part(&part, &ID, "{}", "{}").unwrap());
     let out = |p: &str, parts: Vec<Arc<Part>>, builds: Vec<Arc<BuildResult>>, o: &str| {
         export(tmp(p), parts, builds, o.into())
     };
@@ -381,7 +387,8 @@ fn export_refuses_what_the_cli_refuses_and_what_it_cannot_do() {
         )
         .is_err()
     );
-    let posed = Arc::new(build_part(&part, &rotation_matrix([40.0, 0.0, 0.0]), "{}").unwrap());
+    let posed =
+        Arc::new(build_part(&part, &rotation_matrix([40.0, 0.0, 0.0]), "{}", "{}").unwrap());
     assert!(
         out(
             "x.stl",

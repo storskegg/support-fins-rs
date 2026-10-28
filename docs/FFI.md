@@ -44,7 +44,7 @@ impl Part {
 // M4b:
 #[uniffi::export(callback_interface)] trait BuildListener: Send + Sync { fn done(&self, generation: u64, result: Arc<BuildResult>); fn failed(&self, generation: u64, err: FfiError); }
 #[derive(uniffi::Object)] struct Builder;                    // one per part; owns the generation counter + worker
-impl Builder { fn new(part: Arc<Part>) -> Arc<Self>; fn build(&self, rot: Vec<f64>, opts_json: String, listener: Box<dyn BuildListener>) -> u64; }
+impl Builder { fn new(part: Arc<Part>) -> Arc<Self>; fn build(&self, rot: Vec<f64>, opts_json: String, tunables_json: String, listener: Box<dyn BuildListener>) -> u64; }
 #[derive(uniffi::Object)] struct BuildResult;                // FinsBuilt + the seated part
 impl BuildResult { fn fins(&self) -> Arc<GpuBuffer>; fn pad(&self) -> Arc<GpuBuffer>; fn summary_json(&self) -> String; fn records_json(&self) -> String; }
 fn export(path: String, parts: Vec<Arc<Part>>, builds: Vec<Arc<BuildResult>>, options_json: String) -> Result<(), FfiError>; // STL/3MF as the CLI writes them
@@ -59,6 +59,21 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   `optionsFromDialog` and `computeFins` (`sf_cli::entry::compute_fins_detail`), the CLI's own path, with no
   second parser. The `rot` is the pose as nine column-major numbers; the identity pose is left unposed, as the
   CLI leaves a file with no `--rot`. A bad option or pose arrives through `failed` as `FfiError::Engine`.
+- **`tunables_json`** is the page's `tunables` object, `finOpts().tunables` (`web/ui/finbuild.js:139`): `roundFeet`,
+  `padH`, `padGrab`, `padStyle`, `padCustom` (`{ h, gap, grip, margin }`), `propGap`, `tallRibsHeight`, `cutout`,
+  `iface`, `tineDir`, `pinDepth`, `nozzle`, `wallLines` (and `tineContactOffset`, `tinesPerWall`). `{}` or empty text
+  means none. A key present replaces the value the dialog options would have given; a key absent keeps it.
+- **The request-level extras.** Four settings of the page's build request are neither `options.json` keys nor
+  tunables, so they ride in `opts_json` beside the dialog keys: `tallRibs` (bool, "Brace tall walls"), `curvedWalls`
+  (bool), `sway.uncappedDepth` (bool, "full brace depth") and `sway.crossRise` (fraction 0..1, the cross-rib height).
+  With sway on, a host that sends `tallRibs` also gets the page's `crossAbove` (the tall-wall height when ticked, else
+  never) and the tunables' `roundFeet` for the braces, as `swayOpts()` sets them.
+- **Which build runs.** With no `tunables_json` and none of the extras, a build is the CLI's (`computeFins`: the
+  posed part is re-seated, and `export` of it is byte-identical to the CLI's file). With either, it is **the page's
+  build**: `buildFins` on the part's own topology in this pose with the `finOpts()` request, the tunables applied inside
+  `buildFins` as `applyTunables`, exactly as `web/finworker.js` runs it. `parity/oracle/ffibuild.js` records such builds
+  from the JS Worker path and `crates/sf-ffi/tests/web_build.rs` checks the FFI build against them (hash of the
+  triangles, counts, every record).
 - **Generations** start at 1. A job that is no longer the latest when it starts or when it finishes is dropped:
   `done`/`failed` are only called for the newest generation, on the builder's worker thread.
 - **`BuildResult.fins()` / `pad()`** are `GpuBuffer`s of the same interleaved layout as `Part.mesh()` (position
@@ -71,8 +86,8 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
 - **`records_json()`**: `{ fins: [...], props: [...] }`. A `fins` entry is `{ id, kind (prop|wedge|sway), height,
   length, tines, rows, stilt, lean, bearing, span, short, fill, joined, braces?, ribs?, triRanges, line }`;
   `triRanges` are `[from, to)` **vertex** ranges into the `fins()` buffer (what per-fin removal cuts out). A
-  `props` entry is `{ id, region?, tines, span, height, fill, squat, rimWall }`: **a fill-pass wall has no
-  `region`** (`PropRecord.region` is an `Option`, #23).
+  `props` entry is `{ id?, region?, tines, span, height, fill, squat, rimWall, inBore? }`: **a fill-pass wall has no
+  `id` and no `region`** (`PropRecord.region` is an `Option`, #23).
 - **`export`** writes exactly the bytes `finFile` writes (`sf_cli::cli::output_bytes`, shared with the CLI):
   the path's extension picks STL or 3MF; `options_json` is `{}` or `{ "finsOnly": true }` (an STL of the fins
   mapped back onto the part; like `--fins-only` it refuses a posed build). One part and its build per file; a

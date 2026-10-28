@@ -228,8 +228,11 @@ fn fin(f: &FinRecord) -> Json {
 }
 
 fn prop(q: &PropRecord) -> Json {
-    let mut kv = vec![("id", u(q.id))];
-    // a fill-pass wall has no region
+    let mut kv = Vec::new();
+    // a fill-pass wall has no id and no region (JS has them undefined)
+    if !q.fill {
+        kv.push(("id", u(q.id)));
+    }
     if let Some(r) = q.region {
         kv.push(("region", u(r)));
     }

@@ -592,11 +592,129 @@ pub fn compute_fins_detail(
     positions: &[f64],
     options: &EngineOptions,
 ) -> Result<(FinsResult, FinsBuilt), String> {
-    let m = merge(options)?;
-    let tunables = clearances(&m)?;
+    let request = engine_request(options, None)?;
     let (pos, shift) = seat_soup(positions)?;
     let topo = Arc::new(build_topology(pos));
-    let result = analyze(&topo, m.threshold, &IDENTITY3);
+    let result = analyze(&topo, request.threshold, &IDENTITY3);
+    let cfg = Config::default();
+    let built = build_fins(&topo, &result, &IDENTITY3, &request.opts, &cfg);
+
+    let to_f32 = |v: &[[f64; 4]]| -> Vec<f32> {
+        v.iter()
+            .flat_map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
+            .collect()
+    };
+    let mut triangles = to_f32(&built.triangles);
+    triangles.extend(to_f32(&built.pad_triangles));
+    let stats = build_stats(&built, result.regions.len(), request.pins);
+    Ok((
+        FinsResult {
+            triangles,
+            // seated = input + offset  (so the caller maps fins back with input = seated - offset)
+            offset: Xyz {
+                x: result.offset.x - shift.x,
+                y: result.offset.y - shift.y,
+                z: result.offset.z - shift.z,
+            },
+            stats,
+        },
+        built,
+    ))
+}
+
+/// What the page's build request carries beyond the `options.json` keys a dialog takes: the
+/// `tunables` object (`finOpts().tunables`, applied by `buildFins` as `applyTunables`) and the
+/// request-level settings that are not tunables (`tallRibs`, `curvedWalls`, and the sway settings
+/// `swayOpts()` adds). Every field is optional: what is absent keeps the dialog's value.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PageRequest {
+    /// Overlays the clearances the dialog options give, key by key.
+    pub tunables: Tunables,
+    /// `opts.tallRibs` (face ribs on tall walls).
+    pub tall_ribs: Option<bool>,
+    /// `opts.curvedWalls` (Auto and Full only, as `finOpts` sends it).
+    pub curved_walls: Option<bool>,
+    /// `swayOpts().uncappedDepth` ("full brace depth").
+    pub uncapped_depth: Option<bool>,
+    /// `swayOpts().crossRise` (a fraction).
+    pub cross_rise: Option<f64>,
+}
+
+/// A build request ready for `build_fins`: the options, the overhang threshold and whether the
+/// tines are resin pins.
+pub struct EngineRequest {
+    pub opts: FinsOpts,
+    pub threshold: f64,
+    pub pins: bool,
+}
+
+/// `b` over `a`, key by key.
+fn overlay(a: Tunables, b: &Tunables) -> Tunables {
+    Tunables {
+        round_feet: b.round_feet.clone().or(a.round_feet),
+        pad_h: b.pad_h.or(a.pad_h),
+        pad_grab: b.pad_grab.or(a.pad_grab),
+        pad_style: b.pad_style.clone().or(a.pad_style),
+        pad_custom: b.pad_custom.clone().or(a.pad_custom),
+        prop_gap: b.prop_gap.or(a.prop_gap),
+        tine_contact_offset: b.tine_contact_offset.or(a.tine_contact_offset),
+        tall_ribs_height: b.tall_ribs_height.or(a.tall_ribs_height),
+        tines_per_wall: b.tines_per_wall.or(a.tines_per_wall),
+        cutout: b.cutout.clone().or(a.cutout),
+        iface: b.iface.clone().or(a.iface),
+        tine_dir: b.tine_dir.clone().or(a.tine_dir),
+        pin_depth: b.pin_depth.or(a.pin_depth),
+        nozzle: b.nozzle.or(a.nozzle),
+        wall_lines: b.wall_lines.or(a.wall_lines),
+    }
+}
+
+/// The `buildFins` request `computeFins` makes of its options (fins_entry.js:176-215), with the
+/// page's own settings laid over it when a host sends them (`finOpts()` in ui/finbuild.js).
+pub fn engine_request(
+    options: &EngineOptions,
+    page: Option<&PageRequest>,
+) -> Result<EngineRequest, String> {
+    let m = merge(options)?;
+    let mut tunables = clearances(&m)?;
+    if let Some(p) = page {
+        tunables = overlay(tunables, &p.tunables);
+    }
+    let tine_dir = match &tunables.tine_dir {
+        Some(TunableValue::Str(s)) => s.clone(),
+        _ => m.tine_dir.clone(),
+    };
+    let gap = tunables_gap(&tunables);
+    let sway = m.sway.as_ref().map(|s| {
+        let mut r = SwayRequest {
+            on: true,
+            gap,
+            grip_from: s.grip_from,
+            tine_spacing: s.tine_spacing,
+            reach: s.reach,
+            ..Default::default()
+        };
+        if let Some(p) = page {
+            // swayOpts(): `uncappedDepth`, `crossRise`, `roundFeet: FIN.roundFeet`, and
+            // `crossAbove`: the tall-wall height when "Brace tall walls" is ticked, else never
+            r.uncapped_depth = p.uncapped_depth == Some(true);
+            r.cross_rise = p.cross_rise;
+            r.round_feet = Some(matches!(
+                tunables.round_feet,
+                Some(TunableValue::Bool(true))
+            ));
+            if let Some(on) = p.tall_ribs {
+                r.cross_above = Some(if on {
+                    tunables
+                        .tall_ribs_height
+                        .unwrap_or(Config::default().brace.tall_h)
+                } else {
+                    f64::INFINITY
+                });
+            }
+        }
+        r
+    });
     let opts = FinsOpts {
         mode: Some(m.mode.clone()),
         // `opts.bedPad && opts.padStyle !== 'off'` (bedPad is always true here)
@@ -613,31 +731,25 @@ pub fn compute_fins_detail(
         }),
         plate_only: m.plate_only,
         long_walls: Some(m.long_walls),
-        separate_walls: separate_walls(&m.separate_walls, &m.tine_dir)?,
+        separate_walls: separate_walls(&m.separate_walls, &tine_dir)?,
         // `sway` is forwarded whole, so a host passes the same object the website's options panel
         // builds; buildFins ignores it unless `on` is set. Like the site (ui/finbuild.js
         // swayOpts), braces take the Support gap unless the host sets its own.
-        sway: m.sway.as_ref().map(|s| SwayRequest {
-            on: true,
-            gap: tunables_gap(&tunables),
-            grip_from: s.grip_from,
-            tine_spacing: s.tine_spacing,
-            reach: s.reach,
-            ..Default::default()
-        }),
-        tunables: Some(tunables.clone()),
+        sway,
+        tall_ribs: page.and_then(|p| p.tall_ribs),
+        curved_walls: page.and_then(|p| p.curved_walls),
+        tunables: Some(tunables),
         ..Default::default()
     };
-    let cfg = Config::default();
-    let built = build_fins(&topo, &result, &IDENTITY3, &opts, &cfg);
+    Ok(EngineRequest {
+        opts,
+        threshold: m.threshold,
+        pins: tine_dir == "vertical",
+    })
+}
 
-    let to_f32 = |v: &[[f64; 4]]| -> Vec<f32> {
-        v.iter()
-            .flat_map(|p| [p[0] as f32, p[1] as f32, p[2] as f32])
-            .collect()
-    };
-    let fin = to_f32(&built.triangles);
-    let pad = to_f32(&built.pad_triangles);
+/// The readout numbers of a build (computeFins' `stats`).
+pub fn build_stats(built: &FinsBuilt, regions: usize, pins: bool) -> Stats {
     // Sway braces are appended to the fin soup as one block (web/fins.js): count them so a host
     // can tell a brace from a fin.
     let mut sway_tris = 0usize;
@@ -646,12 +758,12 @@ pub fn compute_fins_detail(
             sway_tris += (r[1] - r[0]) / 3;
         }
     }
-    let stats = Stats {
-        overhang_regions: result.regions.len(),
+    Stats {
+        overhang_regions: regions,
         // The soup is fins | sway braces | pad, in these counts.
-        fin_triangles: fin.len() / 9 - sway_tris,
+        fin_triangles: built.triangles.len() / 3 - sway_tris,
         sway_triangles: sway_tris,
-        pad_triangles: pad.len() / 9,
+        pad_triangles: built.pad_triangles.len() / 3,
         // Tined fins (walls with tines); plain walls are `props`. Sway braces are neither.
         braces: built.brace_count.unwrap_or(0),
         // plain walls (no tines): every wall when Tines is off. walls = braces + props, as the
@@ -659,7 +771,7 @@ pub fn compute_fins_detail(
         props: built.prop_count.unwrap_or(0),
         tines: built.tines,
         // the tines are resin pins (#309): the report names them so
-        pins: m.tine_dir == "vertical",
+        pins,
         // Sway braces are counted apart from the fins: they hold a tall part's sides rather than
         // an overhang, so a readout that merged them would claim overhangs were served that
         // nothing is under. `swayReason` says why none were placed, for a host that asked for
@@ -674,22 +786,7 @@ pub fn compute_fins_detail(
         // first: the plugins' readouts say so, as the site's does
         floating: built.floating.len(),
         floating_drop: built.floating.first().map_or(0.0, |p| p.drop),
-    };
-    let mut triangles = fin;
-    triangles.extend(pad);
-    Ok((
-        FinsResult {
-            triangles,
-            // seated = input + offset  (so the caller maps fins back with input = seated - offset)
-            offset: Xyz {
-                x: result.offset.x - shift.x,
-                y: result.offset.y - shift.y,
-                z: result.offset.z - shift.z,
-            },
-            stats,
-        },
-        built,
-    ))
+    }
 }
 
 fn tunables_gap(t: &Tunables) -> Option<f64> {
