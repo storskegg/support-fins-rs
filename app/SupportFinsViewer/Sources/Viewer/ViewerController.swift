@@ -56,16 +56,17 @@ public final class ViewerController {
     public var showRings = true { didSet { updateGizmo() } }
     /// The rings fade back while a sway brace is aimed (`ringfade.js`); 1 = fully shown.
     public var ringFade: Float = 1 { didSet { updateGizmo() } }
-    public private(set) var ringHover: GizmoAxis? { didSet { updateGizmo() } }
-    public private(set) var ringDragging: GizmoAxis? { didSet { updateGizmo() } }
+    public private(set) var ringHover: GizmoHandle? { didSet { updateGizmo() } }
+    public private(set) var ringDragging: GizmoHandle? { didSet { updateGizmo() } }
     /// The degrees turned so far by the ring drag in progress.
     public private(set) var ringDegrees: Double = 0
     @ObservationIgnored public var onRing: ((RingEvent) -> Void)?
 
     public enum RingEvent {
-        case began(GizmoAxis)
-        /// The turn since the drag began: a world rotation about the ring's axis through the part's centre.
-        case turned(delta: simd_double3x3, degrees: Double, axis: GizmoAxis)
+        case began(GizmoHandle)
+        /// The turn since the drag began: a world rotation through the part's centre (about the ring's axis, the
+        /// view axis for the outer ring, or the trackball's axis for the middle).
+        case turned(delta: simd_double3x3, degrees: Double, handle: GizmoHandle)
         case ended(turned: Bool)
     }
 
@@ -217,7 +218,7 @@ public final class ViewerController {
     }
 
     /// The ring under a pixel, if the rings are on.
-    public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoAxis? {
+    public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoHandle? {
         guard showRings, !supportPicking, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
         return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
                                                     width: Float(width), height: Float(height))
@@ -225,26 +226,28 @@ public final class ViewerController {
 
     /// A press: starts a ring drag when it lands on a ring. True when the ring took the press (no orbit then).
     public func beginRingDrag(x: Int, y: Int, width: Int, height: Int) -> Bool {
-        guard let axis = ringAt(x: x, y: y, width: width, height: height) else { return false }
+        guard let handle = ringAt(x: x, y: y, width: width, height: height) else { return false }
         let center = gizmoCenter
-        guard let d = RotateGizmo(center: center).beginDrag(axis, ray: ndcRay(x: x, y: y, width: width, height: height)) else { return false }
+        guard let d = RotateGizmo(center: center).beginDrag(handle, camera: renderer.camera,
+                                                            ray: ndcRay(x: x, y: y, width: width, height: height)) else { return false }
         drag = (d, rotation, renderer.offset, center)
-        ringDragging = axis
+        ringDragging = handle
         ringDegrees = 0
         clearHover()
-        onRing?(.began(axis))
+        onRing?(.began(handle))
         return true
     }
 
     public func dragRing(x: Int, y: Int, width: Int, height: Int, snap: Bool) {
         guard let d = drag else { return }
         let gizmo = RotateGizmo(center: d.center)
-        guard let degrees = gizmo.angle(d.state, ray: ndcRay(x: x, y: y, width: width, height: height), snap: snap),
-              degrees != ringDegrees else { return }
+        guard let t = gizmo.turn(d.state, ray: ndcRay(x: x, y: y, width: width, height: height), snap: snap) else { return }
+        let degrees = t.radians * 180 / .pi
+        guard degrees != ringDegrees else { return }
         ringDegrees = degrees
-        let delta = RotateGizmo.rotation(d.state.axis, degrees: degrees)
+        let delta = RotateGizmo.rotation(axis: t.axis, radians: t.radians)
         rotation = simd_float3x3(columns: (SIMD3<Float>(delta.columns.0), SIMD3<Float>(delta.columns.1), SIMD3<Float>(delta.columns.2))) * d.rotation
-        onRing?(.turned(delta: delta, degrees: degrees, axis: d.state.axis))
+        onRing?(.turned(delta: delta, degrees: degrees, handle: d.state.handle))
     }
 
     public func endRingDrag() {

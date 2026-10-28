@@ -12,7 +12,7 @@ struct InspectorView: View {
 
     var body: some View {
         Form {
-            PartSections(controller: controller)
+            PartSections(controller: controller, settings: $settings)
             Section {
                 PrinterSection(settings: $settings, open: $sections.printer)
                 PlacementSection(settings: $settings)

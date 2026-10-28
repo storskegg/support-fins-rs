@@ -363,19 +363,32 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         enc.setRenderPipelineState(ringPipeline)
         enc.setDepthStencilState(gizmoDepthState)
         enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
-        var params = SIMD4<Float>(viewport.x, viewport.y, GizmoDisplay.widthPoints * pixelScale, 0)
-        enc.setVertexBytes(&params, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
-        for axis in GizmoAxis.allCases {
-            // while a ring is being dragged only that one shows; otherwise all three
-            if let active = g.active, active != axis { continue }
-            let lit = g.active == axis || g.hover == axis
-            let color = lit ? GizmoDisplay.highlight : axis.color
-            let alpha = (lit ? 1 : GizmoDisplay.opacity) * g.fade
-            let pts = rings.arc(axis, camera: camera).flatMap { [$0.x, $0.y, $0.z] }
-            var c = SIMD4<Float>(color, alpha)
-            enc.setVertexBytes(pts, length: pts.count * 4, index: 0)
+        func stroke(_ pts: [SIMD3<Float>], color: SIMD3<Float>, alpha: Float, width: Float) {
+            var params = SIMD4<Float>(viewport.x, viewport.y, width * pixelScale, 0)
+            enc.setVertexBytes(&params, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
+            let flat = pts.flatMap { [$0.x, $0.y, $0.z] }
+            var c = SIMD4<Float>(color, alpha * g.fade)
+            enc.setVertexBytes(flat, length: flat.count * 4, index: 0)
             enc.setFragmentBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 0)
-            enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: RotateGizmo.segments * 6)
+            enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: (pts.count - 1) * 6)
+        }
+        // The handle that is hovered or being dragged lights itself, and the handles whose names are its letters
+        // (XYZE lights X, Y, Z and E), yellow and opaque (`TransformControlsGizmo`).
+        let current = g.active ?? g.hover
+        func lit(_ h: GizmoHandle) -> Bool { current?.lights(h) ?? false }
+        let w = GizmoDisplay.widthPoints
+        // the gray trackball outline, the translucent yellow outer ring, then the three axis rings
+        stroke(rings.circle(radius: RotateGizmo.freeRadius, camera: camera),
+               color: lit(.free) ? GizmoDisplay.highlight : GizmoDisplay.gray, alpha: 1, width: w)
+        stroke(rings.circle(radius: RotateGizmo.screenRadius, camera: camera),
+               color: GizmoDisplay.highlight, alpha: lit(.screen) ? 1 : GizmoDisplay.screenOpacity, width: w)
+        for axis in GizmoAxis.allCases {
+            stroke(rings.arc(axis, camera: camera), color: lit(.axis(axis)) ? GizmoDisplay.highlight : axis.color, alpha: 1, width: w)
+        }
+        // the helper line along a hovered or dragged axis (white, half transparent), unless it points down the view
+        if case .axis(let axis)? = current, rings.showsAxisLine(axis, camera: camera) {
+            let reach = camera.far
+            stroke([g.center - axis.vector * reach, g.center + axis.vector * reach], color: SIMD3(1, 1, 1), alpha: 0.5, width: 1)
         }
     }
 
@@ -594,17 +607,19 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
 public struct GizmoDisplay: Equatable, Sendable {
     /// three.js' hover colour (`0xffff00`).
     public static let highlight = SIMD3<Float>(1, 1, 0)
-    public static let opacity: Float = 0.9
+    /// `matGray` (`0x787878`) and the outer ring's `matYellowTransparent` opacity.
+    public static let gray = SIMD3<Float>(0.47, 0.47, 0.47)
+    public static let screenOpacity: Float = 0.25
     public static let widthPoints: Float = 3
 
     public var center: SIMD3<Float>
     public var visible = true
-    public var hover: GizmoAxis?
-    public var active: GizmoAxis?
+    public var hover: GizmoHandle?
+    public var active: GizmoHandle?
     /// 1 normally; the rings go faint while a sway brace is aimed (`web/ui/ringfade.js`, `FADED` = 0.15).
     public var fade: Float = 1
 
-    public init(center: SIMD3<Float>, visible: Bool = true, hover: GizmoAxis? = nil, active: GizmoAxis? = nil, fade: Float = 1) {
+    public init(center: SIMD3<Float>, visible: Bool = true, hover: GizmoHandle? = nil, active: GizmoHandle? = nil, fade: Float = 1) {
         self.center = center
         self.visible = visible
         self.hover = hover

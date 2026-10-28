@@ -3,112 +3,175 @@ import Testing
 import simd
 @testable import Viewer
 
-@Suite("Rotate gizmo")
+@Suite("Rotate gizmo (TransformControls)")
 struct GizmoTests {
     let cam = OrbitCamera(target: [0, 0, 20], distance: 300, azimuth: -.pi / 3, elevation: 0.6, aspect: 1.5)
     let w: Float = 900
     let h: Float = 600
+    let g = RotateGizmo(center: [0, 0, 20])
 
-    func px(_ p: SIMD3<Float>, _ g: RotateGizmo) -> SIMD2<Float> { g.screen(p, camera: cam, width: w, height: h) }
-    func ray(at p: SIMD2<Float>) -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
+    func px(_ p: SIMD3<Float>) -> SIMD2<Float> { g.screen(p, camera: cam, width: w, height: h) }
+    func ray(_ p: SIMD2<Float>) -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
         cam.ray(ndcX: 2 * p.x / w - 1, ndcY: 1 - 2 * p.y / h)
     }
+    func drag(_ handle: GizmoHandle, from a: SIMD2<Float>) -> RotateGizmo.Drag? { g.beginDrag(handle, camera: cam, ray: ray(a)) }
 
-    @Test func radiusIsTheThreeJsFormulaAndConstantOnScreen() {
-        let g = RotateGizmo(center: [0, 0, 20])
-        // factor = distance * 1.9 tan(fov / 2); radius = factor * 0.85 / 4
-        let want = 300 * 1.9 * tan(cam.fovY / 2) * 0.85 / 4
-        #expect(abs(g.radius(camera: cam) - want) < 1e-3)
-        // twice as far: twice the world radius, the same size on screen
+    @Test func sizesAreThreeJsUnits() {
+        // s = distance * 1.9 tan(fov / 2) * 0.85 / 4; the axis rings are 0.5 s, the outer ring 0.75 s
+        let s = 300 * 1.9 * tan(cam.fovY / 2) * 0.85 / 4
+        #expect(abs(g.unit(camera: cam) - s) < 1e-3)
+        #expect(abs(g.radius(camera: cam) - 0.5 * s) < 1e-3)
+        // constant on screen: 0.2019 of the view height per unit, whatever the distance
         var far = cam
-        far.distance = 600
-        let r1 = g.radius(camera: cam), r2 = g.radius(camera: far)
-        #expect(abs(r2 / r1 - 2) < 1e-3)
-        // ... and about 17% of the distance, i.e. a ring of ~40% of half the view height
-        #expect(abs(r1 / 300 - 0.167) < 0.002)
+        far.distance = 900
+        #expect(abs(g.pixelsPerUnit(camera: cam, height: h) / h - 0.2019) < 0.001)
+        #expect(abs(g.pixelsPerUnit(camera: far, height: h) - g.pixelsPerUnit(camera: cam, height: h)) < 0.05)
     }
 
-    @Test func eachRingIsTheNearHalfOfACircleInItsPlane() {
-        let g = RotateGizmo(center: [5, -3, 20])
-        let r = g.radius(camera: cam)
+    @Test func theRingsAreCirclesOfTheRightSizeAndPlane() {
+        let s = g.unit(camera: cam)
         let toEye = simd_normalize(cam.eye - g.center)
         for axis in GizmoAxis.allCases {
             let pts = g.arc(axis, camera: cam)
-            #expect(pts.count == RotateGizmo.segments + 1)
             for p in pts {
                 let v = p - g.center
-                #expect(abs(simd_length(v) - r) < 1e-3)
-                #expect(abs(simd_dot(v, axis.vector)) < 1e-3)               // in the plane
-                #expect(simd_dot(v, toEye) > -1e-3 * r)                      // the half facing the camera
+                #expect(abs(simd_length(v) - 0.5 * s) < 1e-3 && abs(simd_dot(v, axis.vector)) < 1e-3)
+                #expect(simd_dot(v, toEye) > -1e-3 * s)                       // the near half
             }
-            // a half turn from end to end
-            let a = pts.first! - g.center, b = pts.last! - g.center
-            #expect(abs(simd_dot(a, b) / (r * r) + 1) < 1e-3)
+        }
+        for (r, name) in [(RotateGizmo.screenRadius, "E"), (RotateGizmo.freeRadius, "XYZE")] {
+            let pts = g.circle(radius: r, camera: cam)
+            #expect(pts.first == pts.last || simd_length(pts.first! - pts.last!) < 1e-3, Comment(rawValue: name))
+            for p in pts {
+                let v = p - g.center
+                #expect(abs(simd_length(v) - r * s) < 1e-3 && abs(simd_dot(v, toEye)) < 1e-3, Comment(rawValue: name))   // in the view plane
+            }
         }
     }
 
-    @Test func aPixelOnARingGrabsItAndAFarOneDoesNot() {
-        let g = RotateGizmo(center: [0, 0, 20])
-        for axis in GizmoAxis.allCases {
-            let mid = g.arc(axis, camera: cam)[RotateGizmo.segments / 2]
-            #expect(g.hit(atPixel: px(mid, g), camera: cam, width: w, height: h) == axis)
-            // a few pixels off still grabs; many do not
-            #expect(g.hit(atPixel: px(mid, g) + [4, 3], camera: cam, width: w, height: h) != nil)
-        }
+    @Test func pickingFindsTheHandleUnderThePointer() {
+        let axisMid = g.arc(.z, camera: cam)[RotateGizmo.segments / 2]
+        #expect(g.hit(atPixel: px(axisMid), camera: cam, width: w, height: h) == .axis(.z))
+        let e = g.circle(radius: RotateGizmo.screenRadius, camera: cam)[RotateGizmo.segments / 8]
+        #expect(g.hit(atPixel: px(e), camera: cam, width: w, height: h) == .screen)
+        // the middle: within 0.25 of the centre, even off the rings
+        let c = px(g.center)
+        #expect(g.hit(atPixel: c + [3, 2], camera: cam, width: w, height: h) == .free)
+        // the pick tube is 0.1 either side of a ring, and no more
+        let ppu = g.pixelsPerUnit(camera: cam, height: h)
+        let out = simd_normalize(px(e) - c)
+        #expect(g.hit(atPixel: px(e) + out * (0.08 * ppu), camera: cam, width: w, height: h) == .screen)
+        #expect(g.hit(atPixel: px(e) + out * (0.2 * ppu), camera: cam, width: w, height: h) == nil)
         #expect(g.hit(atPixel: [5, 5], camera: cam, width: w, height: h) == nil)
-        // the centre of the view is inside all three rings, on none
-        #expect(g.hit(atPixel: px(g.center, g), camera: cam, width: w, height: h) == nil)
     }
 
-    @Test func theRingNearestThePointerWins() {
-        let g = RotateGizmo(center: [0, 0, 20])
-        let z = g.arc(.z, camera: cam)[RotateGizmo.segments / 4]
-        #expect(g.hit(atPixel: px(z, g), camera: cam, width: w, height: h) == .z)
-        // restricting the candidates leaves the others out
-        #expect(g.hit(axes: [.x], atPixel: px(z, g), camera: cam, width: w, height: h) != .z)
+    @Test func theMiddleLightsEveryHandleAndAnAxisOnlyItself() {
+        for h in [GizmoHandle.axis(.x), .axis(.y), .axis(.z), .screen, .free] {
+            #expect(GizmoHandle.free.lights(h))
+        }
+        #expect(GizmoHandle.axis(.x).lights(.axis(.x)) && !GizmoHandle.axis(.x).lights(.axis(.y)) && !GizmoHandle.axis(.x).lights(.screen))
+        #expect(GizmoHandle.screen.lights(.screen) && !GizmoHandle.screen.lights(.free))
+        #expect(GizmoHandle.screen.deltaLabel == "free" && GizmoHandle.free.deltaLabel == "free" && GizmoHandle.axis(.z).deltaLabel == "Z")
     }
 
-    @Test func draggingAroundTheRingGivesTheAngleSnappedTo5Degrees() throws {
-        let g = RotateGizmo(center: [0, 0, 20])
-        let r = g.radius(camera: cam)
+    /// Unit vector on screen along the tangent of an axis ring: the direction of `axis x eye` projected.
+    func tangentPixels(_ axis: GizmoAxis) -> SIMD2<Float> {
+        let e = simd_normalize(cam.eye - g.center)
+        let t = simd_normalize(simd_cross(axis.vector, e))
+        let a = px(g.center), b = px(g.center + t * 10)
+        return simd_normalize(b - a)
+    }
+
+    @Test func anAxisRingTurnsByTheTangentialDisplacementAtTwentyOverDistance() throws {
+        // ROTATION_SPEED = 20 / d, offset in world units on the plane facing the camera: radians per pixel is
+        // 20 * (2 tan(fov / 2) / height), whatever the distance
+        let perPixel = 20 * 2 * tan(cam.fovY / 2) / h
         for axis in GizmoAxis.allCases {
-            let (u, wv) = axis.basis
-            func point(_ degrees: Float) -> SIMD3<Float> {
-                let t = degrees * .pi / 180
-                return g.center + r * (cos(t) * u + sin(t) * wv)
+            let start = px(g.arc(axis, camera: cam)[RotateGizmo.segments / 2])
+            let d = try #require(drag(.axis(axis), from: start))
+            let dir = tangentPixels(axis)
+            for dist: Float in [10, 40, -25] {
+                let t = try #require(g.turn(d, ray: ray(start + dir * dist), snap: false))
+                #expect(abs(t.axis - axis.vector).max() < 1e-5)
+                #expect(abs(Float(t.radians) - dist * perPixel) < 0.01 * abs(dist) * perPixel + 1e-4, "\(axis) \(dist): \(t.radians)")
             }
-            let drag = try #require(g.beginDrag(axis, ray: ray(at: px(point(10), g))))
-            for (turn, snapped) in [(30.0, 30.0), (32.0, 30.0), (33.0, 35.0), (-47.0, -45.0), (120.0, 120.0)] {
-                let free = try #require(g.angle(drag, ray: ray(at: px(point(10 + Float(turn)), g)), snap: false))
-                #expect(abs(free - turn) < 0.05, "\(axis) free \(free) vs \(turn)")
-                let s = try #require(g.angle(drag, ray: ray(at: px(point(10 + Float(turn)), g)), snap: true))
-                #expect(abs(s - snapped) < 1e-9, "\(axis) snapped \(s) vs \(snapped)")
-            }
+            // across the tangent (along the ring's radius on screen) turns nothing
+            let across = SIMD2<Float>(-dir.y, dir.x)
+            let none = try #require(g.turn(d, ray: ray(start + across * 30), snap: false))
+            #expect(abs(none.radians) < 0.02)
         }
     }
 
-    @Test func theDragAngleFollowsTheRightHandRule() throws {
-        let g = RotateGizmo(center: [0, 0, 0])
-        var top = OrbitCamera(target: .zero, distance: 300, azimuth: 0, elevation: OrbitCamera.maxElevation, aspect: 1)
-        top.aspect = 1
-        // looking straight down at a Z ring: moving the pointer counter-clockwise on screen is a positive turn
-        let r = g.radius(camera: top)
-        func ndc(_ p: SIMD3<Float>) -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
-            let n = top.project(p)
-            return top.ray(ndcX: n.x, ndcY: n.y)
-        }
-        let d = try #require(g.beginDrag(.z, ray: ndc([r, 0, 0])))
-        let a = try #require(g.angle(d, ray: ndc([0, r, 0]), snap: false))
-        #expect(abs(a - 90) < 0.1)
-        let rot = RotateGizmo.rotation(.z, degrees: a)
-        #expect(simd_length(rot * SIMD3<Double>(1, 0, 0) - SIMD3(0, 1, 0)) < 1e-6)
+    @Test func theSnapRoundsTheFinalAngleToFiveDegrees() throws {
+        let start = px(g.arc(.y, camera: cam)[RotateGizmo.segments / 2])
+        let d = try #require(drag(.axis(.y), from: start))
+        let to = start + tangentPixels(.y) * 33
+        let free = try #require(g.turn(d, ray: ray(to), snap: false)).radians * 180 / .pi
+        let snapped = try #require(g.turn(d, ray: ray(to), snap: true)).radians * 180 / .pi
+        #expect(abs(snapped - (free / 5).rounded() * 5) < 1e-9 && snapped.truncatingRemainder(dividingBy: 5) == 0)
+        #expect(free != snapped)
     }
 
-    @Test func anEdgeOnPlaneGivesNoAngle() {
-        let g = RotateGizmo(center: [0, 0, 0])
-        // a ray parallel to the Z ring's plane never meets it
-        let flat = (origin: SIMD3<Float>(-100, 0, 5), direction: SIMD3<Float>(1, 0, 0))
-        #expect(g.beginDrag(.z, ray: flat) == nil)
+    @Test func theMiddleIsATrackballThePointerDragsTheFrontSurfaceAlong() throws {
+        let c = px(g.center)
+        let d = try #require(drag(.free, from: c + [2, 0]))
+        let to = c + [2, 0] + [8, -4]                                      // right and up on the screen
+        let t = try #require(g.turn(d, ray: ray(to), snap: false))
+        let e = simd_normalize(cam.eye - g.center)
+        // the point of the ball facing the camera moves the way the pointer moved
+        let front = e
+        let moved = RotateGizmo.rotation(axis: t.axis, radians: t.radians) * SIMD3<Double>(SIMD3<Double>(front)) - SIMD3<Double>(front)
+        let screenDir = SIMD3<Double>(SIMD3<Double>(cam.basis.right) * 8 + SIMD3<Double>(cam.basis.up) * 4)
+        #expect(simd_dot(simd_normalize(moved), simd_normalize(screenDir)) > 0.97)
+        // angle = |offset| * 20 / d, in radians (unsnapped)
+        let perPixel = 20 * 2 * tan(cam.fovY / 2) / h
+        let len = simd_length(SIMD2<Float>(8, 4))
+        #expect(abs(Float(abs(t.radians)) - len * perPixel) < 0.02 * len * perPixel)
+        // a zero move turns nothing
+        let still = try #require(g.turn(d, ray: ray(c + [2, 0]), snap: true))
+        #expect(still.radians == 0)
+    }
+
+    @Test func theOuterRingTurnsAboutTheViewByTheAngleSweptRoundTheCentre() throws {
+        let c = px(g.center)
+        let ppu = g.pixelsPerUnit(camera: cam, height: h)
+        let r = RotateGizmo.screenRadius * ppu
+        func at(_ degrees: Float) -> SIMD2<Float> {
+            let t = degrees * .pi / 180
+            return c + [r * cos(t), -r * sin(t)]                             // counter-clockwise on the screen
+        }
+        let d = try #require(drag(.screen, from: at(10)))
+        for sweep: Float in [30, 95, -60] {
+            let t = try #require(g.turn(d, ray: ray(at(10 + sweep)), snap: false))
+            let e = simd_normalize(cam.eye - g.center)
+            #expect(abs(t.axis - e).max() < 1e-4)
+            #expect(abs(Float(t.radians) * 180 / .pi - sweep) < 0.6, "swept \(sweep): \(t.radians * 180 / .pi)")
+        }
+        let s = try #require(g.turn(d, ray: ray(at(10 + 33)), snap: true))
+        #expect((s.radians * 180 / .pi).truncatingRemainder(dividingBy: 5) == 0)
+    }
+
+    @Test func lookingDownAnAxisTheRingTurnsInThePlaneOfTheView() throws {
+        var top = cam
+        top.azimuth = 0
+        top.elevation = OrbitCamera.maxElevation
+        let g = RotateGizmo(center: [0, 0, 20])
+        func ray2(_ p: SIMD2<Float>) -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
+            top.ray(ndcX: 2 * p.x / 900 - 1, ndcY: 1 - 2 * p.y / 600)
+        }
+        let c = g.screen(g.center, camera: top, width: 900, height: 600)
+        let a = c + [80, 0], b = c + [0, -80]                                 // a quarter turn counter-clockwise
+        let d = try #require(g.beginDrag(.axis(.z), camera: top, ray: ray2(a)))
+        let t = try #require(g.turn(d, ray: ray2(b), snap: false))
+        #expect(abs(t.radians * 180 / .pi - 90) < 0.5)
+        #expect(simd_dot(t.axis, [0, 0, 1]) > 0.999)
+    }
+
+    @Test func axisLineHidesWhenTheAxisPointsDownTheView() {
+        var top = cam
+        top.elevation = OrbitCamera.maxElevation
+        #expect(!g.showsAxisLine(.z, camera: top))
+        #expect(g.showsAxisLine(.x, camera: top) && g.showsAxisLine(.y, camera: top))
     }
 }
 
@@ -130,8 +193,11 @@ struct GizmoViewerTests {
         return (Int((n.x * 0.5 + 0.5) * Float(size)), Int((0.5 - n.y * 0.5) * Float(size)))
     }
 
-    func ringPoint(_ c: ViewerController, _ axis: GizmoAxis, _ i: Int = RotateGizmo.segments / 2) -> (Int, Int) {
-        pixelOf(c, RotateGizmo(center: c.gizmoCenter).arc(axis, camera: c.renderer.camera)[i])
+    func ringPoint(_ c: ViewerController, _ axis: GizmoAxis, _ i: Int = 0) -> (Int, Int) {
+        // the point of the arc farthest from the middle on screen, clear of the trackball's pick sphere
+        let mid = pixelOf(c, c.gizmoCenter)
+        let pts = RotateGizmo(center: c.gizmoCenter).arc(axis, camera: c.renderer.camera).map { pixelOf(c, $0) }
+        return pts.max { hypot(Double($0.0 - mid.0), Double($0.1 - mid.1)) < hypot(Double($1.0 - mid.0), Double($1.1 - mid.1)) }!
     }
 
     func pixels(_ c: ViewerController) -> [UInt8] {
@@ -148,84 +214,107 @@ struct GizmoViewerTests {
         return false
     }
 
-    @Test func theRingsDrawInTheirAxisColours() throws {
+    @Test func theRingsDrawInTheirAxisColoursAndTheOuterRingIsFaintYellow() throws {
         let (c, _) = try rig()
         let px = pixels(c)
         #expect(has(px, near: ringPoint(c, .x)) { r, g, b in r > 180 && g < 90 && b < 90 }, "no red ring")
         #expect(has(px, near: ringPoint(c, .y)) { r, g, b in g > 180 && r < 90 && b < 90 }, "no green ring")
         #expect(has(px, near: ringPoint(c, .z)) { r, g, b in b > 180 && r < 90 && g < 90 }, "no blue ring")
+        let g = RotateGizmo(center: c.gizmoCenter)
+        let e = pixelOf(c, g.circle(radius: RotateGizmo.screenRadius, camera: c.renderer.camera)[RotateGizmo.segments / 3])
+        // 25% yellow over the dark background: a dim olive, clearly lighter than the background
+        #expect(has(px, near: e) { r, g, b in r > 55 && g > 55 && b < 50 }, "no outer ring")
+        let free = pixelOf(c, g.circle(radius: RotateGizmo.freeRadius, camera: c.renderer.camera)[RotateGizmo.segments / 3])
+        #expect(has(px, near: free) { r, g, b in abs(r - 120) < 25 && abs(g - 120) < 25 && abs(b - 120) < 25 }, "no gray trackball outline")
     }
 
     @Test func hidingTheRingsRemovesThemAndTheirGrab() throws {
         let (c, _) = try rig()
         let spot = ringPoint(c, .x)
-        #expect(c.ringAt(x: spot.0, y: spot.1, width: size, height: size) == .x)
+        #expect(c.ringAt(x: spot.0, y: spot.1, width: size, height: size) == .axis(.x))
         c.showRings = false
-        let px = pixels(c)
-        #expect(!has(px, near: spot) { r, g, b in r > 180 && g < 90 && b < 90 })
         #expect(c.ringAt(x: spot.0, y: spot.1, width: size, height: size) == nil)
         #expect(c.renderer.gizmo == nil)
     }
 
-    @Test func aHoveredRingTurnsYellowAndTheFadeDimsThem() throws {
+    @Test func aHoveredRingTurnsYellowAndTheMiddleLightsThemAll() throws {
         let (c, _) = try rig()
         let spot = ringPoint(c, .y)
         c.pointerMoved(x: spot.0, y: spot.1, width: size, height: size)
-        #expect(c.ringHover == .y)
+        #expect(c.ringHover == .axis(.y))
         var px = pixels(c)
         #expect(has(px, near: spot) { r, g, b in r > 200 && g > 200 && b < 90 }, "hovered ring is not yellow")
+        #expect(has(px, near: ringPoint(c, .z)) { r, g, b in b > 180 && r < 90 && g < 90 }, "another ring changed colour")
+        // the middle: every ring lit
+        let mid = pixelOf(c, c.gizmoCenter)
+        c.pointerMoved(x: mid.0 + 2, y: mid.1 + 2, width: size, height: size)
+        #expect(c.ringHover == .free)
+        px = pixels(c)
+        for axis in GizmoAxis.allCases {
+            #expect(has(px, near: ringPoint(c, axis)) { r, g, b in r > 200 && g > 200 && b < 90 }, "\(axis) not lit by XYZE")
+        }
         c.clearRingHover()
         c.ringFade = 0.15
         px = pixels(c)
-        #expect(!has(px, near: ringPoint(c, .z)) { r, g, b in b > 150 && r < 70 && g < 70 }, "faded ring is still bright")
-        #expect(has(px, near: ringPoint(c, .z)) { r, g, b in b > 40 && b > r + 15 }, "the faded ring vanished")
+        #expect(!has(px, near: ringPoint(c, .z)) { r, g, b in b > 150 && r < 70 && g < 70 })
     }
 
-    @Test func dragAlongOneRingTurnsThePartAboutItsCentreInFiveDegreeSteps() async throws {
+    @Test func aDragThroughTheControllerTurnsThePartAboutTheGrabbedCentreInFiveDegreeSteps() async throws {
         let (c, _) = try rig()
         var events: [String] = []
-        var deltas: [simd_double3x3] = []
+        var last: (Double, GizmoHandle)?
         c.onRing = { e in
             switch e {
-            case .began(let a): events.append("began \(a.label)")
-            case .turned(let d, let deg, _): events.append("turned \(Int(deg))"); deltas.append(d)
+            case .began(let h): events.append("began \(h.name)")
+            case .turned(_, let deg, let h): events.append("turned"); last = (deg, h)
             case .ended(let t): events.append("ended \(t)")
             }
         }
         let center = c.gizmoCenter
-        let start = ringPoint(c, .z, RotateGizmo.segments / 2)
+        let start = ringPoint(c, .z)
         #expect(c.beginRingDrag(x: start.0, y: start.1, width: size, height: size))
-        #expect(c.ringDragging == .z)
-        // drag a quarter of the way round the ring's centre on screen: some positive multiple of 5
-        let g = RotateGizmo(center: center)
-        let r = g.radius(camera: c.renderer.camera)
-        let (u, w) = GizmoAxis.z.basis
-        let a0 = atan2(simd_dot(g.arc(.z, camera: c.renderer.camera)[RotateGizmo.segments / 2] - center, w),
-                       simd_dot(g.arc(.z, camera: c.renderer.camera)[RotateGizmo.segments / 2] - center, u))
-        let to = pixelOf(c, center + r * (cos(a0 + 0.5236) * u + sin(a0 + 0.5236) * w))   // +30 degrees
+        #expect(c.ringDragging == .axis(.z))
+        // drag along the ring's tangent on screen
+        let cam = c.renderer.camera
+        let e = simd_normalize(cam.eye - center)
+        let t = simd_normalize(simd_cross(GizmoAxis.z.vector, e))
+        let a = c.renderer.camera.project(center), b = c.renderer.camera.project(center + t * 10)
+        let dir = simd_normalize(SIMD2<Float>(b.x - a.x, -(b.y - a.y)))
+        let to = (start.0 + Int(dir.x * 60), start.1 + Int(dir.y * 60))
         c.dragRing(x: to.0, y: to.1, width: size, height: size, snap: true)
-        #expect(abs(c.ringDegrees - 30) <= 5 && c.ringDegrees.truncatingRemainder(dividingBy: 5) == 0, "\(c.ringDegrees)")
-        // the part has turned, about the centre it was grabbed at (the pivot holds still while dragging)
+        let (deg, handle) = try #require(last)
+        #expect(handle == .axis(.z) && deg != 0 && deg.truncatingRemainder(dividingBy: 5) == 0, "\(deg)")
         #expect(c.rotation != matrix_identity_float3x3)
-        #expect(simd_length(c.gizmoCenter - center) < 0.05)
+        #expect(simd_length(c.gizmoCenter - center) < 0.05)                    // the centre holds still
         c.endRingDrag()
-        #expect(c.ringDragging == nil && events.first == "began Z" && events.last == "ended true")
-        #expect(deltas.count == 1)
-        // released: the part is seated on the plate again
+        #expect(events.first == "began Z" && events.last == "ended true" && c.ringDragging == nil)
+        // re-seated on the plate on release
         var lo = Float.infinity
-        let r3 = c.renderer.rotation, off = c.renderer.offset
         for i in 0..<8 {
             let corner = SIMD3<Float>(i & 1 == 0 ? -20 : 20, i & 2 == 0 ? -20 : 20, i & 4 == 0 ? -20 : 20)
-            lo = min(lo, (r3 * corner + off).z)
+            lo = min(lo, (c.renderer.rotation * corner + c.renderer.offset).z)
         }
         #expect(abs(lo) < 1e-3)
+    }
+
+    @Test func theMiddleAndTheOuterRingStartDragsToo() throws {
+        let (c, _) = try rig()
+        let mid = pixelOf(c, c.gizmoCenter)
+        #expect(c.beginRingDrag(x: mid.0 + 3, y: mid.1, width: size, height: size))
+        #expect(c.ringDragging == .free)
+        c.dragRing(x: mid.0 + 60, y: mid.1 - 20, width: size, height: size, snap: false)
+        #expect(c.rotation != matrix_identity_float3x3)
+        c.endRingDrag()
+        let g = RotateGizmo(center: c.gizmoCenter)
+        let e = pixelOf(c, g.circle(radius: RotateGizmo.screenRadius, camera: c.renderer.camera)[10])
+        #expect(c.beginRingDrag(x: e.0, y: e.1, width: size, height: size))
+        #expect(c.ringDragging == .screen)
+        c.endRingDrag()
     }
 
     @Test func aPressOffTheRingsLeavesThePointerToTheCamera() throws {
         let (c, _) = try rig()
         #expect(!c.beginRingDrag(x: 2, y: 2, width: size, height: size))
-        #expect(c.ringDragging == nil)
-        // a press on a ring that never moves is a drag that turned nothing
         var ended: Bool?
         c.onRing = { if case .ended(let t) = $0 { ended = t } }
         let s = ringPoint(c, .x)

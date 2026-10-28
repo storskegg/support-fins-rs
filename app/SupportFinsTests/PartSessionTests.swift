@@ -117,4 +117,30 @@ struct PartSessionSettingsTests {
         s.undo()
         #expect(s.settings.gap == FinSettings().gap)
     }
+
+    @Test func theOverhangThresholdIsInTheUndoSnapshot() {
+        let s = PartSession()
+        let b = s.settingsBinding
+        var v = b.wrappedValue
+        v.threshold = 55
+        b.wrappedValue = v
+        #expect(s.settings.threshold == 55 && s.canUndo)
+        s.undo()
+        #expect(s.settings.threshold == FinSettings().threshold)
+        s.redo()
+        #expect(s.settings.threshold == 55)
+    }
+}
+
+@MainActor
+struct ThresholdDragTests {
+    @Test func aThresholdSliderDragIsOneStep() {
+        let s = PartSession()
+        s.settingsEditing(true)
+        for t in [46.0, 50, 55] { var v = s.settings; v.threshold = t; s.setSettings(v) }
+        s.settingsEditing(false)
+        #expect(s.history.undoStack.count == 1)
+        s.undo()
+        #expect(s.settings.threshold == FinSettings().threshold)
+    }
 }
