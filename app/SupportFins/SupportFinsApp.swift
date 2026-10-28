@@ -7,6 +7,9 @@ struct SupportFinsApp: App {
             ContentView(document: file.document)
         }
         .defaultSize(width: 1100, height: 760)
-        .commands { ViewCommands() }
+        .commands {
+            ViewCommands()
+            ExportCommands()
+        }
     }
 }
