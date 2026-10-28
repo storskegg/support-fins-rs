@@ -370,7 +370,7 @@ use crate::prop::clearance::{
     station_is_clear, tall_body, tall_span, welds, with_low_tails,
 };
 use crate::prop::contact::{contour_top, lower_sag, settle_top, straightness};
-use crate::prop::ctx::BuildCtx;
+use crate::prop::ctx::{BaseMemo, BuildCtx};
 use crate::prop::curved::bends;
 use crate::prop::downhill::{DownhillOpts, downhill_lines};
 use crate::prop::judge::{JudgeCache, judge_ruler};
@@ -1535,107 +1535,129 @@ pub fn build_props(
     o.circular_frames = Some(circular_regions(topo, result, rot, &circular_cache, cfg));
     let opts = &o;
     let cap_from = ctx.cap_len().unwrap_or(0); // tests' tine capture: see withRaster
-    let normal = build_pass(topo, result, rot, opts, None, ctx);
-    let raster_base = if opts.raster == Some(false) {
-        normal
-    } else {
-        with_raster(
-            topo,
-            result,
-            rot,
-            opts,
-            normal,
-            cap_from,
-            &|regions| build_pass(topo, result, rot, opts, Some(regions), ctx),
-            ctx,
-        )
+    // Auto's judge builds with and without downhill walls: everything up to the race the flag gates
+    // is the same in both, so the second build replays what the first recorded (fins/downhill.js).
+    let memo = ctx.base_memo.take();
+    let replay = match memo {
+        BaseMemo::Replay(base, cap) => Some((base, cap)),
+        other => {
+            *ctx.base_memo.borrow_mut() = other;
+            None
+        }
     };
-    // Circular candidates use a local geometric frame. The race still checks the surrounding
-    // faces and lowest grip; keep the original layout if they lose.
-    let has_circular = opts.circular_frames.as_ref().is_some_and(|f| !f.is_empty());
-    let circ = if opts.raster != Some(false) && has_circular {
-        race_against(
-            topo,
-            result,
-            rot,
-            opts,
-            raster_base,
-            cap_from,
-            &|regions| {
-                build_pass(
+    let base = if let Some((base, cap)) = replay {
+        *ctx.tine_cap.borrow_mut() = cap;
+        base
+    } else {
+        let compute_base = || -> PropsPass {
+            let normal = build_pass(topo, result, rot, opts, None, ctx);
+            let raster_base = if opts.raster == Some(false) {
+                normal
+            } else {
+                with_raster(
                     topo,
                     result,
                     rot,
-                    &BuildOpts {
-                        only_regions: Some(regions.clone()),
-                        circular_pass: true,
-                        ..opts.clone()
-                    },
-                    None,
+                    opts,
+                    normal,
+                    cap_from,
+                    &|regions| build_pass(topo, result, rot, opts, Some(regions), ctx),
                     ctx,
                 )
-            },
-            RaceTag::Circular,
-            RaceArgs {
-                rel: 0.0,
-                equivalent: true,
-                ..Default::default()
-            },
-            ctx,
-        )
-    } else {
-        raster_base
-    };
-    // Rim walls (prop/rim.js, local issue 062): a region the patch path built also tries a wall
-    // along its free outline, the rows stopped short of it, and keeps it where the judge
-    // (prop/judge.js) says it holds more -- at JUDGE.price, held area per plastic added: the
-    // curved edges rows can't reach, not a sliver for a wall. (Regions an earlier race swapped --
-    // raster, circular -- keep their walls.)
-    let swapped: IndexSet<usize> = circ
-        .props
-        .iter()
-        .filter(|q| q.circular == Some(true))
-        .filter_map(|q| q.region)
-        .collect();
-    let base = if opts.rim_walls == Some(false) || opts.raster == Some(false) {
-        circ
-    } else {
-        let ruler = judge_ruler(topo, result, rot, &judge_cache, cfg);
-        race_against(
-            topo,
-            result,
-            rot,
-            opts,
-            circ,
-            cap_from,
-            &|regions| {
-                build_pass(
+            };
+            // Circular candidates use a local geometric frame. The race still checks the surrounding
+            // faces and lowest grip; keep the original layout if they lose.
+            let has_circular = opts.circular_frames.as_ref().is_some_and(|f| !f.is_empty());
+            let circ = if opts.raster != Some(false) && has_circular {
+                race_against(
                     topo,
                     result,
                     rot,
-                    &BuildOpts {
-                        only_regions: Some(regions.clone()),
-                        rim_regions: Some(regions.clone()),
-                        ..opts.clone()
+                    opts,
+                    raster_base,
+                    cap_from,
+                    &|regions| {
+                        build_pass(
+                            topo,
+                            result,
+                            rot,
+                            &BuildOpts {
+                                only_regions: Some(regions.clone()),
+                                circular_pass: true,
+                                ..opts.clone()
+                            },
+                            None,
+                            ctx,
+                        )
                     },
-                    None,
+                    RaceTag::Circular,
+                    RaceArgs {
+                        rel: 0.0,
+                        equivalent: true,
+                        ..Default::default()
+                    },
                     ctx,
                 )
-            },
-            RaceTag::Rim,
-            RaceArgs {
-                rel: 0.0,
-                tried: Some(
-                    (0..result.regions.len())
-                        .filter(|i| !swapped.contains(i))
-                        .collect(),
-                ),
-                ruler: Some(&ruler),
-                price: Some(cfg.judge.price),
-                ..Default::default()
-            },
-            ctx,
-        )
+            } else {
+                raster_base
+            };
+            // Rim walls (prop/rim.js, local issue 062): a region the patch path built also tries a wall
+            // along its free outline, the rows stopped short of it, and keeps it where the judge
+            // (prop/judge.js) says it holds more -- at JUDGE.price, held area per plastic added: the
+            // curved edges rows can't reach, not a sliver for a wall. (Regions an earlier race swapped --
+            // raster, circular -- keep their walls.)
+            let swapped: IndexSet<usize> = circ
+                .props
+                .iter()
+                .filter(|q| q.circular == Some(true))
+                .filter_map(|q| q.region)
+                .collect();
+            if opts.rim_walls == Some(false) || opts.raster == Some(false) {
+                circ
+            } else {
+                let ruler = judge_ruler(topo, result, rot, &judge_cache, cfg);
+                race_against(
+                    topo,
+                    result,
+                    rot,
+                    opts,
+                    circ,
+                    cap_from,
+                    &|regions| {
+                        build_pass(
+                            topo,
+                            result,
+                            rot,
+                            &BuildOpts {
+                                only_regions: Some(regions.clone()),
+                                rim_regions: Some(regions.clone()),
+                                ..opts.clone()
+                            },
+                            None,
+                            ctx,
+                        )
+                    },
+                    RaceTag::Rim,
+                    RaceArgs {
+                        rel: 0.0,
+                        tried: Some(
+                            (0..result.regions.len())
+                                .filter(|i| !swapped.contains(i))
+                                .collect(),
+                        ),
+                        ruler: Some(&ruler),
+                        price: Some(cfg.judge.price),
+                        ..Default::default()
+                    },
+                    ctx,
+                )
+            }
+        };
+        let base = compute_base();
+        if let BaseMemo::Record(slot @ None) = &mut *ctx.base_memo.borrow_mut() {
+            *slot = Some((base.clone(), ctx.tine_cap.borrow().clone()));
+        }
+        base
     };
     // Downhill walls (issue #25): walls that run down the overhang and follow it to the plate,
     // raced per region against what the passes above built -- a region swaps only when they hold
