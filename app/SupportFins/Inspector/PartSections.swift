@@ -1,26 +1,15 @@
 import SwiftUI
 import Viewer
 
-/// M4a's Part, Overhang and Printer-volume sections, moved here from the old `InspectorView`. The Part block
-/// becomes the stats card (Readout/) when that lands, and this file goes with it. (The temporary rotation is
-/// gone: the pose is the session's, turned by the rings and the Rotate commands.)
+/// M4a's Part block, kept for a window with no readout card. The Overhang slider and the Build volume pop-up
+/// are in the window toolbar (`Toolbar/TopBarItems.swift`), where the web has them (UI-MAP section 2).
 struct PartSections: View {
     @Bindable var controller: ViewerController
-    /// The overhang threshold is a session setting (`FinSettings.threshold`): undoable, like the web's `thr` field.
-    @Binding var settings: FinSettings
-    @Environment(PartSession.self) private var session
     /// The M4a Part block; false when the stats card stands in for it.
     var withPartBlock = true
 
     var body: some View {
         if withPartBlock { partBlock }
-        overhang
-        Section("Printer volume") {
-            Picker("Build volume", selection: $controller.volume) {
-                ForEach(PrinterVolume.presets, id: \.self) { Text($0.label).tag($0) }
-                if !controller.volume.isPreset { Text(controller.volume.label).tag(controller.volume) }
-            }
-        }
     }
 
     private var partBlock: some View {
@@ -30,15 +19,6 @@ struct PartSections: View {
             LabeledContent("Size", value: sizeText)
             if let h = controller.hoverLocation {
                 LabeledContent("Face", value: controller.partCount > 1 ? "\(h.face.formatted()) (object \(h.part + 1))" : h.face.formatted())
-            }
-        }
-    }
-
-    private var overhang: some View {
-        Section("Overhang") {
-            LabeledContent("Threshold") {
-                Slider(value: $settings.threshold, in: 30...70, step: 1, onEditingChanged: session.settingsEditing) { Text("Threshold") }
-                Text("\(Int(settings.threshold))°").monospacedDigit().frame(width: 36, alignment: .trailing)
             }
         }
     }
