@@ -31,8 +31,8 @@ final class FinsLoopUITests: XCTestCase {
 
         // open the part: the document app's Open panel (shown at launch, or ⌘O), the path typed with ⇧⌘G
         let toggle = element("fins-toggle")
-        if !app.dialogs.firstMatch.waitForExistence(timeout: 5) && !toggle.exists { app.typeKey("o", modifierFlags: .command) }
-        XCTAssertTrue(app.dialogs.firstMatch.waitForExistence(timeout: 10), "the Open panel")
+        if !panelExists("open-panel", timeout: 5) && !toggle.exists { app.typeKey("o", modifierFlags: .command) }
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
         chooseInPanel(part.path)
         XCTAssertTrue(toggle.waitForExistence(timeout: 20), "the part's window opened")
 
@@ -45,17 +45,23 @@ final class FinsLoopUITests: XCTestCase {
         // change a setting the engine takes -> the rebuild lands (the spinner shows after 300 ms, only on a slow one)
         let slider = element("tine-density")
         XCTAssertTrue(slider.waitForExistence(timeout: 5))
-        let before = slider.value as? String
-        slider.adjust(toNormalizedSliderPosition: 0.6)
-        XCTAssertNotEqual(slider.value as? String, before, "the slider moved")
+        let before = String(describing: slider.value)   // a number or a string, depending on the control
+        // the build's Status block pushes the slider below the inspector's fold: scroll it into view before clicking.
+        // adjust(toNormalizedSliderPosition:) leaves a SwiftUI slider on macOS where it was; a click on the track moves it
+        for _ in 0..<15 where !slider.isHittable { fins.scroll(byDeltaX: 0, deltaY: -80) }
+        XCTAssertTrue(slider.isHittable, "the slider scrolled into view")
+        slider.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).click()
+        XCTAssertNotEqual(String(describing: slider.value), before, "the slider moved")
         Thread.sleep(forTimeInterval: 1)           // the 180 ms debounce, then the build
         waitFor("the rebuild is done", timeout: 60) { !self.element("build-spinner").exists }
         waitFor("the Fins row still shows a count", timeout: 5) { (fins.value as? String ?? fins.label).first?.isNumber == true }
 
         // Export > STL -> the save panel -> a file in the temp dir
         element("export-menu").click()
-        app.menuItems["STL"].click()
-        XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 10) || app.dialogs.firstMatch.waitForExistence(timeout: 5), "the Save panel")
+        // "STL" is also under File > Export: click the one in the menu just opened
+        let stl = app.menuItems.matching(identifier: "STL").allElementsBoundByIndex.first { $0.isHittable }
+        try XCTUnwrap(stl, "the export menu's STL item").click()
+        XCTAssertTrue(panelExists("save-panel", timeout: 10), "the Save panel")
         saveInPanel(into: dir)
         let exported = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey])
             .filter { $0.pathExtension == "stl" && $0.lastPathComponent != part.lastPathComponent }
@@ -71,6 +77,14 @@ final class FinsLoopUITests: XCTestCase {
     private func waitFor(_ what: String, timeout: TimeInterval, _ condition: @escaping () -> Bool) {
         let e = expectation(for: NSPredicate { _, _ in condition() }, evaluatedWith: nil)
         XCTAssertEqual(XCTWaiter().wait(for: [e], timeout: timeout), .completed, what)
+    }
+
+    /// An Open or Save panel: a dialog or sheet, or (macOS 26) a window with the panel's identifier.
+    private func panelExists(_ id: String, timeout: TimeInterval) -> Bool {
+        let shown = NSPredicate { _, _ in
+            self.app.dialogs.firstMatch.exists || self.app.sheets.firstMatch.exists || self.app.windows[id].exists
+        }
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: shown, object: nil)], timeout: timeout) == .completed
     }
 
     /// In an Open panel: ⇧⌘G, the path, Return (go to it), Return (Open).
