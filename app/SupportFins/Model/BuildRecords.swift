@@ -69,9 +69,22 @@ struct PropRecord: Codable, Equatable, Sendable {
 struct BuildRecords: Codable, Equatable, Sendable {
     var fins: [FinRecord]
     var props: [PropRecord]
+    /// `[from, to)` vertex ranges into the `fins()` buffer of the interface crest, the second material
+    /// (docs/FFI.md); empty unless the interface material is on.
+    var crestRanges: [Range<Int>] = []
+
+    private enum CodingKeys: String, CodingKey { case fins, props, crestRanges }
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fins = try c.decode([FinRecord].self, forKey: .fins)
+        props = try c.decode([PropRecord].self, forKey: .props)
+        crestRanges = try c.decodeIfPresent([Range<Int>].self, forKey: .crestRanges) ?? []
+    }
 
     init(json: String) throws { self = try JSONDecoder().decode(Self.self, from: Data(json.utf8)) }
-    init(fins: [FinRecord], props: [PropRecord]) { (self.fins, self.props) = (fins, props) }
+    init(fins: [FinRecord], props: [PropRecord], crestRanges: [Range<Int>] = []) {
+        (self.fins, self.props, self.crestRanges) = (fins, props, crestRanges)
+    }
 }
 
 /// The CLI's `--json` stats (`sf_cli::entry::Stats::to_json`).

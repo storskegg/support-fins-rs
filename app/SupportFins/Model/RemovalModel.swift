@@ -189,7 +189,7 @@ final class RemovalModel {
             self?.update(controller)
         }
         controller.supportPicking = isActive
-        controller.renderer.setFinMask(hidden: hiddenRanges, crest: [])
+        controller.renderer.setFinMask(hidden: hiddenRanges, crest: build.crestRanges)
         controller.renderer.setFinHighlight(highlightedRanges)
     }
 }

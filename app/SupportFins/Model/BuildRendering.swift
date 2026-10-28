@@ -36,15 +36,18 @@ extension BuildModel {
         records?.fins.first { $0.id == id }.map { $0.triRanges.map { $0.from..<$0.to } } ?? []
     }
 
-    /// Puts this build on the renderer: the fins and pad, minus `removed`, and the part's seating. The interface
-    /// crest has no input yet: the engine does not say which ranges are crest (`records_json` has none), so the
-    /// crest mask stays empty.
+    /// The interface crest's vertex ranges in the fin buffer (`records_json().crestRanges`), drawn in the second
+    /// material.
+    var crestRanges: [Range<Int>] { records?.crestRanges ?? [] }
+
+    /// Puts this build on the renderer: the fins and pad, minus `removed`, the interface crest in its own
+    /// colour, and the part's seating.
     func show(on renderer: ViewerRenderer, removed: Set<FinKey> = []) {
         guard let layer = supportLayer(device: renderer.device) else {
             renderer.setSupports(nil)
             return
         }
         renderer.setSupports(layer)
-        renderer.setFinMask(hidden: hiddenRanges(removed: removed), crest: [])
+        renderer.setFinMask(hidden: hiddenRanges(removed: removed), crest: crestRanges)
     }
 }
