@@ -13,3 +13,6 @@
 /app/SupportFins.xcodeproj/
 /app/SupportFinsViewer/.build/
 /app/SupportFins/Info.plist
+
+# the dashboard's live plan, rewritten by the orchestrator (tools/dashboard)
+tools/dashboard/state.json
