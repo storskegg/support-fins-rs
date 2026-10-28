@@ -61,12 +61,15 @@ final class BuildWiring {
                       write: { [session] new, name in session.perform(name) { session.removedFins = new } }))
         let exporter = ExportModel(
             build: build, finsOn: { [session] in session.finsOn },
-            source: { [session] in
+            source: { [session, controller] in
                 session.parts.first.map {
                     .init(partName: $0.info.name, part: $0.part, nozzle: session.settings.nozzle,
-                          layerHeight: session.settings.layerHeight)
+                          layerHeight: session.settings.layerHeight, pose: session.pose.columnMajor,
+                          threshold: session.settings.threshold,
+                          bed: [Double(controller.volume.x), Double(controller.volume.y)])
                 }
             },
+            removed: { [session] in session.removedFins },
             objectCount: { [session] in session.parts.count })
         build.onUpdate = { [weak self] in self?.show() }
         self.build = build

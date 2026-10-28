@@ -44,40 +44,27 @@ private struct StubPanel: SavePanel {
 
 @Suite("Export file names")
 struct ExportNameTests {
+    // the engine names the files (`export_file_name`); these are crates/sf-io/tests/exportname.rs's vectors
     @Test func nameCarriesNozzleAndLayer() {
-        // the vectors of crates/sf-io/tests/exportname.rs, which are web/exportname.js's
-        #expect(ExportName.name(stem: "bracket-fins", ext: "3mf", nozzle: 0.6, layerHeight: 0.24) == "bracket-fins-0.6nozzle-0.24layer.3mf")
-        #expect(ExportName.name(stem: "p", ext: "stl", nozzle: 2, layerHeight: 0.6) == "p-2nozzle-0.6layer.stl")
-        #expect(ExportName.name(stem: "p", ext: "3mf", nozzle: 0.25, layerHeight: 0.1 + 0.2) == "p-0.25nozzle-0.3layer.3mf")
-        #expect(ExportName.name(stem: "p", ext: "3mf", nozzle: 0.004, layerHeight: 0.005) == "p-0nozzle-0.01layer.3mf")
+        #expect(exportFileName(base: "bracket", kind: .threeMf, nozzle: 0.6, layerHeight: 0.24) == "bracket-fins-0.6nozzle-0.24layer.3mf")
+        #expect(exportFileName(base: "p", kind: .stl, nozzle: 2, layerHeight: 0.6) == "p-fins-2nozzle-0.6layer.stl")
+        #expect(exportFileName(base: "p", kind: .finsOnly, nozzle: 0.25, layerHeight: 0.1 + 0.2) == "p-fins-only-0.25nozzle-0.3layer.stl")
+        #expect(exportFileName(base: "p", kind: .threeMf, nozzle: 0.004, layerHeight: 0.005) == "p-fins-0nozzle-0.01layer.3mf")
     }
 
     @Test func settingsThatAreNotPositiveNumbersAreLeftOut() {
-        #expect(ExportName.name(stem: "p", ext: "3mf", nozzle: 0.4, layerHeight: .nan) == "p-0.4nozzle.3mf")
-        #expect(ExportName.name(stem: "p", ext: "3mf", nozzle: nil, layerHeight: nil) == "p.3mf")
-        #expect(ExportName.name(stem: "p", ext: "3mf", nozzle: 0, layerHeight: -1) == "p.3mf")
-        #expect(ExportName.name(stem: "p", ext: "3mf", nozzle: .infinity, layerHeight: 1e21) == "p-Infinitynozzle-1e+21layer.3mf")
-    }
-
-    @Test func toFixedRoundsTheExactValueHalfUp() {
-        // JS: (0.125).toFixed(2) is "0.13" (an exact tie rounds up), (1.005).toFixed(2) is "1.00" (it is below),
-        // (0.285).toFixed(2) is "0.28", (0.145).toFixed(2) is "0.14", (8.345).toFixed(2) is "8.35"
-        let cases: [(Double, String)] = [
-            (0.125, "0.13"), (1.005, "1"), (0.285, "0.28"), (0.145, "0.14"), (8.345, "8.35"), (0.6, "0.6"), (0.24, "0.24"),
-            (0.05, "0.05"), (0.1, "0.1"), (2, "2"), (10.5, "10.5"), (0.995, "0.99"), (0.999, "1"), (99.999, "100"),
-            (0.001, "0"), (-0.001, "0"), (-0.5, "-0.5"), (0.4, "0.4"), (1.0 / 3, "0.33"),
-        ]
-        for (v, want) in cases { #expect(ExportName.mm(v) == want, "\(v)") }
+        #expect(exportFileName(base: "p", kind: .threeMf, nozzle: 0.4, layerHeight: .nan) == "p-fins-0.4nozzle.3mf")
+        #expect(exportFileName(base: "p", kind: .threeMf, nozzle: 0, layerHeight: -1) == "p-fins.3mf")
     }
 
     @Test func baseDropsTheMeshExtension() {
-        #expect(ExportName.base(of: "bracket.stl") == "bracket")
-        #expect(ExportName.base(of: "Bracket.STL") == "Bracket")
-        #expect(ExportName.base(of: "a.b.3mf") == "a.b")
-        #expect(ExportName.base(of: "part.step") == "part")
-        #expect(ExportName.base(of: "x.obj") == "x.obj") // only the web's four extensions
-        #expect(ExportName.base(of: ".stl") == "part")
-        #expect(ExportName.base(of: "") == "part")
+        #expect(ExportModel.base(of: "bracket.stl") == "bracket")
+        #expect(ExportModel.base(of: "Bracket.STL") == "Bracket")
+        #expect(ExportModel.base(of: "a.b.3mf") == "a.b")
+        #expect(ExportModel.base(of: "part.step") == "part")
+        #expect(ExportModel.base(of: "x.obj") == "x.obj") // only the web's four extensions
+        #expect(ExportModel.base(of: ".stl") == "part")
+        #expect(ExportModel.base(of: "") == "part")
     }
 }
 
@@ -97,27 +84,59 @@ final class ExportModelTests {
         try #require(try loadParts(path: try writeSTL("export-tests-cube.stl", box(0, 20, 0, 20, 0, 20), in: dir)).first)
     }
 
-    func rig(_ part: Part, finsOn: Bool = true, panel: any SavePanel = StubPanel(), objects: Int = 1) -> (ExportModel, BuildModel) {
+    func rig(_ part: Part, finsOn: Bool = true, panel: any SavePanel = StubPanel(), objects: Int = 1,
+             pose: [Double] = identity, removed: Set<FinKey> = []) -> (ExportModel, BuildModel) {
         let build = BuildModel(part: part)
         let model = ExportModel(build: build, finsOn: { finsOn }, source: {
-            .init(partName: "bracket.stl", part: part, nozzle: 0.4, layerHeight: 0.2)
-        }, objectCount: { objects }, panel: panel)
+            .init(partName: "bracket.stl", part: part, nozzle: 0.4, layerHeight: 0.2, pose: pose, threshold: 45, bed: [256, 256])
+        }, removed: { removed }, objectCount: { objects }, panel: panel)
         return (model, build)
     }
 
     func tmp(_ name: String) -> URL { dir.appending(path: name) }
 
-    @Test func nothingIsOfferedUntilTheFinsAreBuilt() async throws {
+    @Test func withTheFinsOffThePartAloneIsOfferedAndFinsOnlyWaitsForFins() async throws {
         let (model, build) = rig(try tShape(), finsOn: false)
-        #expect(model.availability == .init(enabled: [], note: "No fins yet: click Add fins first."))
-        let on = rig(try tShape(), finsOn: true)
-        #expect(on.0.availability == .init(enabled: [], note: nil))
+        #expect(model.availability == .init(enabled: [.stl, .threeMF],
+                                            note: "No fins yet: STL and 3MF write the part alone. Click Add fins first."))
+        let (on, onBuild) = rig(try tShape(), finsOn: true)
+        #expect(on.availability == .init(enabled: [], note: nil))
 
+        onBuild.build(rotation: identity, optionsJSON: "{}")
+        #expect(on.availability.enabled.isEmpty, "not while a rebuild is out")
+        await onBuild.settled()
+        #expect(on.availability.enabled == Set(ExportFormat.allCases))
+        #expect(on.availability.note == nil)
+        _ = build
+    }
+
+    @Test func theFinsOffWritesThePartAloneWithNoBuild() throws {
+        let part = try tShape()
+        let (model, _) = rig(part, finsOn: false)
+        let stl = try #require(model.write(.stl, to: tmp("alone.stl")))
+        let size = try #require(try FileManager.default.attributesOfItem(atPath: stl.path)[.size] as? Int)
+        #expect(size == 84 + 50 * Int(part.info().triangles))
+        let mf = try #require(model.write(.threeMF, to: tmp("alone.3mf")))
+        #expect(try Data(contentsOf: mf).prefix(4) == Data([0x50, 0x4b, 0x03, 0x04]))
+        #expect(model.error == nil)
+    }
+
+    @Test func removedFinsAreLeftOut() async throws {
+        let part = try tShape()
+        let (plain, build) = rig(part)
         build.build(rotation: identity, optionsJSON: "{}")
-        #expect(model.availability.enabled.isEmpty, "not while a rebuild is out")
         await build.settled()
-        #expect(model.availability.enabled == Set(ExportFormat.allCases))
-        #expect(model.availability.note == nil)
+        let result = try #require(build.latest)
+        let keys = Set(build.keys.compactMap(\.sig))
+        let gone = try #require(keys.first)
+        let (cut, cutBuild) = rig(part, removed: [gone])
+        cutBuild.build(rotation: identity, optionsJSON: "{}")
+        await cutBuild.settled()
+        let a = try #require(plain.write(.finsOnly, to: tmp("all-fins.stl")))
+        let b = try #require(cut.write(.finsOnly, to: tmp("cut-fins.stl")))
+        let sa = try #require(try FileManager.default.attributesOfItem(atPath: a.path)[.size] as? Int)
+        let sb = try #require(try FileManager.default.attributesOfItem(atPath: b.path)[.size] as? Int)
+        #expect(sb < sa, "a fin fewer (\(result.fins().count()) fin vertices before)")
     }
 
     @Test func aPartWithNoOverhangOffersTheTwoFilesThatWriteThePartAlone() async throws {

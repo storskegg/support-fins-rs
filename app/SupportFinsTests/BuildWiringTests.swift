@@ -74,7 +74,7 @@ struct BuildWiringTests {
         let w = try await Window.open()
         await w.clock.advance(.seconds(2))
         #expect(w.build.generation == 0 && w.build.latest == nil && w.controller.renderer.supports == nil)
-        #expect(w.wiring.exporter?.availability.enabled.isEmpty == true)
+        #expect(w.wiring.exporter?.availability.enabled == [.stl, .threeMF], "the part alone, until Add fins")
     }
 
     @Test func turningFinsOnBuildsAtOnceAndPutsThemOnTheViewer() async throws {
