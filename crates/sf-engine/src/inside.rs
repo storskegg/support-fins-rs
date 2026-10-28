@@ -58,7 +58,7 @@ fn clamp_idx(v: f64, n: usize) -> usize {
 
 /// `buildGrid(topo)` (web/inside.js:40-62).
 fn build_grid(topo: &Topology) -> &InsideGrid {
-    topo.cache.inside_grid.get_or_init(|| {
+    crate::lazy::get_or_build(&topo.cache.inside_grid, |par| {
         let pos = &topo.pos;
         let n_faces = topo.n_faces;
         let mut min_y = f64::INFINITY;
@@ -82,11 +82,13 @@ fn build_grid(topo: &Topology) -> &InsideGrid {
             }
         }
         let [ny, nz] = grid_dims(max_y - min_y, max_z - min_z, n_faces as f64);
-        let fine = bucket_yz(pos, n_faces, min_y, max_y, min_z, max_z, ny, nz);
+        let fine = bucket_yz(pos, n_faces, min_y, max_y, min_z, max_z, ny, nz, par);
         let coarse = if ny == 64 && nz == 64 {
             None
         } else {
-            Some(bucket_yz(pos, n_faces, min_y, max_y, min_z, max_z, 64, 64))
+            Some(bucket_yz(
+                pos, n_faces, min_y, max_y, min_z, max_z, 64, 64, par,
+            ))
         };
         InsideGrid { fine, coarse }
     })
@@ -104,6 +106,7 @@ fn bucket_yz(
     max_z: f64,
     ny: usize,
     nz: usize,
+    par: bool,
 ) -> Bucket {
     let sy = ny as f64 / jsnum::max(1e-6, max_y - min_y);
     let sz = nz as f64 / jsnum::max(1e-6, max_z - min_z);
@@ -121,14 +124,19 @@ fn bucket_yz(
         ]
     };
 
-    let (start, items) = build_csr(n_faces, ny * nz, |f, push| {
-        let [a0, a1, b0, b1] = span(f);
-        for a in a0..=a1 {
-            for b in b0..=b1 {
-                push(a * nz + b);
+    let (start, items) = build_csr(
+        n_faces,
+        ny * nz,
+        |f, push| {
+            let [a0, a1, b0, b1] = span(f);
+            for a in a0..=a1 {
+                for b in b0..=b1 {
+                    push(a * nz + b);
+                }
             }
-        }
-    });
+        },
+        par,
+    );
     let items: Vec<i32> = items.into_iter().map(|f| f as i32).collect();
     Bucket {
         start,
