@@ -25,7 +25,7 @@ private func tPart() throws -> Part {
         for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
         data.append(contentsOf: [0, 0])
     }
-    let path = NSTemporaryDirectory() + "removal-tests-t.stl"
+    let path = try Scratch.file("removal-tests-t.stl").path(percentEncoded: false)
     try data.write(to: URL(fileURLWithPath: path))
     return try #require(try loadParts(path: path).first)
 }

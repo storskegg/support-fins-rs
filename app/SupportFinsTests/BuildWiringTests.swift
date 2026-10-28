@@ -24,7 +24,7 @@ private func tURL() throws -> URL {
         for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
         data.append(contentsOf: [0, 0])
     }
-    let url = URL(fileURLWithPath: NSTemporaryDirectory() + "wiring-tests-bracket.stl")
+    let url = try Scratch.file("wiring-tests-bracket.stl")
     try data.write(to: url)
     return url
 }

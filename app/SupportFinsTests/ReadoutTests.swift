@@ -211,7 +211,7 @@ struct ReadoutFromEngineTests {
             for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
             data.append(contentsOf: [0, 0])
         }
-        let path = NSTemporaryDirectory() + "readout-tests-tshape.stl"
+        let path = try Scratch.file("readout-tests-tshape.stl").path(percentEncoded: false)
         try data.write(to: URL(fileURLWithPath: path))
         return path
     }
