@@ -9,6 +9,12 @@ check:
     cargo test --workspace
     deno test --allow-read --allow-write --allow-run=git,zstd --allow-env parity/oracle/lib/
 
+# Every gate a PR needs, one summary table, non-zero exit on any failure: fmt, clippy, cargo test --workspace, the deno
+# tests, cli-parity, and (when app/ or crates/sf-ffi changed vs origin/main) app-core, app-project, app-test. Run it
+# before reporting. `--all` / `--no-app` / `--only fmt,clippy` to choose. Not app-uitest: only the orchestrator runs that.
+gate *args:
+    python3 tools/gate/gate.py {{args}}
+
 # Rust parity replay only.
 parity:
     cargo test -p parity --tests
