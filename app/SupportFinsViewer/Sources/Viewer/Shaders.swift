@@ -54,8 +54,7 @@ enum Shaders {
         return out;
     }
 
-    fragment float4 mesh_fragment(MeshOut in [[stage_in]], bool front [[front_facing]]) {
-        if (!front) return float4(BACK, 1);
+    float3 shade(MeshOut in) {
         float3 n = normalize(in.normal);
         // the web rig (web/ui/scene.js): hemisphere + key + fill + a light from under the plate, because
         // the overhangs this tool exists to show are on the underside
@@ -64,7 +63,19 @@ enum Shaders {
         float fill = max(dot(n, normalize(float3(-1.0, 0.7, 0.5))), 0.0) * 0.14;
         float under = max(dot(n, normalize(float3(-0.35, 0.55, -1.2))), 0.0) * 0.45;
         float3 lit = in.color * min(hemi + key + fill + under, 1.25);
-        return float4(saturate(lit), 1);
+        return saturate(lit);
+    }
+
+    fragment float4 mesh_fragment(MeshOut in [[stage_in]], bool front [[front_facing]]) {
+        if (!front) return float4(BACK, 1);
+        return float4(shade(in), 1);
+    }
+
+    // Stale supports: the same lighting, blended at buffer(0) opacity (the web sets the fin, pad and drawn
+    // materials to 0.25 while a rebuild is out, `ui/finbuild.js markFinsStale`), so the part shows through.
+    fragment float4 support_stale_fragment(MeshOut in [[stage_in]], bool front [[front_facing]],
+                                           constant float& alpha [[buffer(0)]]) {
+        return float4(front ? shade(in) : BACK, alpha);
     }
 
     // Supports (fins, pad): print space already (no model matrix), one flat colour per draw call, lit like the

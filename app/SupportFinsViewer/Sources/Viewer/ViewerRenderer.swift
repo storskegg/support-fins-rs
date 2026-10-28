@@ -27,6 +27,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     let idPipeline: MTLRenderPipelineState
     let linePipeline: MTLRenderPipelineState
     let supportPipeline: MTLRenderPipelineState
+    let staleSupportPipeline: MTLRenderPipelineState
     let overlayPipeline: MTLRenderPipelineState
     let depthState: MTLDepthStencilState
     let lineDepthState: MTLDepthStencilState
@@ -54,7 +55,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public let stats = FrameStats()
 
     /// The fins on screen are the last settings', not the current ones: a rebuild is out (`markFinsStale`,
-    /// `web/ui/finbuild.js`). They stay, drawn paler.
+    /// `web/ui/finbuild.js:341`). They stay on screen at opacity 0.25, blended, so the part shows through.
+    public static let staleOpacity: Float = 0.25
     public var dimSupports = false { didSet { if dimSupports != oldValue { changeCount += 1 } } }
     /// The fins and bed pad of the latest build (print space), or nil.
     public private(set) var supports: SupportLayer?
@@ -114,6 +116,19 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             support.colorAttachments[0].pixelFormat = Self.colorFormat
             support.depthAttachmentPixelFormat = Self.depthFormat
             supportPipeline = try device.makeRenderPipelineState(descriptor: support)
+
+            let stale = MTLRenderPipelineDescriptor()
+            stale.vertexFunction = lib.makeFunction(name: "support_vertex")
+            stale.fragmentFunction = lib.makeFunction(name: "support_stale_fragment")
+            let sa = stale.colorAttachments[0]!
+            sa.pixelFormat = Self.colorFormat
+            sa.isBlendingEnabled = true
+            sa.sourceRGBBlendFactor = .sourceAlpha
+            sa.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            sa.sourceAlphaBlendFactor = .one
+            sa.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            stale.depthAttachmentPixelFormat = Self.depthFormat
+            staleSupportPipeline = try device.makeRenderPipelineState(descriptor: stale)
 
             let overlay = MTLRenderPipelineDescriptor()
             overlay.vertexFunction = lib.makeFunction(name: "support_vertex")
@@ -314,13 +329,15 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     private func encodeSupports(_ s: SupportLayer, into enc: MTLRenderCommandEncoder) {
         var u = Uniforms(viewProj: camera.viewProjection, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1),
                          params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0))
-        enc.setRenderPipelineState(supportPipeline)
+        enc.setRenderPipelineState(dimSupports ? staleSupportPipeline : supportPipeline)
         enc.setDepthStencilState(depthState)
         enc.setFrontFacing(.counterClockwise)
         enc.setCullMode(.none)
+        var opacity = Self.staleOpacity
+        if dimSupports { enc.setFragmentBytes(&opacity, length: MemoryLayout<Float>.size, index: 0) }
         func draw(_ buffer: MTLBuffer?, _ range: Range<Int>, _ color: SIMD3<Float>) {
             guard let buffer, !range.isEmpty else { return }
-            var c = SIMD4(dimSupports ? simd_mix(color, Palette.background, SIMD3(repeating: 0.55)) : color, 1)
+            var c = SIMD4(color, 1)
             enc.setVertexBuffer(buffer, offset: 0, index: 0)
             enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
             enc.setVertexBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
