@@ -11,9 +11,3 @@ enum OpenRules {
         var errorDescription: String? { "Open an STL, OBJ or 3MF file. STEP import is not available yet." }
     }
 }
-
-/// Merging several picked objects into one part (`mergeObjectPositions`, `io.js:120`). The engine has no merge
-/// of `Part`s (`docs/FFI.md` lists `load_parts` only), so a multi-object pick is refused until it grows one.
-struct MergeUnavailable: LocalizedError {
-    var errorDescription: String? { "Merging several objects into one part needs an engine merge, which is not available yet. Pick one object." }
-}

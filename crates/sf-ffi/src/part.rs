@@ -7,7 +7,9 @@ use std::sync::Arc;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
 use sf_io::obj::read_obj;
 use sf_io::stl::read_stl;
-use sf_io::threemf::{PartColors, PartKind, ReadExtra, ThreeMfObject, read_three_mf};
+use sf_io::threemf::{
+    MergeItem, PartColors, PartKind, ReadExtra, ThreeMfObject, merge_colors, read_three_mf,
+};
 
 use crate::gpu::GpuBuffer;
 
@@ -463,4 +465,78 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
             Arc::new(Part::new(name, base.clone(), pos, slicer, colors, notes))
         })
         .collect())
+}
+
+/// Several picked objects as one part (the picker's "Merge N & load", `web/ui/io.js:140-200`, then
+/// `parseModel`, `io.js:222-286`): their triangle positions concatenated in the order given
+/// (`mergeObjectPositions`, `io.js:120`) and welded as one soup, like any single loaded object. The colours
+/// are merged by triangle (`mergeColors`); a slicer's parts ride along with the uncut positions of every
+/// object, extras in order, as `io.js:252-258` keeps them. The merged part is named after the file
+/// (`stem`), and its notes are the objects' own plus a "merged N objects into one part" line (the web's
+/// "N of TOTAL" needs the file's object count, which a `Part` does not know). One part comes back as itself.
+#[uniffi::export]
+pub fn merge_parts(parts: Vec<Arc<Part>>) -> Result<Arc<Part>, FfiError> {
+    match parts.len() {
+        0 => {
+            return Err(FfiError::Engine {
+                message: "nothing to merge".into(),
+            });
+        }
+        1 => return Ok(parts.into_iter().next().unwrap()),
+        _ => {}
+    }
+    let positions: Vec<f64> = parts
+        .iter()
+        .flat_map(|p| p.topo.pos.iter().copied())
+        .collect();
+    let cut_items: Vec<MergeItem> = parts
+        .iter()
+        .map(|p| MergeItem {
+            colors: p.colors.as_ref(),
+            positions_len: p.topo.pos.len(),
+        })
+        .collect();
+    let colors = merge_colors(&cut_items);
+    let slicer = if parts.iter().any(|p| p.slicer.is_some()) {
+        // the uncut positions and colours of each object: its slicer's, or its own when it had no extras
+        let uncut: Vec<(&[f64], Option<&PartColors>)> = parts
+            .iter()
+            .map(|p| match &p.slicer {
+                Some(s) => (s.positions.as_slice(), s.colors.as_ref()),
+                None => (p.topo.pos.as_slice(), p.colors.as_ref()),
+            })
+            .collect();
+        let items: Vec<MergeItem> = uncut
+            .iter()
+            .map(|(pos, c)| MergeItem {
+                colors: *c,
+                positions_len: pos.len(),
+            })
+            .collect();
+        Some(Slicer {
+            positions: uncut
+                .iter()
+                .flat_map(|(pos, _)| pos.iter().copied())
+                .collect(),
+            colors: merge_colors(&items),
+            extras: parts
+                .iter()
+                .filter_map(|p| p.slicer.as_ref())
+                .flat_map(|s| s.extras.iter().cloned())
+                .collect(),
+        })
+    } else {
+        None
+    };
+    let mut notes: Vec<String> = parts.iter().flat_map(|p| p.notes.iter().cloned()).collect();
+    notes.push(format!("merged {} objects into one part", parts.len()));
+    let stem = parts[0].stem.clone();
+    Ok(Arc::new(Part::new(
+        stem.clone(),
+        stem,
+        positions,
+        slicer,
+        colors,
+        notes,
+    )))
 }
