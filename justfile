@@ -1,5 +1,11 @@
 # Every recipe runs from the workspace root.
 
+# Per-job build caps. Up to 4 agents build at once on a 12-core Mac; each at 4 jobs is ~16
+# compile threads, which keeps the load near the core count where uncapped builds (12 jobs each)
+# sent it to 30-70. Override per run: `CARGO_BUILD_JOBS=8 just check`, `XCODE_JOBS=8 just app-test`.
+export CARGO_BUILD_JOBS := env_var_or_default("CARGO_BUILD_JOBS", "4")
+xcode_jobs := env_var_or_default("XCODE_JOBS", "4")
+
 default: check
 
 # fmt + clippy + every test (unit, ported, parity). Must be green before a PR.
@@ -85,7 +91,7 @@ swift-bindings:
 
 # Regenerate the Swift package and run its tests.
 app-core: swift-bindings
-    cd app/SupportFinsCore && swift test
+    cd app/SupportFinsCore && swift test -j {{xcode_jobs}}
 
 # Generate app/SupportFins.xcodeproj from app/project.yml (XcodeGen; the project is not committed).
 app-project:
@@ -93,13 +99,13 @@ app-project:
 
 # The viewer package's tests (camera maths, offscreen renders) and the app's tests.
 app-test: app-core app-project
-    swift test --package-path app/SupportFinsViewer
-    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'
+    swift test -j {{xcode_jobs}} --package-path app/SupportFinsViewer
+    xcodebuild test -jobs {{xcode_jobs}} -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'
 
 # The window driven end to end (XCUITest): open a part, Add fins, change a setting, export. Needs the Accessibility
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 app-uitest: app-core app-project
-    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+    xcodebuild test -jobs {{xcode_jobs}} -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
 
 # M5 timing: the Rust fin build per case beside the M3 serial numbers, written into docs/PERF-M5.md (Rust only, no Deno). `just bench-m5 needle` times matching cases and prints only. Skips private-fixtures/ cases when the file is absent.
 bench-m5 filter="":
@@ -118,7 +124,7 @@ bench-load *inputs:
 
 # Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5.md, "Rendering"); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
 bench-render *args:
-    swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
+    swift run -j {{xcode_jobs}} -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
 
 # Local port dashboard at http://127.0.0.1:8787: milestones, tasks and agents (tools/dashboard/state.json) beside live load, build/test processes, worktree activity, PRs and commits; pushed live every 2 s.
 dashboard:
