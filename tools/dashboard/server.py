@@ -21,10 +21,11 @@ WORKTREES = REPO.parent / "sfrs-wt"
 STATE = HERE / "state.json"
 PORT = int(os.environ.get("SF_DASHBOARD_PORT", "8787"))
 
-# processes worth showing: builds, tests, benches, the app
-WATCH = ("cargo", "rustc", "xcodebuild", "swift-frontend", "swift-build", "swift-test", "swiftc",
-         "clang", "ld", "deno", "bench_", "viewer-bench", "xctest", "Support Fins", "uniffi",
-         "xcodegen", "samply", "flamegraph", "just")
+# processes worth showing: builds, tests, benches, the app. Names match exactly (a substring
+# match on "ld" caught every system daemon ending in -ld); PREFIX covers families like bench_*.
+WATCH = {"cargo", "rustc", "xcodebuild", "swift-frontend", "swift-build", "swift-test", "swiftc",
+         "clang", "ld", "deno", "xctest", "uniffi-bindgen", "xcodegen", "samply", "flamegraph", "just"}
+PREFIX = ("bench_", "viewer-bench", "sf-", "cargo-", "rustc-")
 HISTORY_SECONDS = 2 * 60 * 60
 SAMPLE_EVERY = 2
 PUSH_EVERY = 2          # seconds between pushes on /api/stream
@@ -75,7 +76,7 @@ def processes():
             continue
         pid, ppid, cpu, rss, et, cmd = f
         exe = cmd.split()[0].rsplit("/", 1)[-1]
-        if not any(w in exe or (w == "Support Fins" and "Support Fins.app" in cmd) for w in WATCH):
+        if not (exe in WATCH or exe.startswith(PREFIX) or "Support Fins.app/Contents/MacOS/" in cmd):
             continue
         if "dashboard/server.py" in cmd:
             continue
