@@ -9,6 +9,7 @@ use std::cell::OnceCell;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use rayon::prelude::*;
 
 use crate::fins::seating::seated_part_tris;
 use crate::fxhash::FxHashMap;
@@ -369,35 +370,51 @@ pub fn automatic_targets(topo: &Topology, result: &Analysis, rot: &Rot3) -> Targ
     let mut volumes: Vec<[f64; 3]> = Vec::new();
     if excluded_support_faces.iter().any(|&e| e != 0) {
         let tris = seated_part_tris(topo, rot, &result.offset);
-        for f in 0..topo.n_faces {
-            if excluded_support_faces[f] == 0 {
-                continue;
-            }
+        let excluded: Vec<usize> = (0..topo.n_faces)
+            .filter(|&f| excluded_support_faces[f] != 0)
+            .collect();
+        for &f in &excluded {
             for k in 0..9 {
                 tris_out.push(tris.v[f * 9 + k]);
             }
-            let a = [tris.v[f * 9], tris.v[f * 9 + 1], tris.v[f * 9 + 2]];
-            let b = [tris.v[f * 9 + 3], tris.v[f * 9 + 4], tris.v[f * 9 + 5]];
-            let c = [tris.v[f * 9 + 6], tris.v[f * 9 + 7], tris.v[f * 9 + 8]];
-            let x = (a[0] + b[0] + c[0]) / 3.0;
-            let y = (a[1] + b[1] + c[1]) / 3.0;
-            let z = (a[2] + b[2] + c[2]) / 3.0;
-            // The actual upward-facing floor, not another diameter or cavity rule.
-            let mut floor = f64::NEG_INFINITY;
-            for [h, nz] in surface_hits_at(&tris, x, y) {
-                if nz > 0.0 && h < z - 1e-6 {
-                    floor = jsnum::max(floor, h);
+        }
+        // Each excluded face probes the part's surface under it, a pure function of the face:
+        // chunks run in parallel and are joined in face order, so `volumes` is what the serial
+        // loop built.
+        let chunks: Vec<Vec<[f64; 3]>> = excluded
+            .par_chunks(256)
+            .map(|fs| {
+                let mut out = Vec::new();
+                for &f in fs {
+                    let a = [tris.v[f * 9], tris.v[f * 9 + 1], tris.v[f * 9 + 2]];
+                    let b = [tris.v[f * 9 + 3], tris.v[f * 9 + 4], tris.v[f * 9 + 5]];
+                    let c = [tris.v[f * 9 + 6], tris.v[f * 9 + 7], tris.v[f * 9 + 8]];
+                    let x = (a[0] + b[0] + c[0]) / 3.0;
+                    let y = (a[1] + b[1] + c[1]) / 3.0;
+                    let z = (a[2] + b[2] + c[2]) / 3.0;
+                    // The actual upward-facing floor, not another diameter or cavity rule.
+                    let mut floor = f64::NEG_INFINITY;
+                    for [h, nz] in surface_hits_at(&tris, x, y) {
+                        if nz > 0.0 && h < z - 1e-6 {
+                            floor = jsnum::max(floor, h);
+                        }
+                    }
+                    if !floor.is_finite() {
+                        continue;
+                    }
+                    let ba = [a[0], a[1], floor];
+                    let bb = [b[0], b[1], floor];
+                    let bc = [c[0], c[1], floor];
+                    out.extend([
+                        a, b, c, ba, bb, bc, a, b, bb, a, bb, ba, b, c, bc, b, bc, bb, c, a, ba, c,
+                        ba, bc,
+                    ]);
                 }
-            }
-            if !floor.is_finite() {
-                continue;
-            }
-            let ba = [a[0], a[1], floor];
-            let bb = [b[0], b[1], floor];
-            let bc = [c[0], c[1], floor];
-            volumes.extend([
-                a, b, c, ba, bb, bc, a, b, bb, a, bb, ba, b, c, bc, b, bc, bb, c, a, ba, c, ba, bc,
-            ]);
+                out
+            })
+            .collect();
+        for c in chunks {
+            volumes.extend(c);
         }
     }
     let small_hole_regions = result.regions.len() - regions.len();
