@@ -22,12 +22,14 @@ final class RingEdits {
         case .began:
             start = session.pose
             session.beginGesture()
+            session.ringDragBegan()
         case .turned(let delta, _, _):
             guard let start else { return }
             session.pose = Pose(rotation: delta * start.rotation)
         case .ended:
             // a drag that ended where it began leaves the pose as it was, so no step is recorded
             session.commitGesture(name: "Rotate")
+            session.ringDragging = false                  // after the final pose is in: one reaction sees both
             start = nil
         }
     }

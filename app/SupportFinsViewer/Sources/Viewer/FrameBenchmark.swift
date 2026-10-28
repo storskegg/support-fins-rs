@@ -16,6 +16,9 @@ public enum BenchScenario: String, CaseIterable, Sendable {
     /// A new build arrives every `flagsEvery * 8` frames: the fins and pad are replaced (`setSupports`) by one of
     /// the layers passed in, alternating, and the flags buffer with it.
     case swap
+    /// A live rebuild while a ring is dragged: the pose turns every frame, and every `flagsEvery` frames a new
+    /// build replaces the fins and pad (`setSupports`, alternating the layers passed in) with a fresh flags buffer.
+    case liveDrag
 }
 
 /// Mean, 95th percentile and worst of a series of milliseconds.
@@ -91,6 +94,12 @@ extension ViewerRenderer {
                 camera.azimuth = baseCamera.azimuth + t * 2 * .pi
                 if frame >= 0, frame % (flagsEvery * 8) == 0, !layers.isEmpty {
                     setSupports(layers[(frame / (flagsEvery * 8)) % layers.count])
+                    setFlags(device.makeBuffer(bytes: spare.bytes, length: flagsLength, options: .storageModeShared)!)
+                }
+            case .liveDrag:
+                setPose(rotation: rotationMatrix(degrees: SIMD3(0, 0, 360 * t * 2)), offset: basePose.1)
+                if frame >= 0, frame % flagsEvery == 0, !layers.isEmpty {
+                    setSupports(layers[(frame / flagsEvery) % layers.count])
                     setFlags(device.makeBuffer(bytes: spare.bytes, length: flagsLength, options: .storageModeShared)!)
                 }
             case .drag:

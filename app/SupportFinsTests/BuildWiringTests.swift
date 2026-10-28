@@ -15,7 +15,7 @@ private func box(_ x0: Float, _ x1: Float, _ y0: Float, _ y1: Float, _ z0: Float
     return faces.map { f in f.flatMap { v[$0] } }
 }
 
-private func tURL() throws -> URL {
+func tURL() throws -> URL {
     let tris = box(-5, 5, -5, 5, 0, 20) + box(-30, 30, -30, 30, 20, 24)
     var data = Data(count: 80)
     var count = UInt32(tris.count)
@@ -31,7 +31,7 @@ private func tURL() throws -> URL {
 
 /// A loaded window: the session, the viewer, the wiring and the clock that drives the debounce.
 @MainActor
-private struct Window {
+struct Window {
     let session: PartSession
     let controller: ViewerController
     let wiring: BuildWiring

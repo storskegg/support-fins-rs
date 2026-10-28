@@ -34,7 +34,7 @@ final class ViewerModel {
         self.rotate = rotate
         view = ViewSettings(controller: controller)
         if controller == nil { status = "This Mac has no usable Metal device." }
-        wiring = controller.map { BuildWiring(session: session, controller: $0) }
+        wiring = controller.map { [view] in BuildWiring(session: session, controller: $0, liveDrag: { view.rebuildWhileDragging }) }
         ringEdits = controller.map { RingEdits(session: session, controller: $0) }
         ringEdits?.onEvent = { rotate.ring($0) }
     }

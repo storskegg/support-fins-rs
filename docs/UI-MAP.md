@@ -345,7 +345,7 @@ New native shortcuts to propose (not in the web app; they use the menu bar, so t
 | File | Open... (⌘O), Open Recent, Close (⌘W), **Export** > STL / 3MF / Fins only (STL) / All plates (3MF) (⌘E for the last used), Add Model to Plate... | M4b / M6 |
 | Edit | Undo ⌘Z, Redo ⇧⌘Z, Delete, Remove Model from Plate, Copy Build Settings | M4b / M6 / M7 |
 | Model | Rotate 90° About X/Y/Z, Reset Rotation, Lay a Face Flat, Move (M), Arrange, Scale..., Suggest Orientation, Strength Arrow... | M4b / M6 |
-| View | Camera: Front/Back/Left/Right/Top/Bottom/Home, Show Rotate Rings, Show Print Layers, Section View, Show Frame Time (debug only) | M4a / M6 |
+| View | Camera: Front/Back/Left/Right/Top/Bottom/Home, Show Rotate Rings, Rebuild While Dragging (native; also in the View popover; on by default, remembered as `sf.rebuildWhileDragging`), Show Print Layers, Section View, Show Frame Time (debug only) | M4a / M6 |
 | Help | Support Fins Help, Calibration Prints..., Full Calibration Guide, GitHub, Support the project, Report a problem | M7 |
 
 ### 8.2 Dialogs and transient UI

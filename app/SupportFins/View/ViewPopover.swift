@@ -30,6 +30,9 @@ struct ViewPopover: View {
             Toggle("Show layers", isOn: Binding(get: { controller.showsLayers }, set: { controller.showsLayers = $0 }))
                 .help("Show the horizontal print layers around the part.")
                 .accessibilityIdentifier("show-layers")
+            Toggle("Rebuild while dragging", isOn: $settings.rebuildWhileDragging)
+                .help("Rebuild the fins while a rotate ring is dragged, so they follow the part. Off builds them when the drag ends.")
+                .accessibilityIdentifier("rebuild-while-dragging")
         }
         .frame(width: 250, alignment: .leading)
     }

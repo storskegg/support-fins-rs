@@ -9,6 +9,10 @@ import Viewer
 ///   (`debouncedRefresh`), the Add fins toggle at once. Only settings the engine takes cause a rebuild: the
 ///   request is the pose, `FinSettings.optionsJSON()` and `tunablesJSON()`, so a display-only setting (Highlight small
 ///   overhangs) changes nothing there.
+/// - **Dragging a ring**: with "Rebuild While Dragging" on (the default; `liveDrag`), the fins are rebuilt live at the
+///   latest pose (`BuildController.refreshLive`) and drawn pale only while they lag the pose; the release does the
+///   final build. Off, nothing is built during the drag and the release builds, as the web does. One undo step per
+///   drag either way (`RingEdits`).
 /// - **Landing**: the fins and pad go on the viewer (no copy), minus the removed fins; the fins on screen
 ///   stay, paler, while a rebuild is out.
 /// - **Removal**: the removed keys are the session's `removedFins`, so a click on a fin and Restore all are undo
@@ -28,11 +32,15 @@ final class BuildWiring {
     @ObservationIgnored let session: PartSession
     @ObservationIgnored let controller: ViewerController
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
+    /// "Rebuild While Dragging" (`ViewSettings.rebuildWhileDragging`), read when a pose arrives.
+    @ObservationIgnored private let liveDrag: @MainActor () -> Bool
 
     init(session: PartSession, controller: ViewerController,
+         liveDrag: @escaping @MainActor () -> Bool = { true },
          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
         self.session = session
         self.controller = controller
+        self.liveDrag = liveDrag
         self.sleep = sleep
     }
 
@@ -71,6 +79,7 @@ final class BuildWiring {
             },
             removed: { [session] in session.removedFins })
         build.onUpdate = { [weak self] in self?.show() }
+        scheduler.onLiveBuild = { [weak self] in self?.updateDim() }
         self.build = build
         self.scheduler = scheduler
         self.removal = removal
@@ -85,8 +94,17 @@ final class BuildWiring {
     func show() {
         guard let build, let removal else { return }
         build.show(on: controller.renderer, removed: session.removedFins)
-        controller.renderer.dimSupports = build.building
+        updateDim()
         removal.update(controller)
+    }
+
+    /// The fins are drawn pale while a rebuild is out. During a live drag only while they lag the pose: a build
+    /// that is catching up with the ring shows the pale fins of the pose it was made for, and nothing is pale once
+    /// the fins on screen are the current pose's.
+    func updateDim() {
+        guard let build else { controller.renderer.dimSupports = false; return }
+        let live = session.ringDragging && liveDrag()
+        controller.renderer.dimSupports = build.building && (!live || build.latestRotation != session.pose.columnMajor)
     }
 
     /// Esc (the window's exit command, wherever the focus is; the viewer also takes it when it has the keys):
@@ -108,6 +126,10 @@ final class BuildWiring {
         /// The page's tunables (`FinSettings.tunablesJSON()`): a gap or a wall-lines change rebuilds too.
         var tunables: String
         var finsOn: Bool
+        /// A rotate ring is being dragged.
+        var dragging: Bool
+        /// `PartSession.ringDrags`: a drag that began and ended between two reactions changes it.
+        var drags: Int
         var mode: FinSettings.Mode
         var removed: Set<FinKey>
     }
@@ -115,7 +137,7 @@ final class BuildWiring {
     var key: Key {
         Key(pose: session.pose, options: session.settings.optionsJSON(),
             tunables: session.settings.tunablesJSON(), finsOn: session.finsOn,
-            mode: session.settings.mode, removed: session.removedFins)
+            dragging: session.ringDragging, drags: session.ringDrags, mode: session.settings.mode, removed: session.removedFins)
     }
 
     /// Re-arming `withObservationTracking`: `onChange` fires once, just before the first change, so the reaction runs
@@ -147,8 +169,13 @@ final class BuildWiring {
     /// One change of the session -> the right amount of work.
     func react(from old: Key?, to new: Key) {
         guard let scheduler, let removal else { return }
+        let poseChanged = old?.pose != new.pose || old?.options != new.options || old?.tunables != new.tunables
         if old?.finsOn != new.finsOn { scheduler.setEnabled(new.finsOn) }
-        else if old?.pose != new.pose || old?.options != new.options || old?.tunables != new.tunables { scheduler.refreshDebounced() }
+        else if new.dragging {
+            // a ring is turning the part: live, a build per new pose; off, the fins wait for the release (the web)
+            if poseChanged && liveDrag() { scheduler.refreshLive() }
+        } else if old?.dragging == true || old?.drags != new.drags { scheduler.endLive() }      // released: the final build
+        else if poseChanged { scheduler.refreshDebounced() }
         if old?.mode != new.mode || old?.finsOn != new.finsOn { removal.sync() }
         // The viewer already follows a click (RemovalModel.update); what is left is to make it follow the session
         // when the removed fins changed some other way (undo, redo), or the mode / toggle ended the pointer mode.
@@ -156,6 +183,6 @@ final class BuildWiring {
         // turn, and the key then looks unchanged.
         let shown = build?.hiddenRanges(removed: new.removed) ?? []
         if shown != controller.renderer.hiddenFinRanges || old?.mode != new.mode || old?.finsOn != new.finsOn { show() }
-        controller.renderer.dimSupports = build?.building ?? false
+        updateDim()
     }
 }

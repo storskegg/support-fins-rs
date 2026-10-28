@@ -41,6 +41,14 @@ extension FocusedValues {
     }
 }
 
+struct ViewSettingsKey: FocusedValueKey { typealias Value = ViewSettings }
+extension FocusedValues {
+    var viewSettings: ViewSettings? {
+        get { self[ViewSettingsKey.self] }
+        set { self[ViewSettingsKey.self] = newValue }
+    }
+}
+
 /// Model menu (docs/UI-MAP.md §8.1): the pose commands of the Rotate popover.
 struct ModelCommands: Commands {
     @FocusedValue(\.session) private var session
@@ -71,12 +79,16 @@ struct ModelCommands: Commands {
 struct ViewCommands: Commands {
     @FocusedValue(\.viewer) private var viewer
     @FocusedValue(\.rotate) private var rotate
+    @FocusedValue(\.viewSettings) private var viewSettings
 
     var body: some Commands {
         CommandMenu("View") {
             // `show-rings` (ui/pose.js:161): the rotate rings, remembered
             Toggle("Show Rotate Rings", isOn: Binding(get: { rotate?.showRings ?? true }, set: { rotate?.showRings = $0 }))
                 .help("The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part.")
+            // a native improvement: the fins follow a ring drag; off, they are built when it ends, as in the web
+            Toggle("Rebuild While Dragging", isOn: Binding(get: { viewSettings?.rebuildWhileDragging ?? true }, set: { viewSettings?.rebuildWhileDragging = $0 }))
+                .help("Rebuild the fins while a rotate ring is dragged, so they follow the part. Off builds them when the drag ends.")
             Button("Frame Part") { viewer?.frame() }.keyboardShortcut("0")
             // the view cube's house (`ui/viewcube.js`): the starting angle, keeping the target and the zoom. The web
             // has no Frame Part, so Home sits beside it rather than replacing it.
