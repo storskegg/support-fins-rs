@@ -30,7 +30,7 @@ struct ContentView: View {
                 ViewerViewport(controller: controller)
                     .ignoresSafeArea()
                     #if DEBUG
-                    .overlay(alignment: .topLeading) { FrameOverlay(controller: controller) }
+                    .overlay(alignment: .topLeading) { if controller.showsFrameTime { FrameOverlay(controller: controller) } }
                     #endif
             }
             if model.showsEmptyState {

@@ -59,6 +59,11 @@ bench-m3:
     /usr/bin/time -l target/release/examples/bench_m3 2> target/bench-m3/rust-time.txt
     deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js report
 
+# M5 suggest timing: web suggestOrientations under Deno against the Rust serial, parallel and wide searches.
+bench-suggest:
+    deno run -A bench/suggest.js
+    cargo run --release -q -p sf-testkit --example bench_suggest
+
 # Build sf-ffi and generate the SupportFinsCore Swift package: the UniFFI Swift source (committed) and the
 # XCFramework around the static library (gitignored, rebuilt here).
 swift-bindings:
@@ -100,3 +105,7 @@ app-uitest: app-core app-project
 bench-load *inputs:
     cargo build --release -q -p sf-testkit --example bench_load
     target/release/examples/bench_load {{inputs}}
+
+# Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5-rendering.md); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
+bench-render *args:
+    swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}

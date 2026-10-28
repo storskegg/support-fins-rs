@@ -314,6 +314,71 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
 }
 
 #[test]
+fn the_wide_search_ranks_more_poses_and_density_one_is_the_web_search() {
+    for name in ["sphere", "torus", "cone"] {
+        let part = load(name);
+        let web = part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap();
+        let one = part
+            .suggest_orientations_wide(45.0, "{}".into(), ctx(), 1.0)
+            .unwrap();
+        assert_eq!(web, one, "{name}: density 1 is the web's candidate set");
+        let wide = part
+            .suggest_orientations_wide(45.0, "{}".into(), ctx(), 10.0)
+            .unwrap();
+        let want = orient::suggest_orientations_wide(
+            part.topology(),
+            3,
+            45.0,
+            &engine_cfg(),
+            10.0,
+            &|| false,
+        )
+        .unwrap();
+        assert_eq!(wide.rows.len(), want.candidates.len(), "{name}");
+        for (r, c) in wide.rows.iter().zip(&want.candidates) {
+            assert_eq!(r.rot, c.rot.to_vec(), "{name}");
+        }
+        assert!(
+            orient::wide_candidate_downs(part.topology(), 10.0).len()
+                > orient::candidate_downs(part.topology(), 12).len(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_stale_wide_search_stops_early_and_the_newer_one_is_delivered() {
+    let part = load("sphere");
+    let s = Suggester::new(part.clone());
+    let (l1, rx1) = listener();
+    let (l2, rx2) = listener();
+    let g1 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l1);
+    let g2 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l2);
+    assert_eq!((g1, g2), (1, 2));
+    let Event::Suggested(g, _) = rx2.recv_timeout(Duration::from_secs(120)).unwrap() else {
+        panic!("not a suggestion")
+    };
+    assert_eq!(g, 2);
+    assert!(matches!(
+        rx1.recv_timeout(Duration::from_millis(300)),
+        Err(mpsc::RecvTimeoutError::Disconnected)
+    ));
+}
+
+#[test]
+fn the_engine_stops_between_candidates_once_cancelled() {
+    let part = load("sphere");
+    let polls = std::sync::atomic::AtomicUsize::new(0);
+    let r =
+        orient::suggest_orientations_wide(part.topology(), 3, 45.0, &engine_cfg(), 10.0, &|| {
+            polls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 3
+        });
+    assert!(r.is_none());
+    // every later candidate saw the flag and skipped its analysis; the run delivered nothing
+    assert!(polls.into_inner() > 3);
+}
+
+#[test]
 fn strength_and_failures_arrive_through_the_same_listener() {
     let part = load("lbracket");
     let s = Suggester::new(part.clone());
