@@ -35,7 +35,10 @@ fn a_part_covers_the_cells_of_its_posed_mesh() {
     let g = cube_grid();
     let b = g.bounds();
     // every cell the mesh touches: the cube's size, plus the line it ends on
-    assert!(b[2] as f64 >= size[0] && b[3] as f64 >= size[1], "{b:?} vs {size:?}");
+    assert!(
+        b[2] as f64 >= size[0] && b[3] as f64 >= size[1],
+        "{b:?} vs {size:?}"
+    );
     assert!(g.area() >= (size[0] * size[1]) as u64);
     // the seating offset moves it
     let lifted = footprint_of_part(part, ID.to_vec(), vec![30.0, -5.0, 0.0])
@@ -69,9 +72,12 @@ fn placing_sharing_and_the_clash_cells() {
     let at = g.placed(0.0, 0.0);
     assert!(at.shared_count(near.clone()) > 0);
     assert_eq!(at.shared_count(apart.clone()), 0);
-    assert_eq!(at.shared(near.clone()).len() as u64, 2 * at.shared_count(near.clone()));
+    assert_eq!(
+        at.shared(near.clone()).len() as u64,
+        2 * at.shared_count(near.clone())
+    );
     let cells = footprint_clash_cells(vec![at.clone(), near, apart]);
-    assert!(!cells.is_empty() && cells.len() % 2 == 0);
+    assert!(!cells.is_empty() && cells.len().is_multiple_of(2));
     assert!(footprint_clash_cells(vec![at.clone()]).is_empty());
     let u = footprint_union(Some(at.clone()), None).unwrap();
     assert_eq!(u.area(), at.area());
@@ -85,14 +91,26 @@ fn a_new_model_goes_beside_the_ones_on_the_plate() {
     let first = footprint_spot(vec![], Some(g.clone()), 250.0, 220.0, 10);
     // the free spot nearest the middle: the first model sits about there
     let size = load("cube").info().size;
-    assert!(first[0].abs() <= size[0] && first[1].abs() <= size[1], "{first:?}");
+    assert!(
+        first[0].abs() <= size[0] && first[1].abs() <= size[1],
+        "{first:?}"
+    );
     let taken = g.placed(first[0], first[1]);
     let next = footprint_spot(vec![taken.clone()], Some(g.clone()), 250.0, 220.0, 10);
-    assert_eq!(g.placed(next[0], next[1]).dilate(10).shared_count(taken.clone()), 0, "{next:?}");
+    assert_eq!(
+        g.placed(next[0], next[1])
+            .dilate(10)
+            .shared_count(taken.clone()),
+        0,
+        "{next:?}"
+    );
     // a bed with no room: past the others' right edge
     let tiny = footprint_spot(vec![taken.clone()], Some(g.clone()), 20.0, 20.0, 10);
     let b = taken.bounds();
-    assert!(tiny[0] + g.bounds()[0] as f64 >= (b[0] + b[2]) as f64 + 10.0 - 1.0, "{tiny:?}");
+    assert!(
+        tiny[0] + g.bounds()[0] as f64 >= (b[0] + b[2]) as f64 + 10.0 - 1.0,
+        "{tiny:?}"
+    );
     // an empty slot goes to the right of the others at y 0
     let empty = footprint_spot(vec![taken], None, 250.0, 220.0, 10);
     assert_eq!(empty[1], 0.0);

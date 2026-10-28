@@ -79,7 +79,6 @@ final class PlateBoard {
         stash.build.onUpdate = { [weak self] in self?.sync() }
         m.stash = stash
         session.install(parts: [], pose: .identity, removedFins: [], owner: nil)
-        controller.rotation = Pose.identity.float3x3
         controller.show([], name: "")
         host.openedName = nil
     }

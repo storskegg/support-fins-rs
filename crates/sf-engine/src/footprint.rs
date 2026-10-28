@@ -478,10 +478,8 @@ pub fn spot(others: &[Option<&Grid>], grid: Option<&Grid>, bx: f64, by: f64, gap
     for g in others {
         take(&mut bed, *g);
     }
-    if let Some(g) = grid {
-        if let Some(at) = find_spot(&bed, g, gap, 5) {
-            return [at[0] as f64, at[1] as f64];
-        }
+    if let Some(at) = grid.and_then(|g| find_spot(&bed, g, gap, 5)) {
+        return [at[0] as f64, at[1] as f64];
     }
     let mut right = bx / 2.0;
     for g in others.iter().flatten() {
