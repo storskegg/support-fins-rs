@@ -119,16 +119,54 @@ struct SupportRenderTests {
         #expect(count(render(r), isRed) == 0)
     }
 
-    @Test func staleFinsArePalerWhileARebuildIsOut() throws {
+    /// The BGRA pixel of the middle of the first quad, rendered.
+    func middle(_ r: ViewerRenderer) -> SIMD3<Float> {
+        let px = render(r)
+        let (x, y) = pixelOf(r, [7.5, 7.5, 5])
+        let o = (y * size + x) * 4
+        return SIMD3(Float(px[o + 2]), Float(px[o + 1]), Float(px[o]))
+    }
+
+    func pixelOf(_ r: ViewerRenderer, _ p: SIMD3<Float>) -> (Int, Int) {
+        let c = r.camera.viewProjection * SIMD4(p, 1)
+        let n = SIMD2(c.x, c.y) / c.w
+        return (Int((n.x * 0.5 + 0.5) * Float(size)), Int((1 - (n.y * 0.5 + 0.5)) * Float(size)))
+    }
+
+    @Test func staleFinsAreTranslucentSoThePartShowsThroughThem() throws {
+        // `markFinsStale` sets the fin materials to opacity 0.25 (ui/finbuild.js:341); the fins stay on screen
+        let r = try #require(ViewerRenderer(), "no Metal device")
+        // a cube under the quad (its top face at z = 3, the quad at z = 5), seen from above
+        r.setMesh(GeneratedMesh.cube(edge: 8, center: [7.5, 7.5, -1], device: r.device))
+        let partOnly = middle(r)
+        r.setSupports(layer(r, finQuads: [(0, 0)]))
+        let opaque = middle(r)
+        r.dimSupports = true
+        let stale = middle(r)
+        // blended at 0.25 over the part: part + 0.25 (fin - part), per channel
+        for k in 0..<3 {
+            let want = partOnly[k] + 0.25 * (opaque[k] - partOnly[k])
+            #expect(abs(stale[k] - want) < 4, "channel \(k): \(stale[k]) vs \(want)")
+        }
+        #expect(simd_distance(stale, partOnly) < simd_distance(stale, opaque), "mostly the part, not the fin")
+        #expect(simd_distance(stale, partOnly) > 10, "tinted by the fin")
+        // and back to opaque when the build lands
+        r.dimSupports = false
+        #expect(middle(r) == opaque)
+    }
+
+    @Test func staleFinsOverEmptySpaceAreAQuarterOfTheWayFromTheBackground() throws {
         let r = try #require(ViewerRenderer(), "no Metal device")
         r.setSupports(layer(r, finQuads: [(0, 0)]))
-        let fresh = count(render(r), isFin)
+        let opaque = middle(r)
         r.dimSupports = true
-        let dim = render(r)
-        #expect(fresh > 100 && count(dim, isFin) < fresh / 4, "the same fins, paler: they stay on screen")
-        #expect(count(dim) { r, g, b in g > b && g > r && g > 60 } > 100, "still green-ish, just toward the background")
-        r.dimSupports = false
-        #expect(count(render(r), isFin) == fresh)
+        let stale = middle(r)
+        // the plate's grid line may cross the middle; the background is all around it
+        let bg = Palette.background * 255
+        for k in 0..<3 {
+            let want = bg[k] + 0.25 * (opaque[k] - bg[k])
+            #expect(abs(stale[k] - want) < 12, "channel \(k): \(stale[k]) vs \(want)")
+        }
     }
 
     @Test func aNewBuildResetsTheMasks() throws {
