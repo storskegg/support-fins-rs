@@ -105,7 +105,7 @@ fn engine(message: impl Into<String>) -> FfiError {
 }
 
 /// The `options.json` keys of a JSON object (empty text is `{}`), as `optionsFromDialog` takes them.
-fn dialog_values(text: &str) -> Result<Vec<(String, Json)>, FfiError> {
+pub(crate) fn dialog_values(text: &str) -> Result<Vec<(String, Json)>, FfiError> {
     if text.trim().is_empty() {
         return Ok(vec![]);
     }

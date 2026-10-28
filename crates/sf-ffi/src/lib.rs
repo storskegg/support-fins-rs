@@ -9,10 +9,15 @@ mod builder;
 mod gpu;
 mod part;
 mod records;
+mod suggest;
 
 pub use builder::{BuildListener, BuildResult, Builder, build_part, export};
 pub use gpu::GpuBuffer;
 pub use part::{AnalysisSummary, FfiError, Part, PartInfo, load_parts};
+pub use suggest::{
+    LoadAlignment, StrengthAdvice, StrengthPose, SuggestContext, SuggestListener, SuggestResult,
+    SuggestTier, Suggester, Suggestion, load_alignment,
+};
 
 uniffi::setup_scaffolding!();
 

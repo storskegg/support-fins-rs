@@ -77,3 +77,67 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   the path's extension picks STL or 3MF; `options_json` is `{}` or `{ "finsOnly": true }` (an STL of the fins
   mapped back onto the part; like `--fins-only` it refuses a posed build). One part and its build per file; a
   list of several is an `Engine` error until the app has a plate layout to put them on.
+
+## M4b additions: orientation suggestions, strength, readout data
+
+Everything the Suggest and Strength popovers and the readouts show is computed in Rust; Swift only draws it
+(`ui/suggest.js`, `ui/strength.js`, `ui/readout.js`). Wording is the page's English; the app translates later by
+the same keys.
+
+```rust
+// Suggest orientation (ui/suggest.js). A ranking can take seconds on a big part, so it runs like a build.
+#[derive(uniffi::Record)] struct SuggestContext { current_bore: u64, density: f64 }  // walls the CURRENT pose stands in a bore
+                                                             // (summary_json `boreWalls`); the material's g/cm3
+#[derive(uniffi::Record)] struct Suggestion {
+    rot: Vec<f64>,          // 9, column-major: apply it to the part
+    rank: String,           // "Best", "#2", "#3"
+    line: String,           // "40 mm · 4 fins · 2 rough holes" or "... · can’t print (on a point)"
+    height: f64, fins: u64, rough_holes: u64, regions: u64, bore: u64, volume: f64, // the raw numbers behind `line`
+    cant_print: bool,       // seating is a point: shown as a bad row
+    tier: SuggestTier,      // Free (green row, "no fins") | HoleClean (badge) | Ordinary
+    badge: Option<String>,  // "Bores clean" for HoleClean
+    note: Option<String>,   // the verdict's sentence for this pose
+}
+enum SuggestTier { Free, HoleClean, Ordinary }
+#[derive(uniffi::Record)] struct SuggestResult {
+    rows: Vec<Suggestion>,  // best first, at most 3
+    confidence: String,     // "high" | "medium" | "low" | "none"
+    note: String,           // the line under the list (empty list: why)
+    note_good: bool,        // the note is the "no support" win (styled good)
+}
+impl Part { fn suggest_orientations(&self, threshold_deg: f64, opts_json: String, context: SuggestContext) -> Result<SuggestResult, FfiError>; } // blocking: call off the main thread
+
+// Strength (ui/strength.js; web/orient.js loadAlignment / suggestStrengthPose)
+#[derive(uniffi::Record)] struct LoadAlignment { cross: f64, quality: String /* good|mixed|poor */, text: String, can_suggest: bool }
+fn load_alignment(dir_world: Vec<f64>) -> Result<Option<LoadAlignment>, FfiError>;  // world +Z is the build axis; None: no direction
+#[derive(uniffi::Record)] struct StrengthPose { rot: Vec<f64>, cross: f64, quality: String, text: String, height: f64, over: f64, bed_area: f64 }
+#[derive(uniffi::Record)] struct StrengthAdvice {
+    pose: Option<StrengthPose>, // the pose to turn to; None when already about as strong as it gets
+    already_strongest: bool,    // show `note` ("This is about the strongest printable orientation ...") instead of turning
+    note: Option<String>,
+}
+impl Part { fn suggest_strength_pose(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64) -> Result<StrengthAdvice, FfiError>; }
+//   dir_local: the load in the part's own frame; dir_world: the same load in the CURRENT pose (to compare with).
+
+// Off the main thread, with a generation counter like Builder: a newer request drops an older, unfinished one.
+#[uniffi::export(callback_interface)] trait SuggestListener: Send + Sync {
+    fn suggested(&self, generation: u64, result: SuggestResult);
+    fn strength(&self, generation: u64, advice: StrengthAdvice);
+    fn failed(&self, generation: u64, err: FfiError);
+}
+#[derive(uniffi::Object)] struct Suggester;                  // one per part, one worker
+impl Suggester {
+    fn new(part: Arc<Part>) -> Arc<Self>;
+    fn suggest(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> u64;
+    fn strength(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64, listener: Box<dyn SuggestListener>) -> u64;
+}
+```
+
+`opts_json` is the same `options.json` object a build takes: the finalists are built under that gap, pad and
+nozzle (the page hands the worker its `supportTunables()`). `SuggestResult` and `StrengthAdvice` carry the text
+the page writes, so the row strings, badges and notes cannot drift from `ui/suggest.js`.
+
+**Readout data added to `summary_json()`** (all computed from the build, so Swift never touches geometry):
+`boreWalls` (props standing in a bore: the `SuggestContext.current_bore` of the next ranking), `seating`
+(`{ kind: face|edge|point, span, bedArea }`), `hasPad`, `finVolumeMm3` and `padVolumeMm3` (the grams receipt's
+volumes, `readout.js meshVolumeMM3`). `records_json()` props also carry `inBore`.
