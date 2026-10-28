@@ -27,7 +27,7 @@ from it one milestone at a time; this file stays the source of truth for *why*.
 | Booleans | **Manifold 3.5.4** (the vendored version) through its official C API (`manifoldc`) via `bindgen`. |
 | Integrations | Ship a Rust **CLI** with the same flags as `plugins/cli` (generated from `options.json`). Host plugins (Blender, Fusion, …) stay on the JS engine. |
 | Upstream | **Frozen at `299ef49` until full feature parity (M7).** Decided by the user on 2026-10-27: no milestone-boundary catch-ups until then, so the first goal isn't a moving target. After parity, catch up in one pass, then at each later milestone. The JS checkout must stay at the `UPSTREAM` commit. |
-| Process | **Four** Sonnet 5.5 (medium) agents (two in M3–M4a to stay within usage limits; back to four from M4b, 2026-10-27) write the code in their own worktrees and open PRs. The orchestrator writes briefs, reviews, merges. Two failed reviews on one ticket → re-assigned to Opus, and the user is alerted. All four work within a milestone; the orchestrator stops at each milestone for the user's go-ahead. |
+| Process | **Four** Sonnet 5.5 (medium) agents (two in M3–M4a to stay within usage limits; back to four from M4b, 2026-10-27) write the code in their own worktrees and open PRs. The orchestrator writes briefs, reviews, merges. Two failed reviews on one ticket → re-assigned to Opus, and the user is alerted. All four work within a milestone. **Four agents when writing code, two when measuring** (benchmarks and timing runs, so they do not disturb each other's numbers). Since 2026-10-28 the orchestrator no longer pauses for the user's go-ahead at milestones: it carries on until the port is complete, and still posts a milestone report at each one. |
 | Reporting | Written report at every milestone (landed, parity, perf vs JS, known gaps). Demo build at the major ones: **M3** engine done, **M4** app usable, **M7** full parity. |
 
 ### Performance targets (starting values, revised once measured)
@@ -188,7 +188,7 @@ which Rust code has to follow.
 
 ## 5. Milestones
 
-Each milestone ends with a stop: a written report, then the user's go-ahead. Upstream catch-ups are paused until M7 (see §1).
+Each milestone ends with a written report. Since 2026-10-28 there is no pause for the user's go-ahead (see the Process row in §1): work continues straight into the next milestone. Upstream catch-ups are paused until M7 (see §1).
 Tracks **A–D** are the four agents. Agents rotate between tracks; the track is the work, not the agent.
 
 **The maths comes first.** M0–M3 are engine-only: all four agents port maths, file formats
