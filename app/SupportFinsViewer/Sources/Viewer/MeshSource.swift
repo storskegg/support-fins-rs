@@ -31,6 +31,15 @@ public protocol MeshSource: AnyObject {
     /// plate) and rotation (`rotation` takes model coordinates to print coordinates), and the engine's seating
     /// offset for it when it has one. Runs off the main actor in a real part (the engine is not instant).
     func analysis(thresholdDegrees: Double, rotation: simd_float3x3) async -> MeshAnalysis
+    /// As above; `wantsSummary` false says the caller will not read `offset` and `size` (a ring drag keeps the
+    /// pivot and the box it started with), so a source that pays for them separately can skip that work.
+    func analysis(thresholdDegrees: Double, rotation: simd_float3x3, wantsSummary: Bool) async -> MeshAnalysis
+}
+
+extension MeshSource {
+    public func analysis(thresholdDegrees: Double, rotation: simd_float3x3, wantsSummary: Bool) async -> MeshAnalysis {
+        await analysis(thresholdDegrees: thresholdDegrees, rotation: rotation)
+    }
 }
 
 /// What `MeshSource.analysis` returns. The buffer is shared memory the GPU reads; it is handed over once and

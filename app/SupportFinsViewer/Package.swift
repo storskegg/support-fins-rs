@@ -7,9 +7,13 @@ import PackageDescription
 let package = Package(
     name: "SupportFinsViewer",
     platforms: [.macOS(.v26)],
-    products: [.library(name: "Viewer", targets: ["Viewer"])],
+    products: [
+        .library(name: "Viewer", targets: ["Viewer"]),
+        .executable(name: "viewer-bench", targets: ["ViewerBench"]),
+    ],
     targets: [
         .target(name: "Viewer", swiftSettings: [.swiftLanguageMode(.v6)]),
+        .executableTarget(name: "ViewerBench", dependencies: ["Viewer"], swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "ViewerTests", dependencies: ["Viewer"], swiftSettings: [.swiftLanguageMode(.v6)]),
     ]
 )
