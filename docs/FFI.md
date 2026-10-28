@@ -91,10 +91,26 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   `triRanges` are `[from, to)` **vertex** ranges into the `fins()` buffer (what per-fin removal cuts out). A
   `props` entry is `{ id, region?, tines, span, height, fill, squat, rimWall, inBore? }`: **a fill-pass wall has no
   `region`** (and its `id` is a placeholder: `fill` says so) (`PropRecord.region` is an `Option`, #23).
-- **`export`** writes exactly the bytes `finFile` writes (`sf_cli::cli::output_bytes`, shared with the CLI):
-  the path's extension picks STL or 3MF; `options_json` is `{}` or `{ "finsOnly": true }` (an STL of the fins
-  mapped back onto the part; like `--fins-only` it refuses a posed build). One part and its build per file; a
-  list of several is an `Engine` error until the app has a plate layout to put them on.
+- **`export`** writes **what the page exports** (`web/ui/export.js`), not what the CLI's `finFile` writes: the part as
+  oriented and seated on the plate, with the fins and the pad in the same file. `path`'s extension picks STL or 3MF.
+  `parts` and `builds` hold one part and its build (several is an `Engine` error until the app has a plate layout).
+  `options_json` (`{}` is the defaults; an unknown key is an error):
+  - `finsOnly: true` (STL): just the fins and the pad, **in the part's print position whatever the pose** (the CLI's
+    refuse-when-posed rule does not apply);
+  - `fins: false`: the part alone, seated in the pose (STL or 3MF). Give the `pose` (nine numbers, column-major) and
+    `threshold` (default 45); `builds` may then be empty, the seating coming from an analysis of the pose;
+  - `removed: [ids]`: fins removed by hand (`records_json` fin ids) are left out, the pad stays (`filteredTriangles`);
+  - 3MF only: `bed: [x, y]` (the build volume; the part is written where it stands on a centred bed) and
+    `placed: [x, y]` (the model's spot on the plate, `liveXY()`). An STL ignores `placed`, as the page does.
+  The bytes are the page's (`parity/oracle/ffiexport.js` writes them through the real writers, `crates/sf-ffi/tests/export.rs`
+  compares): STL header `{name} - support-fins` with the file's name, `{name} fins` for fins only; a 3MF is always the
+  separate form (part, supports, the interface crest as the supports' second part, the slicer's own parts uncut beside
+  the part, the part's paint, title `{name}`), with no session yet (sessions in the 3MF are M7). The triangles are the
+  build's own `f64` values, not the `f32` the CLI rounds to, so a CLI-path build exports facet normals the CLI's file does not
+  have; the app's builds (with `tunables_json`) are the page's, which is what this follows.
+- **`export_file_name(base, kind, nozzle, layer_height) -> String`** is the name the page suggests
+  (`ui/export.js` `plateName`, `exportName`): `{base}-fins-0.4nozzle-0.2layer.stl`, `...3mf`, `{base}-fins-only-...stl`;
+  a setting that is not positive is left out. `kind` is `ExportKind::{Stl, ThreeMf, FinsOnly}`.
 
 ## M4b additions: orientation suggestions, strength, readout data
 

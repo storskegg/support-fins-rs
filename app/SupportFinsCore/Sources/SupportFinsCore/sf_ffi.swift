@@ -2296,6 +2296,91 @@ public func FfiConverterTypeSuggestion_lower(_ value: Suggestion) -> RustBuffer 
 
 
 /**
+ * What `export` writes. `ExportKind` names the file the way the page does (`exportName`).
+ */
+
+public enum ExportKind: Equatable, Hashable {
+    
+    /**
+     * Part + fins as one STL.
+     */
+    case stl
+    /**
+     * Part and supports as separate objects in a 3MF.
+     */
+    case threeMf
+    /**
+     * The fins and pad alone, an STL.
+     */
+    case finsOnly
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ExportKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeExportKind: FfiConverterRustBuffer {
+    typealias SwiftType = ExportKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ExportKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .stl
+        
+        case 2: return .threeMf
+        
+        case 3: return .finsOnly
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ExportKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .stl:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .threeMf:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .finsOnly:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExportKind_lift(_ buf: RustBuffer) throws -> ExportKind {
+    return try FfiConverterTypeExportKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeExportKind_lower(_ value: ExportKind) -> RustBuffer {
+    return FfiConverterTypeExportKind.lower(value)
+}
+
+
+
+/**
  * What went wrong, carrying the JS-identical message where one exists.
  */
 public 
@@ -3134,10 +3219,20 @@ public func engineVersion() -> String  {
 })
 }
 /**
- * Write a part and its build as the CLI writes them: `path`'s extension picks STL or 3MF, and
- * `options_json` may carry `{ "finsOnly": true }` (the CLI's `--fins-only`, an STL of the fins mapped
- * back onto the part as it is in the file, so only for an unposed build, as the CLI says). One part and its build per file for now: several would
- * need a plate layout the engine does not have.
+ * Write what the page exports (`web/ui/export.js`): the part as oriented and seated on the plate, with the
+ * fins and pad in the same file. `path`'s extension picks STL or 3MF; `parts` and `builds` hold one of each
+ * (a plate of several needs a layout the engine does not have). `options_json`:
+ *
+ * - `finsOnly` (STL): just the fins and the pad, in the part's print position whatever the pose;
+ * - `fins: false`: the part alone, seated in the pose (give `pose`, and `threshold` if not 45; `builds` may be
+ * empty, the seating then comes from an analysis of the pose);
+ * - `removed`: ids of fins removed by hand, left out;
+ * - 3MF: `bed` (the build volume's x and y; the part is written where it stands on a centred bed) and `placed`
+ * (the model's spot on the plate, mm; STL ignores it, as the page does).
+ *
+ * The bytes are the page's: STL header `{name} - support-fins` of the file's name (`{name} fins` for fins
+ * only); a 3MF is always the separate form (part, supports, the interface crest as the supports' second part,
+ * the slicer's own parts, the part's paint) with `{name}` as its title. `export_file_name` gives the file name.
  */
 public func export(path: String, parts: [Part], builds: [BuildResult], optionsJson: String)throws   {try rustCallWithError(FfiConverterTypeFfiError_lift) {
         uniffiCallStatus in
@@ -3148,6 +3243,22 @@ public func export(path: String, parts: [Part], builds: [BuildResult], optionsJs
         FfiConverterString.lower(optionsJson),uniffiCallStatus
     )
 }
+}
+/**
+ * The file name the page suggests (`web/ui/export.js` `plateName`, `web/exportname.js`):
+ * `{base}-fins-0.4nozzle-0.2layer.stl`, `{base}-fins-...3mf` or `{base}-fins-only-...stl`. A setting that is
+ * not a positive number is left out of the name.
+ */
+public func exportFileName(base: String, kind: ExportKind, nozzle: Double, layerHeight: Double) -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_sf_ffi_fn_func_export_file_name(
+        FfiConverterString.lower(base),
+        FfiConverterTypeExportKind_lower(kind),
+        FfiConverterDouble.lower(nozzle),
+        FfiConverterDouble.lower(layerHeight),uniffiCallStatus
+    )
+})
 }
 /**
  * The midair-starts card (`web/ui/islands.js` `renderIslandCard`): what the starts are and how many nothing
@@ -3210,7 +3321,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_sf_ffi_checksum_func_engine_version() != 38314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_sf_ffi_checksum_func_export() != 44033) {
+    if (uniffi_sf_ffi_checksum_func_export() != 23369) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_sf_ffi_checksum_func_export_file_name() != 39192) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_sf_ffi_checksum_func_island_card() != 45558) {

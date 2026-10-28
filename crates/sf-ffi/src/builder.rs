@@ -10,15 +10,18 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 
-use sf_cli::cli::{output_bytes, pose_matrix};
+use sf_cli::cli::pose_matrix;
 use sf_cli::entry::{
     PageRequest, build_stats, compute_fins_detail, engine_request, options_from_dialog,
 };
 use sf_engine::config::Config;
 use sf_engine::fins::build::build_fins;
 use sf_engine::overhangs::analyze;
+use sf_engine::prop::crest::split_interface;
 use sf_engine::types::{IDENTITY3, Xyz};
 use sf_io::json::{Json, parse};
+use sf_io::stl::write_binary_stl;
+use sf_io::threemf::{Bed, ExtraPart, Model, write_plate_3mf};
 
 use crate::gpu::GpuBuffer;
 use crate::part::{FfiError, Part, rot9};
@@ -410,10 +413,121 @@ impl Builder {
     }
 }
 
-/// Write a part and its build as the CLI writes them: `path`'s extension picks STL or 3MF, and
-/// `options_json` may carry `{ "finsOnly": true }` (the CLI's `--fins-only`, an STL of the fins mapped
-/// back onto the part as it is in the file, so only for an unposed build, as the CLI says). One part and its build per file for now: several would
-/// need a plate layout the engine does not have.
+/// What `export` writes. `ExportKind` names the file the way the page does (`exportName`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum ExportKind {
+    /// Part + fins as one STL.
+    Stl,
+    /// Part and supports as separate objects in a 3MF.
+    ThreeMf,
+    /// The fins and pad alone, an STL.
+    FinsOnly,
+}
+
+/// The file name the page suggests (`web/ui/export.js` `plateName`, `web/exportname.js`):
+/// `{base}-fins-0.4nozzle-0.2layer.stl`, `{base}-fins-...3mf` or `{base}-fins-only-...stl`. A setting that is
+/// not a positive number is left out of the name.
+#[uniffi::export]
+pub fn export_file_name(base: String, kind: ExportKind, nozzle: f64, layer_height: f64) -> String {
+    let (stem, ext) = match kind {
+        ExportKind::Stl => ("fins", ".stl"),
+        ExportKind::ThreeMf => ("fins", ".3mf"),
+        ExportKind::FinsOnly => ("fins-only", ".stl"),
+    };
+    sf_io::exportname::export_name(
+        &format!("{base}-{stem}"),
+        ext,
+        &sf_io::exportname::ExportOpts {
+            nozzle,
+            layer_height,
+        },
+    )
+}
+
+struct ExportOptions {
+    fins_only: bool,
+    fins: bool,
+    removed: Vec<u64>,
+    pose: [f64; 9],
+    threshold: f64,
+    bed: Option<(f64, f64)>,
+    placed: [f64; 2],
+}
+
+fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
+    let mut o = ExportOptions {
+        fins_only: false,
+        fins: true,
+        removed: vec![],
+        pose: IDENTITY3,
+        threshold: 45.0,
+        bed: None,
+        placed: [0.0, 0.0],
+    };
+    let kv = match parse(if text.trim().is_empty() { "{}" } else { text }) {
+        Some(Json::Obj(kv)) => kv,
+        _ => return Err(engine("export options must be a JSON object")),
+    };
+    let nums = |v: &Json, n: usize, what: &str| -> Result<Vec<f64>, FfiError> {
+        match v {
+            Json::Arr(a)
+                if a.len() == n && a.iter().all(|x| matches!(x, Json::Num(v) if v.is_finite())) =>
+            {
+                Ok(a.iter()
+                    .map(|x| if let Json::Num(v) = x { *v } else { 0.0 })
+                    .collect())
+            }
+            _ => Err(engine(format!("{what} must be {n} numbers"))),
+        }
+    };
+    for (k, v) in &kv {
+        match (k.as_str(), v) {
+            ("finsOnly", Json::Bool(b)) => o.fins_only = *b,
+            ("fins", Json::Bool(b)) => o.fins = *b,
+            ("removed", Json::Arr(a)) => {
+                for x in a {
+                    match x {
+                        Json::Num(n) if *n >= 0.0 && n.fract() == 0.0 => o.removed.push(*n as u64),
+                        _ => return Err(engine("removed must be fin ids")),
+                    }
+                }
+            }
+            ("pose", v) => o.pose = nums(v, 9, "pose")?.try_into().unwrap(),
+            ("threshold", Json::Num(n)) if n.is_finite() => o.threshold = *n,
+            ("bed", v) => {
+                let b = nums(v, 2, "bed")?;
+                o.bed = Some((b[0], b[1]));
+            }
+            ("placed", v) => {
+                let p = nums(v, 2, "placed")?;
+                o.placed = [p[0], p[1]];
+            }
+            (k, _) => return Err(engine(format!("unknown or malformed export option {k}"))),
+        }
+    }
+    Ok(o)
+}
+
+fn xyz4(v: &[sf_engine::types::V4], at: [f64; 2]) -> Vec<[f64; 3]> {
+    v.iter()
+        .map(|p| [p[0] + at[0], p[1] + at[1], p[2]])
+        .collect()
+}
+
+/// Write what the page exports (`web/ui/export.js`): the part as oriented and seated on the plate, with the
+/// fins and pad in the same file. `path`'s extension picks STL or 3MF; `parts` and `builds` hold one of each
+/// (a plate of several needs a layout the engine does not have). `options_json`:
+///
+/// - `finsOnly` (STL): just the fins and the pad, in the part's print position whatever the pose;
+/// - `fins: false`: the part alone, seated in the pose (give `pose`, and `threshold` if not 45; `builds` may be
+///   empty, the seating then comes from an analysis of the pose);
+/// - `removed`: ids of fins removed by hand, left out;
+/// - 3MF: `bed` (the build volume's x and y; the part is written where it stands on a centred bed) and `placed`
+///   (the model's spot on the plate, mm; STL ignores it, as the page does).
+///
+/// The bytes are the page's: STL header `{name} - support-fins` of the file's name (`{name} fins` for fins
+/// only); a 3MF is always the separate form (part, supports, the interface crest as the supports' second part,
+/// the slicer's own parts, the part's paint) with `{name}` as its title. `export_file_name` gives the file name.
 #[uniffi::export]
 pub fn export(
     path: String,
@@ -421,19 +535,7 @@ pub fn export(
     builds: Vec<Arc<BuildResult>>,
     options_json: String,
 ) -> Result<(), FfiError> {
-    let fins_only = match parse(if options_json.trim().is_empty() {
-        "{}"
-    } else {
-        &options_json
-    }) {
-        Some(Json::Obj(kv)) => {
-            if let Some((k, _)) = kv.iter().find(|(k, _)| k != "finsOnly") {
-                return Err(engine(format!("unknown export option {k}")));
-            }
-            matches!(kv.first(), Some((_, Json::Bool(true))))
-        }
-        _ => return Err(engine("export options must be a JSON object")),
-    };
+    let o = export_options(&options_json)?;
     let ext = Path::new(&path)
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
@@ -442,35 +544,105 @@ pub fn export(
         Some("stl") => false,
         _ => return Err(engine(format!("output {path}: write .3mf or .stl"))),
     };
-    if fins_only && three_mf {
-        return Err(engine("--fins-only writes an .stl"));
+    if o.fins_only && three_mf {
+        return Err(engine("Fins only writes an .stl"));
     }
-    let ([part], [build]) = (parts.as_slice(), builds.as_slice()) else {
+    if o.fins_only && !o.fins {
+        return Err(engine("Fins only needs fins"));
+    }
+    let [part] = parts.as_slice() else {
         return Err(engine(format!(
-            "export writes one part and its build per file, got {} parts and {} builds",
-            parts.len(),
-            builds.len()
+            "export writes one part per file, got {}",
+            parts.len()
         )));
     };
-    if fins_only && build.rot.is_some() {
-        return Err(engine(
-            "--fins-only lines up with the part as it is in your file, so it can't take a pose: pose the part in your file, or write part + fins (.3mf)",
-        ));
+    if builds.len() > 1 || (o.fins && builds.is_empty()) {
+        return Err(engine(format!(
+            "export writes one part's build per file, got {} builds",
+            builds.len()
+        )));
     }
-    if fins_only && build.triangles.is_empty() {
+    let topo = part.topology();
+    // the pose, the seating and the supports (print space already)
+    let (rot, offset, added): (Option<[f64; 9]>, Xyz, Vec<sf_engine::types::V4>) = if o.fins {
+        let b = &builds[0];
+        let mut added: Vec<sf_engine::types::V4> = if o.removed.is_empty() {
+            b.built.triangles.clone()
+        } else {
+            // the kept fins' own triangles, in record order (ui/remove.js `filteredTriangles`)
+            b.built
+                .fins
+                .iter()
+                .filter(|f| !o.removed.contains(&(f.id as u64)))
+                .flat_map(|f| {
+                    f.tri_ranges
+                        .iter()
+                        .flat_map(|&[lo, hi]| b.built.triangles[lo..hi].iter().copied())
+                })
+                .collect()
+        };
+        added.extend_from_slice(&b.built.pad_triangles);
+        (b.rot, b.offset, added)
+    } else {
+        let rot = (o.pose != IDENTITY3).then_some(o.pose);
+        let a = analyze(topo, o.threshold, &o.pose);
+        (rot, a.offset, vec![])
+    };
+    if o.fins_only && added.is_empty() {
         return Err(engine("no fins, nothing written"));
     }
-    let posed = pose_matrix(&part.topology().pos, build.rot);
-    let bytes = output_bytes(
-        part.stem(),
-        &posed,
-        &build.triangles,
-        build.offset,
-        fins_only,
-        three_mf,
-        part.slicer(),
-        build.rot,
-    );
+    let name = part.stem();
+    let print = |flat: &[f64]| -> Vec<[f64; 3]> {
+        pose_matrix(flat, rot)
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|p| [p[0] + offset.x, p[1] + offset.y, p[2] + offset.z])
+            .collect()
+    };
+    let bytes = if three_mf {
+        let at = o.placed;
+        let shift = |v: Vec<[f64; 3]>| -> Vec<[f64; 3]> {
+            v.into_iter()
+                .map(|p| [p[0] + at[0], p[1] + at[1], p[2]])
+                .collect()
+        };
+        // a file with a slicer's own parts goes out as the file had it: the part uncut beside its negative
+        // parts, modifiers and blockers, all posed the same way (the fins are for the cut part)
+        let (part_tris, colors, extras) = match part.slicer() {
+            Some(s) => (
+                shift(print(&s.positions)),
+                s.colors.clone(),
+                s.extras
+                    .iter()
+                    .map(|e| ExtraPart {
+                        kind: e.kind,
+                        name: e.name.clone(),
+                        settings: e.settings.clone(),
+                        tris: shift(print(&e.positions)),
+                    })
+                    .collect(),
+            ),
+            None => (shift(print(&topo.pos)), part.colors().cloned(), vec![]),
+        };
+        let (body, iface) = split_interface(&added);
+        let model = Model {
+            part_tris,
+            fin_tris: xyz4(&body, at),
+            name: name.to_string(),
+            iface: xyz4(&iface, at),
+            colors,
+            extras,
+        };
+        let bed = o.bed.map(|(x, y)| Bed { x, y });
+        write_plate_3mf(&[model], name, true, None, bed)
+    } else if o.fins_only {
+        write_binary_stl(&xyz4(&added, [0.0, 0.0]), &format!("{name} fins"))
+    } else {
+        let mut tris = print(&topo.pos);
+        tris.extend(xyz4(&added, [0.0, 0.0]));
+        write_binary_stl(&tris, name)
+    };
     std::fs::write(&path, bytes).map_err(|e| FfiError::Io {
         message: format!("{path}: {e}"),
     })
