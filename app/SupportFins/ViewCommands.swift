@@ -85,6 +85,10 @@ struct ViewCommands: Commands {
             // `show-layers` (ui/strength.js): the horizontal print layers around the part
             Toggle("Show Print Layers", isOn: Binding(get: { viewer?.showsLayers ?? false }, set: { viewer?.showsLayers = $0 }))
                 .help("Show the horizontal print layers around the part.")
+            #if DEBUG
+            // docs/UI-MAP.md: the debug-only frame-time overlay (the web's `#fps`)
+            Toggle("Show Frame Time", isOn: Binding(get: { viewer?.showsFrameTime ?? false }, set: { viewer?.showsFrameTime = $0 }))
+            #endif
             Divider()
             ForEach(Array(CameraView.allCases.enumerated()), id: \.offset) { i, v in
                 Button(v.label) { viewer?.apply(v) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")))

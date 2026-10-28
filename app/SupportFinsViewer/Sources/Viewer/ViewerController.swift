@@ -31,6 +31,8 @@ public final class ViewerController {
     public var showsIslands = false { didSet { if showsIslands != oldValue { refreshIslands() } } }
 
     public var showsLayers = false { didSet { if showsLayers != oldValue { refreshHUD() } } }
+    /// The debug frame-time overlay (View > Show Frame Time, debug builds only).
+    public var showsFrameTime = false
     /// The posed part's size: the engine's when a single part has been analysed, else the rotated bounds.
     public private(set) var posedSize = SIMD3<Float>.zero
 
@@ -245,7 +247,7 @@ public final class ViewerController {
         let dragging = drag != nil
         Task { @MainActor in
             let tasks = meshes.map { mesh in
-                Task { @MainActor in await mesh.analysis(thresholdDegrees: threshold, rotation: rot) }
+                Task { @MainActor in await mesh.analysis(thresholdDegrees: threshold, rotation: rot, wantsSummary: !dragging) }
             }
             var results: [(Int, MeshAnalysis)] = []
             for (i, t) in tasks.enumerated() { results.append((i, await t.value)) }
