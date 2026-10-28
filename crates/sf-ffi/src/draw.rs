@@ -25,6 +25,7 @@ use sf_io::json::{Json, parse};
 use crate::builder::{BuildResult, soup_buffer};
 use crate::gpu::GpuBuffer;
 use crate::part::{FfiError, Part, rot9};
+use crate::records;
 
 fn engine(message: impl Into<String>) -> FfiError {
     FfiError::Engine {
@@ -288,12 +289,12 @@ impl DrawKit {
     }
 
     /// Re-stand `walls_json` (the part's frame, see docs/FFI.md) for this pose and settings
-    /// (`sweepDrawn`). `auto` is Auto's build when its supports are on screen, `removed` its removed
+    /// (`sweepDrawn`). `auto_build` is Auto's build when its supports are on screen, `removed` its removed
     /// fin ids.
     pub fn sweep(
         &self,
         walls_json: String,
-        auto: Option<Arc<BuildResult>>,
+        auto_build: Option<Arc<BuildResult>>,
         removed: Vec<u64>,
     ) -> Result<Arc<DrawnSweep>, FfiError> {
         let walls = parse_walls(&walls_json)?;
@@ -305,7 +306,7 @@ impl DrawKit {
             &self.tris,
             &walls,
             &self.settings,
-            auto.as_ref().map(|b| b.built()),
+            auto_build.as_ref().map(|b| b.built()),
             &gone,
             &self.cfg,
         );
@@ -319,7 +320,7 @@ impl DrawKit {
         face: u64,
         point: Vec<f64>,
         sweep: Option<Arc<DrawnSweep>>,
-        auto: Option<Arc<BuildResult>>,
+        auto_build: Option<Arc<BuildResult>>,
         removed: Vec<u64>,
     ) -> Result<Arc<BraceSpot>, FfiError> {
         let p = v3(&point, "point")?;
@@ -327,7 +328,7 @@ impl DrawKit {
             return Err(engine("face is out of range"));
         }
         let gone: HashSet<usize> = removed.iter().map(|&i| i as usize).collect();
-        let avoid: AutoAvoid = auto_supports(auto.as_ref().map(|b| b.built()), &gone);
+        let avoid: AutoAvoid = auto_supports(auto_build.as_ref().map(|b| b.built()), &gone);
         let drawn: Vec<SwayRib> = sweep.as_ref().map_or(Vec::new(), |s| {
             s.sweep
                 .walls
@@ -462,12 +463,36 @@ impl DrawnSweep {
         Ok(pick_support(&self.sweep, o, d, part_distance).map(|i| i as u64))
     }
 
+    /// What the built supports add to the plate, for the fit check and the grams receipt (`activeAdded`):
+    /// `{ volumeMm3, bounds: { min, max } | null }`, the volume as `meshVolumeMM3` and the extent as the build's
+    /// `addedBounds`, in print space.
+    pub fn added_json(&self) -> String {
+        Json::Obj(vec![
+            (
+                "volumeMm3".to_string(),
+                Json::Num(records::mesh_volume(&self.sweep.tris)),
+            ),
+            (
+                "bounds".to_string(),
+                records::bounds(self.sweep.tris.iter()),
+            ),
+        ])
+        .stringify()
+    }
+
     /// The triangles of wall `index` alone (the selection's highlight).
     pub fn wall_triangles(&self, index: u64) -> Arc<GpuBuffer> {
         match self.sweep.walls.get(index as usize) {
             Some(w) => f32_soup(&self.sweep.tris[w.tri_start * 3..w.tri_end * 3]),
             None => f32_soup(&[]),
         }
+    }
+}
+
+impl DrawnSweep {
+    /// The built supports' vertices, three to a triangle.
+    pub(crate) fn tris(&self) -> &[V4] {
+        &self.sweep.tris
     }
 }
 

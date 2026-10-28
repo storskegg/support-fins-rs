@@ -247,8 +247,8 @@ impl DrawKit {
     fn face_takes_brace(&self, face: u64) -> bool;                // faceIsUpright
     fn ghost(&self, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>) -> Result<Arc<DrawnGhost>, FfiError>;
     fn check_wall(&self, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>) -> Result<Arc<DrawnGhost>, FfiError>;
-    fn sweep(&self, walls_json: String, auto: Option<Arc<BuildResult>>, removed: Vec<u64>) -> Result<Arc<DrawnSweep>, FfiError>;
-    fn brace_at(&self, face: u64, point: Vec<f64>, sweep: Option<Arc<DrawnSweep>>, auto: Option<Arc<BuildResult>>,
+    fn sweep(&self, walls_json: String, auto_build: Option<Arc<BuildResult>>, removed: Vec<u64>) -> Result<Arc<DrawnSweep>, FfiError>;
+    fn brace_at(&self, face: u64, point: Vec<f64>, sweep: Option<Arc<DrawnSweep>>, auto_build: Option<Arc<BuildResult>>,
                 removed: Vec<u64>) -> Result<Arc<BraceSpot>, FfiError>;
 }
 #[derive(uniffi::Record)] struct SurfaceSpot { point: Vec<f64>, normal: Vec<f64>, distance: f64 }   // print space
@@ -266,7 +266,7 @@ fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError>
 - **`surface_hit(face, origin, dir)`** is `pickFace`'s `hit.point` (web/ui/pose.js:264): the GPU id pass says which face is under the pointer,
   this says where on it (the ray meets that triangle, both sides). `origin` / `dir` (unit) are in print space (`ViewerController.ray`);
   `None` when the ray misses that triangle, the caller then keeps the last spot.
-- **`sweep`** (`sweepDrawn`) re-stands every wall for the pose: `auto` is Auto's build when its supports are on screen (hand braces and
+- **`sweep`** (`sweepDrawn`) re-stands every wall for the pose: `auto_build` is Auto's build when its supports are on screen (`auto` is a C keyword, which the generated header cannot use as a parameter name) (hand braces and
   tall-wall ribs stand clear of them) and `removed` its removed fin ids (`records_json` ids). `DrawnSweep`: `triangles()` (interleaved
   position + normal, `f32`, print space, in the walls' order), `walls_json()` (one entry per wall, in order: `{ ok, triStart, triEnd, kind,
   reason | length, height, tines, ribs | cross, stilt }`; `triStart` / `triEnd` are triangle indices), `pick(origin, dir, part_distance)`
@@ -277,4 +277,8 @@ fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError>
 - **`brace_at`** is `braceAt` (without its memo): the brace a click at `point` stands, `BraceSpot { ok(), reason(), full(), point(), key(),
   height(), triangles() }`. `key` is the web's memo key (equal keys are the same brace); `point` is what a placed brace stores. Pass the
   current `sweep` so the hand braces already standing are avoided.
-- **Build mode `draw`.** `opts_json` `{"mode":"draw"}` builds only the seating verdict and the bed pad (`buildFins`), as the web's Draw does.
+- **Build mode `draw`.** `Builder.build`'s `opts_json` accepts `{"mode":"draw"}` as a request-level extra (`PageRequest.mode`, like `tallRibs`;
+  `options.json` has no such mode): the build is only the seating verdict and the bed pad (`buildFins`), as the web's Draw does.
+- **Export.** `export_with_drawn(path, parts, builds, drawn: Option<Arc<DrawnSweep>>, options_json)` is `export` with the hand-placed supports
+  in the file, between the auto fins and the pad (`activeAdded()`, `web/ui/export.js`); `None` is `export`. `DrawnSweep.added_json()` is what
+  the supports add to the plate: `{ volumeMm3, bounds: { min, max } | null }` (the fit check's extent and the grams receipt's volume).

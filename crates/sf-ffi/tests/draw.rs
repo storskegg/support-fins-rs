@@ -442,3 +442,66 @@ fn bad_input_is_an_engine_error_not_a_panic() {
             .is_err()
     );
 }
+
+fn stl_triangles(path: &std::path::Path) -> u32 {
+    let b = std::fs::read(path).unwrap();
+    u32::from_le_bytes([b[80], b[81], b[82], b[83]])
+}
+
+#[test]
+fn the_export_carries_the_drawn_walls_between_the_fins_and_the_pad() {
+    let part = part_of(&parse(r#"{"block":[-20,20,-15,15,0,10]}"#).unwrap(), 980);
+    let (s, c) = 35f64.to_radians().sin_cos();
+    let rot = vec![1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c];
+    let kit = DrawKit::new(
+        part.clone(),
+        rot.clone(),
+        45.0,
+        SETTINGS.into(),
+        "{}".into(),
+    )
+    .unwrap();
+    let under = |x: f64, y: f64| {
+        let (_, h) = nearest(&kit, 12, [x, y, -5.0], [0.0, 0.0, 1.0]).expect("the underside");
+        h.point
+    };
+    let (a, b) = (
+        kit.world_to_local(under(-8.0, 0.0)).unwrap(),
+        kit.world_to_local(under(8.0, 0.0)).unwrap(),
+    );
+    let sweep = kit
+        .sweep(
+            format!("[{{\"kind\":\"wall\",\"a\":{a:?},\"b\":{b:?}}}]"),
+            None,
+            vec![],
+        )
+        .unwrap();
+    let drawn_tris = sweep.triangles().count() / 3;
+    assert!(drawn_tris > 0);
+    let added = parse(&sweep.added_json()).unwrap();
+    assert!(num(field(&added, "volumeMm3")) > 0.0);
+    assert!(matches!(field(&added, "bounds"), Json::Obj(_)));
+    // Draw's own build: the seating and the pad only
+    let build = Arc::new(build_part(&part, &rot, r#"{"mode":"draw"}"#, "{}").unwrap());
+    assert_eq!(build.fins().count(), 0, "draw builds no walls of its own");
+    let dir = std::env::temp_dir().join(format!("sf-ffi-draw-export-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (plain, with) = (dir.join("plain.stl"), dir.join("with.stl"));
+    let opts = format!("{{\"pose\":{rot:?}}}");
+    sf_ffi::export(
+        plain.to_string_lossy().into(),
+        vec![part.clone()],
+        vec![build.clone()],
+        opts.clone(),
+    )
+    .unwrap();
+    sf_ffi::export_with_drawn(
+        with.to_string_lossy().into(),
+        vec![part],
+        vec![build],
+        Some(sweep),
+        opts,
+    )
+    .unwrap();
+    assert_eq!(stl_triangles(&with), stl_triangles(&plain) + drawn_tris);
+}

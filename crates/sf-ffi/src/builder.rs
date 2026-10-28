@@ -222,6 +222,12 @@ fn split_options(
     let mut dialog = Vec::new();
     let mut extras = false;
     for (k, v) in dialog_values(opts_json)? {
+        // Draw: `options.json` has no such mode, the page's `finOpts` sends it
+        if k == "mode" && matches!(&v, Json::Str(m) if m == "draw") {
+            extras = true;
+            page.mode = Some("draw".to_string());
+            continue;
+        }
         if !PAGE_KEYS.contains(&k.as_str()) {
             dialog.push((k, v));
             continue;
@@ -601,7 +607,31 @@ pub fn export(
     builds: Vec<Arc<BuildResult>>,
     options_json: String,
 ) -> Result<(), FfiError> {
-    let o = export_options(&options_json)?;
+    export_impl(&path, &parts, &builds, &[], &options_json)
+}
+
+/// [`export`] with the hand-placed supports of Draw (`web/ui/export.js` `activeAdded()`: the auto fins, then the
+/// drawn walls and braces, then the pad). `drawn` is the sweep of the current pose; `None` is `export`.
+#[uniffi::export]
+pub fn export_with_drawn(
+    path: String,
+    parts: Vec<Arc<Part>>,
+    builds: Vec<Arc<BuildResult>>,
+    drawn: Option<Arc<crate::draw::DrawnSweep>>,
+    options_json: String,
+) -> Result<(), FfiError> {
+    let tris = drawn.as_ref().map_or(&[][..], |d| d.tris());
+    export_impl(&path, &parts, &builds, tris, &options_json)
+}
+
+fn export_impl(
+    path: &str,
+    parts: &[Arc<Part>],
+    builds: &[Arc<BuildResult>],
+    drawn: &[sf_engine::types::V4],
+    options_json: &str,
+) -> Result<(), FfiError> {
+    let o = export_options(options_json)?;
     let ext = Path::new(&path)
         .extension()
         .map(|e| e.to_string_lossy().to_ascii_lowercase());
@@ -616,7 +646,7 @@ pub fn export(
     if o.fins_only && !o.fins {
         return Err(engine("Fins only needs fins"));
     }
-    let [part] = parts.as_slice() else {
+    let [part] = parts else {
         return Err(engine(format!(
             "export writes one part per file, got {}",
             parts.len()
@@ -647,6 +677,7 @@ pub fn export(
                 })
                 .collect()
         };
+        added.extend_from_slice(drawn);
         added.extend_from_slice(&b.built.pad_triangles);
         (b.rot, b.offset, added)
     } else {
@@ -709,7 +740,7 @@ pub fn export(
         tris.extend(xyz4(&added, [0.0, 0.0]));
         write_binary_stl(&tris, name)
     };
-    std::fs::write(&path, bytes).map_err(|e| FfiError::Io {
+    std::fs::write(path, bytes).map_err(|e| FfiError::Io {
         message: format!("{path}: {e}"),
     })
 }

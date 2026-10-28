@@ -14,7 +14,7 @@ mod suggest;
 
 pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, build_part, build_part_cancellable, export,
-    export_file_name,
+    export_file_name, export_with_drawn,
 };
 pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
 pub use gpu::GpuBuffer;
