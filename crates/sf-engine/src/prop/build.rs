@@ -638,7 +638,7 @@ pub(crate) fn build_pass(
         off,
         cfg,
         ctx,
-        part_tris: &*part_tris,
+        part_tris: &part_tris,
         with_tines,
         tine_step_eff,
         tine_height,
@@ -824,7 +824,7 @@ pub(crate) fn build_pass(
             let lines = raster_tracks(
                 &region_pts,
                 &region_tris,
-                &*part_tris,
+                &part_tris,
                 step,
                 row_span,
                 &support,
