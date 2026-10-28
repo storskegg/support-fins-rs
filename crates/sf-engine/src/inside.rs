@@ -342,6 +342,36 @@ fn dist2(p: [f64; 3], q: [f64; 3]) -> f64 {
     dx * dx + dy * dy + dz * dz
 }
 
+/// Are all of `a`'s vertices on one side of `b`'s plane, and farther from it than `sqrt(best)`
+/// (with a margin much wider than any rounding), or the same the other way round? Then no point of
+/// `a` is within `sqrt(best)` of `b`, `a` cannot cross `b`, and none of the distances `solidClearance`
+/// measures between the two (vertex to triangle, edge to edge) can beat `best`: the pair is skipped
+/// whole. A sliver with no usable plane, or a NaN, answers no.
+fn planes_apart(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3], best: f64) -> bool {
+    fn one_way(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3], reach: f64) -> bool {
+        let (e1x, e1y, e1z) = (b[1][0] - b[0][0], b[1][1] - b[0][1], b[1][2] - b[0][2]);
+        let (e2x, e2y, e2z) = (b[2][0] - b[0][0], b[2][1] - b[0][1], b[2][2] - b[0][2]);
+        let (nx, ny, nz) = (
+            e1y * e2z - e1z * e2y,
+            e1z * e2x - e1x * e2z,
+            e1x * e2y - e1y * e2x,
+        );
+        let nn = nx * nx + ny * ny + nz * nz;
+        // (the normal's length is the sliver's twice-area: use no plane below 1e-9 mm2)
+        if nn.is_nan() || nn <= 1e-18 || !nn.is_finite() {
+            return false;
+        }
+        let need = reach * nn.sqrt();
+        let d =
+            |p: &[f64; 3]| nx * (p[0] - b[0][0]) + ny * (p[1] - b[0][1]) + nz * (p[2] - b[0][2]);
+        let (d0, d1, d2) = (d(&a[0]), d(&a[1]), d(&a[2]));
+        (d0 > need && d1 > need && d2 > need) || (d0 < -need && d1 < -need && d2 < -need)
+    }
+    // a margin of 1e-6 relative (plus 1e-9 mm) on the reach covers the rounding of the dots
+    let reach = best.sqrt() * (1.0 + 1e-6) + 1e-9;
+    reach.is_finite() && (one_way(a, b, reach) || one_way(b, a, reach))
+}
+
 /// The exact minimum clearance between an added solid and the part, or `None` if it is at
 /// least `rMax` everywhere.
 ///
@@ -522,6 +552,11 @@ pub fn solid_clearance(
                     }
 
                     let b_tri = tri_verts(pos, f);
+
+                    // A pair a plane apart can neither cross nor come nearer than `best`
+                    if planes_apart(&a_tri, &b_tri, best) {
+                        continue;
+                    }
 
                     // INTERSECTION FIRST. Every distance primitive below is only valid
                     // for triangles that do not cross.
