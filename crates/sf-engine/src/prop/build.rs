@@ -14,7 +14,6 @@ use crate::jsnum;
 use crate::prop::circular::CircularFrame;
 use crate::tris::Tris;
 use crate::types::V4;
-use rayon::prelude::*;
 
 /// `COVER_SPARSE_SPAN` (web/prop.js:112): mm row pitch at the sparsest coverage (0). This is
 /// DELIBERATELY wider than maxUnsupportedSpan: the mid-slider (0.5) is the structural anti-sag
@@ -367,7 +366,7 @@ use crate::prop::bridgerace::bridge_race;
 use crate::prop::circular::{CircularCache, circular_regions, circular_tracks};
 use crate::prop::clearance::{
     body_mask, insert_floor_stations, longest_run, min_span_for, station_certified,
-    station_is_clear, tall_body, tall_span, welds, with_low_tails,
+    station_is_clear, station_verdicts, tall_body, tall_span, welds, with_low_tails,
 };
 use crate::prop::contact::{contour_top, lower_sag, settle_top, straightness};
 use crate::prop::ctx::BuildCtx;
@@ -1267,13 +1266,10 @@ fn place_line(
     // over a local problem. See `longestRun`.
     // (each station's verdict is a pure function of the station: the stations are probed in
     // parallel and collected in order)
-    let clear: Vec<bool> = (0..line.len())
-        .into_par_iter()
-        .map(|k| {
-            line[k][2] - prop.gap >= prop.min_height_squat
-                && station_is_clear(line, k, topo, rot, off, cfg)
-        })
-        .collect();
+    let clear: Vec<bool> = station_verdicts(line.len(), |k| {
+        line[k][2] - prop.gap >= prop.min_height_squat
+            && station_is_clear(line, k, topo, rot, off, cfg)
+    });
     let usable = with_low_tails(
         &line
             .iter()
@@ -1336,13 +1332,10 @@ fn place_line(
     // prevent, reintroduced one step later. Re-trim against the settled line: on height, and on
     // the measured clearance to everything settleTop could not see (stationCertified). Tall
     // stations carry the wall; low ones may only extend it as its tail.
-    let mut low_a: Vec<bool> = (0..sub.len())
-        .into_par_iter()
-        .map(|k| {
-            sub[k][2] - prop.gap >= prop.min_height_squat
-                && station_certified(&sub, k, topo, rot, off, cfg)
-        })
-        .collect();
+    let mut low_a: Vec<bool> = station_verdicts(sub.len(), |k| {
+        sub[k][2] - prop.gap >= prop.min_height_squat
+            && station_certified(&sub, k, topo, rot, off, cfg)
+    });
     let mut tall_a: Vec<bool> = sub
         .iter()
         .enumerate()

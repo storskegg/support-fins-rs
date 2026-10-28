@@ -9,7 +9,9 @@
 use crate::inside::{Nearest, solid_clearance};
 use crate::jsnum;
 use crate::overhangs::Topology;
-use crate::prop::clearance::{longest_run, station_certified, station_is_clear, welds};
+use crate::prop::clearance::{
+    longest_run, station_certified, station_is_clear, station_verdicts, welds,
+};
 use crate::prop::config::TineDir;
 use crate::prop::contact::settle_top;
 use crate::prop::crest::{crest_cut, crest_kinds, drop_collapsed, emit_crest};
@@ -19,7 +21,6 @@ use crate::prop::sweep::stem_half;
 use crate::solids::{ribbon, rounded_flange};
 use crate::tris::Tris;
 use crate::types::{Rot3, V4, Xyz};
-use rayon::prelude::*;
 
 type V3 = [f64; 3];
 
@@ -201,16 +202,13 @@ pub fn build_squat_bed(
     let height_of = |p: &V3| (p[2] - prop.gap) - z_bed;
     // (each station's verdict is a pure function of the station: the stations are probed in
     // parallel and collected in order)
-    let usable: Vec<bool> = (0..line.len())
-        .into_par_iter()
-        .map(|k| {
-            let h = height_of(&line[k]);
-            h >= prop.min_height_squat
-                && h < prop.min_height
-                && !claimed.is_some_and(|c| c.get(k).copied().unwrap_or(false))
-                && station_is_clear(line, k, topo, rot, offset, cfg)
-        })
-        .collect();
+    let usable: Vec<bool> = station_verdicts(line.len(), |k| {
+        let h = height_of(&line[k]);
+        h >= prop.min_height_squat
+            && h < prop.min_height
+            && !claimed.is_some_and(|c| c.get(k).copied().unwrap_or(false))
+            && station_is_clear(line, k, topo, rot, offset, cfg)
+    });
 
     let mut k = 0;
     while k < usable.len() {
@@ -240,15 +238,12 @@ pub fn build_squat_bed(
         // a full wall. Keep only what is still squat-height and measurably clear.
         // (`settleTop`'s defaults: step 0.25, band Infinity.)
         settle_top(&mut raw, region_tris, 0.25, f64::INFINITY, cfg);
-        let avail: Vec<bool> = (0..raw.len())
-            .into_par_iter()
-            .map(|i| {
-                let h = height_of(&raw[i]);
-                h >= prop.min_height_squat
-                    && h < prop.min_height
-                    && station_certified(&raw, i, topo, rot, offset, cfg)
-            })
-            .collect();
+        let avail: Vec<bool> = station_verdicts(raw.len(), |i| {
+            let h = height_of(&raw[i]);
+            h >= prop.min_height_squat
+                && h < prop.min_height
+                && station_certified(&raw, i, topo, rot, offset, cfg)
+        });
         let Some(run) = longest_run(&avail) else {
             continue;
         };

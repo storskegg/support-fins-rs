@@ -13,6 +13,21 @@ use crate::jsnum;
 use crate::overhangs::Topology;
 use crate::prop::sweep::profile_half;
 use crate::types::{Rot3, Xyz};
+use rayon::prelude::*;
+
+/// A line with fewer stations than this has its stations probed on the calling thread: a probe is
+/// ~10-15 us, and waking the pool costs about as much as a dozen of them.
+const PAR_MIN_STATIONS: usize = 16;
+
+/// `f(k)` for each station `k` of `0..n`, in order: the stations of a long line are probed in
+/// parallel (each verdict is a pure function of its station) and collected in station order.
+pub fn station_verdicts(n: usize, f: impl Fn(usize) -> bool + Sync + Send) -> Vec<bool> {
+    if n < PAR_MIN_STATIONS {
+        (0..n).map(f).collect()
+    } else {
+        (0..n).into_par_iter().map(f).collect()
+    }
+}
 
 /// The unit across-the-wall direction at station `k` (`(ry, -rx) / rn`), or `None` when the
 /// neighbours coincide (`rn < 1e-9`: JS returns `true` early).
