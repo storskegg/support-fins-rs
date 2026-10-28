@@ -54,7 +54,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public private(set) var gizmo: GizmoDisplay?
     /// Device pixels per point (ring thickness follows it); the view sets it.
     public var pixelScale: Float = 2
-    private var viewport = SIMD2<Float>(1, 1)
+    var viewport = SIMD2<Float>(1, 1)
     /// The parts on show: a file can hold several objects, all drawn in the file's frame.
     public private(set) var meshes: [any MeshSource] = []
     private var flagBuffers: [MTLBuffer] = []
@@ -301,6 +301,9 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         hoverFace = face
         changeCount += 1
     }
+
+    /// The flags buffer of a part (for tests).
+    func flagBufferForTest(part: Int) -> MTLBuffer { flagBuffers[part] }
 
     /// The flag byte of one face (for tests and the inspector).
     public func flagByte(_ face: Int) -> UInt8 {
