@@ -1,6 +1,8 @@
 import Foundation
+import Metal
 import SupportFinsCore
 import Testing
+import Viewer
 
 @testable import Support_Fins
 
@@ -143,5 +145,51 @@ struct BuildModelTests {
         #expect(matched.count == 1 && matched.values.first == gone)
         // a key from another pose matches nothing
         #expect(model.matchedRemovals(of: [FinKey(raw: "prop:500.0,500.0,5.0:6.0:0.5")]).isEmpty)
+    }
+
+    @Test func aBuildReachesTheViewerWithNoCopyAndRemovalsMaskTheirRanges() async throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let model = try tShapeModel()
+        #expect(model.supportLayer(device: device) == nil && model.seatingOffset == nil)
+        model.build(rotation: identity, optionsJSON: "{}")
+        await model.settled()
+
+        let layer = try #require(model.supportLayer(device: device))
+        let result = try #require(model.latest)
+        #expect(layer.finVertices == Int(result.fins().count()) && layer.finVertices > 0 && layer.stride == 6)
+        // the fin buffer is the Rust allocation itself
+        let fins = try #require(layer.fins)
+        #expect(fins.contents() == UnsafeMutableRawPointer(bitPattern: UInt(result.fins().address())))
+        #expect(layer.padVertices == Int(result.pad().count()))
+        let o = try #require(model.summary).offset
+        #expect(model.seatingOffset == SIMD3<Float>(Float(o.x), Float(o.y), Float(o.z)))
+
+        // removing a fin hides exactly its ranges; an unknown key hides nothing
+        let records = try #require(model.records)
+        let key = try #require(model.keys.first?.sig)
+        #expect(model.hiddenRanges(removed: []).isEmpty)
+        #expect(model.hiddenRanges(removed: [key]) == model.ranges(ofFin: records.fins[0].id))
+        #expect(model.hiddenRanges(removed: [FinKey(raw: "prop:900,900,5:6:0")]).isEmpty)
+        let hidden = model.hiddenRanges(removed: [key])
+        let drawn = SupportSegments.fins(total: layer.finVertices, hidden: hidden, crest: []).reduce(0) { $0 + $1.range.count }
+        #expect(drawn == layer.finVertices - hidden.reduce(0) { $0 + $1.count })
+        #expect(model.ranges(ofFin: -1).isEmpty)
+    }
+
+    @Test func showPutsTheBuildOnTheRendererWithTheRemovalsMasked() async throws {
+        let renderer = try #require(ViewerRenderer(), "no Metal device")
+        let model = try tShapeModel()
+        model.show(on: renderer)
+        #expect(renderer.supports == nil)
+        model.build(rotation: identity, optionsJSON: "{}")
+        await model.settled()
+        let key = try #require(model.keys.first?.sig)
+        model.show(on: renderer, removed: [key])
+        #expect(renderer.supports?.finVertices == Int(model.latest!.fins().count()))
+        #expect(renderer.hiddenFinRanges == model.hiddenRanges(removed: [key]) && !renderer.hiddenFinRanges.isEmpty)
+        #expect(renderer.crestFinRanges.isEmpty)
+        model.clear()
+        model.show(on: renderer)
+        #expect(renderer.supports == nil)
     }
 }
