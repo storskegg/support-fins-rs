@@ -8,6 +8,7 @@ struct PartSections: View {
     @Bindable var controller: ViewerController
     /// The overhang threshold is a session setting (`FinSettings.threshold`): undoable, like the web's `thr` field.
     @Binding var settings: FinSettings
+    @Environment(PartSession.self) private var session
 
     var body: some View {
         Section("Part") {
@@ -20,7 +21,7 @@ struct PartSections: View {
         }
         Section("Overhang") {
             LabeledContent("Threshold") {
-                Slider(value: $settings.threshold, in: 30...70, step: 1) { Text("Threshold") }
+                Slider(value: $settings.threshold, in: 30...70, step: 1, onEditingChanged: session.settingsEditing) { Text("Threshold") }
                 Text("\(Int(settings.threshold))°").monospacedDigit().frame(width: 36, alignment: .trailing)
             }
         }

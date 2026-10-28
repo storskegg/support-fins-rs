@@ -131,3 +131,16 @@ struct PartSessionSettingsTests {
         #expect(s.settings.threshold == 55)
     }
 }
+
+@MainActor
+struct ThresholdDragTests {
+    @Test func aThresholdSliderDragIsOneStep() {
+        let s = PartSession()
+        s.settingsEditing(true)
+        for t in [46.0, 50, 55] { var v = s.settings; v.threshold = t; s.setSettings(v) }
+        s.settingsEditing(false)
+        #expect(s.history.undoStack.count == 1)
+        s.undo()
+        #expect(s.settings.threshold == FinSettings().threshold)
+    }
+}
