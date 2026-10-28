@@ -140,3 +140,122 @@ struct SupportRenderTests {
         #expect(count(px, isFin) > 100)
     }
 }
+
+/// Picking a fin by the pixel (`ui/remove.js` pickFin): the triangle of the fin buffer under the pointer.
+@MainActor
+@Suite("Support picking")
+struct SupportPickTests {
+    let w = 256, h = 256
+
+    /// Two quads, A at x 0...15 and B at x 20...35, y 0...15, z = 5; triangles 0, 1 are A's and 2, 3 are B's.
+    func scene() throws -> ViewerRenderer {
+        let r = try #require(ViewerRenderer(), "no Metal device")
+        var f: [Float] = []
+        for x in [Float(0), 20] {
+            let p: [SIMD3<Float>] = [[x, 0, 5], [x + 15, 0, 5], [x + 15, 15, 5], [x, 15, 5]]
+            for i in [0, 1, 2, 0, 2, 3] { f += [p[i].x, p[i].y, p[i].z, 0, 0, 1] }
+        }
+        let buffer = r.device.makeBuffer(bytes: f, length: f.count * 4, options: .storageModeShared)
+        r.setSupports(SupportLayer(fins: buffer, finVertices: 12, pad: nil, padVertices: 0))
+        r.camera = OrbitCamera(target: [20, 7.5, 5], distance: 120, azimuth: -.pi / 2, elevation: OrbitCamera.maxElevation, aspect: 1)
+        return r
+    }
+
+    /// The pixel (origin top left) a print-space point lands on.
+    func pixel(_ r: ViewerRenderer, _ p: SIMD3<Float>) -> (Int, Int) {
+        let c = r.camera.viewProjection * SIMD4(p, 1)
+        let n = SIMD2(c.x, c.y) / c.w
+        return (Int((n.x * 0.5 + 0.5) * Float(w)), Int((1 - (n.y * 0.5 + 0.5)) * Float(h)))
+    }
+
+    @Test func thePointedAtTriangleIsReported() async throws {
+        let r = try scene()
+        // a point well inside each triangle of the two quads (the quad splits along its 0-2 diagonal)
+        let cases: [(SIMD3<Float>, Int)] = [([11, 4, 5], 0), ([4, 11, 5], 1), ([31, 4, 5], 2), ([24, 11, 5], 3)]
+        for (p, tri) in cases {
+            let (x, y) = pixel(r, p)
+            #expect(await r.pickSupport(x: x, y: y, width: w, height: h) == tri, "\(p)")
+        }
+    }
+
+    @Test func emptySpaceAndOutsideTheViewPickNothing() async throws {
+        let r = try scene()
+        let (x, y) = pixel(r, [17.5, 7.5, 5]) // between the quads
+        #expect(await r.pickSupport(x: x, y: y, width: w, height: h) == nil)
+        #expect(await r.pickSupport(x: -1, y: 5, width: w, height: h) == nil)
+        #expect(await r.pickSupport(x: 5, y: h, width: w, height: h) == nil)
+        r.setSupports(nil)
+        #expect(await r.pickSupport(x: 128, y: 128, width: w, height: h) == nil)
+    }
+
+    @Test func aRemovedFinCannotBePicked() async throws {
+        let r = try scene()
+        r.setFinMask(hidden: [0..<6], crest: [])
+        let a = pixel(r, [11, 4, 5]), b = pixel(r, [31, 4, 5])
+        #expect(await r.pickSupport(x: a.0, y: a.1, width: w, height: h) == nil)
+        #expect(await r.pickSupport(x: b.0, y: b.1, width: w, height: h) == 2)
+    }
+}
+
+@MainActor
+@Suite("Remove-fins pointer mode")
+struct SupportPointerTests {
+    func rig() throws -> (ViewerController, SupportPickTests) {
+        let c = try #require(ViewerController(), "no Metal device")
+        let t = SupportPickTests()
+        let r = try t.scene()
+        // reuse the scene's supports and camera on the controller's own renderer
+        c.renderer.setSupports(r.supports)
+        c.renderer.camera = r.camera
+        return (c, t)
+    }
+
+    @Test func hoverReportsTheFinTriangleAndTheCursorHint() async throws {
+        let (c, t) = try rig()
+        var seen: [Int?] = []
+        c.onSupportHover = { seen.append($0) }
+        c.supportPicking = true
+        let (x, y) = t.pixel(c.renderer, [31, 4, 5])
+        c.hover(x: x, y: y, width: t.w, height: t.h)
+        while seen.isEmpty { await Task.yield() }
+        #expect(seen.last == 2 && c.hoverSupportTriangle == 2 && c.hoveringSupport)
+        #expect(c.hoverFace == nil, "the part's faces are not hovered in this mode")
+        c.clearHover()
+        #expect(seen.last! == nil && !c.hoveringSupport)
+    }
+
+    @Test func aClickReportsTheTriangleAndNothingWhenTheModeIsOff() async throws {
+        let (c, t) = try rig()
+        var clicks: [Int?] = []
+        c.onSupportClick = { clicks.append($0) }
+        let (x, y) = t.pixel(c.renderer, [4, 11, 5])
+        c.click(x: x, y: y, width: t.w, height: t.h)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(clicks.isEmpty, "off: a click is not a pick")
+        c.supportPicking = true
+        c.click(x: x, y: y, width: t.w, height: t.h)
+        while clicks.isEmpty { await Task.yield() }
+        #expect(clicks == [1])
+        let empty = t.pixel(c.renderer, [17.5, 7.5, 5])
+        c.click(x: empty.0, y: empty.1, width: t.w, height: t.h)
+        while clicks.count < 2 { await Task.yield() }
+        #expect(clicks[1] == nil)
+    }
+
+    @Test func cancelIsTheModesOnlyWhileItIsArmed() throws {
+        let (c, _) = try rig()
+        var cancelled = 0
+        c.onCancelArmed = { cancelled += 1 }
+        #expect(!c.cancelArmed() && cancelled == 0, "not armed: Esc and a right click are the view's")
+        c.supportPicking = true
+        #expect(c.cancelArmed() && cancelled == 1)
+    }
+
+    @Test func leavingTheModeClearsTheHighlight() throws {
+        let (c, _) = try rig()
+        c.supportPicking = true
+        c.renderer.setFinHighlight([0..<3])
+        c.supportPicking = false
+        #expect(c.renderer.highlightedFinRanges.isEmpty)
+    }
+}

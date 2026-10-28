@@ -29,6 +29,45 @@ public final class ViewerMTKView: MTKView {
                           width: Int(bounds.width * s), height: Int(bounds.height * s))
     }
 
+    // A click is a press that did not drag (the web: pointerdown and up within 4 px, `app.js`): the viewer's
+    // left drag orbits, so a press that moves is a turn, not a pick.
+    private var pressAt: NSPoint?
+    private static let clickSlop: CGFloat = 4
+
+    public override func mouseDown(with e: NSEvent) {
+        MainActor.assumeIsolated {
+            window?.makeFirstResponder(self)
+            // Ctrl+click is the Mac's right click: it cancels an armed mode
+            if e.modifierFlags.contains(.control), controller?.cancelArmed() == true { pressAt = nil; return }
+            pressAt = e.locationInWindow
+        }
+    }
+
+    public override func mouseUp(with e: NSEvent) {
+        MainActor.assumeIsolated {
+            defer { pressAt = nil }
+            guard let start = pressAt, hypot(e.locationInWindow.x - start.x, e.locationInWindow.y - start.y) <= Self.clickSlop else { return }
+            let p = convert(e.locationInWindow, from: nil)
+            let s = scale
+            controller?.click(x: Int(p.x * s), y: Int((bounds.height - p.y) * s),
+                              width: Int(bounds.width * s), height: Int(bounds.height * s))
+        }
+    }
+
+    public override func rightMouseDown(with e: NSEvent) {
+        MainActor.assumeIsolated { _ = controller?.cancelArmed() }
+    }
+
+    public override func keyDown(with e: NSEvent) {
+        let handled = MainActor.assumeIsolated { () -> Bool in e.keyCode == 53 && controller?.cancelArmed() == true }
+        if !handled { super.keyDown(with: e) }
+    }
+
+    public override func resetCursorRects() {
+        let pointing = MainActor.assumeIsolated { controller?.hoveringSupport == true }
+        if pointing { addCursorRect(bounds, cursor: .pointingHand) }
+    }
+
     public override func mouseMoved(with e: NSEvent) { MainActor.assumeIsolated { hover(e) } }
     public override func mouseExited(with e: NSEvent) { MainActor.assumeIsolated { controller?.clearHover() } }
 
@@ -81,6 +120,7 @@ public struct ViewerViewport: NSViewRepresentable {
     public func makeNSView(context: Context) -> ViewerMTKView {
         let view = ViewerMTKView(frame: .zero, device: controller.renderer.device)
         view.controller = controller
+        controller.onCursorChange = { [weak view] in if let view { view.window?.invalidateCursorRects(for: view) } }
         view.delegate = controller.renderer
         view.colorPixelFormat = ViewerRenderer.colorFormat
         view.depthStencilPixelFormat = ViewerRenderer.depthFormat

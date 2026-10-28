@@ -26,6 +26,7 @@ struct InspectorView: View {
                     Text("Honeycomb").tag(FinSettings.Cutout.honeycomb)
                 }
                 .help(Tip.cutout)
+                RemoveFinsControls()
                 MoreSettingsSection(settings: $settings, open: $sections.more)
             }
         }
