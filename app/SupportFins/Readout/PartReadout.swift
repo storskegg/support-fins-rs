@@ -38,6 +38,8 @@ struct PartReadoutInput: Equatable, Sendable {
 enum OverhangsSegment: Equatable, Sendable {
     case text(String)
     case swatch(help: String)
+    /// The red swatch of the midair-starts suffix (`<i class="sw sw-over">`, `ui/islands.js:119-123`).
+    case redSwatch(help: String)
 }
 
 struct PartReadout: Equatable, Sendable {
@@ -81,8 +83,15 @@ struct PartReadout: Equatable, Sendable {
             seg.append(.swatch(help: "Amber after generation: small-hole ceilings left for bridging"))
             seg.append(.text(JS.tn("{n} small hole left for bridging", "{n} small holes left for bridging", i.smallHoleCount) + ")"))
         }
+        // The midair-starts count, after the line (`renderIslandText`, `ui/islands.js:114-126`): no face there is
+        // red, so the count says the part is not clean, and the row is not green.
+        if i.islandCount > 0 {
+            seg.append(.text(" (+"))
+            seg.append(.redSwatch(help: "Spots that start in midair"))
+            seg.append(.text(JS.tn("{n} midair start", "{n} midair starts", i.islandCount) + ")"))
+        }
         r.overhangs = seg
-        r.overhangsGood = i.regionCount == 0 && dropped <= 0
+        r.overhangsGood = i.regionCount == 0 && dropped <= 0 && i.islandCount == 0
         r.area = "\(JS.toFixed0(i.overArea)) mm²"
         r.bed = "\(JS.toFixed0(i.bedArea)) mm²"
         r.bedWarn = i.bedArea < 1

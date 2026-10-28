@@ -17,6 +17,14 @@ extension FocusedValues {
     }
 }
 
+struct ToolbarKey: FocusedValueKey { typealias Value = ToolbarRegistry }
+extension FocusedValues {
+    var toolbar: ToolbarRegistry? {
+        get { self[ToolbarKey.self] }
+        set { self[ToolbarKey.self] = newValue }
+    }
+}
+
 struct LayFaceKey: FocusedValueKey { typealias Value = LayFaceModel }
 extension FocusedValues {
     var layFace: LayFaceModel? {
@@ -37,6 +45,7 @@ extension FocusedValues {
 struct ModelCommands: Commands {
     @FocusedValue(\.session) private var session
     @FocusedValue(\.layFace) private var layFace
+    @FocusedValue(\.toolbar) private var toolbar
 
     var body: some Commands {
         CommandMenu("Model") {
@@ -48,6 +57,12 @@ struct ModelCommands: Commands {
             // `lay-face` (ui/pose.js:221): arms the lay-a-face pointer mode; a second choice disarms it
             Toggle("Lay a Face Flat", isOn: Binding(get: { layFace?.armed ?? false }, set: { _ in layFace?.toggle() }))
                 .disabled(layFace?.canArm != true)
+            Divider()
+            // each opens its popover in the view toolbar (`ToolbarRegistry.open`); only a single part has them
+            Button("Suggest Orientation") { toolbar?.open = .suggest }
+                .disabled(toolbar?.badges[.suggest] == nil)
+            Button("Strength Arrow…") { toolbar?.open = .strength }
+                .disabled(toolbar?.badges[.strength] == nil)
         }
     }
 }

@@ -44,6 +44,8 @@ struct ReadoutSections: View {
 
     @State private var analysis: Analysis?
     @State private var afterRemoval: AfterRemoval?
+    /// `flatRegions` (`part.js:255-258`): the part as loaded (identity pose) has this many overhang regions.
+    @State private var flatRegions: Int?
 
     /// `after_removal_json`: what the readouts re-measure when fins are removed by hand (`ui/remove.js`).
     struct AfterRemoval: Decodable, Equatable {
@@ -56,6 +58,8 @@ struct ReadoutSections: View {
     struct Analysis: Equatable {
         var summary: AnalysisSummary
         var islands: Int
+        /// The starts themselves, for the viewer's cones; empty while a ring turns the part.
+        var starts: [Island] = []
         var weldMs: Double
     }
 
@@ -64,6 +68,8 @@ struct ReadoutSections: View {
         var pose: Pose
         var threshold: Double
         var parts: [ObjectIdentifier]
+        /// A ring is turning the part: the starts are found after a drag, not during it (`ui/islands.js:11-12`).
+        var dragging: Bool
     }
 
     var body: some View {
@@ -77,7 +83,7 @@ struct ReadoutSections: View {
             regionCount: regions, rawRegionCount: Int(analysis?.summary.rawRegionCount ?? 0),
             overArea: analysis?.summary.overArea ?? 0, bedArea: analysis?.summary.bedArea ?? 0,
             smallHoleCount: built?.smallHoleRegions ?? 0, islandCount: analysis?.islands ?? 0,
-            highlightSmall: settings.highlightSmall, flatRegions: nil,
+            highlightSmall: settings.highlightSmall, flatRegions: flatRegions,
             analysisMs: analysis?.summary.analyzeMs ?? 0, weldMs: analysis?.weldMs ?? 0))
         let fit = FitReadout.make(FitInput(
             size: dims, added: built?.addedBounds.map { (x0: $0.min[0], x1: $0.max[0], y0: $0.min[1], y1: $0.max[1], z1: $0.max[2]) },
@@ -89,7 +95,9 @@ struct ReadoutSections: View {
         }
         .task(id: RemovalKey(removed: session.removedFins, generation: build?.readoutResult.map(ObjectIdentifier.init))) { await measureRemoval() }
         .task(id: Key(pose: session.pose, threshold: session.settings.threshold,
-                      parts: session.parts.map { ObjectIdentifier($0) })) { await analyse() }
+                      parts: session.parts.map { ObjectIdentifier($0) },
+                      dragging: controller.ringDragging != nil)) { await analyse() }
+        .task(id: FlatKey(threshold: session.settings.threshold, parts: session.parts.map { ObjectIdentifier($0) })) { await measureFlat() }
     }
 
     /// The build's numbers, with the bare area, the extent and the volume measured again when fins are removed by hand.
@@ -145,16 +153,43 @@ struct ReadoutSections: View {
         return c
     }
 
+    private struct FlatKey: Equatable {
+        var threshold: Double
+        var parts: [ObjectIdentifier]
+    }
+
+    /// `computeFlatBaseline` (`part.js:256-258`): the overhang regions of the part as loaded, which depends on the
+    /// threshold and the part, never on the pose. Read by the "prints clean lying flat" note.
+    private func measureFlat() async {
+        guard let core = session.parts.first else { flatRegions = nil; return }
+        let part = core.part, threshold = session.settings.threshold
+        let n = await Task.detached(priority: .userInitiated) {
+            (try? part.analyze(thresholdDeg: threshold, rot: [1, 0, 0, 0, 1, 0, 0, 0, 1]))
+                .map { Int($0.regionCount) }
+        }.value
+        if !Task.isCancelled { flatRegions = n }
+    }
+
     private func analyse() async {
-        guard let core = session.parts.first else { analysis = nil; return }
+        guard let core = session.parts.first else { analysis = nil; controller.islandMarkers = []; return }
         let part = core.part, threshold = session.settings.threshold
         let rot = CorePart.columnMajor(session.pose.float3x3)
         let weld = core.info.weldMs
+        let dragging = controller.ringDragging != nil
+        let kept = analysis?.islands ?? 0
         let result = await Task.detached(priority: .userInitiated) { () -> Analysis? in
             guard let summary = try? part.analyze(thresholdDeg: threshold, rot: rot) else { return nil }
-            let islands = (try? part.islands(thresholdDeg: threshold, rot: rot).count) ?? 0
-            return Analysis(summary: summary, islands: islands, weldMs: weld)
+            // mid-drag none are found, and the last count stands so the notes do not flash (`hadIslands`)
+            let starts = dragging ? [] : ((try? part.islands(thresholdDeg: threshold, rot: rot)) ?? [])
+            return Analysis(summary: summary, islands: dragging ? kept : starts.count, starts: starts, weldMs: weld)
         }.value
-        if !Task.isCancelled { analysis = result }
+        if Task.isCancelled { return }
+        analysis = result
+        // One model on the plate: the engine seats a part the way the viewer does. A group is seated as one.
+        controller.islandMarkers = session.parts.count == 1
+            ? (result?.starts ?? []).map { s in
+                IslandMarker(tip: SIMD3(Float(s.x), Float(s.y), Float(s.z)),
+                             points: stride(from: 0, to: s.points.count - 2, by: 3).map { SIMD3(Float(s.points[$0]), Float(s.points[$0 + 1]), Float(s.points[$0 + 2])) })
+            } : []
     }
 }
