@@ -7,7 +7,7 @@ import Viewer
 ///
 /// - **Builds** (`BuildController`): a pose or settings change refreshes 180 ms after the last one
 ///   (`debouncedRefresh`), the Add fins toggle at once. Only settings the engine takes cause a rebuild: the
-///   request is the pose and `FinSettings.optionsJSON()`, so a display-only setting (Highlight small
+///   request is the pose, `FinSettings.optionsJSON()` and `tunablesJSON()`, so a display-only setting (Highlight small
 ///   overhangs) changes nothing there.
 /// - **Landing**: the fins and pad go on the viewer (no copy), minus the removed fins; the fins on screen
 ///   stay, paler, while a rebuild is out.
@@ -103,13 +103,16 @@ final class BuildWiring {
     struct Key: Equatable {
         var pose: Pose
         var options: String
+        /// The page's tunables (`FinSettings.tunablesJSON()`): a gap or a wall-lines change rebuilds too.
+        var tunables: String
         var finsOn: Bool
         var mode: FinSettings.Mode
         var removed: Set<FinKey>
     }
 
     var key: Key {
-        Key(pose: session.pose, options: session.settings.optionsJSON(), finsOn: session.finsOn,
+        Key(pose: session.pose, options: session.settings.optionsJSON(),
+            tunables: session.settings.tunablesJSON(), finsOn: session.finsOn,
             mode: session.settings.mode, removed: session.removedFins)
     }
 
@@ -143,7 +146,7 @@ final class BuildWiring {
     func react(from old: Key?, to new: Key) {
         guard let scheduler, let removal else { return }
         if old?.finsOn != new.finsOn { scheduler.setEnabled(new.finsOn) }
-        else if old?.pose != new.pose || old?.options != new.options { scheduler.refreshDebounced() }
+        else if old?.pose != new.pose || old?.options != new.options || old?.tunables != new.tunables { scheduler.refreshDebounced() }
         if old?.mode != new.mode || old?.finsOn != new.finsOn { removal.sync() }
         // The viewer already follows a click (RemovalModel.update); what is left is to make it follow the session
         // when the removed fins changed some other way (undo, redo), or the mode / toggle ended the pointer mode.

@@ -53,6 +53,27 @@ private func tShapeModel() throws -> BuildModel {
 @MainActor
 @Suite("BuildModel")
 struct BuildModelTests {
+    @Test func theSettingsOptionsAndTunablesBuildForReal() async throws {
+        let model = try tShapeModel()
+        func volume(_ edit: (inout FinSettings) -> Void) async throws -> Double {
+            var s = FinSettings()
+            edit(&s)
+            model.build(rotation: identity, optionsJSON: s.optionsJSON(), tunablesJSON: s.tunablesJSON())
+            await model.settled()
+            #expect(model.error == nil, "the engine took the settings: \(model.error ?? "")")
+            return try #require(model.summary).volume
+        }
+        let standard = try await volume { _ in }
+        #expect(standard > 0)
+        // a tunable the dialog cannot carry changes the build: the support gap and the wall lines thicken/lower the fins
+        let gap = try await volume { $0.gap = 0.4 }
+        let lines = try await volume { $0.wallLines = 4 }
+        #expect(gap != standard, "propGap reaches the engine")
+        #expect(lines != standard, "wallLines reaches the engine")
+        let again = try await volume { _ in }
+        #expect(again == standard, "the same settings build the same fins")
+    }
+
     @Test func aRealBuildIsDecodedIntoSummaryAndRecords() async throws {
         let model = try tShapeModel()
         #expect(model.latest == nil && !model.building)

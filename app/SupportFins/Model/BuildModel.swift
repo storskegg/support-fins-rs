@@ -48,13 +48,13 @@ final class BuildModel {
     }
 
     /// Starts a build of the part in the pose `rotation` (nine numbers, column-major) with `optionsJSON`
-    /// (`options.json` keys, `{}` for the engine defaults) and returns its generation. Supersedes any build in
+    /// (`options.json` keys, `{}` for the engine defaults) and the page's `tunablesJSON` (`{}` for none) and returns its generation. Supersedes any build in
     /// flight: the engine drops the older job, and its result is ignored here.
     @discardableResult
-    func build(rotation: [Double], optionsJSON: String) -> UInt64 {
+    func build(rotation: [Double], optionsJSON: String, tunablesJSON: String = "{}") -> UInt64 {
         error = nil
         building = true
-        let g = builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: "{}", listener: listener)
+        let g = builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: tunablesJSON, listener: listener)
         generation = g
         wanted = g
         return g

@@ -10,6 +10,7 @@ struct FinSettingsTests {
         let id: String
         let form: Data
         let dialog: [String: Any]
+        let tunables: [String: Any]
     }
 
     private static func corpus() throws -> [Case] {
@@ -21,7 +22,8 @@ struct FinSettingsTests {
             let out = try #require(obj["out"] as? [String: Any])
             return Case(id: try #require(obj["id"] as? String),
                         form: try JSONSerialization.data(withJSONObject: args[0]),
-                        dialog: try #require(out["dialog"] as? [String: Any]))
+                        dialog: try #require(out["dialog"] as? [String: Any]),
+                        tunables: try #require((out["finOpts"] as? [String: Any])?["tunables"] as? [String: Any]))
         }
     }
 
@@ -33,6 +35,14 @@ struct FinSettingsTests {
         }
         if let x = a as? String, let y = b as? String { return x == y }
         return false
+    }
+
+    /// `same` through nested objects.
+    private static func sameTree(_ a: Any, _ b: Any) -> Bool {
+        if let x = a as? [String: Any], let y = b as? [String: Any] {
+            return Set(x.keys) == Set(y.keys) && x.allSatisfy { sameTree($0.value, y[$0.key]!) }
+        }
+        return same(a, b)
     }
 
     private func dictionary(_ json: String) throws -> [String: Any] {
@@ -63,9 +73,8 @@ struct FinSettingsTests {
         #expect(d.swayDepth == 15 && !d.fullBraceDepth && d.swayCrossHeight == 50)
         #expect(d.coverage == 50 && !d.plateOnly && !d.separateWalls && d.longWalls && !d.curvedWalls)
         #expect(d.highlightSmall && !d.showIslands && d.interfaceMaterial == .off)
-        #expect(d.notSentToEngine.isEmpty)
         let json = try dictionary(d.optionsJSON())
-        #expect(json.count == 16)
+        #expect(json.count == 18)
         #expect(Self.same(json["coverage"]!, 0.5) && Self.same(json["sway.on"]!, false) && Self.same(json["mode"]!, "auto"))
     }
 
@@ -81,19 +90,19 @@ struct FinSettingsTests {
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(FinSettings.self, from: Data(#"{"mode":"sideways"}"#.utf8)) }
     }
 
-    @Test func settingsTheEngineEntryCannotTakeAreListedNotSilentlyDropped() {
-        var s = FinSettings()
-        s.roundedFeet = true
-        s.wallLines = 4
-        s.tallRibs = false
-        s.curvedWalls = true
-        s.bedPad = .custom
-        s.padGap = 0
-        s.interfaceMaterial = .flat
-        #expect(s.notSentToEngine == ["roundedFeet", "bedPad=custom", "padGap", "wallLines", "tallRibs", "curvedWalls", "interfaceMaterial"])
-        var t = FinSettings()
-        t.highlightSmall = false // display only: nothing to send
-        #expect(t.notSentToEngine.isEmpty)
+    @Test func tunablesJSONMatchesTheWebForEveryRecordedCase() throws {
+        let cases = try Self.corpus()
+        for c in cases {
+            let settings = try JSONDecoder().decode(FinSettings.self, from: c.form)
+            let got = try dictionary(settings.tunablesJSON())
+            #expect(Self.sameTree(got, c.tunables), "\(c.id): \(got) vs the web's \(c.tunables)")
+        }
+    }
+
+    @Test func ifaceOffIsFalseAndTheDefaultsAreTheFreshPage() throws {
+        let t = try dictionary(FinSettings().tunablesJSON())
+        #expect(Self.same(t["iface"]!, false) && Self.same(t["padStyle"]!, "auto") && Self.same(t["tallRibsHeight"]!, 100))
+        #expect(t.count == 13)
     }
 
     @Test func drawSendsNoModeAndNoSwayBraces() throws {

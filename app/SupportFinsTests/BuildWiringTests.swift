@@ -120,6 +120,18 @@ struct BuildWiringTests {
         try await w.eventually("the options rebuild") { w.build.generation == before + 1 }
     }
 
+    @Test func aTunableAloneRebuilds() async throws {
+        let w = try await Window.open()
+        try await w.finsOn()
+        let before = w.build.generation
+        var s = w.session.settings
+        s.gap = 0.3                               // not an options.json key: it travels in the tunables
+        w.session.setSettings(s)
+        try await Task.sleep(for: .milliseconds(100))
+        await w.clock.advance(.milliseconds(180))
+        try await w.eventually("the tunables rebuild") { w.build.generation == before + 1 }
+    }
+
     @Test func removingAFinIsUndoableAndNeverRebuilds() async throws {
         let w = try await Window.open()
         try await w.finsOn()

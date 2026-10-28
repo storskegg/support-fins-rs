@@ -4,10 +4,9 @@ import Foundation
 /// slider holds 0...100, tall-rib height is in cm). A value type: the session snapshots it for undo and the
 /// build model turns it into the engine's options with `optionsJSON()`.
 ///
-/// Only some fields reach the engine. `docs/FFI.md` takes exactly the `options.json` keys
-/// (`crates/sf-cli/options.json`, the CLI's and the plugins' dialog), through `optionsFromDialog`; the web
-/// sends the rest to its Worker as `tunables` (`web/ui/finbuild.js:142-153`), which that entry does not
-/// take. `notSentToEngine` lists the ones a build would need that are changed from their default.
+/// Two JSON texts carry them to the engine (`docs/FFI.md`, "M4b as implemented"): `optionsJSON()` is the
+/// `options.json` keys plus four request extras, and `tunablesJSON()` is the web's `finOpts().tunables`
+/// (`web/ui/finbuild.js:139-147`), which the web sends to its Worker.
 struct FinSettings: Codable, Equatable, Sendable {
     enum Mode: String, Codable, Sendable, CaseIterable { case auto, full, draw }
     enum TineDirection: String, Codable, Sendable, CaseIterable { case horizontal, vertical }
@@ -170,7 +169,9 @@ struct FinSettings: Codable, Equatable, Sendable {
     /// - Draw (M6) places walls by hand, so it sends no `mode` and no sway braces.
     /// - Full coverage sends `coverage` 0.5 whatever the slider says (`FIN.coverDefault`): the slider is Auto's.
     /// - Sway braces send only `sway.on` when off; the other sway keys only when on.
-    /// - Custom pad numbers have no key: `padStyle` is left out (see `notSentToEngine`).
+    /// - Custom pad numbers have no key: `padStyle` is left out; they travel in `tunablesJSON()` (`padCustom`).
+    /// - Four request extras ride here beside the dialog keys (FFI.md): `tallRibs`, `curvedWalls` (Auto and Full
+    ///   only, like `autoLike()`) and, with sway on, `sway.uncappedDepth` and `sway.crossRise`.
     func optionsJSON() -> String {
         var o: [(String, String)] = []
         func put(_ key: String, _ value: Double) { o.append((key, Self.number(value))) }
@@ -192,12 +193,16 @@ struct FinSettings: Codable, Equatable, Sendable {
         put("plateOnly", plateOnly)
         put("separateWalls", separateWalls ? "on" : "off")
         put("longWalls", longWalls)
+        put("tallRibs", tallRibs)
+        put("curvedWalls", curvedWalls && mode != .draw)
         let braces = sway && mode != .draw
         put("sway.on", braces)
         if braces {
             put("sway.gripFrom", swayFrom)
             put("sway.tineSpacing", swaySpacing)
             put("sway.reach", swayDepth / 100)
+            put("sway.uncappedDepth", fullBraceDepth)
+            put("sway.crossRise", min(90, max(10, swayCrossHeight)) / 100)
         }
         return "{" + o.map { "\"\($0.0)\":\($0.1)" }.joined(separator: ",") + "}"
     }
@@ -209,25 +214,40 @@ struct FinSettings: Codable, Equatable, Sendable {
         return "\(v)"
     }
 
-    /// The settings that differ from the default and that a build needs but `optionsJSON()` cannot carry
-    /// (they have no `options.json` key), by their field names. The engine entry takes none of them yet.
-    var notSentToEngine: [String] {
-        let d = FinSettings()
-        var out: [String] = []
-        if roundedFeet != d.roundedFeet { out.append("roundedFeet") }
-        if bedPad == .custom { out.append("bedPad=custom") }
-        if bedPad == .custom {
-            for (name, value, standard) in [("padThickness", padThickness, d.padThickness), ("padGap", padGap, d.padGap),
-                                            ("padGrip", padGrip, d.padGrip), ("padSpread", padSpread, d.padSpread)]
-            where value != standard { out.append(name) }
-        }
-        if wallLines != d.wallLines { out.append("wallLines") }
-        if tallRibs != d.tallRibs { out.append("tallRibs") }
-        if tallRibsHeight != d.tallRibsHeight { out.append("tallRibsHeight") }
-        if fullBraceDepth != d.fullBraceDepth { out.append("fullBraceDepth") }
-        if swayCrossHeight != d.swayCrossHeight { out.append("swayCrossHeight") }
-        if curvedWalls != d.curvedWalls { out.append("curvedWalls") }
-        if interfaceMaterial != d.interfaceMaterial { out.append("interfaceMaterial") }
-        return out
+    // MARK: the page's tunables
+
+    /// The `tunables_json` of `Builder.build`: the web's `finOpts().tunables` (`web/ui/finbuild.js:139-147`), the
+    /// module state the page reads from its controls and the Worker gets in the request. Values are what the page's
+    /// modules hold after its own clamps: `propGap` 0.1...0.4 (`ui/settings.js:248`), the custom pad's numbers to
+    /// their fields' ranges (`:139-142`), `tallRibsHeight` in mm from the 5...200 cm field (`:267`), `pinDepth` to
+    /// 0.05...1 (`fins.js:124`). `padH` and `padGrab` are the fixed Sure-hold numbers the page keeps now the PLA/PETG
+    /// profile is gone (`fins/config.js:16`, `fins/pad.js:14`). With the pad off the page keeps its last style, so a
+    /// fresh page's `auto` is sent; a style other than Custom carries the page's untouched `padCustom`
+    /// (`fins/pad.js:55`).
+    func tunablesJSON() -> String {
+        func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double { min(hi, max(lo, v)) }
+        let custom = bedPad == .custom
+        let padCustom: [(String, Double)] = custom
+            ? [("h", clamp(padThickness, 0.1, 1)), ("gap", clamp(padGap, 0, 0.5)),
+               ("grip", clamp(padGrip, -0.2, 0.3)), ("margin", clamp(padSpread, 1, 12))]
+            : [("h", 0.5), ("gap", 0), ("grip", 0.05), ("margin", 4)]
+        let iface: String = switch interfaceMaterial { case .off: "false"; case .flat: "\"flat\""; case .all: "\"all\"" }
+        let pad = padCustom.map { "\"\($0.0)\":\(Self.number($0.1))" }.joined(separator: ",")
+        let o: [(String, String)] = [
+            ("roundFeet", roundedFeet ? "true" : "false"),
+            ("padH", Self.number(0.5)),
+            ("padGrab", Self.number(0.05)),
+            ("padStyle", "\"\(bedPad == .off ? "auto" : bedPad.rawValue)\""),
+            ("padCustom", "{\(pad)}"),
+            ("propGap", Self.number(clamp(gap, 0.1, 0.4))),
+            ("tallRibsHeight", Self.number(clamp(tallRibsHeight, 5, 200) * 10)),
+            ("cutout", "\"\(cutout.rawValue)\""),
+            ("iface", iface),
+            ("tineDir", "\"\(tineDirection.rawValue)\""),
+            ("pinDepth", Self.number(clamp(pinDepth, 0.05, 1))),
+            ("nozzle", Self.number(nozzle)),
+            ("wallLines", String(wallLines)),
+        ]
+        return "{" + o.map { "\"\($0.0)\":\($0.1)" }.joined(separator: ",") + "}"
     }
 }
