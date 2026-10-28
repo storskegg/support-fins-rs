@@ -14,6 +14,7 @@ use crate::jsnum;
 use crate::prop::circular::CircularFrame;
 use crate::tris::Tris;
 use crate::types::V4;
+use rayon::prelude::*;
 
 /// `COVER_SPARSE_SPAN` (web/prop.js:112): mm row pitch at the sparsest coverage (0). This is
 /// DELIBERATELY wider than maxUnsupportedSpan: the mid-slider (0.5) is the structural anti-sag
@@ -1264,11 +1265,12 @@ fn place_line(
 
     // Trim to the longest run that can actually carry a wall, rather than discarding the track
     // over a local problem. See `longestRun`.
-    let clear: Vec<bool> = line
-        .iter()
-        .enumerate()
-        .map(|(k, p)| {
-            p[2] - prop.gap >= prop.min_height_squat
+    // (each station's verdict is a pure function of the station: the stations are probed in
+    // parallel and collected in order)
+    let clear: Vec<bool> = (0..line.len())
+        .into_par_iter()
+        .map(|k| {
+            line[k][2] - prop.gap >= prop.min_height_squat
                 && station_is_clear(line, k, topo, rot, off, cfg)
         })
         .collect();
@@ -1334,11 +1336,10 @@ fn place_line(
     // prevent, reintroduced one step later. Re-trim against the settled line: on height, and on
     // the measured clearance to everything settleTop could not see (stationCertified). Tall
     // stations carry the wall; low ones may only extend it as its tail.
-    let mut low_a: Vec<bool> = sub
-        .iter()
-        .enumerate()
-        .map(|(k, p)| {
-            p[2] - prop.gap >= prop.min_height_squat
+    let mut low_a: Vec<bool> = (0..sub.len())
+        .into_par_iter()
+        .map(|k| {
+            sub[k][2] - prop.gap >= prop.min_height_squat
                 && station_certified(&sub, k, topo, rot, off, cfg)
         })
         .collect();
