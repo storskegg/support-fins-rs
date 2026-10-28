@@ -28,54 +28,13 @@ enum ExportFormat: CaseIterable, Sendable {
 
     var fileExtension: String { self == .threeMF ? "3mf" : "stl" }
     var contentType: UTType { self == .threeMF ? UTType(filenameExtension: "3mf") ?? .data : .stl }
-    /// The stem the web puts after the part's name (`ui/export.js:150-186`: `fins` or `fins-only`).
-    var stem: String { self == .finsOnly ? "fins-only" : "fins" }
-    /// `export(options_json:)`
-    var optionsJSON: String { self == .finsOnly ? #"{"finsOnly":true}"# : "{}" }
-}
-
-/// Export file names (`web/exportname.js`, GitHub #279): the fins are built for one nozzle and one layer
-/// height, and the slicer has to be set to the same two, so the name carries both:
-/// `part-fins` + `-0.6nozzle-0.24layer` + `.3mf`.
-enum ExportName {
-    /// `"0.24"`, `"0.6"`: `+Number(v).toFixed(2)` printed: at most two decimals, no trailing zeros, no float
-    /// noise. `toFixed` rounds the exact binary value half up, so the digits are read from its exact decimal
-    /// expansion (never from `v * 100`, which rounds first).
-    static func mm(_ v: Double) -> String {
-        // `String(Infinity)`; `toFixed` itself returns `String(x)` from 1e21 on (here: "1e+21")
-        guard v.isFinite, abs(v) < 1e21 else { return v.isInfinite ? (v < 0 ? "-Infinity" : "Infinity") : "\(v)" }
-        // the exact expansion of a double has at most 1074 places; 60 is far past any value that matters
-        let exact = String(format: "%.60f", abs(v))
-        let parts = exact.split(separator: ".", omittingEmptySubsequences: false)
-        var whole = String(parts[0])
-        let frac = Array(parts[1].utf8.map { Int($0) - 48 })
-        var cents = frac[0] * 10 + frac[1]
-        // half up on what follows the second place (any non-zero digit past a leading 5 is above half)
-        if frac[2] >= 5 { cents += 1 }
-        if cents >= 100 {
-            cents -= 100
-            whole = String((Int(whole) ?? 0) + 1)
+    /// The engine's name for the file (`export_file_name`).
+    var kind: ExportKind {
+        switch self {
+        case .stl: .stl
+        case .threeMF: .threeMf
+        case .finsOnly: .finsOnly
         }
-        var s = whole
-        if cents != 0 {
-            s += cents % 10 == 0 ? ".\(cents / 10)" : String(format: ".%02d", cents)
-        }
-        return v < 0 && s != "0" ? "-" + s : s
-    }
-
-    /// `exportName(stem, ext, { nozzle, layerHeight })` (`web/exportname.js:16`). A setting that isn't a
-    /// positive number is left out of the name.
-    static func name(stem: String, ext: String, nozzle: Double?, layerHeight: Double?) -> String {
-        var tags: [String] = []
-        if let n = nozzle, n > 0 { tags.append("\(mm(n))nozzle") }
-        if let l = layerHeight, l > 0 { tags.append("\(mm(l))layer") }
-        return ([stem] + tags).joined(separator: "-") + "." + ext
-    }
-
-    /// The part's name without its mesh extension, or `part` (`ui/export.js:63`).
-    static func base(of partName: String) -> String {
-        let stripped = partName.replacing(/\.(stl|3mf|step|stp)$/.ignoresCase(), with: "")
-        return stripped.isEmpty ? "part" : stripped
     }
 }
 
@@ -96,9 +55,11 @@ struct SystemSavePanel: SavePanel {
     }
 }
 
-/// What File > Export offers right now and writes it: one part and its build per file, through the engine's
-/// `export` (`docs/FFI.md`, the bytes the CLI writes). Several objects in one file are written one file per
-/// object until the plate layout of M6 (a folder is asked for, the files are named per object).
+/// What File > Export offers right now and writes it, through the engine's `export`, which writes what the page
+/// exports (`web/ui/export.js`, docs/FFI.md): the part as oriented and seated on the plate with the fins and
+/// the pad (STL: one solid; 3MF: separate objects), just the fins and pad in print position for any pose
+/// ("Fins only"), or the part alone while the fins are off; removed fins are left out. One part per file until
+/// the plate layout of M6.
 @MainActor
 @Observable
 final class ExportModel {
@@ -109,6 +70,13 @@ final class ExportModel {
         /// the nozzle and layer height the fins were built for: they go in the file name
         var nozzle: Double
         var layerHeight: Double
+        /// the pose (nine numbers, column-major) and the overhang threshold: the part alone is seated from them
+        var pose: [Double]
+        var threshold: Double
+        /// the build volume's x and y: a 3MF is written where the part stands on a centred bed
+        var bed: [Double]
+        /// the model's spot on the plate (`liveXY()`, `ui/models.js:38`): `[0, 0]` until Move and Arrange (M6)
+        var placed: [Double] = [0, 0]
     }
 
     struct Availability: Equatable {
@@ -126,30 +94,32 @@ final class ExportModel {
     @ObservationIgnored private let finsOn: @MainActor () -> Bool
     @ObservationIgnored private let panel: any SavePanel
     @ObservationIgnored private let objectCount: @MainActor () -> Int
+    @ObservationIgnored private let removedKeys: @MainActor () -> Set<FinKey>
     /// The format ⌘E writes again.
     private(set) var lastFormat = ExportFormat.stl
 
     init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, source: @escaping @MainActor () -> Source?,
+         removed: @escaping @MainActor () -> Set<FinKey> = { [] },
          objectCount: @escaping @MainActor () -> Int = { 1 }, panel: any SavePanel = SystemSavePanel()) {
         self.build = build
+        self.removedKeys = removed
         self.objectCount = objectCount
         self.source = source
         self.finsOn = finsOn
         self.panel = panel
     }
 
-    /// `setOpen` of `ui/export.js:192-216`: nothing to write until a part is loaded and its fins are built,
-    /// and nothing while a rebuild is out (the old fins under the new settings' name); no fins-only file
-    /// without fins.
-    ///
-    /// Divergence: the web also writes STL and 3MF with the fins off (the part alone). The engine's `export`
-    /// takes a build, so without one (fins off) STL and 3MF wait for Add fins.
+    /// `setOpen` of `ui/export.js:192-216`: nothing to write until a part is loaded, and nothing while a rebuild is
+    /// out (the old fins under the new settings' name). With the fins off STL and 3MF write the part alone; Fins
+    /// only needs fins.
     var availability: Availability {
         guard source() != nil else { return Availability(enabled: [], note: nil) }
-        guard let result = build.latest else {
-            return Availability(enabled: [], note: finsOn() ? nil : "No fins yet: click Add fins first.")
+        guard finsOn() else {
+            return Availability(enabled: [.stl, .threeMF],
+                                note: "No fins yet: STL and 3MF write the part alone. Click Add fins first.")
         }
-        guard !build.building else { return Availability(enabled: [], note: nil) }
+        // fins on: they are the build, which must have landed
+        guard let result = build.latest, !build.building else { return Availability(enabled: [], note: nil) }
         let hasFins = result.fins().count() + result.pad().count() > 0
         return Availability(
             enabled: hasFins ? Set(ExportFormat.allCases) : [.stl, .threeMF],
@@ -162,11 +132,16 @@ final class ExportModel {
         objectCount() > 1 ? "This file has \(objectCount()) objects: export writes the one being edited. One file per object until plates arrive." : nil
     }
 
-    /// The suggested file name: `part-fins-0.4nozzle-0.2layer.stl`.
+    /// The suggested file name: `part-fins-0.4nozzle-0.2layer.stl` (`export_file_name`, `ui/export.js` `plateName`).
     func fileName(for format: ExportFormat) -> String? {
         guard let s = source() else { return nil }
-        return ExportName.name(stem: "\(ExportName.base(of: s.partName))-\(format.stem)", ext: format.fileExtension,
-                               nozzle: s.nozzle, layerHeight: s.layerHeight)
+        return exportFileName(base: Self.base(of: s.partName), kind: format.kind, nozzle: s.nozzle, layerHeight: s.layerHeight)
+    }
+
+    /// The part's name without its mesh extension, or `part` (`ui/export.js:63`).
+    nonisolated static func base(of partName: String) -> String {
+        let stripped = partName.replacing(/\.(stl|3mf|step|stp)$/.ignoresCase(), with: "")
+        return stripped.isEmpty ? "part" : stripped
     }
 
     /// Asks where, then writes. Returns the file written, or nil when cancelled or failed (`error` says why).
@@ -178,14 +153,38 @@ final class ExportModel {
         return write(format, to: url)
     }
 
+    /// The engine's `export` options for `format` (docs/FFI.md): the fins off writes the part alone from the
+    /// pose; removed fins are left out by their record ids; a 3MF carries the bed and the model's spot.
+    func optionsJSON(for format: ExportFormat) -> String? {
+        guard let s = source() else { return nil }
+        var o: [String: Any] = [:]
+        if format == .finsOnly { o["finsOnly"] = true }
+        if !finsOn() {
+            o["fins"] = false
+            o["pose"] = s.pose
+            o["threshold"] = s.threshold
+        } else {
+            let ids = build.matchedRemovals(of: removedKeys()).keys.sorted()
+            if !ids.isEmpty { o["removed"] = ids }
+        }
+        if format == .threeMF {
+            o["bed"] = s.bed
+            o["placed"] = s.placed
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
     /// Writes `format` to `url` (the extension picks STL or 3MF in the engine, so it must match).
     @discardableResult
     func write(_ format: ExportFormat, to url: URL) -> URL? {
         error = nil
-        guard let s = source(), let result = build.latest else { return nil }
+        guard let s = source(), let options = optionsJSON(for: format) else { return nil }
+        // fins on: the build; off: the part alone, no build
+        let builds: [BuildResult] = finsOn() ? build.latest.map { [$0] } ?? [] : []
+        if finsOn() && builds.isEmpty { return nil }
         do {
-            try export(path: url.path(percentEncoded: false), parts: [s.part], builds: [result],
-                       optionsJson: format.optionsJSON)
+            try export(path: url.path(percentEncoded: false), parts: [s.part], builds: builds, optionsJson: options)
             lastWritten = url
             return url
         } catch let e as FfiError {
