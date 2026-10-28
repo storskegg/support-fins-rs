@@ -23,3 +23,4 @@ pub mod sway;
 pub mod three;
 pub mod tris;
 pub mod types;
+pub mod weld;
