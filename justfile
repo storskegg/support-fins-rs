@@ -1,5 +1,7 @@
 # Every recipe runs from the workspace root.
 
+uitest_derived_data := env_var_or_default("UITEST_DERIVED_DATA", env_var("HOME") + "/RustRoverProjects/sfrs-wt/uitest.dd")
+
 default: check
 
 # fmt + clippy + every test (unit, ported, parity). Must be green before a PR.
@@ -98,8 +100,12 @@ app-test: app-core app-project
 
 # The window driven end to end (XCUITest): open a part, Add fins, change a setting, export. Needs the Accessibility
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
+#
+# The derived data path is fixed (one for every worktree, outside them), so the UI test runner's code signature
+# stays the same from run to run and macOS does not ask for the Accessibility permission again. This takes over
+# the mouse and keyboard: only the orchestrator runs it, never an agent and never `just gate`.
 app-uitest: app-core app-project
-    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+    xcodebuild test -derivedDataPath "{{uitest_derived_data}}" -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
 
 # M5 timing: the Rust fin build per case beside the M3 serial numbers, written into docs/PERF-M5.md (Rust only, no Deno). `just bench-m5 needle` times matching cases and prints only. Skips private-fixtures/ cases when the file is absent.
 bench-m5 filter="":
