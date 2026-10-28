@@ -6,12 +6,13 @@
 //! face is MUST.
 
 use std::cell::OnceCell;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use rayon::prelude::*;
 
 use crate::fins::seating::seated_part_tris;
+use crate::fxhash::FxHashMap;
 use crate::jsnum;
 use crate::overhangs::{Analysis, Region, Topology};
 use crate::prop::surface::surface_hits_at;
@@ -39,7 +40,7 @@ const LOW_Z: f64 = 0.82;
 pub struct Reach {
     r: f64,
     cell: f64,
-    grid: HashMap<i64, Vec<[f64; 3]>>,
+    grid: FxHashMap<i64, Vec<[f64; 3]>>,
 }
 
 /// `key(i, j)` (web/fins/coverage.js:26).
@@ -53,7 +54,7 @@ pub fn reach_of(tops: &[[f64; 3]], r: f64) -> Reach {
     let mut reach = Reach {
         r,
         cell: jsnum::max(r, 1.0),
-        grid: HashMap::new(),
+        grid: FxHashMap::default(),
     };
     for p in tops {
         reach.add(*p);
@@ -73,18 +74,33 @@ impl Reach {
 
     /// `near(cx, cy, cz)`.
     pub fn near(&self, cx: f64, cy: f64, cz: f64) -> bool {
+        if self.grid.is_empty() {
+            return false;
+        }
         let gi = jsnum::floor(cx / self.cell);
         let gj = jsnum::floor(cy / self.cell);
+        // `hypot(dx, dy) <= r`, decided on dx^2 + dy^2 unless it is within a hair of r^2 (hypot is
+        // correct to an ulp or two, the margin is 1e-9): the exact `hypot` settles the rest
+        let lim = self.r * self.r;
+        let (far, close) = if self.r >= 0.0 && self.r.is_finite() {
+            (lim * (1.0 + 1e-9), lim * (1.0 - 1e-9))
+        } else {
+            (f64::INFINITY, f64::NEG_INFINITY)
+        };
         for di in -1..=1 {
             for dj in -1..=1 {
                 if let Some(cell) = self.grid.get(&cell_key(gi + di as f64, gj + dj as f64)) {
                     for p in cell {
                         let dz = cz - p[2];
-                        if dz >= -0.05
-                            && dz <= 1.5
-                            && jsnum::hypot(&[cx - p[0], cy - p[1]]) <= self.r
-                        {
-                            return true;
+                        if dz >= -0.05 && dz <= 1.5 {
+                            let (dx, dy) = (cx - p[0], cy - p[1]);
+                            let d2 = dx * dx + dy * dy;
+                            if d2 > far {
+                                continue;
+                            }
+                            if d2 < close || jsnum::hypot(&[dx, dy]) <= self.r {
+                                return true;
+                            }
                         }
                     }
                 }
@@ -354,35 +370,51 @@ pub fn automatic_targets(topo: &Topology, result: &Analysis, rot: &Rot3) -> Targ
     let mut volumes: Vec<[f64; 3]> = Vec::new();
     if excluded_support_faces.iter().any(|&e| e != 0) {
         let tris = seated_part_tris(topo, rot, &result.offset);
-        for f in 0..topo.n_faces {
-            if excluded_support_faces[f] == 0 {
-                continue;
-            }
+        let excluded: Vec<usize> = (0..topo.n_faces)
+            .filter(|&f| excluded_support_faces[f] != 0)
+            .collect();
+        for &f in &excluded {
             for k in 0..9 {
                 tris_out.push(tris.v[f * 9 + k]);
             }
-            let a = [tris.v[f * 9], tris.v[f * 9 + 1], tris.v[f * 9 + 2]];
-            let b = [tris.v[f * 9 + 3], tris.v[f * 9 + 4], tris.v[f * 9 + 5]];
-            let c = [tris.v[f * 9 + 6], tris.v[f * 9 + 7], tris.v[f * 9 + 8]];
-            let x = (a[0] + b[0] + c[0]) / 3.0;
-            let y = (a[1] + b[1] + c[1]) / 3.0;
-            let z = (a[2] + b[2] + c[2]) / 3.0;
-            // The actual upward-facing floor, not another diameter or cavity rule.
-            let mut floor = f64::NEG_INFINITY;
-            for [h, nz] in surface_hits_at(&tris, x, y) {
-                if nz > 0.0 && h < z - 1e-6 {
-                    floor = jsnum::max(floor, h);
+        }
+        // Each excluded face probes the part's surface under it, a pure function of the face:
+        // chunks run in parallel and are joined in face order, so `volumes` is what the serial
+        // loop built.
+        let chunks: Vec<Vec<[f64; 3]>> = excluded
+            .par_chunks(256)
+            .map(|fs| {
+                let mut out = Vec::new();
+                for &f in fs {
+                    let a = [tris.v[f * 9], tris.v[f * 9 + 1], tris.v[f * 9 + 2]];
+                    let b = [tris.v[f * 9 + 3], tris.v[f * 9 + 4], tris.v[f * 9 + 5]];
+                    let c = [tris.v[f * 9 + 6], tris.v[f * 9 + 7], tris.v[f * 9 + 8]];
+                    let x = (a[0] + b[0] + c[0]) / 3.0;
+                    let y = (a[1] + b[1] + c[1]) / 3.0;
+                    let z = (a[2] + b[2] + c[2]) / 3.0;
+                    // The actual upward-facing floor, not another diameter or cavity rule.
+                    let mut floor = f64::NEG_INFINITY;
+                    for [h, nz] in surface_hits_at(&tris, x, y) {
+                        if nz > 0.0 && h < z - 1e-6 {
+                            floor = jsnum::max(floor, h);
+                        }
+                    }
+                    if !floor.is_finite() {
+                        continue;
+                    }
+                    let ba = [a[0], a[1], floor];
+                    let bb = [b[0], b[1], floor];
+                    let bc = [c[0], c[1], floor];
+                    out.extend([
+                        a, b, c, ba, bb, bc, a, b, bb, a, bb, ba, b, c, bc, b, bc, bb, c, a, ba, c,
+                        ba, bc,
+                    ]);
                 }
-            }
-            if !floor.is_finite() {
-                continue;
-            }
-            let ba = [a[0], a[1], floor];
-            let bb = [b[0], b[1], floor];
-            let bc = [c[0], c[1], floor];
-            volumes.extend([
-                a, b, c, ba, bb, bc, a, b, bb, a, bb, ba, b, c, bc, b, bc, bb, c, a, ba, c, ba, bc,
-            ]);
+                out
+            })
+            .collect();
+        for c in chunks {
+            volumes.extend(c);
         }
     }
     let small_hole_regions = result.regions.len() - regions.len();

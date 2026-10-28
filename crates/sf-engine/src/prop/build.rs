@@ -357,6 +357,7 @@ impl std::fmt::Debug for BuildOpts {
 
 // ---------------------------------------------------------------------------- buildPass
 
+use crate::fins::seating::seated_part_tris;
 use crate::inside::{Nearest, inside_part, solid_clearance};
 use crate::overhangs::{Analysis, MIN_REGION_AREA, Topology};
 use crate::prop::arc::arc_line;
@@ -618,18 +619,11 @@ pub(crate) fn build_pass(
     // stilting through the part.
 
     // The whole part, seated once, for the part-attached floor probe: the floor a support lands
-    // on is usually a DIFFERENT region than the overhang, so it must raycast the full mesh. Cheap
-    // next to the per-region work below.
-    let mut part_v = vec![0.0f64; pos.len()];
-    for f in 0..topo.n_faces {
-        for i in 0..3 {
-            let v = seat(pos, f * 9 + i * 3, rot, off);
-            part_v[f * 9 + i * 3] = v[0];
-            part_v[f * 9 + i * 3 + 1] = v[1];
-            part_v[f * 9 + i * 3 + 2] = v[2];
-        }
-    }
-    let part_tris = Tris::new(part_v);
+    // on is usually a DIFFERENT region than the overhang, so it must raycast the full mesh. It is
+    // the pose's cached seated copy (fins/seating.js `seatedPartTris`, the same arithmetic as the
+    // per-pass copy JS builds), so the surface grid on it is built once per pose, not once per
+    // pass: on a 772k-triangle part that grid is ~36 ms each.
+    let part_tris = seated_part_tris(topo, rot, off);
 
     // DENSE grip comb, uniform along every grippable wall (see the JS comment: the user's "Tine
     // grip" slider, opts.tineDensity, can loosen it, never silently).
