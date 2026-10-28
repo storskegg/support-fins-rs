@@ -1,4 +1,7 @@
 # Every recipe runs from the workspace root.
+#
+# app-test, app-uitest and every bench-* take the machine-wide lock (tools/lock): one at a time on this Mac,
+# whichever worktree they run from. Benchmarks also record the machine load before and during the run.
 
 default: check
 
@@ -53,16 +56,19 @@ cli-parity filter="":
 bench-m3:
     #!/usr/bin/env bash
     set -euo pipefail
-    deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js run
     cargo build --release -q -p sf-testkit --example bench_m3
-    # peak memory of the Rust process (the private coin file dominates it when present)
-    /usr/bin/time -l target/release/examples/bench_m3 2> target/bench-m3/rust-time.txt
-    deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js report
+    # the machine lock (one benchmark or app test at a time) and the load figures wrap the whole run
+    tools/lock/lock.py --bench bench-m3 -- bash -ec '
+        deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js run
+        # peak memory of the Rust process (the private coin file dominates it when present)
+        /usr/bin/time -l target/release/examples/bench_m3 2> target/bench-m3/rust-time.txt
+        deno run --allow-read --allow-write --allow-run --allow-env bench/m3.js report'
+
 
 # M5 suggest timing: web suggestOrientations under Deno against the Rust serial, parallel and wide searches.
 bench-suggest:
-    deno run -A bench/suggest.js
-    cargo run --release -q -p sf-testkit --example bench_suggest
+    cargo build --release -q -p sf-testkit --example bench_suggest
+    tools/lock/lock.py --bench bench-suggest -- bash -ec 'deno run -A bench/suggest.js; target/release/examples/bench_suggest'
 
 # Build sf-ffi and generate the SupportFinsCore Swift package: the UniFFI Swift source (committed) and the
 # XCFramework around the static library (gitignored, rebuilt here).
@@ -93,32 +99,32 @@ app-project:
 
 # The viewer package's tests (camera maths, offscreen renders) and the app's tests.
 app-test: app-core app-project
-    swift test --package-path app/SupportFinsViewer
-    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'
+    tools/lock/lock.py app-test -- bash -ec "swift test --package-path app/SupportFinsViewer; xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'"
 
 # The window driven end to end (XCUITest): open a part, Add fins, change a setting, export. Needs the Accessibility
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 app-uitest: app-core app-project
-    xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+    tools/lock/lock.py app-uitest -- xcodebuild test -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
 
 # M5 timing: the Rust fin build per case beside the M3 serial numbers, written into docs/PERF-M5.md (Rust only, no Deno). `just bench-m5 needle` times matching cases and prints only. Skips private-fixtures/ cases when the file is absent.
 bench-m5 filter="":
     cargo build --release -q -p sf-testkit --example bench_m5
-    target/release/examples/bench_m5 {{filter}}
+    tools/lock/lock.py --bench bench-m5 -- target/release/examples/bench_m5 {{filter}}
 
 # M5 cancel latency: how long after the flag is raised a build returns (docs/PERF-M5.md, "Live drag"). Prints a table; `just bench-cancel needle` runs matching cases.
 bench-cancel filter="":
     cargo build --release -q -p sf-testkit --example bench_cancel
-    target/release/examples/bench_cancel {{filter}}
+    tools/lock/lock.py --bench bench-cancel -- target/release/examples/bench_cancel {{filter}}
 
 # M5 load / weld timing: a generated 1.5M-face STL and OBJ (under target/bench-load/, never committed) and the private 3MF when present. Prints a table; `just bench-load stl` runs one input.
 bench-load *inputs:
     cargo build --release -q -p sf-testkit --example bench_load
-    target/release/examples/bench_load {{inputs}}
+    tools/lock/lock.py --bench bench-load -- target/release/examples/bench_load {{inputs}}
 
 # Headless frame-time benchmark of the viewer on a generated 1.5M-triangle scene with fins and tines (docs/PERF-M5.md, "Rendering"); pass flags after the recipe, e.g. `just bench-render --tris 2000000`.
 bench-render *args:
-    swift run -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
+    swift build -c release --package-path app/SupportFinsViewer --product viewer-bench
+    tools/lock/lock.py --bench bench-render -- swift run --skip-build -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
 
 # Local port dashboard at http://127.0.0.1:8787: milestones, tasks and agents (tools/dashboard/state.json) beside live load, build/test processes, worktree activity, PRs and commits; pushed live every 2 s.
 dashboard:

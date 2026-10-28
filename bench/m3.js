@@ -167,11 +167,13 @@ function report() {
       rss ? `- **Peak memory (Rust, whole \`bench_m3\` process, \`/usr/bin/time -l\`):** ${(Number(rss) / 2 ** 20).toFixed(0)} MiB. The stress models add a few MB; the coin file dominates.` : "",
     ].filter(Boolean).join("\n");
   }
+  // from tools/lock/lock.py --bench (just bench-m3): baseline load before the run and mean during it
+  const loadLine = (() => { try { return `\n- **${Deno.readTextFileSync(Deno.env.get("SFRS_BENCH_LOAD_FILE")).trim().replace(": ", ":** ")}`; } catch { return ""; } })();
   const md = `# M3 timing: JS engine vs single-threaded Rust engine
 
 The serial baseline M5 improves on. Regenerate with \`just bench-m3\` (writes this file).
 
-- **Machine:** ${js.meta.chip}, ${js.meta.os}.
+- **Machine:** ${js.meta.chip}, ${js.meta.os}.${loadLine}
 - **JS:** Deno ${js.meta.deno}, \`buildFins\` from the pinned upstream (${js.meta.upstream.slice(0, 7)}). **Rust:** ${rs.meta.rustc}, \`cargo build --release\`, \`build_fins\`, one thread.
 - **Builds:** the site's own request (\`tests/_scene.js\` \`siteOpts()\`: Auto, PLA, tines, bed pad, the form untouched), threshold 45.
 - **Method:** each case is timed ${js.meta.runs} times after one discarded warm-up; the table gives the median. The phases are separate:

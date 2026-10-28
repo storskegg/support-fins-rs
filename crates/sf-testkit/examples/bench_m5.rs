@@ -330,6 +330,10 @@ fn main() {
         engine_threads(),
         runs.min(3)
     );
+    // tools/lock/lock.py --bench (just bench-m5) keeps the machine-load line in this file
+    if let Some(load) = std::env::var_os("SFRS_BENCH_LOAD_FILE").and_then(|p| std::fs::read_to_string(p).ok()) {
+        s += &format!("- **{}\n", load.trim().replacen(": ", ":** ", 1));
+    }
     s += "- **out verts** is the build's output vertex count, recorded so a change that alters output shows here (the parity corpus is the real gate).\n\n";
     s += "### Summary\n\n";
     s += &summary("Stress models at golden poses", &golden);
