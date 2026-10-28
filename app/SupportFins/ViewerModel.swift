@@ -35,6 +35,8 @@ final class ViewerModel {
     /// A file was tried in this window (the empty window then shows only the button, `#drop.compact`).
     private(set) var hasOpened = false
     private(set) var isLoading = false
+    /// The file being read, for the "reading STEP…" overlay (`parseStep`, `ui/io.js:313`).
+    private(set) var loadingURL: URL?
     /// The name of the file on show, which can differ from the document's when a file is opened in place.
     private(set) var openedName: String?
     var hasPart: Bool { (controller?.partCount ?? 0) > 0 }
@@ -46,7 +48,8 @@ final class ViewerModel {
         guard let controller else { return }
         hasOpened = true
         isLoading = true
-        defer { isLoading = false }
+        loadingURL = url
+        defer { isLoading = false; loadingURL = nil }
         do {
             let parts = try await loader.load(url: url, device: controller.renderer.device)
             guard !parts.isEmpty else { status = "The file has no mesh."; return }
