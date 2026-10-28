@@ -137,3 +137,40 @@ Each object at the pose it has in the file; only the name, counts and timings ar
 | object 10 | 772340 | 576 | 940 | 931 | 1.01x |
 
 <!-- bench:end -->
+
+## Where the build time goes (profile, serial, before M5)
+
+Method: macOS `sample` (1 ms call trees of 100-400 builds of one case) to find the functions, then wall-clock timers around the pipeline stages (uncommitted instrumentation; the rows are inclusive and nested, so they do not add up) on a quiet-ish machine, one build per case. The upstream spec's "60% unattributed" is attributed below.
+
+| stage (inclusive) | cone X40 | torus X45 | coin X40 | needle X60Z30 | ushape X40 | lowledge up | private object 1 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| build_fins total ms | 62.7 | 50.9 | 37.9 | 69.3 | 41.3 | 38.4 | 973 |
+| automatic_targets (classify, tiny-hole floors) | 0% | 1% | 0% | 0% | 0% | 0% | 50% |
+| judge: downhill build | 59% | 59% | 57% | 19% | 53% | 93% | 44% |
+| judge: plain build (same base again) | 33% | 32% | - | - | 42% | - | - |
+| build_props | 91% | 90% | 57% | 18% | 46% | 93% | 25% |
+| - normal pass | 31% | 24% | 54% | 17% | 16% | 41% | 12% |
+| - raster race | 33% | 36% | 0% | 0% | 17% | 0% | 5% |
+| - rim race | 1% | 1% | 2% | 1% | 1% | 52% | 1% |
+| - downhill race | 25% | 25% | 0% | 0% | 11% | 0% | 4% |
+| per-wall: solid_clearance (finished-wall weld check) | 41% | 28% | 23% | 7% | 15% | squat bed | 1% |
+| per-wall: station_certified | 16% | 10% | 12% | 2% | 8% | squat bed | 0% |
+| per-wall: station_is_clear | 12% | 16% | 11% | 2% | 8% | 6% | 1% |
+| per-wall: part_attached (settle_top, floor_line) | 4% | 10% | 3% | 4% | 3% | 3% | 12% |
+| per-wall: emit_tines | 3% | 3% | 2% | 1% | 3% | - | 6% |
+| bed pad (brim lattice) | 0% | 0% | 0% | 1% | 50% | - | 0% |
+| bare_area (fill.rs) | 8% | 6% | 40% | 22% | 4% | 4% | 4% |
+| last_resort_walls | 0% | 0% | 0% | 0% | 0% | 0% | 12% |
+| floating_pieces | 0% | 0% | 0% | 0% | 0% | 0% | 3% |
+
+(needle X60Z30's bare_area was 15 ms of 30 ms on a quiet run: 50%. Percentages are of that case's `build_fins` time in the instrumented run.)
+
+What the profile says, in the order it was acted on:
+
+1. **`bare_area` re-walks every red triangle twice** and spends its time in `Reach::near` (SipHash grid lookups, 300k calls on needle X60Z30) and the std hasher: 57% of needle X60Z30, 25% of coin X40.
+2. **Auto's judge builds everything twice** when a region swapped to a downhill wall, and the second build recomputes the same base (normal pass, raster, rim) that the downhill flag does not touch: a third of cone/torus/ushape.
+3. **The finished-wall weld check (`inside::solid_clearance`) is the largest primitive** (41% of cone X40), then the per-station probes (`station_certified` -> `nearest_part`, `station_is_clear` -> `inside_part`): about 70% of a cone build, inside one or two walls (the stress parts have 1-3 patches per pass, so the parallelism has to be inside a wall, not across walls).
+4. **The bed pad's brim lattice** is half of ushape X40: ~42,000 `top(x, y)` calls of 17 surface lookups each.
+5. **On the 772k-triangle private objects**, half the build is `automatic_targets`: a floor probe under each of the excluded tiny-hole faces (~430 ms), five 772k-triangle surface grids (36 ms each, one per pass because `build_pass` seated its own copy of the part), and a lazily built 64x64 inside grid.
+
+Not changed (and why): the per-wall corridor early-out (strategy 2) is not exact, since `inside_part` is a ray-parity test whose answer in an empty box depends on open meshes and on rays that graze an edge; the weld-regression station and z-probe steps are untouched (strategy 6 is off the table); merging `station_is_clear` and `station_certified` (strategy 3) is not possible, since the second runs on the line after `settle_top` has moved it.
