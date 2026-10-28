@@ -1,1 +1,6 @@
 parity/corpus/**/*.zst filter=lfs diff=lfs merge=lfs -text
+
+# Cargo.lock is generated from the Cargo.toml files. When two branches both change it, a textual merge is
+# meaningless: take one side whole (the `ours` driver, which needs the one-time `git config merge.ours.driver true`,
+# see docs/AGENTS.md), then regenerate with `cargo update -w`.
+Cargo.lock merge=ours linguist-generated=true
