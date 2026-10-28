@@ -26,7 +26,8 @@ WATCH = ("cargo", "rustc", "xcodebuild", "swift-frontend", "swift-build", "swift
          "clang", "ld", "deno", "bench_", "viewer-bench", "xctest", "Support Fins", "uniffi",
          "xcodegen", "samply", "flamegraph", "just")
 HISTORY_SECONDS = 2 * 60 * 60
-SAMPLE_EVERY = 20
+SAMPLE_EVERY = 2
+PUSH_EVERY = 2          # seconds between pushes on /api/stream
 
 _history = []          # [(t, load1, busy_cpu_percent)]
 _cache = {}            # key -> (t, value)
@@ -224,7 +225,7 @@ def sampler():
 def state():
     procs = processes()
     ld = load()
-    wts = cached("wt", 30, lambda: worktrees(procs))
+    wts = cached("wt", 10, lambda: worktrees(procs))
     pl = plan()
     with _lock:
         hist = list(_history)
@@ -237,6 +238,9 @@ def state():
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith("/api/stream"):
+            self.stream()
+            return
         if self.path.startswith("/api/state"):
             body = json.dumps(state()).encode()
             ctype = "application/json"
@@ -253,6 +257,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def stream(self):
+        """Server-sent events: push the whole state every PUSH_EVERY seconds until the page goes away."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        try:
+            while True:
+                self.wfile.write(b"data: " + json.dumps(state()).encode() + b"\n\n")
+                self.wfile.flush()
+                time.sleep(PUSH_EVERY)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def log_message(self, *args):
         pass
 
@@ -260,4 +278,6 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     threading.Thread(target=sampler, daemon=True).start()
     print(f"Port dashboard: http://127.0.0.1:{PORT}")
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    server.daemon_threads = True  # open streams don't block shutdown
+    server.serve_forever()
