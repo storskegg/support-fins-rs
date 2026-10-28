@@ -174,6 +174,37 @@ struct BuildWiringTests {
         try await w.eventually("undo of the toggle") { w.session.finsOn && w.controller.renderer.supports != nil }
     }
 
+    @Test func flatContactsDrawTheCrestInItsOwnColour() async throws {
+        func crestPixels(_ w: Window) -> Int {
+            let r = w.controller.renderer
+            // from the side, a little below the slab: the crest sits on the wall tops, under the part, out of sight from above
+            r.camera = OrbitCamera(target: [0, 0, 20], distance: 160, azimuth: -.pi / 2, elevation: -0.05, aspect: 1)
+            let px = ViewerRenderer.pixels(of: r.renderOffscreen(width: 400, height: 400))
+            var n = 0
+            // BGRA; the lit #9b6bff stays violet: blue high, green lowest
+            for i in stride(from: 0, to: px.count, by: 4) {
+                let (b, g, r) = (Int(px[i]), Int(px[i + 1]), Int(px[i + 2]))
+                if b > 150 && b > g + 50 && r > g + 10 { n += 1 }
+            }
+            return n
+        }
+        let off = try await Window.open()
+        try await off.finsOn()
+        #expect(off.build.crestRanges.isEmpty && off.controller.renderer.crestFinRanges.isEmpty)
+        #expect(crestPixels(off) == 0)
+
+        let w = try await Window.open()
+        var s = w.session.settings
+        s.interfaceMaterial = .flat
+        w.session.setSettings(s)
+        try await w.finsOn()
+        #expect(!w.build.crestRanges.isEmpty && w.controller.renderer.crestFinRanges == w.build.crestRanges)
+        #expect(crestPixels(w) > 0, "the crest is #9b6bff")
+        // removing a fin keeps the crest mask
+        w.wiring.show()
+        #expect(w.controller.renderer.crestFinRanges == w.build.crestRanges)
+    }
+
     @Test func escEndsRemoveModeAndOtherwiseIsLeftAlone() async throws {
         let w = try await Window.open()
         try await w.finsOn()
