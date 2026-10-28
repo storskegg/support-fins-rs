@@ -3,6 +3,7 @@ import SwiftUI
 /// More settings: four groups, "N changed" in the header and a dot on each changed field
 /// (`index.html:463-593`, `web/ui/more.js`).
 struct MoreSettingsSection: View {
+    @Environment(PartSession.self) private var session
     @Binding var settings: FinSettings
     @Binding var open: Bool
 
@@ -61,7 +62,7 @@ struct MoreSettingsSection: View {
                     LabeledContent {
                         HStack {
                             Text("sparse").font(.caption).foregroundStyle(.secondary)
-                            Slider(value: $settings.coverage, in: 0...100, step: 5)
+                            Slider(value: $settings.coverage, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
                             Text("dense").font(.caption).foregroundStyle(.secondary)
                         }
                     } label: { ChangedLabel("Wide-face coverage", changed: changed.contains(.coverage)) }

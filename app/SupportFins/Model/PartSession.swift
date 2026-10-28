@@ -89,20 +89,18 @@ final class PartSession {
     /// A binding for the inspector: every write goes through `setSettings`.
     var settingsBinding: Binding<FinSettings> { Binding(get: { self.settings }, set: { self.setSettings($0) }) }
 
-    /// Changes closer together than this are one step: a slider drag fires a write per tick, and the web records
-    /// one step per `change` event, i.e. per release (`web/ui/history.js:93-98`).
-    static let settingsEditWindow: TimeInterval = 0.8
-    @ObservationIgnored private var lastSettingsEdit: Date?
-
-    /// The inspector wrote new settings: a step of its own unless it follows another settings write closely.
-    func setSettings(_ new: FinSettings, now: Date = Date()) {
+    /// The inspector wrote new settings. Between `settingsEditing(true)` and `settingsEditing(false)` (a slider
+    /// held down) the writes are one step; a control with no editing phase (a toggle, a menu, a stepper tick, a
+    /// text field's commit) makes a step per write. That is the web's boundary: one step per `change` event
+    /// (`web/ui/history.js:93-98`), which a slider fires once, on release.
+    func setSettings(_ new: FinSettings) {
         guard new != settings else { return }
-        if let last = lastSettingsEdit, now.timeIntervalSince(last) < Self.settingsEditWindow, history.canUndo, !history.inGesture {
-            settings = new                        // the same drag: the step recorded at its start stands
-        } else {
-            perform("Change Settings") { settings = new }
-        }
-        lastSettingsEdit = now
+        if history.inGesture { settings = new } else { perform("Change Settings") { settings = new } }
+    }
+
+    /// A Slider's `onEditingChanged`: true when the thumb goes down, false when it is released.
+    func settingsEditing(_ on: Bool) {
+        if on { beginGesture() } else { commitGesture(name: "Change Settings") }
     }
 
     // MARK: undo / redo
@@ -130,7 +128,6 @@ final class PartSession {
     }
 
     private func restore(_ s: SessionSnapshot) {
-        lastSettingsEdit = nil
         pose = s.pose
         settings = s.settings
         removedFins = s.removedFins

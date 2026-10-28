@@ -3,6 +3,7 @@ import SwiftUI
 /// Tines: the section header is the switch; grip, direction, pin depth and the resin note follow it
 /// (`index.html:358-405`, `web/ui/settings.js:172-195`).
 struct TinesSection: View {
+    @Environment(PartSession.self) private var session
     @Binding var settings: FinSettings
     @Binding var open: Bool
 
@@ -17,7 +18,7 @@ struct TinesSection: View {
                 LabeledContent(settings.pins ? "Pins per wall" : "Tine grip") {
                     HStack {
                         Text(settings.pins ? "fewer" : "light").font(.caption).foregroundStyle(.secondary)
-                        Slider(value: $settings.tineDensity, in: 0...100, step: 5)
+                        Slider(value: $settings.tineDensity, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
                         Text(settings.pins ? "more" : "firm").font(.caption).foregroundStyle(.secondary)
                     }
                 }
