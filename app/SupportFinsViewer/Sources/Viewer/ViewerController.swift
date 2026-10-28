@@ -97,6 +97,7 @@ public final class ViewerController {
         guard let r = ViewerRenderer(device: device) else { return nil }
         renderer = r
         r.setVolume(volume)
+        r.onCameraChange = { [weak self] in MainActor.assumeIsolated { self?.cameraRevision &+= 1 } }
     }
 
     // MARK: the part
@@ -127,9 +128,42 @@ public final class ViewerController {
     }
 
     /// Frame the part again (⌘0).
-    public func frame() { renderer.camera.frame(size: size) }
+    public func frame() { stopGlide(); renderer.camera.frame(size: size) }
 
-    public func apply(_ view: CameraView) { renderer.camera.apply(view) }
+    /// Bumps whenever the camera moves, so a SwiftUI view that reads it (the view cube) redraws with it.
+    public private(set) var cameraRevision = 0
+    /// The Mouse preset (`web/ui/navigation.js`): which button orbits, pans and dollies.
+    public var navPreset = NavPreset.default
+    /// The view's height in points, the unit of an orbit (a full turn per view height).
+    public var viewHeight: CGFloat = 0
+
+    // MARK: camera views (`web/ui/camviews.js`)
+
+    @ObservationIgnored private var glideTask: Task<Void, Never>?
+
+    /// Glide round to look back along `dir` at the target, keeping the zoom: 450 ms ease-in-out (`glideTo`). A
+    /// second call takes over from the first, and any drag of the view stops it.
+    public func glide(toward dir: SIMD3<Float>) {
+        stopGlide()
+        let from = renderer.camera.offset
+        let start = ContinuousClock.now
+        glideTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled, let self {
+                let t = (ContinuousClock.now - start) / .seconds(1)
+                renderer.camera.setOffset(CameraGlide.offset(from: from, toward: dir, after: t))
+                if t >= CameraGlide.seconds { break }
+                try? await Task.sleep(for: .milliseconds(4))
+            }
+        }
+    }
+
+    public func stopGlide() { glideTask?.cancel(); glideTask = nil }
+
+    /// Front, Back, Left, Right, Top or Bottom: the View popover's buttons and the View menu.
+    public func apply(_ view: CameraView) { glide(toward: view.direction) }
+
+    /// Home (`HOME_DIR`, the view cube's house): the starting angle, keeping the target and the zoom.
+    public func goHome() { glide(toward: OrbitCamera.homeDirection) }
 
     private func currentRotation() -> simd_float3x3 { rotation }
 
@@ -287,15 +321,28 @@ public final class ViewerController {
     // MARK: input (points; the view passes its height for the gesture maths)
 
     public func orbit(dx: CGFloat, dy: CGFloat, viewHeight: CGFloat) {
+        stopGlide()
         renderer.camera.orbit(dx: Float(dx), dy: Float(dy), viewHeight: Float(viewHeight))
     }
 
     public func pan(dx: CGFloat, dy: CGFloat, viewHeight: CGFloat) {
+        stopGlide()
         renderer.camera.pan(dx: Float(dx), dy: Float(dy), viewHeight: Float(viewHeight))
     }
 
-    public func zoom(magnification: CGFloat) { renderer.camera.zoom(by: Float(1 + magnification)) }
-    public func zoom(wheelDelta: CGFloat) { renderer.camera.zoom(wheelDelta: Float(wheelDelta)) }
+    public func zoom(magnification: CGFloat) { stopGlide(); renderer.camera.zoom(by: Float(1 + magnification)) }
+    public func zoom(wheelDelta: CGFloat) { stopGlide(); renderer.camera.zoom(wheelDelta: Float(wheelDelta)) }
+
+    /// Perform a preset's action for a drag of (`dx`, `dy`) points; a dolly zooms by the drag's height, as
+    /// OrbitControls' `handleMouseMoveDolly` does.
+    public func navigate(_ action: NavAction, dx: CGFloat, dy: CGFloat, viewHeight: CGFloat) {
+        switch action {
+        case .orbit: orbit(dx: dx, dy: dy, viewHeight: viewHeight)
+        case .pan: pan(dx: dx, dy: dy, viewHeight: viewHeight)
+        case .dolly: zoom(wheelDelta: dy)
+        case .none: break
+        }
+    }
 
     /// Hover at a pixel of the drawable (origin top left); picks coalesce so only the newest runs behind one in flight.
     public func hover(x: Int, y: Int, width: Int, height: Int) {

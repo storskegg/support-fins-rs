@@ -8,6 +8,18 @@ public enum CameraView: String, CaseIterable, Sendable {
 
     static let tilt: Float = 1e-4
 
+    /// The button's tooltip (`VIEWS[key].hint`).
+    public var hint: String {
+        switch self {
+        case .front: "Look at the part from the front."
+        case .back: "Look at the part from the back."
+        case .left: "Look at the part from the left."
+        case .right: "Look at the part from the right."
+        case .top: "Look down on the part from above."
+        case .bottom: "Look up at the part from below the plate."
+        }
+    }
+
     public var label: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
 
     /// Direction from the target to the camera (`VIEWS[key].dir`).

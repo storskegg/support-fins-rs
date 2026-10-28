@@ -61,7 +61,7 @@ struct ControllerTests {
         #expect(c.renderer.volume == PrinterVolume(x: 300, y: 300, z: 300))
     }
 
-    @Test func gesturesMoveTheCamera() throws {
+    @Test func gesturesMoveTheCamera() async throws {
         let (c, _) = try rig()
         let a = c.renderer.camera
         c.orbit(dx: 20, dy: 5, viewHeight: 400)
@@ -71,7 +71,8 @@ struct ControllerTests {
         let d = c.renderer.camera.distance
         c.zoom(magnification: 0.5)
         #expect(c.renderer.camera.distance < d)
-        c.apply(.front)
+        c.apply(.front)          // glides (450 ms)
+        try await Task.sleep(for: .milliseconds(900))
         #expect(simd_length(c.renderer.camera.direction - SIMD3(0, -1, 0)) < 1e-3)
     }
 
