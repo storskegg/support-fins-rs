@@ -6,36 +6,14 @@ import simd
 /// Mouse preset; Home goes back to the starting angle. Every jump keeps the target and the zoom.
 public struct ViewCubeView: View {
     let controller: ViewerController
-    @State private var hot: SIMD3<Int>?
-    @State private var press: Press?
-
-    private struct Press { var last: CGPoint; var start: CGPoint; var dragged = false }
 
     public init(controller: ViewerController) { self.controller = controller }
 
-    private static let axes: [(name: String, color: Color)] = [
-        ("X", Color(red: 1, green: 0.353, blue: 0.353)),        // #ff5a5a, the rotate rings' colours
-        ("Y", Color(red: 0.353, green: 0.839, blue: 0.353)),    // #5ad65a
-        ("Z", Color(red: 0.353, green: 0.549, blue: 1)),        // #5a8cff
-    ]
-    private static let accent = Color(red: 0.302, green: 0.639, blue: 1)    // #4da3ff
-
+    /// Only the cube and the axis marker follow the camera; the Home button beside them does not, so it is not
+    /// re-evaluated for every frame of an orbit (the whole view was, and its glass button with it).
     public var body: some View {
-        let _ = controller.cameraRevision          // redraw with the camera
-        let basis = ViewCube.Basis(camera: controller.renderer.camera)
         HStack(alignment: .bottom, spacing: 2) {
-            Canvas { ctx, size in draw(&ctx, size, basis) }
-                .frame(width: CGFloat(ViewCube.stage), height: CGFloat(ViewCube.stage))
-                .contentShape(.rect)
-                .gesture(drag(basis))
-                .onContinuousHover { phase in
-                    guard press == nil else { return }
-                    switch phase {
-                    case .active(let p): hot = ViewCube.hit(Self.local(p), basis)?.direction
-                    case .ended: hot = nil
-                    }
-                }
-                .accessibilityHidden(true)
+            ViewCubeStage(controller: controller)
             VStack(spacing: 4) {
                 Button { controller.goHome() } label: {
                     Image(systemName: "house").imageScale(.small).padding(4)
@@ -44,11 +22,43 @@ public struct ViewCubeView: View {
                 .glassEffect(.regular, in: .rect(cornerRadius: 6))
                 .help("Home view: front right, from above. Keeps the zoom.")
                 .accessibilityLabel("Home view: front right, from above. Keeps the zoom.")
-                Canvas { ctx, _ in drawAxes(&ctx, basis) }
-                    .frame(width: 32, height: 32)
-                    .accessibilityHidden(true)
+                ViewCubeAxes(controller: controller)
             }
         }
+    }
+}
+
+/// The cube itself: redraws with the camera, takes the clicks and drags.
+struct ViewCubeStage: View {
+    let controller: ViewerController
+    @State private var hot: SIMD3<Int>?
+    @State private var press: Press?
+
+    private struct Press { var last: CGPoint; var start: CGPoint; var dragged = false }
+
+    private static let accent = Color(red: 0.302, green: 0.639, blue: 1)    // #4da3ff
+
+    var body: some View {
+        let _ = controller.cameraRevision          // redraw with the camera
+        let basis = ViewCube.Basis(camera: controller.renderer.camera)
+        Canvas(rendersAsynchronously: true) { ctx, size in draw(&ctx, size, basis) } symbols: {
+            // the labels are resolved once as symbols; resolving the text again for every camera change
+            // was the largest cost of an orbit on the main thread
+            ForEach(ViewCube.Face.allCases, id: \.self) { face in
+                Text(face.label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(white: 0.92)).tag(face)
+            }
+        }
+        .frame(width: CGFloat(ViewCube.stage), height: CGFloat(ViewCube.stage))
+        .contentShape(.rect)
+        .gesture(drag(basis))
+        .onContinuousHover { phase in
+            guard press == nil else { return }
+            switch phase {
+            case .active(let p): hot = ViewCube.hit(Self.local(p), basis)?.direction
+            case .ended: hot = nil
+            }
+        }
+        .accessibilityHidden(true)
     }
 
     /// A point of the stage in points from the cube's centre.
@@ -103,8 +113,7 @@ public struct ViewCubeView: View {
                 }
             }
             g.stroke(Path(CGRect(x: -S / 2, y: -S / 2, width: S, height: S)), with: .color(line), lineWidth: 1)
-            let label = g.resolve(Text(face.label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(white: 0.92)))
-            g.draw(label, at: .zero)
+            if let label = ctx.resolveSymbol(id: face) { g.draw(label, at: .zero) }
         }
     }
 
@@ -113,6 +122,29 @@ public struct ViewCubeView: View {
         func span(_ i: Int) -> (CGFloat, CGFloat) { i < 0 ? (-S / 2, E) : i > 0 ? (S / 2 - E, E) : (-S / 2 + E, S - 2 * E) }
         let x = span(col), y = span(row)
         return CGRect(x: x.0, y: y.0, width: x.1, height: y.1)
+    }
+}
+
+/// The X, Y and Z marker beside the cube.
+struct ViewCubeAxes: View {
+    let controller: ViewerController
+
+    private static let axes: [(name: String, color: Color)] = [
+        ("X", Color(red: 1, green: 0.353, blue: 0.353)),        // #ff5a5a, the rotate rings' colours
+        ("Y", Color(red: 0.353, green: 0.839, blue: 0.353)),    // #5ad65a
+        ("Z", Color(red: 0.353, green: 0.549, blue: 1)),        // #5a8cff
+    ]
+
+    var body: some View {
+        let _ = controller.cameraRevision
+        let basis = ViewCube.Basis(camera: controller.renderer.camera)
+        Canvas(rendersAsynchronously: true) { ctx, _ in drawAxes(&ctx, basis) } symbols: {
+            ForEach(Self.axes, id: \.name) { axis in
+                Text(axis.name).font(.system(size: 7, weight: .bold)).foregroundStyle(axis.color).tag(axis.name)
+            }
+        }
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
     }
 
     /// The axis marker: X, Y and Z as the camera sees them, the ones pointing away dimmer (`syncViewCube`).
@@ -127,8 +159,9 @@ public struct ViewCubeView: View {
             path.move(to: CGPoint(x: 16, y: 16))
             path.addLine(to: CGPoint(x: 16 + CGFloat(p.x) * 10, y: 16 + CGFloat(p.y) * 10))
             g.stroke(path, with: .color(axis.color), style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-            g.draw(g.resolve(Text(axis.name).font(.system(size: 7, weight: .bold)).foregroundStyle(axis.color)),
-                   at: CGPoint(x: 16 + CGFloat(p.x) * 14.5, y: 16 + CGFloat(p.y) * 14.5))
+            if let label = ctx.resolveSymbol(id: axis.name) {
+                g.draw(label, at: CGPoint(x: 16 + CGFloat(p.x) * 14.5, y: 16 + CGFloat(p.y) * 14.5))
+            }
         }
     }
 }

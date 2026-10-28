@@ -748,6 +748,7 @@ dependencies = [
  "libm",
  "parity",
  "proptest",
+ "rayon",
  "sf-testkit",
 ]
 
@@ -781,6 +782,7 @@ version = "0.1.0"
 dependencies = [
  "indexmap",
  "parity",
+ "rayon",
  "sf-engine",
  "sf-io",
 ]
