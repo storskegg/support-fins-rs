@@ -12,7 +12,7 @@ use sf_engine::fins::seating::SeatingKind;
 use sf_engine::jsnum;
 use sf_engine::orient::{
     Candidate, Confidence, Posture, layer_verdict, load_alignment as engine_load_alignment,
-    suggest_orientations, suggest_strength_pose,
+    suggest_orientations_cancellable, suggest_orientations_wide, suggest_strength_pose,
 };
 
 use crate::builder::dialog_values;
@@ -240,13 +240,39 @@ impl Part {
         opts_json: &str,
         ctx: &SuggestContext,
     ) -> Result<SuggestResult, FfiError> {
+        Ok(self
+            .rank_poses_with(threshold_deg, opts_json, ctx, None, &|| false)?
+            .expect("never cancelled"))
+    }
+
+    /// [`Part::rank_poses`] over the web's candidate set (`density: None`) or the wide set
+    /// (`Some(density)`: that many times the web's candidate budget, same scoring and wording).
+    /// `cancelled` is polled between candidates, from several threads; `Ok(None)` is a cancelled run.
+    pub fn rank_poses_with(
+        &self,
+        threshold_deg: f64,
+        opts_json: &str,
+        ctx: &SuggestContext,
+        density: Option<f64>,
+        cancelled: &(dyn Fn() -> bool + Sync),
+    ) -> Result<Option<SuggestResult>, FfiError> {
         if !threshold_deg.is_finite() {
             return Err(engine("threshold must be a finite number of degrees"));
         }
         let options = options_from_dialog(&dialog_values(opts_json)?).map_err(engine)?;
         let mut cfg = Config::default();
         apply_tunables(&mut cfg, Some(&support_tunables(&options).map_err(engine)?));
-        let ranked = suggest_orientations(self.topology(), 3, threshold_deg, &cfg);
+        let ranked = match density {
+            None => {
+                suggest_orientations_cancellable(self.topology(), 3, threshold_deg, &cfg, cancelled)
+            }
+            Some(d) => {
+                suggest_orientations_wide(self.topology(), 3, threshold_deg, &cfg, d, cancelled)
+            }
+        };
+        let Some(ranked) = ranked else {
+            return Ok(None);
+        };
         let confidence = ranked.confidence.as_str().to_string();
         if ranked.candidates.is_empty() || ranked.confidence == Confidence::None {
             let note = if ranked.confidence == Confidence::None {
@@ -254,12 +280,12 @@ impl Part {
             } else {
                 "Nothing to suggest for this part."
             };
-            return Ok(SuggestResult {
+            return Ok(Some(SuggestResult {
                 rows: vec![],
                 confidence,
                 note: note.into(),
                 note_good: false,
-            });
+            }));
         }
         let rows: Vec<Suggestion> = ranked
             .candidates
@@ -272,12 +298,12 @@ impl Part {
             Some(n) => (n.clone(), true),
             None => ("Click a pose to turn the part.".to_string(), false),
         };
-        Ok(SuggestResult {
+        Ok(Some(SuggestResult {
             rows,
             confidence,
             note,
             note_good,
-        })
+        }))
     }
 
     /// `suggestStrengthPose` and the "already about as strong as it gets" decision of the page.
@@ -331,6 +357,23 @@ impl Part {
         self.rank_poses(threshold_deg, &opts_json, &context)
     }
 
+    /// The wide search: [`Part::suggest_orientations`] over `density` times the web's candidate
+    /// budget (10 is the wide default), finer steps of the same candidate generator, ranked and
+    /// worded exactly the same. Blocking, and slower than the default only by the cheap first pass.
+    pub fn suggest_orientations_wide(
+        &self,
+        threshold_deg: f64,
+        opts_json: String,
+        context: SuggestContext,
+        density: f64,
+    ) -> Result<SuggestResult, FfiError> {
+        Ok(self
+            .rank_poses_with(threshold_deg, &opts_json, &context, Some(density), &|| {
+                false
+            })?
+            .expect("never cancelled"))
+    }
+
     /// The strongest printable pose for a load. `dir_local`: the load in the part's own frame;
     /// `dir_world`: the same load in the current pose.
     pub fn suggest_strength_pose(
@@ -356,6 +399,8 @@ enum Work {
         threshold_deg: f64,
         opts_json: String,
         context: SuggestContext,
+        /// `None`: the web's candidate set; `Some(n)`: the wide search at `n` times the budget.
+        density: Option<f64>,
     },
     Strength {
         dir_local: Vec<f64>,
@@ -397,11 +442,18 @@ impl Suggester {
                             threshold_deg,
                             opts_json,
                             context,
+                            density,
                         } => part
-                            .rank_poses(*threshold_deg, opts_json, context)
-                            .map(|r| {
-                                Box::new(move |g, l: &dyn SuggestListener| l.suggested(g, r))
-                                    as Delivery
+                            .rank_poses_with(*threshold_deg, opts_json, context, *density, &|| {
+                                latest.load(Ordering::SeqCst) != job.generation
+                            })
+                            .map(|r| match r {
+                                Some(r) => {
+                                    Box::new(move |g, l: &dyn SuggestListener| l.suggested(g, r))
+                                        as Delivery
+                                }
+                                // stopped early: a newer request replaced it, so nothing is delivered
+                                None => Box::new(|_, _: &dyn SuggestListener| {}) as Delivery,
                             }),
                         Work::Strength {
                             dir_local,
@@ -441,6 +493,28 @@ impl Suggester {
                 threshold_deg,
                 opts_json,
                 context,
+                density: None,
+            },
+            listener,
+        )
+    }
+
+    /// Queue the wide search ([`Part::suggest_orientations_wide`]); returns its generation. A newer
+    /// request stops it between candidates.
+    pub fn suggest_wide(
+        &self,
+        threshold_deg: f64,
+        opts_json: String,
+        context: SuggestContext,
+        density: f64,
+        listener: Box<dyn SuggestListener>,
+    ) -> u64 {
+        self.submit(
+            Work::Rank {
+                threshold_deg,
+                opts_json,
+                context,
+                density: Some(density),
             },
             listener,
         )

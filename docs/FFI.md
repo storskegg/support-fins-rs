@@ -141,6 +141,11 @@ enum SuggestTier { Free, HoleClean, Ordinary }
     note_good: bool,        // the note is the "no support" win (styled good)
 }
 impl Part { fn suggest_orientations(&self, threshold_deg: f64, opts_json: String, context: SuggestContext) -> Result<SuggestResult, FfiError>; } // blocking: call off the main thread
+impl Part { fn suggest_orientations_wide(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, density: f64) -> Result<SuggestResult, FfiError>; }
+//   The wide search (M5): the same ranking, scoring and wording over `density` times the web's candidate budget
+//   (10 is the wide default; 1 is exactly suggest_orientations). The candidate generator is the web's, at a finer
+//   step: the cluster cap grows by `density`, the normal bucket and the near-duplicate angle shrink by sqrt(density).
+//   A part with few distinct face normals (a box) has no more stable down-faces and keeps its handful of poses.
 
 // Strength (ui/strength.js; web/orient.js loadAlignment / suggestStrengthPose)
 #[derive(uniffi::Record)] struct LoadAlignment { cross: f64, quality: String /* good|mixed|poor */, text: String, can_suggest: bool }
@@ -164,8 +169,11 @@ impl Part { fn suggest_strength_pose(&self, dir_local: Vec<f64>, dir_world: Vec<
 impl Suggester {
     fn new(part: Arc<Part>) -> Arc<Self>;
     fn suggest(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> u64;
+    fn suggest_wide(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, density: f64, listener: Box<dyn SuggestListener>) -> u64;
     fn strength(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64, listener: Box<dyn SuggestListener>) -> u64;
 }
+// Scoring runs on Rayon's global pool (candidates in parallel, results collected in candidate order, so the ranking and its
+// tie-breaks equal the serial run). A newer request stops an older ranking between candidates; the older one is never delivered.
 ```
 
 `opts_json` is the same `options.json` object a build takes: the finalists are built under that gap, pad and

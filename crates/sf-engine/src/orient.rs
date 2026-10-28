@@ -22,6 +22,7 @@
 //! Line numbers are at the checkout's commit (299ef49).
 
 use indexmap::IndexMap;
+use rayon::prelude::*;
 
 use std::sync::Arc;
 
@@ -154,10 +155,45 @@ struct Bin {
 ///
 /// `maxClusters` is JS's `maxClusters = 12`; callers pass it.
 pub fn candidate_downs(topo: &Topology, max_clusters: usize) -> Vec<V3> {
+    candidate_downs_with(topo, max_clusters, WEB_BUCKETS, WEB_DEDUP_COS)
+}
+
+/// `q(v) = Math.round(v * 12) / 12` of `candidateDowns`: buckets per unit of normal component.
+const WEB_BUCKETS: f64 = 12.0;
+/// The dedup threshold of `candidateDowns` (`> 0.996`, about 5.1 degrees).
+const WEB_DEDUP_COS: f64 = 0.996;
+
+/// The wide search's candidate set: the web's generator at a finer step. `density` is the
+/// factor on the candidate budget (the web is 1.0, the wide search 10.0): the cluster cap grows so
+/// the whole list (clusters plus the six axes) can reach `density` times the web's 18, and the two
+/// angular steps (the normal bucket and the near-duplicate threshold) shrink by `sqrt(density)`, so a curved part, whose normals spread over the sphere, yields about
+/// `density` times as many distinct poses. A part with few distinct face normals (a box) has no
+/// more stable down-faces to find and keeps what it has.
+pub fn wide_candidate_downs(topo: &Topology, density: f64) -> Vec<V3> {
+    let density = if density.is_finite() && density > 1.0 {
+        density
+    } else {
+        1.0
+    };
+    if density == 1.0 {
+        return candidate_downs(topo, 12);
+    }
+    let s = density.sqrt();
+    let max_clusters = (18.0 * density - 6.0).round() as usize;
+    let dedup_cos = (WEB_DEDUP_COS.acos() / s).cos();
+    candidate_downs_with(topo, max_clusters, WEB_BUCKETS * s, dedup_cos)
+}
+
+fn candidate_downs_with(
+    topo: &Topology,
+    max_clusters: usize,
+    buckets: f64,
+    dedup_cos: f64,
+) -> Vec<V3> {
     let (nrm, area, n_faces) = (&topo.nrm, &topo.area, topo.n_faces);
     // keyed by the JS template string `${q(x)},${q(y)},${q(z)}`, in first-seen order
     let mut bins: IndexMap<String, Bin> = IndexMap::new();
-    let q = |v: f64| jsnum::round(v * 12.0) / 12.0; // ~5deg buckets
+    let q = |v: f64| jsnum::round(v * buckets) / buckets; // ~5deg buckets (web)
     for f in 0..n_faces {
         let (x, y, z) = (nrm[f * 3], nrm[f * 3 + 1], nrm[f * 3 + 2]);
         if x == 0.0 && y == 0.0 && z == 0.0 {
@@ -222,7 +258,7 @@ pub fn candidate_downs(topo: &Topology, max_clusters: usize) -> Vec<V3> {
     for d in downs {
         if !out
             .iter()
-            .any(|e| e[0] * d[0] + e[1] * d[1] + e[2] * d[2] > 0.996)
+            .any(|e| e[0] * d[0] + e[1] * d[1] + e[2] * d[2] > dedup_cos)
         {
             out.push(d);
         }
@@ -311,18 +347,64 @@ pub fn suggest_orientations(
     cfg: &Config,
 ) -> Suggestions {
     let downs = candidate_downs(topo, 12);
+    rank_downs(topo, &downs, top, threshold, cfg, &|| false).expect("never cancelled")
+}
 
+/// The wide search: `suggestOrientations` over [`wide_candidate_downs`] (`density` times the web's
+/// candidate budget), scored and worded exactly as the web scores them. `cancelled` is polled
+/// between candidates (from several threads); once it is true the work stops and the result is
+/// `None`.
+pub fn suggest_orientations_wide(
+    topo: &Arc<Topology>,
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+    density: f64,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<Suggestions> {
+    let downs = wide_candidate_downs(topo, density);
+    rank_downs(topo, &downs, top, threshold, cfg, cancelled)
+}
+
+/// [`suggest_orientations`] with a cancel flag polled between candidates.
+pub fn suggest_orientations_cancellable(
+    topo: &Arc<Topology>,
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<Suggestions> {
+    let downs = candidate_downs(topo, 12);
+    rank_downs(topo, &downs, top, threshold, cfg, cancelled)
+}
+
+/// The two passes over a candidate list. Both fan out over Rayon's global pool and collect in
+/// candidate order (an indexed collect), so the stable sorts and their tie-breaks see exactly the
+/// serial sequence.
+fn rank_downs(
+    topo: &Arc<Topology>,
+    downs: &[V3],
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+    cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<Suggestions> {
     // pass 1: cheap analyze() on every candidate
     struct Scored {
         rot: Rot3,
         a: Analysis,
         cheap: f64,
     }
-    let mut scored: Vec<Scored> = downs
-        .iter()
-        .map(|&d| {
+    let last = downs.len().saturating_sub(1);
+    let scored: Vec<Option<Scored>> = downs
+        .par_iter()
+        .enumerate()
+        .map(|(i, &d)| {
+            if cancelled() {
+                return None;
+            }
             let rot = rot_from_to(d, DOWN);
-            let a = analyze(topo, threshold, &rot);
+            let mut a = analyze(topo, threshold, &rot);
             // The small overhangs analyze() drops as slivers ARE the hole ceilings, slot roofs and
             // bore tops that print rough by surprise -- a pose that turns them UP prints them
             // clean with no support, so fewer is better. This is the quality-first counterpart to
@@ -336,9 +418,17 @@ pub fn suggest_orientations(
                 + jsnum::max(0.0, 200.0 - a.bed_area) * 0.25
                 + a.size.z * 2.0
                 + holes * 2.0;
-            Scored { rot, a, cheap }
+            // Only the last candidate's flags are ever read (the aliasing below), so the others
+            // give theirs back: a wide search would otherwise hold hundreds of face-flag sets.
+            if i != last {
+                a.over = Vec::new();
+                a.kept = Vec::new();
+                a.on_bed = Vec::new();
+            }
+            Some(Scored { rot, a, cheap })
         })
         .collect();
+    let mut scored: Vec<Scored> = scored.into_iter().collect::<Option<_>>()?;
     // (the aliased flags: the last analyze call's, before the sort)
     let last_flags = scored
         .last()
@@ -347,10 +437,13 @@ pub fn suggest_orientations(
 
     // pass 2: full fin build on the finalists, to measure real finnable coverage
     let n_final = jsnum::max((top + 2) as f64, 5.0) as usize;
-    let mut built: Vec<Candidate> = scored
-        .into_iter()
-        .take(n_final)
+    scored.truncate(n_final);
+    let built: Vec<Option<Candidate>> = scored
+        .into_par_iter()
         .map(|mut s| {
+            if cancelled() {
+                return None;
+            }
             if let Some((over, kept, on_bed)) = &last_flags {
                 s.a.over = over.clone();
                 s.a.kept = kept.clone();
@@ -396,7 +489,7 @@ pub fn suggest_orientations(
                 + holes as f64 * 2.0
                 + bore as f64 * 5.0
                 + if point { 1e6 } else { 0.0 };
-            Candidate {
+            Some(Candidate {
                 rot: s.rot,
                 over_area: s.a.over_area,
                 bed_area: s.a.bed_area,
@@ -410,9 +503,10 @@ pub fn suggest_orientations(
                 holes,
                 bore,
                 score,
-            }
+            })
         })
         .collect();
+    let mut built: Vec<Candidate> = built.into_iter().collect::<Option<_>>()?;
     built.sort_by(|p, r| cmp_diff(p.score - r.score));
 
     // Confidence is the honest part, and it is about the POSE, not the fins: how clearly does the
@@ -436,10 +530,10 @@ pub fn suggest_orientations(
         _ => {}
     }
     built.truncate(top);
-    Suggestions {
+    Some(Suggestions {
         candidates: built,
         confidence,
-    }
+    })
 }
 
 /// Port of `crossFraction` (web/orient.js:233-236): cos of the angle between two unit-ish
