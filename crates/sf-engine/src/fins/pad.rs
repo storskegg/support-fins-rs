@@ -1,13 +1,15 @@
 //! Port of `web/fins/pad.js`. Read `docs/AGENTS.md` before changing anything here.
 
 use indexmap::IndexMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::config::Config;
+
 use crate::jsnum;
 use crate::prop::surface::surface_z_at;
 use crate::tris::Tris;
 use crate::types::{Pt3, V4};
+use rayon::prelude::*;
 
 /// `PAD.style`: `'auto'`, `'light'`, `'sure'` or `'custom'` (web/fins/pad.js:54).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -579,11 +581,6 @@ fn brim_pad(
     let at = |s: f64, t: f64| [cx + ax * s + bx * t, cy + ay * s + by * t];
     // every vertex lives in `verts`; an index is the JS object's identity
     let mut verts: Vec<[f64; 3]> = Vec::new();
-    let vert = |s: f64, t: f64, verts: &mut Vec<[f64; 3]>| -> usize {
-        let [x, y] = at(s, t);
-        verts.push([x, y, top(x, y)]);
-        verts.len() - 1
-    };
 
     // The lattice: columns across the long axis at `brimCell`, rim to rim, and rows
     // as FRACTIONS of each column's half-width (so the outline stays the smooth
@@ -771,6 +768,72 @@ fn brim_pad(
         }
     }
 
+    // `top` is a pure function of (x, y) and ~17 surface lookups: the lattice's nodes are known
+    // before they are made, so the tops of every node of a fine block and every coarse block's
+    // corners and hub are computed up front, in parallel, and `vert` / the hubs read them back.
+    // (A block the checks below promote to fine, or a node missed here, is computed on demand: the
+    // same function of the same point, so the pad is what it was.)
+    let memo: HashMap<[u64; 2], f64> = {
+        let node_xy = |i: usize, r: usize| -> [f64; 2] {
+            if i == 0 {
+                at(-r1, 0.0)
+            } else if i == n_s - 1 {
+                at(r1, 0.0)
+            } else {
+                let s = s_at(i);
+                at(s, half(s) * rows[r])
+            }
+        };
+        let mut seen_xy: HashSet<[u64; 2]> = HashSet::new();
+        let mut pts: Vec<[f64; 2]> = Vec::new();
+        let mut want = |p: [f64; 2]| {
+            if seen_xy.insert([p[0].to_bits(), p[1].to_bits()]) {
+                pts.push(p);
+            }
+        };
+        want(at(-r1, 0.0));
+        want(at(r1, 0.0));
+        for a in 0..n_cb {
+            for bl in 0..n_rb {
+                if fine_blk[a * n_rb + bl] != 0 {
+                    for i in cb[a]..=cb[a + 1] {
+                        for r in rb[bl]..=rb[bl + 1] {
+                            want(node_xy(i, r));
+                        }
+                    }
+                } else {
+                    let (mut x, mut y) = (0.0, 0.0);
+                    for (i, r) in [
+                        (cb[a], rb[bl]),
+                        (cb[a + 1], rb[bl]),
+                        (cb[a], rb[bl + 1]),
+                        (cb[a + 1], rb[bl + 1]),
+                    ] {
+                        let p = node_xy(i, r);
+                        want(p);
+                        x += p[0] / 4.0;
+                        y += p[1] / 4.0;
+                    }
+                    want([x, y]);
+                }
+            }
+        }
+        let zs: Vec<f64> = pts.par_iter().map(|p| top(p[0], p[1])).collect();
+        pts.iter()
+            .zip(zs)
+            .map(|(p, z)| ([p[0].to_bits(), p[1].to_bits()], z))
+            .collect()
+    };
+    let top = |x: f64, y: f64| -> f64 {
+        memo.get(&[x.to_bits(), y.to_bits()])
+            .copied()
+            .unwrap_or_else(|| top(x, y))
+    };
+    let vert = |s: f64, t: f64, verts: &mut Vec<[f64; 3]>| -> usize {
+        let [x, y] = at(s, t);
+        verts.push([x, y, top(x, y)]);
+        verts.len() - 1
+    };
     let tip_l = vert(-r1, 0.0, &mut verts);
     let tip_r = vert(r1, 0.0, &mut verts);
     let mut vv: Vec<Vec<Option<usize>>> = vec![Vec::new(); n_s]; // V[i][r]: lattice vertex, made once
