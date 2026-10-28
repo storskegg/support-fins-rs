@@ -1,15 +1,16 @@
 import SwiftUI
 
 /// The badges of the floating view toolbar that other tracks fill in (`ui/toolbar.js`, UI-MAP section 5).
-/// Order is fixed: Undo, Redo, |, Rotate, Suggest, Strength. A slot nobody has registered shows dimmed and inert.
+/// Order is fixed: Undo, Redo, |, Rotate, Suggest, Strength, View. A slot nobody has registered shows dimmed and inert.
 enum ToolbarSlot: String, CaseIterable, Identifiable {
-    case rotate, suggest, strength
+    case rotate, suggest, strength, view
     var id: String { rawValue }
     var title: LocalizedStringKey {
         switch self {
         case .rotate: "Rotate"
         case .suggest: "Suggest"
         case .strength: "Strength"
+        case .view: "View"
         }
     }
     var systemImage: String {
@@ -17,6 +18,7 @@ enum ToolbarSlot: String, CaseIterable, Identifiable {
         case .rotate: "rotate.3d"
         case .suggest: "wand.and.stars"
         case .strength: "arrow.up.and.down.and.arrow.left.and.right"
+        case .view: "eye"
         }
     }
     var help: LocalizedStringKey {
@@ -24,6 +26,7 @@ enum ToolbarSlot: String, CaseIterable, Identifiable {
         case .rotate: "Turn the part: 90° steps, Reset, Lay a face flat and the rotate rings."
         case .suggest: "Rank the ways this part could sit on the bed."
         case .strength: "Strength arrow: which way is the part loaded in use?"
+        case .view: "Camera views, the mouse preset and the print layers around the part."
         }
     }
 }

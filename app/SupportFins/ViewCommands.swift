@@ -78,6 +78,10 @@ struct ViewCommands: Commands {
             Toggle("Show Rotate Rings", isOn: Binding(get: { rotate?.showRings ?? true }, set: { rotate?.showRings = $0 }))
                 .help("The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part.")
             Button("Frame Part") { viewer?.frame() }.keyboardShortcut("0")
+            // the view cube's house (`ui/viewcube.js`): the starting angle, keeping the target and the zoom. The web
+            // has no Frame Part, so Home sits beside it rather than replacing it.
+            Button("Home") { viewer?.goHome() }
+                .help("Home view: front right, from above. Keeps the zoom.")
             // `show-layers` (ui/strength.js): the horizontal print layers around the part
             Toggle("Show Print Layers", isOn: Binding(get: { viewer?.showsLayers ?? false }, set: { viewer?.showsLayers = $0 }))
                 .help("Show the horizontal print layers around the part.")

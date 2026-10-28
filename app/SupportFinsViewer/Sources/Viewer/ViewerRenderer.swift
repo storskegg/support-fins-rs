@@ -39,7 +39,9 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     /// No depth test and no depth write: the HUD (load arrow, layer frames) is always visible.
     let hudDepthState: MTLDepthStencilState
 
-    public var camera = OrbitCamera.home() { didSet { changeCount += 1 } }
+    public var camera = OrbitCamera.home() { didSet { changeCount += 1; onCameraChange?() } }
+    /// Called after every change of the camera (the view cube turns with it).
+    public var onCameraChange: (@Sendable () -> Void)?
     /// Takes model coordinates to print coordinates (a pure rotation).
     public private(set) var rotation = matrix_identity_float3x3
     /// The engine's `Analysis.offset`: seats the rotated part on the plate.
