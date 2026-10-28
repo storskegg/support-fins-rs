@@ -12,8 +12,15 @@ enum JS {
     /// `x.toFixed(0)` for x >= 0 (a tie takes the larger integer).
     static func toFixed0(_ x: Double) -> String { String(Int64(round(x))) }
 
-    /// `x.toFixed(1)`. A tie at one decimal needs x = (2n+1)/20, which no double is, so C's exact rounding agrees.
-    static func toFixed1(_ x: Double) -> String { String(format: "%.1f", x) }
+    /// `x.toFixed(1)` for x >= 0. An exact tie (an odd multiple of 0.25, such as 0.25 or 2.25) takes the larger n
+    /// as the spec says, where C's `%.1f` rounds it to even; every other value C already rounds exactly.
+    static func toFixed1(_ x: Double) -> String {
+        let q = x * 4 // exact: a power-of-two scaling
+        if q == q.rounded(), Int64(q) % 2 != 0 {
+            return String(format: "%.1f", (x * 10 + 0.5).rounded(.down) / 10) // x*10 is exactly k + 0.5 here
+        }
+        return String(format: "%.1f", x)
+    }
 
     /// The English `tn`: `singular` for 1, else `plural`, with `{n}` and any other `{key}` replaced.
     static func tn(_ singular: String, _ plural: String, _ n: Int, _ params: [String: String] = [:]) -> String {

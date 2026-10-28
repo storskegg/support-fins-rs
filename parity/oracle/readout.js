@@ -260,6 +260,10 @@ writeCases("readout", "updateReadout", cases);
 const grams = [0, 0.04, 0.05, 0.94, 1, 2.449, 5.5, 9.9, 9.94, 9.949999, 9.95, 9.951, 10, 10.4, 10.5, 99.5, 123.456, 1000.4, 0.0001];
 writeCases("readout", "fmtGrams", grams.map((g) => ({ id: String(g), args: [g], out: readout.fmtGrams(g) })));
 
+// toFixed1: V8's (1).toFixed on exact ties (odd multiples of 0.25 go to the larger n) and near-ties
+const fixed = [0, 0.04, 0.05, 0.25, 0.75, 1.25, 1.005, 2.25, 2.35, 5.55, 9.95, 9.949999, 12.25, 100.75, 1234.5];
+writeCases("readout", "toFixed1", fixed.map((x) => ({ id: String(x), args: [x], out: x.toFixed(1) })));
+
 console.log("readout:", cases.length, "updateReadout cases;", grams.length, "fmtGrams cases");
 Deno.removeSync(dir, { recursive: true });
 if (upstreamStatus() !== statusBefore) throw new Error("the upstream checkout changed during the run");

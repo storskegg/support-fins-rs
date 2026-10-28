@@ -62,6 +62,15 @@ struct ReadoutTests {
         }
     }
 
+    @Test func toFixed1MatchesV8OnTies() throws {
+        let cases = try Self.corpus("toFixed1")
+        #expect(cases.count >= 15)
+        for c in cases {
+            let x = try #require(c.args[0] as? Double)
+            #expect(JS.toFixed1(x) == c.out["value"] as? String, "\(c.id)")
+        }
+    }
+
     @Test func noBuildYetIsDashes() {
         let r = FinReadout.make(nil, ReadoutContext())
         #expect(r.fins == "—" && r.pad == "—" && r.lead.isEmpty && !r.finsWarn && r.time == nil && r.grams == nil)
