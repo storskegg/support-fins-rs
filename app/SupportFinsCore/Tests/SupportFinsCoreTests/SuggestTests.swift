@@ -105,7 +105,7 @@ private final class BuildCollector: BuildListener, @unchecked Sendable {
     let collector = BuildCollector()
     _ = Builder(part: part).build(
         rot: [1, 0, 0, 0, 0.8660254037844387, 0.49999999999999994, 0, -0.49999999999999994, 0.8660254037844387],
-        optsJson: "{}", listener: collector)
+        optsJson: "{}", tunablesJson: "{}", listener: collector)
     var built: BuildResult?
     for await result in collector.stream { built = result; break }
     let result = try #require(built)

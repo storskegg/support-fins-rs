@@ -350,7 +350,7 @@ fn num(v: &Json, k: &str) -> f64 {
 #[test]
 fn the_summary_carries_the_readout_data() {
     let part = load("sphere");
-    let r = build_part(&part, &rotation_matrix([30.0, 0.0, 0.0]), "{}").unwrap();
+    let r = build_part(&part, &rotation_matrix([30.0, 0.0, 0.0]), "{}", "{}").unwrap();
     let s = parse(&r.summary_json()).unwrap();
     assert_eq!(num(&s, "boreWalls"), 0.0);
     let seating = s.get("seating").unwrap();
