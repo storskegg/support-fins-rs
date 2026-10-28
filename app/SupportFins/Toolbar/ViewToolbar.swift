@@ -67,7 +67,9 @@ private struct SlotButton: View {
         .popover(isPresented: Binding(get: { registry.open == slot && badge != nil && (badge?.tool?.isOn() ?? true) },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {
-            badge?.popover().padding(12)
+            // Esc folds the popover (`ui/toolbar.js:106-114`) whichever of its controls has the focus: the toolbar's
+            // own `onExitCommand` is outside the popover's window, where a clicked button holds the key focus
+            badge?.popover().padding(12).onExitCommand { registry.fold() }
         }
     }
 }
