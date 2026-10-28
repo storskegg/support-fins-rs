@@ -45,6 +45,8 @@ struct ContentView: View {
             }
         }
         .toolbar {
+            ToolbarItem { if let controller = model.controller { VolumePicker(controller: controller) } }
+            ToolbarItem { OverhangSlider(session: model.session) }
             ToolbarItem { FinsToggle(session: model.session) }
             ToolbarItem { ExportMenu(model: model.wiring?.exporter) }
             ToolbarItem { Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector) }
