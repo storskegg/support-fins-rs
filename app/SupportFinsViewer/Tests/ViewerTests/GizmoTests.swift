@@ -237,6 +237,20 @@ struct GizmoViewerTests {
         #expect(c.renderer.gizmo == nil)
     }
 
+    @Test func layingAFaceFlatTakesTheRingsAwayAndCancelsThroughItsOwnHook() throws {
+        let (c, _) = try rig()
+        let spot = ringPoint(c, .x)
+        var cancelled = 0
+        c.onFaceCancel = { cancelled += 1 }
+        c.facePicking = true
+        #expect(c.ringAt(x: spot.0, y: spot.1, width: size, height: size) == nil)
+        #expect(c.renderer.gizmo == nil)
+        #expect(c.cancelArmed() && cancelled == 1)
+        c.facePicking = false
+        #expect(c.ringAt(x: spot.0, y: spot.1, width: size, height: size) == .axis(.x))
+        #expect(!c.cancelArmed() && cancelled == 1)
+    }
+
     @Test func aHoveredRingTurnsYellowAndTheMiddleLightsThemAll() throws {
         let (c, _) = try rig()
         let spot = ringPoint(c, .y)

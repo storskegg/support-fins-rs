@@ -19,12 +19,15 @@ final class ViewerModel {
     private(set) var strength: StrengthModel?
     @ObservationIgnored private let loader: any PartLoading
     @ObservationIgnored private var ringEdits: RingEdits?
+    /// Lay a face flat (`ui/pose.js`).
+    let layFace: LayFaceModel
     /// The Rotate popover's model (`ui/pose.js`).
     let rotate: RotateModel
 
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
         controller = ViewerController()
+        layFace = LayFaceModel(session: session, controller: controller)
         let rotate = RotateModel(session: session, controller: controller)
         self.rotate = rotate
         if controller == nil { status = "This Mac has no usable Metal device." }
@@ -38,6 +41,7 @@ final class ViewerModel {
         do {
             let parts = try await loader.load(url: url, device: controller.renderer.device)
             guard let first = parts.first else { status = "The file has no mesh."; return }
+            layFace.cancel()
             session.replaceParts(parts.compactMap { $0.mesh as? CorePart })
             controller.rotation = session.pose.float3x3
             wiring?.attach()

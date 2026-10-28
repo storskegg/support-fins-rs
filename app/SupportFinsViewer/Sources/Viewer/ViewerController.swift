@@ -46,6 +46,22 @@ public final class ViewerController {
     public private(set) var hoverSupportTriangle: Int?
     /// The pointer is over a fin that a click would pick (the view shows a pointing hand).
     public private(set) var hoveringSupport = false { didSet { onCursorChange?() } }
+    /// "Lay a face flat" is armed (`web/ui/pose.js layPlacing`): the rotate rings step aside, the face under the
+    /// pointer is lit (the hover colour) with a pointing hand, a click (a press that did not drag) reports its
+    /// part and face through `onFaceClick`, and Esc, a right click or Ctrl+click call `onFaceCancel`.
+    public var facePicking = false {
+        didSet {
+            guard facePicking != oldValue else { return }
+            clearHover()
+            ringHover = nil
+            updateGizmo()
+            onCursorChange?()
+        }
+    }
+    @ObservationIgnored public var onFaceClick: (@MainActor (_ part: Int, _ face: Int) -> Void)?
+    @ObservationIgnored public var onFaceCancel: (@MainActor () -> Void)?
+    /// The pointer is over a face that a click would lay flat.
+    public var hoveringFaceToLay: Bool { facePicking && hoverFace != nil }
     @ObservationIgnored public var onSupportHover: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onSupportClick: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onCancelArmed: (@MainActor () -> Void)?
@@ -213,13 +229,13 @@ public final class ViewerController {
     }
 
     func updateGizmo() {
-        guard showRings, !supportPicking, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
+        guard showRings, !supportPicking, !facePicking, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
         renderer.setGizmo(GizmoDisplay(center: drag?.center ?? gizmoCenter, hover: ringHover, active: ringDragging, fade: ringFade))
     }
 
     /// The ring under a pixel, if the rings are on.
     public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoHandle? {
-        guard showRings, !supportPicking, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
+        guard showRings, !supportPicking, !facePicking, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
         return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
                                                     width: Float(width), height: Float(height))
     }
@@ -298,8 +314,11 @@ public final class ViewerController {
                     continue
                 }
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
+                let before = hoveringFaceToLay
                 hoverFace = face
-                renderer.setHover(face)
+                // the web lights the hovered face only while Lay a face flat is armed (`web/ui/pose.js layHover`)
+                renderer.setHover(facePicking ? face : nil)
+                if hoveringFaceToLay != before { onCursorChange?() }
             }
             pickInFlight = false
         }
@@ -307,8 +326,10 @@ public final class ViewerController {
 
     public func clearHover() {
         pendingPick = nil
+        let wasLit = hoveringFaceToLay
         hoverFace = nil
         renderer.setHover(nil)
+        if wasLit { onCursorChange?() }
         if supportPicking, hoverSupportTriangle != nil {
             hoverSupportTriangle = nil
             hoveringSupport = false
@@ -316,9 +337,17 @@ public final class ViewerController {
         }
     }
 
-    /// A click at a pixel of the drawable (origin top left) in remove mode: reports the fin-buffer triangle
+    /// A click at a pixel of the drawable (origin top left): in lay-a-face mode the part and face under it; in remove mode the fin-buffer triangle
     /// under it (nil: empty space). Does nothing when the mode is off.
     public func click(x: Int, y: Int, width: Int, height: Int) {
+        if facePicking {
+            Task { @MainActor in
+                guard let face = await renderer.pickFace(x: x, y: y, width: width, height: height), facePicking,
+                      let at = renderer.locate(face) else { return }
+                onFaceClick?(at.part, at.face)
+            }
+            return
+        }
         guard supportPicking else { return }
         Task { @MainActor in
             let tri = await renderer.pickSupport(x: x, y: y, width: width, height: height)
@@ -331,6 +360,7 @@ public final class ViewerController {
     /// armed, i.e. the event was the mode's.
     @discardableResult
     public func cancelArmed() -> Bool {
+        if facePicking { onFaceCancel?(); return true }
         guard supportPicking else { return false }
         onCancelArmed?()
         return true

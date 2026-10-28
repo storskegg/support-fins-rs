@@ -75,7 +75,7 @@ public final class ViewerMTKView: MTKView {
     }
 
     public override func resetCursorRects() {
-        let pointing = MainActor.assumeIsolated { controller?.hoveringSupport == true }
+        let pointing = MainActor.assumeIsolated { controller.map { $0.hoveringSupport || $0.hoveringFaceToLay } == true }
         if pointing { addCursorRect(bounds, cursor: .pointingHand) }
     }
 

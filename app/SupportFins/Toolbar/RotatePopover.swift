@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The Rotate popover (`#rotate-pop`, `index.html:637-651`, `ui/pose.js`): Rotate 90° X / Y / Z, Reset, the
-/// live readout and the delta, and Show rotate rings. Lay a face flat joins it in the next PR.
+/// live readout and the delta, and Show rotate rings. Lay a face flat sits between the readout and the rings switch (`index.html:646-651`).
 struct RotatePopover: View {
     @Bindable var model: RotateModel
+    @Bindable var layFace: LayFaceModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -23,6 +24,7 @@ struct RotatePopover: View {
                 Text(model.delta).foregroundStyle(.secondary).accessibilityIdentifier("rot-delta")
             }
             .font(.callout.monospacedDigit())
+            LayFaceButton(model: layFace)
             Toggle("Show rotate rings", isOn: $model.showRings)
                 .help("The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part.")
                 .accessibilityIdentifier("show-rings")

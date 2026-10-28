@@ -85,6 +85,20 @@ struct ControllerTests {
         #expect(c.hoverFace == nil && c.renderer.hoverFace == nil)
     }
 
+    @Test func theHoveredFaceIsLitOnlyWhileLayingAFace() async throws {
+        let (c, _) = try rig()
+        c.renderer.camera = OrbitCamera(target: [0, 0, 20], distance: 200, azimuth: 0, elevation: OrbitCamera.maxElevation, aspect: 1)
+        c.hover(x: 128, y: 128, width: 256, height: 256)
+        for _ in 0..<200 where c.hoverFace == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(c.hoverFace != nil && c.renderer.hoverFace == nil, "picked for the readout, not lit")
+        c.facePicking = true
+        c.hover(x: 128, y: 128, width: 256, height: 256)
+        for _ in 0..<200 where c.renderer.hoverFace == nil { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(c.renderer.hoverFace == c.hoverFace && c.hoveringFaceToLay)
+        c.facePicking = false
+        #expect(c.renderer.hoverFace == nil)
+    }
+
     @Test func anIdleViewDrawsNothingNewUntilSomethingChanges() throws {
         let (c, _) = try rig()
         let n = c.renderer.changeCount

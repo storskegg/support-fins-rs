@@ -45,6 +45,35 @@ struct Pose: Equatable, Hashable, Sendable {
     /// The 90° step of the Rotate popover (`rotate90`, `ui/pose.js:227`).
     func rotated90(about axis: Axis) -> Pose { rotated(about: axis, degrees: 90) }
 
+    /// Lay a face on the plate (`layClick`, `web/ui/pose.js:312-322`): the face's model-frame unit normal goes
+    /// through the pose, then the shortest turn takes it to straight down, applied about the world origin
+    /// (`part.quaternion.premultiply(layQuat)`). The reseating onto the plate is the engine's `offset`.
+    func laidFlat(onFaceNormal n: SIMD3<Double>) -> Pose {
+        let faceNormal = rotation * n
+        return Pose(rotation: simd_double3x3(Self.quaternionFromUnitVectors(faceNormal, Self.down)) * rotation)
+    }
+
+    /// `DOWN` (`web/ui/pose.js:249`).
+    static let down = SIMD3<Double>(0, 0, -1)
+
+    /// three.js `Quaternion.setFromUnitVectors` (`vFrom` and `vTo` unit length), operation for operation,
+    /// including the half-turn branch for a from-vector pointing straight away from `to`.
+    static func quaternionFromUnitVectors(_ from: SIMD3<Double>, _ to: SIMD3<Double>) -> simd_quatd {
+        var r = from.x * to.x + from.y * to.y + from.z * to.z + 1
+        var x: Double, y: Double, z: Double
+        if r < Double.ulpOfOne {
+            // vFrom is opposite vTo
+            r = 0
+            if abs(from.x) > abs(from.z) { (x, y, z) = (-from.y, from.x, 0) } else { (x, y, z) = (0, -from.z, from.y) }
+        } else {
+            x = from.y * to.z - from.z * to.y
+            y = from.z * to.x - from.x * to.z
+            z = from.x * to.y - from.y * to.x
+        }
+        let length = (x * x + y * y + z * z + r * r).squareRoot()
+        return simd_quatd(ix: x / length, iy: y / length, iz: z / length, r: r / length)
+    }
+
     /// Is this the same orientation as `other`, to rounding?
     func isSame(as other: Pose, tolerance: Double = 1e-9) -> Bool {
         let a = rotation.columns, b = other.rotation.columns
