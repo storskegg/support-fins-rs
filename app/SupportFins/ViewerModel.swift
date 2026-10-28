@@ -21,14 +21,19 @@ final class ViewerModel {
     @ObservationIgnored private var ringEdits: RingEdits?
     /// Lay a face flat (`ui/pose.js`).
     let layFace: LayFaceModel
+    /// The Rotate popover's model (`ui/pose.js`).
+    let rotate: RotateModel
 
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
         controller = ViewerController()
         layFace = LayFaceModel(session: session, controller: controller)
+        let rotate = RotateModel(session: session, controller: controller)
+        self.rotate = rotate
         if controller == nil { status = "This Mac has no usable Metal device." }
         wiring = controller.map { BuildWiring(session: session, controller: $0) }
         ringEdits = controller.map { RingEdits(session: session, controller: $0) }
+        ringEdits?.onEvent = { rotate.ring($0) }
     }
 
     func load(url: URL?) async {

@@ -25,6 +25,14 @@ extension FocusedValues {
     }
 }
 
+struct RotateKey: FocusedValueKey { typealias Value = RotateModel }
+extension FocusedValues {
+    var rotate: RotateModel? {
+        get { self[RotateKey.self] }
+        set { self[RotateKey.self] = newValue }
+    }
+}
+
 /// Model menu (docs/UI-MAP.md §8.1): the pose commands of the Rotate popover.
 struct ModelCommands: Commands {
     @FocusedValue(\.session) private var session
@@ -47,9 +55,13 @@ struct ModelCommands: Commands {
 /// View menu: the camera views of docs/UI-MAP.md (the web app's View popover) with ⌘0..⌘6.
 struct ViewCommands: Commands {
     @FocusedValue(\.viewer) private var viewer
+    @FocusedValue(\.rotate) private var rotate
 
     var body: some Commands {
         CommandMenu("View") {
+            // `show-rings` (ui/pose.js:161): the rotate rings, remembered
+            Toggle("Show Rotate Rings", isOn: Binding(get: { rotate?.showRings ?? true }, set: { rotate?.showRings = $0 }))
+                .help("The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part.")
             Button("Frame Part") { viewer?.frame() }.keyboardShortcut("0")
             // `show-layers` (ui/strength.js): the horizontal print layers around the part
             Toggle("Show Print Layers", isOn: Binding(get: { viewer?.showsLayers ?? false }, set: { viewer?.showsLayers = $0 }))
