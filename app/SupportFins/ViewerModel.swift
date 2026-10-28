@@ -18,12 +18,14 @@ final class ViewerModel {
     private(set) var suggest: SuggestModel?
     private(set) var strength: StrengthModel?
     @ObservationIgnored private let loader: any PartLoading
+    @ObservationIgnored private var ringEdits: RingEdits?
 
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
         controller = ViewerController()
         if controller == nil { status = "This Mac has no usable Metal device." }
         wiring = controller.map { BuildWiring(session: session, controller: $0) }
+        ringEdits = controller.map { RingEdits(session: session, controller: $0) }
     }
 
     func load(url: URL?) async {
