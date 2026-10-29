@@ -7,7 +7,7 @@ struct FinsToggle: View {
 
     var body: some View {
         Toggle(session.finsOn ? "Fins on" : "Add fins", systemImage: "square.stack.3d.up",
-               isOn: Binding(get: { session.finsOn }, set: { on in session.perform(on ? "Add Fins" : "Remove Fins") { session.finsOn = on } }))
+               isOn: Binding(get: { session.finsOn }, set: { on in session.perform(on ? JS.t("Add fins") : JS.t("Remove fins")) { session.finsOn = on } }))
             .toggleStyle(.button)
             .help("Build the supports for this pose")
             .accessibilityIdentifier("fins-toggle")
@@ -21,7 +21,7 @@ struct BuildSpinner: View {
             Spacer()
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Generating supports…").font(.callout)
+                Text("generating supports…").font(.callout)
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(.regularMaterial, in: .capsule)
@@ -30,7 +30,7 @@ struct BuildSpinner: View {
         .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
         .transition(.opacity)
-        .accessibilityLabel("Generating supports")
+        .accessibilityLabel("generating supports…")
         .accessibilityIdentifier("build-spinner")
     }
 }

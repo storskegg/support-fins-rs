@@ -7,7 +7,7 @@ struct TinesSection: View {
     @Binding var settings: FinSettings
     @Binding var open: Bool
 
-    static let resinNote = "Not tested on a resin printer yet. Tell us how it prints on GitHub issue #309."
+    static var resinNote: String { JS.t("Not tested on a resin printer yet. Tell us how it prints on GitHub issue #309.") }
 
     var body: some View {
         let v = settings.visibility
@@ -40,7 +40,7 @@ struct TinesSection: View {
             }
         } label: {
             HStack {
-                Toggle("Tines - grip the part", isOn: $settings.tines).help(Tip.tines)
+                Toggle(isOn: $settings.tines) { ChangedLabel("Tines", detail: "grip the part", changed: false) }.help(Tip.tines)
                 Spacer()
                 if !open { Text(settings.tinesSummary).font(.caption).foregroundStyle(.secondary) }
             }
@@ -48,5 +48,5 @@ struct TinesSection: View {
     }
 
     /// The slider's tooltip for Vertical tines (`PIN_SPACING_TIP`, `web/ui/settings.js:176-178`).
-    static let pinSpacingTip = "How many pins each wall gets. More pins = a firmer hold; fewer = fewer marks to clean up. Add pins before deepening them: a deeper pin leaves a bigger mark and is harder to snap off."
+    static var pinSpacingTip: String { JS.t("How many pins each wall gets. More pins = a firmer hold; fewer = fewer marks to clean up. Add pins before deepening them: a deeper pin leaves a bigger mark and is harder to snap off.") }
 }

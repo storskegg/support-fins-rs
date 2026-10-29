@@ -249,7 +249,7 @@ final class PlateBoard {
     }
 
     func removedText(_ slots: [ModelSlot]) -> String {
-        slots.count == 1 ? "Removed \(slots[0].stash?.name ?? "model")" : "Removed \(slots.count) models"
+        slots.count == 1 ? JS.t("Removed {name}", ["name": slots[0].stash?.name ?? "model"]) : JS.t("Removed {n} models", ["n": String(slots.count)])
     }
 
     // MARK: the toast's Undo

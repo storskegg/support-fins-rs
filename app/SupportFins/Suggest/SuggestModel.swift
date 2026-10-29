@@ -42,7 +42,7 @@ final class SuggestModel {
     var noteIsGood: Bool { if case .ready(let r) = state { r.noteGood } else { false } }
     var isRanking: Bool { state == .ranking }
     /// The button's label (`Ranking…` while it runs, as the page's).
-    var buttonTitle: String { isRanking ? "Ranking…" : "Suggest orientation" }
+    var buttonTitle: String { isRanking ? JS.t("Ranking…") : JS.t("Suggest orientation") }
 
     /// The wide search's candidate density: ten times the web's candidate poses, in less wall time than the web
     /// (docs/PERF-M5.md, "Suggest").

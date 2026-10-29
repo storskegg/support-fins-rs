@@ -13,7 +13,7 @@ final class LayFaceModel {
     private(set) var armed = false
 
     /// The button's text (`syncLayUI`, `ui/pose.js:216`).
-    var title: String { armed ? "Click a face to lay it flat — Esc cancels" : "Lay a face flat" }
+    var title: String { armed ? JS.t("Click a face to lay it flat — Esc cancels") : JS.t("Lay a face flat") }
 
     init(session: PartSession, controller: ViewerController?) {
         self.session = session
@@ -44,7 +44,7 @@ final class LayFaceModel {
     /// that is gone, a face out of range) leaves it armed, like `if (!hit) return`.
     func click(part: Int, face: Int) {
         guard armed, session.parts.indices.contains(part), let normal = session.parts[part].faceNormal(face) else { return }
-        session.setPose(session.pose.laidFlat(onFaceNormal: normal), name: "Lay Face Flat")
+        session.setPose(session.pose.laidFlat(onFaceNormal: normal), name: JS.t("Lay Face Flat"))
         cancel()
     }
 }

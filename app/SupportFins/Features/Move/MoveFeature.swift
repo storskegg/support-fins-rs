@@ -68,7 +68,7 @@ final class MoveFeature: Feature {
         let model = f?.model
         return [MenuSection(menu: .model, order: 2, entries: [
             .divider,
-            .check("Move", help: "Move models on the plate: drag one to place it (M). Esc to stop.",
+            .check(JS.t("Move"), help: JS.t("Move models on the plate: drag one to place it (M). Esc to stop."),
                    enabled: f?.host.hasPart == true,
                    isOn: Binding(get: { model?.isOn ?? false }, set: { model?.setOn($0) })),
         ])]

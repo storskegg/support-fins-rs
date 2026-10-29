@@ -60,18 +60,18 @@ final class RotateFeature: Feature {
         let session = f?.host.session, layFace = f?.layFace, rotate = f?.rotate
         return [
             MenuSection(menu: .model, order: 0, entries:
-                Pose.Axis.allCases.map { axis in .item("Rotate 90° About \(axis.label)") { session?.rotate90(about: axis) } }
+                Pose.Axis.allCases.map { axis in .item(JS.t("Rotate 90° About {axis}", ["axis": axis.label])) { session?.rotate90(about: axis) } }
                 + [
-                    .item("Reset Rotation") { session?.resetPose() },
+                    .item(JS.t("Reset Rotation")) { session?.resetPose() },
                     .divider,
                     // `lay-face` (ui/pose.js:221): arms the lay-a-face pointer mode; a second choice disarms it
-                    .check("Lay a Face Flat", enabled: layFace?.canArm == true,
+                    .check(JS.t("Lay a Face Flat"), enabled: layFace?.canArm == true,
                            isOn: Binding(get: { layFace?.armed ?? false }, set: { _ in layFace?.toggle() })),
                 ]),
             // `show-rings` (ui/pose.js:161): the rotate rings, remembered
             MenuSection(menu: .view, order: 0, entries: [
-                .check("Show Rotate Rings",
-                       help: "The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part.",
+                .check(JS.t("Show Rotate Rings"),
+                       help: JS.t("The rotate rings around the part. Off hides them; Rotate 90°, Reset and Lay a face flat still turn the part."),
                        isOn: Binding(get: { rotate?.showRings ?? true }, set: { rotate?.showRings = $0 })),
             ]),
         ]

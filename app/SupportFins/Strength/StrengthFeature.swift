@@ -47,7 +47,7 @@ final class StrengthFeature: Feature {
     static func menus(_ f: StrengthFeature?) -> [MenuSection] {
         let toolbar = f?.host.toolbar
         return [MenuSection(menu: .model, order: 20, entries: [
-            .item("Strength Arrow…", enabled: toolbar?.badges[.strength] != nil) { toolbar?.open = .strength },
+            .item(JS.t("Strength Arrow…"), enabled: toolbar?.badges[.strength] != nil) { toolbar?.open = .strength },
         ])]
     }
 }

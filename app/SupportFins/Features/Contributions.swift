@@ -146,7 +146,7 @@ struct MenuID: Hashable, Identifiable {
     static let systemTitles: Set<String> = ["File", "Edit", "Format", "View", "Window", "Help"]
 
     static let view = MenuID(title: "View", order: 0, group: .beforeToolbar)
-    static let model = MenuID(title: "Model", order: 10)
+    static let model = MenuID(title: JS.t("Model"), order: 10)
     static let fileExport = MenuID(title: "File", order: 100, group: .afterNewItem)
     /// Items after Undo and Redo in the Edit menu (Remove Model from Plate).
     static let edit = MenuID(title: "Edit", order: 110, group: .afterUndoRedo)

@@ -138,16 +138,16 @@ final class PlatesFeature: Feature {
         }
     }
 
-    static let addHelp = "Put another model on this plate, beside this one. Click a model to edit it."
-    static let removeHelp = "Take this model off the plate, to import another without reloading the page."
+    static let addHelp = JS.t("Put another model on this plate, beside this one. Click a model to edit it.")
+    static let removeHelp = JS.t("Take this model off the plate, to import another without reloading the page.")
 
     static func menus(_ f: PlatesFeature?) -> [MenuSection] {
         [
             MenuSection(menu: .fileExport, order: 10, entries: [
-                .item("Add Model to Plate…", help: addHelp, enabled: f != nil) { f?.addModels() },
+                .item(JS.t("Add Model to Plate…"), help: addHelp, enabled: f != nil) { f?.addModels() },
             ]),
             MenuSection(menu: .edit, order: 10, entries: [
-                .item("Remove Model from Plate", help: removeHelp, enabled: (f?.board.hasLive ?? false) && !(f?.board.busy ?? true)) {
+                .item(JS.t("Remove Model from Plate"), help: removeHelp, enabled: (f?.board.hasLive ?? false) && !(f?.board.busy ?? true)) {
                     f?.board.removeModel()
                 },
             ]),

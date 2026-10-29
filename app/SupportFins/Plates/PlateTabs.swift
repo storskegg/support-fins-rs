@@ -40,7 +40,7 @@ struct PlateTabs: View {
         return HStack(spacing: 0) {
             Button { board.switchPlate(i) } label: {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Plate \(i + 1)").font(.system(size: 12))
+                    Text(JS.t("Plate {n}", ["n": String(i + 1)])).font(.system(size: 12))
                     if !name.isEmpty {
                         Text(count > 1 ? "\(PlateBoard.stem(name)) +\(count - 1)" : PlateBoard.stem(name))
                             .font(.system(size: 11)).foregroundStyle(.secondary)
@@ -51,16 +51,16 @@ struct PlateTabs: View {
                 .foregroundStyle(current ? .primary : .secondary)
             }
             .buttonStyle(.plain)
-            .help(name.isEmpty ? "Empty plate" : name)
+            .help(name.isEmpty ? JS.t("Empty plate") : name)
             .accessibilityIdentifier("plate-tab-\(i + 1)")
-            .accessibilityValue(current ? "selected" : "")
+            .accessibilityValue(current ? JS.t("selected") : "")
             // one empty plate has nothing to delete
             if board.plates.count > 1 || !name.isEmpty {
                 Button { board.deletePlate(i) } label: { Text("×").font(.system(size: 14)).padding(.horizontal, 7).padding(.vertical, 2) }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .help("Delete plate \(i + 1)")
-                    .accessibilityLabel("Delete plate \(i + 1)")
+                    .help(JS.t("Delete plate {n}", ["n": String(i + 1)]))
+                    .accessibilityLabel(JS.t("Delete plate {n}", ["n": String(i + 1)]))
                     .accessibilityIdentifier("plate-x-\(i + 1)")
             }
         }
@@ -82,7 +82,7 @@ struct PlateLabels: View {
                     let at = SIMD3<Float>(Float(Double(i - board.active) * board.pitch - live.x),
                                           Float(-live.y - Double(v.y) / 2 - w / 6), 0.05)
                     let n = c.renderer.camera.project(at)
-                    Text("Plate \(i + 1)")
+                    Text(JS.t("Plate {n}", ["n": String(i + 1)]))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(i == board.active ? Color(red: 0.30, green: 0.64, blue: 1) : Color(red: 0.55, green: 0.58, blue: 0.65))
                         .position(x: CGFloat((n.x + 1) / 2) * geo.size.width, y: CGFloat((1 - n.y) / 2) * geo.size.height)

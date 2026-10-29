@@ -18,7 +18,7 @@ struct PartSections: View {
             LabeledContent("Triangles", value: controller.faceCount.formatted())
             LabeledContent("Size", value: sizeText)
             if let h = controller.hoverLocation {
-                LabeledContent("Face", value: controller.partCount > 1 ? "\(h.face.formatted()) (object \(h.part + 1))" : h.face.formatted())
+                LabeledContent("Face", value: controller.partCount > 1 ? JS.t("{face} (object {object})", ["face": h.face.formatted(), "object": String(h.part + 1)]) : h.face.formatted())
             }
         }
     }

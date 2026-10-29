@@ -1,0 +1,22 @@
+{
+  "{\"triangles\": %d, \"parts\": %d, \"frames\": %d, \"fps\": %.1f, \"gpu_mean_ms\": %.2f, \"gpu_p99_ms\": %.2f, \"frame_p99_ms\": %.2f, \"frame_worst_ms\": %.2f}\n": "benchmark output (JSON for tools)",
+  "off": "FinSettings.engineJSON: a value the engine reads",
+  "tines": "FinSettings.engineJSON: a key the engine reads",
+  "nozzle": "FinSettings.engineJSON: a key the engine reads",
+  "gap": "FinSettings.engineJSON: a key the engine reads",
+  "light": "padStyle value compared with the engine's",
+  "fins": "ExportModel: the key of the export options the engine reads",
+  "too tight": "compared with the engine's reason text (the shown text goes through JS.t)",
+  "a setting is not a finite number": "precondition message, a programming error",
+  " supports": "ObjectPickerModel: matches the name of the supports object a 3MF export writes",
+  "The build's records could not be read: %arg": "a mismatch between the engine's JSON and the app, a bug to see (docs/FFI.md); the web shows its errors untranslated too",
+  "%.0f fps": "debug-build frame-time overlay",
+  "GPU %.2f ms (p99 %.2f)": "debug-build frame-time overlay",
+  "frame p99 %.2f ms, worst %.2f": "debug-build frame-time overlay",
+  "File": "MenuID: the system menu's name, matched against the feature menus",
+  "Edit": "MenuID: the system menu's name, matched against the feature menus",
+  "View": "MenuID: the system menu's name, matched against the feature menus",
+  "Format": "MenuID: the system menu's name, matched against the feature menus",
+  "Window": "MenuID: the system menu's name, matched against the feature menus",
+  "Help": "MenuID: the system menu's name, matched against the feature menus"
+}

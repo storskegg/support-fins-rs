@@ -89,20 +89,20 @@ extension FinReadout {
             parts.append(JS.tn("{n} sway brace", "{n} sway braces", braces)
                 + (crosses != 0 ? " · " + JS.tn("{n} brace rib", "{n} brace ribs", crosses) : ""))
         }
-        r.fins = !ok.isEmpty ? parts.joined(separator: " + ") + (tines != 0 ? " · " + tineCount(tines) : "") : "none yet"
+        r.fins = !ok.isEmpty ? parts.joined(separator: " + ") + (tines != 0 ? " · " + tineCount(tines) : "") : JS.t("none yet")
         r.finsWarn = ok.isEmpty
 
         var lead: [String] = []
         var help: [String] = []
         if d.walls.isEmpty && d.msg.isEmpty {
             lead.append(d.shape == "curve"
-                ? "Click the two ends of a curve on the overhang, then a point it runs through, to lay a curved breakaway wall under it"
-                : "Click two points across an overhang (a line lands right where you draw it, red faces included) to lay a breakaway wall under it")
+                ? JS.t("Click the two ends of a curve on the overhang, then a point it runs through, to lay a curved breakaway wall under it")
+                : JS.t("Click two points across an overhang (a line lands right where you draw it, red faces included) to lay a breakaway wall under it"))
         }
         if !ok.isEmpty {
             help.append(tines != 0
-                ? (pins ? "The pins attach each wall to the part, as a resin print needs." : "The tines grab onto the part and bend away when you snap the wall off.")
-                : "Each wall stops a hair under the part (0.2mm) so it snaps off clean. Turn Tines on if you want it to grip the part.")
+                ? (pins ? JS.t("The pins attach each wall to the part, as a resin print needs.") : JS.t("The tines grab onto the part and bend away when you snap the wall off."))
+                : JS.t("Each wall stops a hair under the part (0.2mm) so it snaps off clean. Turn Tines on if you want it to grip the part."))
         }
         // A brace you place by hand is built even where Auto would refuse to stand one, so say what it is doing: below
         // its first tine it holds nothing and nothing holds it, which is worth knowing but is your call to make.
@@ -122,8 +122,8 @@ extension FinReadout {
         if let note = d.selectedNote { lead.append(note) }
         if built?.seating?.kind == "point" {
             lead.append(built?.pad != nil
-                ? "this part balances on one point, so the bed pad is holding it. Print with the pad on"
-                : "this part balances on one point. Turn the bed pad on to seat it, or rotate until it sits down")
+                ? JS.t("this part balances on one point, so the bed pad is holding it. Print with the pad on")
+                : JS.t("this part balances on one point. Turn the bed pad on to seat it, or rotate until it sits down"))
         }
         if let b = built {
             let note = padNote(b, ctx)
@@ -133,7 +133,7 @@ extension FinReadout {
 
         r.lead = lead.isEmpty ? "" : lead.joined(separator: ". ") + "."
         r.info = help.filter { !$0.isEmpty }.joined(separator: " ")
-        if let ms = ctx.ms { r.time = "\(ctx.analysisTiming) · pad \(JS.toFixed0(ms)) ms" }
+        if let ms = ctx.ms { r.time = "\(ctx.analysisTiming) · \(JS.t("pad")) \(JS.toFixed0(ms)) ms" }
         if ctx.hasAdded { r.grams = "\(fmtGrams(ctx.volumeMm3 * Self.materialDensity / 1000)) g" }
         return r
     }

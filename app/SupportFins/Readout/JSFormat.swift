@@ -22,15 +22,18 @@ enum JS {
         return String(format: "%.1f", x)
     }
 
-    /// The English `tn`: `singular` for 1, else `plural`, with `{n}` and any other `{key}` replaced.
-    static func tn(_ singular: String, _ plural: String, _ n: Int, _ params: [String: String] = [:]) -> String {
-        t(n == 1 ? singular : plural, ["n": String(n)].merging(params) { $1 })
+    /// `tn(singular, plural, n, params)` of `web/ui/i18n.js`: the text for a count, in the system language. The web
+    /// looks the plural key up first (the language's plural forms live on it) and picks the form by the language's
+    /// plural rule; the catalog has both keys with the same forms, English included (`tools/i18n/catalog.ts`).
+    /// A text that never shows its count still varies by it: the count goes on the key as a last, hidden `%lld`.
+    static func tn(_ singular: String, _ plural: String, _ n: Int, _ params: [String: String] = [:], in language: L10n.Language? = nil) -> String {
+        L10n.text(plural, ["n": String(n)].merging(params) { $1 }, hiddenCount: plural.contains("{n}") ? nil : n, in: language)
     }
 
-    /// The English `t`: the key with its `{param}`s replaced.
-    static func t(_ key: String, _ params: [String: String] = [:]) -> String {
-        var s = key
-        for (k, v) in params { s = s.replacingOccurrences(of: "{\(k)}", with: v) }
-        return s
+    /// `t(key, params)` of `web/ui/i18n.js`: the web's English string in the system language (the catalog is
+    /// generated from the web's tables), with its `{param}`s replaced. A string the web has no translation for stays
+    /// English, as it does on the web.
+    static func t(_ key: String, _ params: [String: String] = [:], in language: L10n.Language? = nil) -> String {
+        L10n.text(key, params, hiddenCount: nil, in: language)
     }
 }

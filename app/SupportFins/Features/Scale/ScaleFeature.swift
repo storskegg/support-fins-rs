@@ -49,7 +49,7 @@ final class ScaleFeature: Feature {
         let toolbar = f?.host.toolbar
         return [MenuSection(menu: .model, order: 5, entries: [
             .divider,
-            .item("Scale…", help: "Scale the part by a percent.", enabled: toolbar?.badges[.scale] != nil) { toolbar?.open = .scale },
+            .item("Scale…", help: JS.t("Scale the part by a percent."), enabled: toolbar?.badges[.scale] != nil) { toolbar?.open = .scale },
         ])]
     }
 }

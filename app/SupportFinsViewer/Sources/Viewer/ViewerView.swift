@@ -245,7 +245,7 @@ public struct ViewerViewport: NSViewRepresentable {
         // points of its frame: SwiftUI's identifier on a representable does not reliably reach the AppKit view
         view.setAccessibilityElement(true)
         view.setAccessibilityRole(.group)
-        view.setAccessibilityLabel("3D view")
+        view.setAccessibilityLabel(String(localized: "3D view", bundle: .main))
         view.setAccessibilityIdentifier("viewport")
         return view
     }

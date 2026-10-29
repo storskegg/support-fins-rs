@@ -72,7 +72,7 @@ struct PartReadout: Equatable, Sendable {
         let dropped = i.rawRegionCount - i.regionCount
         // The slivers keep their own amber swatch, so the amber faces have a name even when this pose has no
         // region the tool supports (`part.js:303-326`).
-        var seg: [OverhangsSegment] = [.text(i.regionCount == 0 ? "none" : JS.tn("{n} region", "{n} regions", i.regionCount))]
+        var seg: [OverhangsSegment] = [.text(i.regionCount == 0 ? JS.t("none") : JS.tn("{n} region", "{n} regions", i.regionCount))]
         if dropped > 0 {
             seg.append(.text(" (+"))
             seg.append(.swatch(help: JS.t("Amber: overhangs under {area} mm², too small for a fin", ["area": String(minRegionArea)])))
@@ -80,14 +80,14 @@ struct PartReadout: Equatable, Sendable {
         }
         if i.smallHoleCount > 0 {
             seg.append(.text(" ("))
-            seg.append(.swatch(help: "Amber after generation: small-hole ceilings left for bridging"))
+            seg.append(.swatch(help: JS.t("Amber after generation: small-hole ceilings left for bridging")))
             seg.append(.text(JS.tn("{n} small hole left for bridging", "{n} small holes left for bridging", i.smallHoleCount) + ")"))
         }
         // The midair-starts count, after the line (`renderIslandText`, `ui/islands.js:114-126`): no face there is
         // red, so the count says the part is not clean, and the row is not green.
         if i.islandCount > 0 {
             seg.append(.text(" (+"))
-            seg.append(.redSwatch(help: "Spots that start in midair"))
+            seg.append(.redSwatch(help: JS.t("Spots that start in midair")))
             seg.append(.text(JS.tn("{n} midair start", "{n} midair starts", i.islandCount) + ")"))
         }
         r.overhangs = seg
@@ -108,12 +108,12 @@ struct PartReadout: Equatable, Sendable {
         if i.regionCount == 0 && i.islandCount > 0 {
             // no red, but a start in midair: not "no supports needed" (the midair-starts card says why)
         } else if i.regionCount == 0 {
-            r.flatNote = dropped != 0 ? "Nothing big enough for a fin this way up." : "No supports needed this way up."
+            r.flatNote = dropped != 0 ? JS.t("Nothing big enough for a fin this way up.") : JS.t("No supports needed this way up.")
             r.flatNoteGood = true
         } else if i.flatRegions == 0 {
-            r.flatNote = "This prints clean lying flat. You only need fins if you’re tilting it for strength."
+            r.flatNote = JS.t("This prints clean lying flat. You only need fins if you’re tilting it for strength.")
         }
-        r.time = "\(JS.toFixed0(i.analysisMs)) ms · weld \(JS.toFixed0(i.weldMs)) ms"
+        r.time = "\(JS.toFixed0(i.analysisMs)) ms · \(JS.t("weld")) \(JS.toFixed0(i.weldMs)) ms"
         return r
     }
 }
@@ -158,15 +158,15 @@ struct FitReadout: Equatable, Sendable {
             || y0 + f.spot.y < -v.y / 2 - e || y1 + f.spot.y > v.y / 2 + e || f.parkedOff)
         let text: String
         if big {
-            text = f.added != nil ? "does not fit (with fins)" : "does not fit"
+            text = f.added != nil ? JS.t("does not fit (with fins)") : JS.t("does not fit")
         } else if off && f.clash {
-            text = "models overlap · hangs off the bed"
+            text = "\(JS.t("models overlap")) · \(JS.t("hangs off the bed"))"
         } else if off {
-            text = "hangs off the bed"
+            text = JS.t("hangs off the bed")
         } else if f.clash {
-            text = "models overlap"
+            text = JS.t("models overlap")
         } else {
-            text = "fits"
+            text = JS.t("fits")
         }
         return FitReadout(text: text, warn: big || off || f.clash)
     }
