@@ -63,6 +63,8 @@ struct MoreSettingsSection: View {
                         HStack {
                             Text("sparse").font(.caption).foregroundStyle(.secondary)
                             Slider(value: $settings.coverage, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
+                                .accessibilityLabel("Wide-face coverage")
+                                .accessibilityValue("\(Int(settings.coverage)) percent")
                             Text("dense").font(.caption).foregroundStyle(.secondary)
                         }
                     } label: { ChangedLabel("Wide-face coverage", changed: changed.contains(.coverage)) }

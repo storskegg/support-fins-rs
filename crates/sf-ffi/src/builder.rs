@@ -28,6 +28,7 @@ use sf_io::threemf::{Bed, ExtraPart, Model, write_plate_3mf};
 use crate::gpu::GpuBuffer;
 use crate::part::{FfiError, Part, rot9};
 use crate::records;
+use crate::session::SessionInput;
 
 /// Where a build's result (or its failure) arrives, on the builder's worker thread.
 #[uniffi::export(callback_interface)]
@@ -557,6 +558,8 @@ struct ExportOptions {
     threshold: f64,
     bed: Option<(f64, f64)>,
     placed: [f64; 2],
+    /// 3MF: the model's session (`session`, `sf_io::session::model_from_json`), written beside the model
+    session: Option<SessionInput>,
 }
 
 fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
@@ -568,6 +571,7 @@ fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
         threshold: 45.0,
         bed: None,
         placed: [0.0, 0.0],
+        session: None,
     };
     let kv = match parse(if text.trim().is_empty() { "{}" } else { text }) {
         Some(Json::Obj(kv)) => kv,
@@ -607,6 +611,7 @@ fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
                 let p = nums(v, 2, "placed")?;
                 o.placed = [p[0], p[1]];
             }
+            ("session", v @ Json::Obj(_)) => o.session = Some(SessionInput::from_json(v.clone())?),
             (k, _) => return Err(engine(format!("unknown or malformed export option {k}"))),
         }
     }
@@ -670,6 +675,9 @@ pub struct PlateModel {
     pub removed: Vec<u64>,
     pub x: f64,
     pub y: f64,
+    /// The model's session (docs/FFI.md "Sessions"), JSON text. A plate of one model writes it into its 3MF
+    /// (`session: gs.length === 1 ? gs[0].session() : null`); a plate of several carries none.
+    pub session: Option<String>,
 }
 
 /// One plate's file of Export all plates: its name in the zip and its models.
@@ -686,6 +694,7 @@ fn plate_3mf_bytes(models: &[PlateModel], bed: Option<Bed>) -> Result<Vec<u8>, F
         return Err(engine("a plate with no models has nothing to write"));
     };
     let mut written = Vec::with_capacity(models.len());
+    let mut session = None;
     for m in models {
         let pose = if m.build.is_some() {
             IDENTITY3
@@ -702,14 +711,41 @@ fn plate_3mf_bytes(models: &[PlateModel], bed: Option<Bed>) -> Result<Vec<u8>, F
             m.threshold,
         );
         written.push(plate_model(&m.part, rot, offset, &added, [m.x, m.y]));
+        if let [only] = models
+            && let Some(text) = &only.session
+        {
+            session = Some(session_json(
+                &m.part,
+                rot,
+                offset,
+                &SessionInput::parse(text)?,
+            ));
+        }
     }
     Ok(write_plate_3mf(
         &written,
         first.part.stem(),
         true,
-        None,
+        session.as_ref(),
         bed,
     ))
+}
+
+/// `sessionOf(partTris, model)` (`ui/export.js` `modelGeometry`): the session of a model written posed `rot`
+/// and seated at `offset`. `partTris` is the part in print space as written, before it is moved to its spot
+/// on the plate (`placed` copies the geometry; the session keeps the unmoved one, and is relative to its box).
+fn session_json(part: &Part, rot: Option<[f64; 9]>, offset: Xyz, input: &SessionInput) -> Json {
+    let tris: Vec<[f64; 3]> = pose_matrix(&part.topology().pos, rot)
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|p| [p[0] + offset.x, p[1] + offset.y, p[2] + offset.z])
+        .collect();
+    input.session(
+        &tris,
+        rot.unwrap_or(IDENTITY3),
+        [offset.x, offset.y, offset.z],
+    )
 }
 
 fn plate_bed(options_json: &str) -> Result<Option<Bed>, FfiError> {
@@ -885,7 +921,11 @@ fn export_impl(
     let bytes = if three_mf {
         let model = plate_model(part, rot, offset, &added, o.placed);
         let bed = o.bed.map(|(x, y)| Bed { x, y });
-        write_plate_3mf(&[model], name, true, None, bed)
+        let session = o
+            .session
+            .as_ref()
+            .map(|s| session_json(part, rot, offset, s));
+        write_plate_3mf(&[model], name, true, session.as_ref(), bed)
     } else if o.fins_only {
         write_binary_stl(&xyz4(&added, [0.0, 0.0]), &format!("{name} fins"))
     } else {

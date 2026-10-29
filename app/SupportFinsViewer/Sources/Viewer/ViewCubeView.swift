@@ -51,6 +51,15 @@ struct ViewCubeStage: View {
         .frame(width: CGFloat(ViewCube.stage), height: CGFloat(ViewCube.stage))
         .contentShape(.rect)
         .gesture(drag(basis))
+        // VoiceOver: one element, its faces as actions (a click on a face looks from there)
+        .accessibilityElement()
+        .accessibilityLabel("View cube")
+        .accessibilityHint("Choose a face to look at the part from there")
+        .accessibilityActions {
+            ForEach(ViewCube.Face.allCases, id: \.self) { face in
+                Button(face.label) { controller.glide(toward: face.n) }
+            }
+        }
         .onContinuousHover { phase in
             guard press == nil else { return }
             switch phase {
@@ -58,7 +67,6 @@ struct ViewCubeStage: View {
             case .ended: hot = nil
             }
         }
-        .accessibilityHidden(true)
     }
 
     /// A point of the stage in points from the cube's centre.

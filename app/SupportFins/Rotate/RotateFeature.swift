@@ -36,7 +36,7 @@ final class RotateFeature: Feature {
     func partWillShow() { layFace.cancel() }
 
     var overlays: [WindowOverlay] {
-        [WindowOverlay("lay-face-hint", order: 50, alignment: .top) { LayFaceHint(model: self.layFace) }]
+        [WindowOverlay("lay-face-hint", order: 50, alignment: .top) { LayFaceHint(model: self.layFace, clashBannerUp: self.host.features[PlatesFeature.self]?.board.clashing == true) }]
     }
 
     var modifiers: [WindowModifier] {
@@ -58,11 +58,15 @@ final class RotateFeature: Feature {
 
     static func menus(_ f: RotateFeature?) -> [MenuSection] {
         let session = f?.host.session, layFace = f?.layFace, rotate = f?.rotate
+        let hasPart = f?.host.hasPart == true
         return [
             MenuSection(menu: .model, order: 0, entries:
-                Pose.Axis.allCases.map { axis in .item("Rotate 90° About \(axis.label)") { session?.rotate90(about: axis) } }
+                // ⌘R, ⌥⌘R, ⌃⌘R (native; the web has no shortcut)
+                Pose.Axis.allCases.map { axis in
+                    .item("Rotate 90° About \(axis.label)", shortcut: "r", modifiers: axis.menuModifiers, enabled: hasPart) { session?.rotate90(about: axis) }
+                }
                 + [
-                    .item("Reset Rotation") { session?.resetPose() },
+                    .item("Reset Rotation", enabled: hasPart) { session?.resetPose() },
                     .divider,
                     // `lay-face` (ui/pose.js:221): arms the lay-a-face pointer mode; a second choice disarms it
                     .check("Lay a Face Flat", enabled: layFace?.canArm == true,
@@ -75,5 +79,16 @@ final class RotateFeature: Feature {
                        isOn: Binding(get: { rotate?.showRings ?? true }, set: { rotate?.showRings = $0 })),
             ]),
         ]
+    }
+}
+
+private extension Pose.Axis {
+    /// ⌘R rotates about X, ⌥⌘R about Y, ⌃⌘R about Z (docs/UI-MAP.md section 7).
+    var menuModifiers: EventModifiers {
+        switch self {
+        case .x: .command
+        case .y: [.command, .option]
+        case .z: [.command, .control]
+        }
     }
 }
