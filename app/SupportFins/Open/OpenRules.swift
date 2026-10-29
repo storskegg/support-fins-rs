@@ -10,6 +10,6 @@ enum OpenRules {
     static func accepts(_ url: URL) -> Bool { extensions.contains(url.pathExtension.lowercased()) }
 
     struct Unsupported: LocalizedError {
-        var errorDescription: String? { "Open an STL, 3MF, STEP or OBJ file." }
+        var errorDescription: String? { JS.t("Open an STL, 3MF, STEP or OBJ file.") }
     }
 }

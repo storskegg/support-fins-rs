@@ -102,7 +102,7 @@ struct ReadoutSections: View {
         let fins = FinReadout.make(built, context(settings, built, regions))
         Group {
             StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins, rows: statsRows)
-            StatusCard(part: part, fins: fins, importNote: session.parts.first?.info.importNote ?? "",
+            StatusCard(part: part, fins: fins, importNote: ImportNote.localized(session.parts.first?.info.importNote ?? ""),
                        islandCard: islandCard(built, count: analysis?.islands ?? 0), extra: extraLines)
         }
         .task(id: RemovalKey(removed: session.removedFins, generation: build?.readoutResult.map(ObjectIdentifier.init))) { await measureRemoval() }
@@ -164,7 +164,7 @@ struct ReadoutSections: View {
         c.padStyle = s.bedPad == .off ? "auto" : s.bedPad.rawValue
         c.padCustomGap = s.bedPad == .custom ? s.padGap : 0
         c.iface = s.interfaceMaterial == .off ? nil : s.interfaceMaterial.rawValue
-        c.analysisTiming = analysis.map { "\(JS.toFixed0($0.summary.analyzeMs)) ms · weld \(JS.toFixed0($0.weldMs)) ms" } ?? ""
+        c.analysisTiming = analysis.map { "\(JS.toFixed0($0.summary.analyzeMs)) ms · \(JS.t("weld")) \(JS.toFixed0($0.weldMs)) ms" } ?? ""
         if let b = built {
             c.hasAdded = b.finCount > 0 || b.pad != nil
             c.volumeMm3 = b.finVolumeMm3 + b.padVolumeMm3

@@ -5,7 +5,7 @@ import SwiftUI
 struct PlacementSection: View {
     @Binding var settings: FinSettings
 
-    private static let modes: [(FinSettings.Mode, String)] = [(.auto, "Auto"), (.full, "Full coverage"), (.draw, "Draw")]
+    private static let modes: [(FinSettings.Mode, String)] = [(.auto, JS.t("Auto")), (.full, JS.t("Full coverage")), (.draw, JS.t("Draw"))]
 
     var body: some View {
         FindRow("fin-mode-fld") { picker }

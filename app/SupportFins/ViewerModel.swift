@@ -22,7 +22,7 @@ final class ViewerModel {
     init(loader: any PartLoading = CoreLoader()) {
         self.loader = loader
         controller = ViewerController()
-        if controller == nil { status = "This Mac has no usable Metal device." }
+        if controller == nil { status = JS.t("This Mac has no usable Metal device.") }
         wiring = controller.map { [session] in
             BuildWiring(session: session, controller: $0,
                         liveDrag: { [weak self] in self?.features[ViewFeature.self]?.settings.rebuildWhileDragging ?? true })
@@ -58,7 +58,7 @@ final class ViewerModel {
         defer { isLoading = false; loadingURL = nil }
         do {
             let parts = try await loader.load(url: url, device: controller.renderer.device)
-            guard !parts.isEmpty else { addingModel = false; status = "The file has no mesh."; return }
+            guard !parts.isEmpty else { addingModel = false; status = JS.t("The file has no mesh."); return }
             // a plate of several goes to the picker; cancelling it keeps whatever is on show (`io.js:200-205`)
             guard parts.count > 1 else { show(parts, url: url); return }
             let picker = ObjectPickerModel(objects: parts.map {
@@ -86,9 +86,9 @@ final class ViewerModel {
         defer { isLoading = false }
         do {
             let cores = chosen.compactMap { ($0.mesh as? CorePart)?.part }
-            guard cores.count == chosen.count else { addingModel = false; status = "These objects cannot be merged."; return }
+            guard cores.count == chosen.count else { addingModel = false; status = JS.t("These objects cannot be merged."); return }
             let merged = try await Task.detached(priority: .userInitiated) { try mergeParts(parts: cores, objectCount: UInt64(total)) }.value
-            guard let core = CorePart(part: merged, device: controller.renderer.device) else { addingModel = false; status = "The merged mesh could not be shared with the GPU."; return }
+            guard let core = CorePart(part: merged, device: controller.renderer.device) else { addingModel = false; status = JS.t("The merged mesh could not be shared with the GPU."); return }
             show([LoadedPart(name: core.info.name, mesh: core)], url: url)
         } catch {
             addingModel = false

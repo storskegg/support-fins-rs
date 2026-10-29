@@ -49,7 +49,7 @@ struct ReadingStepSpinner: View {
         }
         .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
-        .accessibilityLabel("reading STEP")
+        .accessibilityLabel("reading STEP…")
         .accessibilityIdentifier("reading-step")
     }
 }

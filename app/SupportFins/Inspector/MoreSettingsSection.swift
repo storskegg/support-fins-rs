@@ -79,7 +79,7 @@ struct MoreSettingsSection: View {
                                     Text("sparse").font(.caption).foregroundStyle(.secondary)
                                     Slider(value: $settings.coverage, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
                                     .accessibilityLabel("Wide-face coverage")
-                                    .accessibilityValue("\(Int(settings.coverage)) percent")
+                                    .accessibilityValue(JS.t("{n} percent", ["n": String(Int(settings.coverage))]))
                                     Text("dense").font(.caption).foregroundStyle(.secondary)
                                 }
                             } label: { ChangedLabel("Wide-face coverage", changed: changed.contains(.coverage)) }
@@ -92,10 +92,10 @@ struct MoreSettingsSection: View {
                         FindRow("separate-walls-fld") { ChangedToggle(title: "Separate walls", isOn: $settings.separateWalls, changed: changed.contains(.separateWalls), help: Tip.separateWalls) }
                     }
                     if v.longWalls {
-                        FindRow("long-walls-fld") { ChangedToggle(title: "Long walls along the part", isOn: $settings.longWalls, changed: changed.contains(.longWalls), help: Tip.longWalls) }
+                        FindRow("long-walls-fld") { ChangedToggle(title: "Long walls", detail: "along the part", isOn: $settings.longWalls, changed: changed.contains(.longWalls), help: Tip.longWalls) }
                     }
                     if v.curvedWalls {
-                        FindRow("curved-walls-fld") { ChangedToggle(title: "Curved walls follow the curve, more plastic", isOn: $settings.curvedWalls, changed: changed.contains(.curvedWalls), help: Tip.curvedWalls) }
+                        FindRow("curved-walls-fld") { ChangedToggle(title: "Curved walls", detail: "follow the curve, more plastic", isOn: $settings.curvedWalls, changed: changed.contains(.curvedWalls), help: Tip.curvedWalls) }
                     }
                 }
             }
@@ -115,5 +115,5 @@ struct MoreSettingsSection: View {
     }
 
     /// The coverage slider's tooltip in Full coverage (`COVER_TIP_FULL`, `web/ui/settings.js:50-51`).
-    static let coverageTipFull = "Full coverage supports every overhang a wall can reach, so this slider only applies in Auto."
+    static var coverageTipFull: String { JS.t("Full coverage supports every overhang a wall can reach, so this slider only applies in Auto.") }
 }

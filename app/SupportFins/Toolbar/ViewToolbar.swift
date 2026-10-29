@@ -10,9 +10,9 @@ struct ViewToolbar: View {
     var body: some View {
         GlassEffectContainer {
             HStack(spacing: 4) {
-                ToolbarButton(title: "Undo", systemImage: "arrow.uturn.backward", help: "Undo (⌘Z)",
+                ToolbarButton(title: "Undo", systemImage: "arrow.uturn.backward", help: Text(verbatim: "\(JS.t("Undo")) (⌘Z)"),
                               enabled: session.canUndo) { session.undo() }
-                ToolbarButton(title: "Redo", systemImage: "arrow.uturn.forward", help: "Redo (⇧⌘Z)",
+                ToolbarButton(title: "Redo", systemImage: "arrow.uturn.forward", help: Text(verbatim: "\(JS.t("Redo")) (⇧⌘Z)"),
                               enabled: session.canRedo) { session.redo() }
                 Divider().frame(height: 18).padding(.horizontal, 2)
                 ForEach(registry.slots) { slot in
@@ -31,7 +31,7 @@ struct ViewToolbar: View {
 private struct ToolbarButton: View {
     let title: LocalizedStringKey
     let systemImage: String
-    let help: LocalizedStringKey
+    let help: Text
     var enabled = true
     var detail = ""
     var lit = false
@@ -56,7 +56,7 @@ private struct SlotButton: View {
 
     var body: some View {
         let badge = registry.badges[slot]
-        ToolbarButton(title: slot.title, systemImage: slot.systemImage, help: slot.help,
+        ToolbarButton(title: slot.title, systemImage: slot.systemImage, help: Text(slot.help),
                       enabled: badge != nil && (badge?.isEnabled() ?? true), detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
             registry.toggle(slot)
         }

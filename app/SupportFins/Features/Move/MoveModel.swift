@@ -140,7 +140,7 @@ final class MoveModel {
             setOn(true)
             return
         }
-        host.session.pushMoves([SlotMove(who: d.slot.id, xy: d.from)], name: "Move Model")
+        host.session.pushMoves([SlotMove(who: d.slot.id, xy: d.from)], name: JS.t("Move Model"))
     }
 
     /// An undo or redo of a move: the slots back at their spots, edited or parked (`placeSlots`).

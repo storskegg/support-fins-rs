@@ -53,24 +53,24 @@ final class ViewFeature: Feature {
         let viewer = f?.host.controller, settings = f?.settings
         var entries: [MenuEntry] = [
             // a native improvement: the fins follow a ring drag; off, they are built when it ends, as in the web
-            .check("Rebuild While Dragging",
-                   help: "Rebuild the fins while a rotate ring is dragged, so they follow the part. Off builds them when the drag ends.",
+            .check(JS.t("Rebuild While Dragging"),
+                   help: JS.t("Rebuild the fins while a rotate ring is dragged, so they follow the part. Off builds them when the drag ends."),
                    isOn: Binding(get: { settings?.rebuildWhileDragging ?? true }, set: { settings?.rebuildWhileDragging = $0 })),
-            .item("Frame Part", shortcut: "0") { viewer?.frame() },
+            .item(JS.t("Frame Part"), shortcut: "0") { viewer?.frame() },
             // the view cube's house (`ui/viewcube.js`): the starting angle, keeping the target and the zoom. The web
             // has no Frame Part, so Home sits beside it rather than replacing it.
-            .item("Home", help: "Home view: front right, from above. Keeps the zoom.") { viewer?.goHome() },
+            .item(JS.t("Home"), help: JS.t("Home view: front right, from above. Keeps the zoom.")) { viewer?.goHome() },
             // `show-layers` (ui/strength.js): the horizontal print layers around the part
-            .check("Show Print Layers", help: "Show the horizontal print layers around the part.",
+            .check(JS.t("Show Print Layers"), help: JS.t("Show the horizontal print layers around the part."),
                    isOn: Binding(get: { viewer?.showsLayers ?? false }, set: { viewer?.showsLayers = $0 })),
         ]
         #if DEBUG
         // docs/UI-MAP.md: the debug-only frame-time overlay (the web's `#fps`)
-        entries.append(.check("Show Frame Time", isOn: Binding(get: { viewer?.showsFrameTime ?? false }, set: { viewer?.showsFrameTime = $0 })))
+        entries.append(.check(JS.t("Show Frame Time"), isOn: Binding(get: { viewer?.showsFrameTime ?? false }, set: { viewer?.showsFrameTime = $0 })))
         #endif
         entries.append(.divider)
         for (i, v) in CameraView.allCases.enumerated() {
-            entries.append(.item(v.label, shortcut: KeyEquivalent(Character("\(i + 1)"))) { viewer?.apply(v) })
+            entries.append(.item(JS.t(v.label), shortcut: KeyEquivalent(Character("\(i + 1)"))) { viewer?.apply(v) })
         }
         return [MenuSection(menu: .view, order: 10, entries: entries)]
     }

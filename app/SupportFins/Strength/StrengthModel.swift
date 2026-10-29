@@ -34,19 +34,19 @@ final class StrengthModel {
             case .down: "↓"
             case .left: "←"
             case .right: "→"
-            case .front: "⊙ front"
-            case .back: "⊗ back"
+            case .front: JS.t("⊙ front")
+            case .back: JS.t("⊗ back")
             }
         }
 
         var help: String {
             switch self {
-            case .up: "Load points up"
-            case .down: "Load points down"
-            case .left: "Load points left"
-            case .right: "Load points right"
-            case .front: "Load points toward you"
-            case .back: "Load points away from you"
+            case .up: JS.t("Load points up")
+            case .down: JS.t("Load points down")
+            case .left: JS.t("Load points left")
+            case .right: JS.t("Load points right")
+            case .front: JS.t("Load points toward you")
+            case .back: JS.t("Load points away from you")
             }
         }
     }

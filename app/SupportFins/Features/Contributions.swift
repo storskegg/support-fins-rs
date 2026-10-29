@@ -12,14 +12,18 @@ struct WindowOverlay: Identifiable {
     var alignment: Alignment
     /// Draw under the title bar and the toolbar, like the viewport (only the frame-time readout needs it).
     var ignoresSafeArea: Bool
+    /// The layer places its content at viewport points (a projected point, the pointer), so it stays left to right
+    /// in a right-to-left language: SwiftUI mirrors `.position` and `.offset` there, the viewport does not mirror.
+    var inViewportSpace: Bool
     var content: () -> AnyView
 
     init<V: View>(_ id: String, order: Int, alignment: Alignment = .topLeading, ignoresSafeArea: Bool = false,
-                  @ViewBuilder content: @escaping () -> V) {
+                  inViewportSpace: Bool = false, @ViewBuilder content: @escaping () -> V) {
         self.id = id
         self.order = order
         self.alignment = alignment
         self.ignoresSafeArea = ignoresSafeArea
+        self.inViewportSpace = inViewportSpace
         self.content = { AnyView(content()) }
     }
 }
@@ -146,7 +150,7 @@ struct MenuID: Hashable, Identifiable {
     static let systemTitles: Set<String> = ["File", "Edit", "Format", "View", "Window", "Help"]
 
     static let view = MenuID(title: "View", order: 0, group: .beforeToolbar)
-    static let model = MenuID(title: "Model", order: 10)
+    static let model = MenuID(title: JS.t("Model"), order: 10)
     static let fileExport = MenuID(title: "File", order: 100, group: .afterNewItem)
     /// Items after Undo and Redo in the Edit menu (Remove Model from Plate).
     static let edit = MenuID(title: "Edit", order: 110, group: .afterUndoRedo)

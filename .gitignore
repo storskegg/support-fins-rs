@@ -20,3 +20,4 @@
 
 # the dashboard's live plan, rewritten by the orchestrator (tools/dashboard)
 tools/dashboard/state.json
+/.dd/

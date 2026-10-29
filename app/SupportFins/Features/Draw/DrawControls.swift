@@ -77,9 +77,9 @@ struct DrawControls: View {
 
 /// The web's tooltips (`index.html:423, 447-451`).
 enum DrawTip {
-    static let augment = "Place extra breakaway walls by hand, on top of the auto-placed ones."
-    static let back = "Take back the last point of the wall you're drawing (Backspace also works)."
-    static let removeSelected = "Remove the support you clicked (Delete or Backspace also works)."
+    static let augment = JS.t("Place extra breakaway walls by hand, on top of the auto-placed ones.")
+    static let back = JS.t("Take back the last point of the wall you're drawing (Backspace also works).")
+    static let removeSelected = JS.t("Remove the support you clicked (Delete or Backspace also works).")
 }
 
 /// The sway brace preview's label (`#brace-tip`, `style.css:948-967`): follows the cursor, easing after it, and fades.

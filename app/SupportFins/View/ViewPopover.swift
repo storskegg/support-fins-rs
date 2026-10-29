@@ -18,11 +18,11 @@ struct ViewPopover: View {
             .accessibilityLabel("Camera view")
             VStack(alignment: .leading, spacing: 4) {
                 Picker("Mouse", selection: $settings.navPreset) {
-                    ForEach(NavPreset.allCases) { Text($0.label).tag($0) }
+                    ForEach(NavPreset.allCases) { Text(JS.t($0.label)).tag($0) }
                 }
-                .help(settings.navPreset.hint)
+                .help(JS.t(settings.navPreset.hint))
                 .accessibilityIdentifier("nav-preset")
-                Text(settings.navPreset.hint)
+                Text(JS.t(settings.navPreset.hint))
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("nav-hint")
@@ -38,10 +38,10 @@ struct ViewPopover: View {
     }
 
     private func button(_ view: CameraView) -> some View {
-        Button(view.label) { controller.apply(view) }
+        Button(JS.t(view.label)) { controller.apply(view) }
             .buttonStyle(.bordered)
             .frame(maxWidth: .infinity)
-            .help(view.hint)
+            .help(JS.t(view.hint))
             .accessibilityIdentifier("view-\(view.rawValue)")
     }
 }
