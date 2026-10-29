@@ -145,6 +145,8 @@ final class DrawModel {
         message = ""
         clearPreview()
         sync()
+        // the web re-runs the build (`settings.js` augment-toggle handler calls `refreshFins()`)
+        if session.finsOn { host.wiring?.scheduler?.refresh() }
     }
 
     // MARK: the window's changes (WindowModifier.onChange)
