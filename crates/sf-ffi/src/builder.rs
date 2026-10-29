@@ -288,9 +288,69 @@ pub(crate) fn page_tunables(
         return Ok(None);
     }
     match parse(tunables_json) {
-        Some(j @ Json::Obj(_)) => Ok(Some(sf_io::fins_opts::tunables_from_json(&j))),
+        Some(j @ Json::Obj(_)) => {
+            check_tunable_ranges(&j)?;
+            Ok(Some(sf_io::fins_opts::tunables_from_json(&j)))
+        }
         _ => Err(engine("tunables must be a JSON object")),
     }
+}
+
+/// The ranges the app's inspector clamps the tunables to (`FinSettings.tunablesJSON()`, `FinSettings+Rules.swift`
+/// limits; the web's input min/max in index.html and `NOZZLE_MAX` / `WALL_LINES` in web/nozzle.js), each in the
+/// tunables' own units. The JS engine silently ignores a junk nozzle or wall-line count and takes the rest as
+/// given; the FFI is the app's boundary, so a value no control can produce is an error here (S-07), not a build
+/// of a million-line wall. A key that is absent, or not a number, is left to the engine as before.
+const TUNABLE_RANGES: [(&str, f64, f64); 6] = [
+    ("propGap", 0.1, 0.4),
+    // 5...200 cm in the field (50...2000 mm in the tunables). The lower bound is looser than the app's clamp:
+    // the parity corpus's drawn-wall request builds with 8 mm, and only a height that makes no sense is refused
+    ("tallRibsHeight", 1.0, 2000.0),
+    ("pinDepth", 0.05, 1.0),
+    ("nozzle", 0.1, 2.0),
+    ("tineContactOffset", 0.0, 10.0),
+    ("tinesPerWall", 0.0, 1000.0),
+];
+const PAD_CUSTOM_RANGES: [(&str, f64, f64); 4] = [
+    ("h", 0.1, 1.0),
+    ("gap", 0.0, 0.5),
+    ("grip", -0.2, 0.3),
+    ("margin", 1.0, 12.0),
+];
+/// `WALL_LINES` (web/nozzle.js:31): the Wall lines menu.
+const WALL_LINES: [f64; 4] = [2.0, 4.0, 6.0, 8.0];
+
+fn check_range(key: &str, v: &Json, lo: f64, hi: f64) -> Result<(), FfiError> {
+    match v {
+        Json::Num(n) if !(lo..=hi).contains(n) => Err(engine(format!(
+            "tunable {key} is {n}, outside {lo} to {hi}"
+        ))),
+        _ => Ok(()),
+    }
+}
+
+/// `Err` when a numeric tunable is outside the range its control allows. See `TUNABLE_RANGES`.
+pub(crate) fn check_tunable_ranges(t: &Json) -> Result<(), FfiError> {
+    for (key, lo, hi) in TUNABLE_RANGES {
+        if let Some(v) = t.get(key) {
+            check_range(key, v, lo, hi)?;
+        }
+    }
+    if let Some(Json::Num(n)) = t.get("wallLines")
+        && !WALL_LINES.contains(n)
+    {
+        return Err(engine(format!(
+            "tunable wallLines is {n}, not one of 2, 4, 6, 8"
+        )));
+    }
+    if let Some(Json::Obj(kv)) = t.get("padCustom") {
+        for (k, v) in kv {
+            if let Some((_, lo, hi)) = PAD_CUSTOM_RANGES.iter().find(|r| r.0 == k) {
+                check_range(&format!("padCustom.{k}"), v, *lo, *hi)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// One build of `part` in the pose `rot` (9 numbers, column-major).

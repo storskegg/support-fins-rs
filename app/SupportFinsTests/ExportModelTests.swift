@@ -102,7 +102,7 @@ final class ExportModelTests {
         let (on, onBuild) = rig(try tShape(), finsOn: true)
         #expect(on.availability == .init(enabled: [], note: nil))
 
-        onBuild.build(rotation: identity, optionsJSON: "{}")
+        onBuild.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         #expect(on.availability.enabled.isEmpty, "not while a rebuild is out")
         await onBuild.settled()
         #expect(on.availability.enabled == Set(ExportFormat.allCases))
@@ -124,13 +124,13 @@ final class ExportModelTests {
     @Test func removedFinsAreLeftOut() async throws {
         let part = try tShape()
         let (plain, build) = rig(part)
-        build.build(rotation: identity, optionsJSON: "{}")
+        build.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await build.settled()
         let result = try #require(build.latest)
         let keys = Set(build.keys.compactMap(\.sig))
         let gone = try #require(keys.first)
         let (cut, cutBuild) = rig(part, removed: [gone])
-        cutBuild.build(rotation: identity, optionsJSON: "{}")
+        cutBuild.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await cutBuild.settled()
         let a = try #require(plain.write(.finsOnly, to: tmp("all-fins.stl")))
         let b = try #require(cut.write(.finsOnly, to: tmp("cut-fins.stl")))
@@ -141,7 +141,7 @@ final class ExportModelTests {
 
     @Test func aPartWithNoOverhangOffersTheTwoFilesThatWriteThePartAlone() async throws {
         let (model, build) = rig(try cube())
-        build.build(rotation: identity, optionsJSON: "{}")
+        build.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await build.settled()
         #expect(model.availability.enabled == [.stl, .threeMF])
         #expect(model.availability.note == "No supports on this plate: STL and 3MF write the part alone.")
@@ -157,7 +157,7 @@ final class ExportModelTests {
     @Test func theStlHoldsThePartAndTheFinsAndTheFinsOnlyFileJustTheFins() async throws {
         let part = try tShape()
         let (model, build) = rig(part)
-        build.build(rotation: identity, optionsJSON: "{}")
+        build.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await build.settled()
         let result = try #require(build.latest)
         let finTris = Int(result.fins().count() + result.pad().count()) / 3
@@ -183,7 +183,7 @@ final class ExportModelTests {
     @Test func aPosedBuildWritesFinsOnlyInThePrintPositionLikeThePage() async throws {
         // the page writes the fins and pad in the print position whatever the pose (docs/FFI.md, "export")
         let (model, build) = rig(try tShape())
-        build.build(rotation: tilt(30), optionsJSON: "{}")
+        build.build(rotation: tilt(30), optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await build.settled()
         let url = try #require(model.write(.finsOnly, to: tmp("posed.stl")))
         #expect(model.error == nil)
@@ -196,14 +196,14 @@ final class ExportModelTests {
         StubPanel.asked = []
         let part = try tShape()
         let cancelled = rig(part, panel: StubPanel(answer: nil))
-        cancelled.1.build(rotation: identity, optionsJSON: "{}")
+        cancelled.1.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await cancelled.1.settled()
         #expect(cancelled.0.run(.threeMF) == nil && cancelled.0.lastFormat == .stl)
         #expect(StubPanel.asked.last?.0 == "bracket-fins-0.4nozzle-0.2layer.3mf" && StubPanel.asked.last?.1.preferredFilenameExtension == "3mf")
 
         let target = tmp("run.stl")
         let ok = rig(part, panel: StubPanel(answer: target))
-        ok.1.build(rotation: identity, optionsJSON: "{}")
+        ok.1.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await ok.1.settled()
         #expect(ok.0.run(.finsOnly) == target && ok.0.lastFormat == .finsOnly)
         // a format that is not offered never reaches the panel

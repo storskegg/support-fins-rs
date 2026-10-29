@@ -43,7 +43,10 @@ pub fn build_report(
         Json::Obj(vec![])
     } else {
         match parse(&tunables_json) {
-            Some(j @ Json::Obj(_)) => j,
+            Some(j @ Json::Obj(_)) => {
+                crate::builder::check_tunable_ranges(&j)?;
+                j
+            }
             _ => return Err(engine("tunables must be a JSON object")),
         }
     };

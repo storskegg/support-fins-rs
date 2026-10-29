@@ -1,6 +1,8 @@
 //! The footprint surface of docs/FFI.md: the part's posed cells, a build's fin and pad cells, and the plate maths
 //! built on them (`ui/arrange.js`, `ui/models.js`). The grid maths itself is `sf_engine::footprint`, checked
 //! against the JS in `crates/sf-engine/tests/parity_footprint.rs`.
+mod common;
+
 use std::sync::Arc;
 
 use sf_ffi::{
@@ -55,7 +57,7 @@ fn a_build_adds_its_fin_and_pad_cells_and_a_removal_takes_the_fins_out() {
     let part = load("cube");
     // tilted so there are overhangs to support
     let rot = sf_cli::cli::rotation_matrix([40.0, 0.0, 0.0]);
-    let build = Arc::new(build_part(&part, &rot, "{}", "{}").unwrap());
+    let build = Arc::new(build_part(&part, &rot, &common::options(), &common::tunables()).unwrap());
     let all = footprint_of_build(build.clone(), vec![]).expect("fins and a pad");
     assert!(all.area() > 0);
     // removing every fin leaves the pad, if the build has one, or nothing

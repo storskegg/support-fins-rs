@@ -1,6 +1,9 @@
 //! `export` writes what the page exports (web/ui/export.js), byte for byte: parity/oracle/ffiexport.js writes
 //! the page's STL / 3MF / fins-only files through its real writers (writeBinarySTL, writePlate3MF) from a
 //! posed build, and the FFI export of the same build must give the same bytes.
+// the remaining `"{}"` are export options that are empty on purpose (failure cases); see common/mod.rs.
+mod common;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -110,7 +113,7 @@ fn the_ffi_export_writes_the_pages_bytes() {
 fn the_options_are_checked_and_the_page_refusals_hold() {
     let part = part_of(&parse("{\"model\":\"sphere\"}").unwrap());
     let rot = sf_testkit::rot_x(30.0);
-    let build = Arc::new(build_part(&part, &rot, "{}", "{}").unwrap());
+    let build = Arc::new(build_part(&part, &rot, &common::options(), &common::tunables()).unwrap());
     let to = |name: &str| dir_file(name);
     let run = |name: &str, opts: &str, builds: Vec<Arc<sf_ffi::BuildResult>>| {
         export(to(name), vec![part.clone()], builds, opts.into())
@@ -129,7 +132,15 @@ fn the_options_are_checked_and_the_page_refusals_hold() {
     assert!(run("fins.stl", "{\"finsOnly\":true}", vec![build.clone()]).is_ok());
     // a part with nothing to support has no fins to write
     let cube = part_of(&parse("{\"model\":\"cube\"}").unwrap());
-    let flat = Arc::new(build_part(&cube, &sf_testkit::rot_x(0.0), "{}", "{}").unwrap());
+    let flat = Arc::new(
+        build_part(
+            &cube,
+            &sf_testkit::rot_x(0.0),
+            &common::options(),
+            &common::tunables(),
+        )
+        .unwrap(),
+    );
     let none = export(
         to("none.stl"),
         vec![cube],

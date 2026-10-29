@@ -25,10 +25,7 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
   build is byte-identical to one that was never cancellable.
 - **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled}`) carrying the JS-identical
-  message where one exists. On the Swift side `FfiError.localizedDescription` is that message, not UniFFI's
-  `String(reflecting:)` type dump: `just swift-bindings` rewrites the generated `errorDescription` to call the
-  hand-written `ffiErrorDescription` (`FfiError+Description.swift`) and fails if UniFFI's line changes. A failed file open
-  shows `ReadFailure.text`: the web's `Could not read <name>:\n<message>` (`ui/io.js:407`).
+  message where one exists.
 
 ## Surface (M4a; extended in M4b)
 
@@ -75,6 +72,14 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   `padH`, `padGrab`, `padStyle`, `padCustom` (`{ h, gap, grip, margin }`), `propGap`, `tallRibsHeight`, `cutout`,
   `iface`, `tineDir`, `pinDepth`, `nozzle`, `wallLines` (and `tineContactOffset`, `tinesPerWall`). `{}` or empty text
   means none. A key present replaces the value the dialog options would have given; a key absent keeps it.
+  **Ranges (S-07).** Every entry that takes `tunables_json` (`Builder.build`, `build_part*`, the suggest entries,
+  `DrawKit::new`, `build_report`) refuses a numeric value outside what the inspector's controls clamp to, with
+  `FfiError::Engine` ("tunable nozzle is 0, outside 0.1 to 2"): `propGap` 0.1 to 0.4, `tallRibsHeight` 1 to 2000 mm (the
+  field is 5 to 200 cm; the lower bound is looser because the parity corpus builds with 8 mm), `pinDepth` 0.05 to 1,
+  `nozzle` 0.1 to 2, `wallLines` one of 2, 4, 6, 8, `padCustom` `h` 0.1 to 1, `gap` 0 to 0.5, `grip` -0.2 to 0.3,
+  `margin` 1 to 12, `tineContactOffset` 0 to 10, `tinesPerWall` 0 to 1000. The JS engine ignores such values (a junk
+  nozzle or wall-line count is skipped, the rest taken as given); the app never sends them, so this changes no build
+  it makes. A key that is absent or not a number is left to the engine as before.
 - **The request-level extras.** Four settings of the page's build request are neither `options.json` keys nor
   tunables, so they ride in `opts_json` beside the dialog keys: `tallRibs` (bool, "Brace tall walls"), `curvedWalls`
   (bool), `sway.uncappedDepth` (bool, "full brace depth") and `sway.crossRise` (fraction 0..1, the cross-rib height).

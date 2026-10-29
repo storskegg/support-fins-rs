@@ -2,6 +2,9 @@
 //! `braceAt` and `arcPoints` (sliced out of walls.js at the pinned commit) and records what they make. The
 //! FFI (`DrawKit`) must give the same walls, reasons, counts and triangles. The rest is the pointer-ray
 //! maths (`surface_hit`, `pick`), which three.js did in the web, checked against hand-made cases.
+// the remaining `"{}"` are failure cases (bad settings, bad walls) and an empty sweep; see common/mod.rs.
+mod common;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -266,7 +269,7 @@ fn block_kit(b: [f64; 6]) -> Arc<DrawKit> {
         &parse(&format!("{{\"block\":{:?}}}", b)).unwrap(),
         900 + b[5] as usize,
     );
-    DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), "{}".into()).unwrap()
+    DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), common::tunables()).unwrap()
 }
 
 /// The nearest face a ray meets, as the id pass would pick it: every face is tried, the nearest hit wins.
@@ -320,7 +323,7 @@ fn local_and_world_are_inverse() {
     let part = part_of(&parse(r#"{"block":[-10,10,-10,10,0,10]}"#).unwrap(), 950);
     let (s, c) = 35f64.to_radians().sin_cos();
     let rot = vec![1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c];
-    let kit = DrawKit::new(part, rot, 45.0, SETTINGS.into(), "{}".into()).unwrap();
+    let kit = DrawKit::new(part, rot, 45.0, SETTINGS.into(), common::tunables()).unwrap();
     let p = vec![3.5, -7.25, 11.0];
     let back = kit
         .world_to_local(kit.local_to_world(p.clone()).unwrap())
@@ -344,7 +347,7 @@ fn a_click_on_a_drawn_wall_picks_it_unless_the_part_is_in_front() {
         vec![1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c],
         45.0,
         SETTINGS.into(),
-        "{}".into(),
+        common::tunables(),
     )
     .unwrap();
     // two points on the tilted underside, found by raycasting up from below
@@ -459,7 +462,7 @@ fn bad_input_is_an_engine_error_not_a_panic() {
         .is_err()
     );
     assert!(DrawKit::new(part.clone(), ID.to_vec(), 45.0, "{}".into(), "{}".into()).is_err());
-    let kit = DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), "{}".into()).unwrap();
+    let kit = DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), common::tunables()).unwrap();
     assert!(kit.sweep("{}".into(), None, vec![]).is_err());
     assert!(
         kit.sweep(r#"[{"kind":"wall","a":[0,0]}]"#.into(), None, vec![])
@@ -490,7 +493,7 @@ fn the_export_carries_the_drawn_walls_between_the_fins_and_the_pad() {
         rot.clone(),
         45.0,
         SETTINGS.into(),
-        "{}".into(),
+        common::tunables(),
     )
     .unwrap();
     let under = |x: f64, y: f64| {
@@ -514,7 +517,15 @@ fn the_export_carries_the_drawn_walls_between_the_fins_and_the_pad() {
     assert!(num(field(&added, "volumeMm3")) > 0.0);
     assert!(matches!(field(&added, "bounds"), Json::Obj(_)));
     // Draw's own build: the seating and the pad only
-    let build = Arc::new(build_part(&part, &rot, r#"{"mode":"draw"}"#, "{}").unwrap());
+    let build = Arc::new(
+        build_part(
+            &part,
+            &rot,
+            &common::options().replace("\"mode\":\"auto\"", "\"mode\":\"draw\""),
+            &common::tunables(),
+        )
+        .unwrap(),
+    );
     assert_eq!(build.fins().count(), 0, "draw builds no walls of its own");
     let dir = std::env::temp_dir().join(format!("sf-ffi-draw-export-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -602,7 +613,7 @@ fn placing_a_wall_whose_ends_sit_against_a_side_wall_is_refused_with_the_webs_wo
     let part = load_parts(path.to_string_lossy().into_owned())
         .unwrap()
         .remove(0);
-    let kit = DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), "{}".into()).unwrap();
+    let kit = DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), common::tunables()).unwrap();
     let w = |p: [f64; 3]| kit.local_to_world(p.to_vec()).unwrap();
     // (the part's own frame: the box as modelled)
     let ok = kit
