@@ -51,6 +51,9 @@ struct ViewCubeStage: View {
         .frame(width: CGFloat(ViewCube.stage), height: CGFloat(ViewCube.stage))
         .contentShape(.rect)
         .gesture(drag(basis))
+        // never mirrored in a right-to-left language: SwiftUI would mirror the pointer's x here, so a drag would
+        // orbit the other way and a click would pick the mirrored cell (the cube's place in the window does mirror)
+        .environment(\.layoutDirection, .leftToRight)
         // VoiceOver: one element, its faces as actions (a click on a face looks from there)
         .accessibilityElement()
         .accessibilityLabel("View cube")
@@ -152,6 +155,7 @@ struct ViewCubeAxes: View {
             }
         }
         .frame(width: 32, height: 32)
+        .environment(\.layoutDirection, .leftToRight)      // the camera's axes, never mirrored (like the cube)
         .accessibilityHidden(true)
     }
 

@@ -68,6 +68,24 @@ struct LocalizationTests {
         #expect(fins(7, zh).replacingOccurrences(of: "7", with: "1") == fins(1, zh))
     }
 
+    @Test("a pair the language does not translate falls back as the web's tn() does: English singular or plural")
+    func untranslatedPair() throws {
+        let de = try lang("de"), zh = try lang("zh-Hans"), en = try lang("en")
+        // the web's de and nl tables have no "{n} prop" (zh does)
+        #expect(JS.tn("{n} prop", "{n} props", 1, in: de) == "1 prop")
+        #expect(JS.tn("{n} prop", "{n} props", 2, in: de) == "2 props")
+        #expect(JS.tn("{n} prop", "{n} props", 0, in: de) == "0 props")
+        #expect(JS.tn("{n} prop", "{n} props", 1, in: en) == "1 prop")
+        #expect(JS.tn("{n} prop", "{n} props", 1, in: zh) != "1 prop")
+        // zh has no "{n} midair start" either: one plural form in Chinese, but the web's fallback is English's
+        #expect(JS.tn("{n} midair start", "{n} midair starts", 1, in: zh) == "1 midair start")
+        #expect(JS.tn("{n} midair start", "{n} midair starts", 4, in: zh) == "4 midair starts")
+        // a pair whose singular hides its count
+        let one = JS.tn("One brace stands up to {mm}mm before gripping the part — that much of it prints as a lone wall. Fine if it prints; rotate so that side reaches the plate if it wobbles.",
+                        "{n} braces stand up to {mm}mm before gripping the part — that much of it prints as a lone wall. Fine if it prints; rotate so that side reaches the plate if it wobbles.", 1, ["mm": "4"], in: de)
+        #expect(one.hasPrefix("One brace stands up to 4mm"))
+    }
+
     @Test("a plural with other arguments")
     func pluralWithArguments() throws {
         let de = try lang("de")

@@ -23,8 +23,8 @@ enum L10n {
 
     /// The localized `key` with its `{name}` placeholders replaced by `params`. `n` is the count (an integer), every
     /// other parameter a string. `hiddenCount` is the count of a `tn()` text that does not show it.
-    static func text(_ key: String, _ params: [String: String], hiddenCount: Int?, in language: Language? = nil) -> String {
-        let bundle = language?.bundle ?? Bundle.main, locale = language?.locale ?? Locale.current
+    /// A web string cut at its `{name}` placeholders: the text before the first, then each name with the text after it.
+    private static func placeholders(_ key: String) -> (head: Substring, names: [(name: String, rest: Substring)]) {
         let pieces = key.split(separator: "{", omittingEmptySubsequences: false)
         var names: [(name: String, rest: Substring)] = []
         var head = pieces.first ?? ""
@@ -37,6 +37,28 @@ enum L10n {
                 names[names.count - 1].rest += "{" + p
             }
         }
+        return (head, names)
+    }
+
+    /// Whether the language translates `key` (a `tn()` plural key; `hiddenCount` as for `text`). The catalog key is
+    /// the one `catalogKey` of `tools/i18n/catalog.ts` writes: `{n}` is `%lld`, other names `%@`, `%` doubled when
+    /// there are arguments. Xcode copies an untranslated key into every language with the key itself as its text, so
+    /// both a missing key and one that comes back unchanged mean the language has no translation.
+    static func translates(_ key: String, hiddenCount: Int?, in language: Language? = nil) -> Bool {
+        let (head, names) = placeholders(key)
+        let args = !names.isEmpty || hiddenCount != nil
+        func esc(_ s: Substring) -> String { args ? s.replacingOccurrences(of: "%", with: "%%") : String(s) }
+        var format = esc(head)
+        for (name, rest) in names { format += (name == "n" ? "%lld" : "%@") + esc(rest) }
+        if hiddenCount != nil { format += "%lld" }
+        let missing = "\u{1}missing"
+        let found = (language?.bundle ?? Bundle.main).localizedString(forKey: format, value: missing, table: "Localizable")
+        return found != missing && found != format
+    }
+
+    static func text(_ key: String, _ params: [String: String], hiddenCount: Int?, in language: Language? = nil) -> String {
+        let bundle = language?.bundle ?? Bundle.main, locale = language?.locale ?? Locale.current
+        let (head, names) = placeholders(key)
         // no arguments: the key as it stands (the compiler does not escape a literal's `%` either)
         if names.isEmpty && hiddenCount == nil {
             return String(localized: String.LocalizationValue(key), bundle: bundle, locale: locale)

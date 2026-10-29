@@ -47,7 +47,7 @@ final class PlatesFeature: Feature {
 
     var overlays: [WindowOverlay] {
         [
-            WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true) { PlateLabels(board: self.board) },
+            WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true, inViewportSpace: true) { PlateLabels(board: self.board) },
             WindowOverlay("plate-tabs", order: 65, alignment: .top) { PlateTabs(board: self.board) },
             WindowOverlay("clash-banner", order: 66, alignment: .top) { ClashBanner(board: self.board) },
             WindowOverlay("plate-toast", order: 70, alignment: .bottom) { PlateToast(board: self.board) },

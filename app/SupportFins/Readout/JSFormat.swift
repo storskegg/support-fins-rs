@@ -26,8 +26,15 @@ enum JS {
     /// looks the plural key up first (the language's plural forms live on it) and picks the form by the language's
     /// plural rule; the catalog has both keys with the same forms, English included (`tools/i18n/catalog.ts`).
     /// A text that never shows its count still varies by it: the count goes on the key as a last, hidden `%lld`.
+    /// A language with no plural forms for the pair falls back as the web's does: the English rule picks the singular
+    /// or the plural, and `t()` looks that up (so German shows "1 prop", not "1 props", until it translates the pair).
     static func tn(_ singular: String, _ plural: String, _ n: Int, _ params: [String: String] = [:], in language: L10n.Language? = nil) -> String {
-        L10n.text(plural, ["n": String(n)].merging(params) { $1 }, hiddenCount: plural.contains("{n}") ? nil : n, in: language)
+        let all = ["n": String(n)].merging(params) { $1 }
+        let hidden = plural.contains("{n}") ? nil : n
+        if L10n.translates(plural, hiddenCount: hidden, in: language) {
+            return L10n.text(plural, all, hiddenCount: hidden, in: language)
+        }
+        return t(n == 1 ? singular : plural, all, in: language)
     }
 
     /// `t(key, params)` of `web/ui/i18n.js`: the web's English string in the system language (the catalog is
