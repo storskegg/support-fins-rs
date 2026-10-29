@@ -193,6 +193,21 @@ struct FeatureSetTests {
         #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file + edit)
     }
 
+    /// Backspace and Delete are keys of the whole window (`app.js:56-74`), not of the 3D view: the key monitor takes them
+    /// while the focus is outside a text field, a slider or a pop-up.
+    @MainActor @Test func backspaceAndDeleteAreNamedAndSkipFields() throws {
+        func key(_ code: UInt16) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                          context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code))
+        }
+        #expect(try key(51).deleteKey == .backspace && key(117).deleteKey == .delete && key(0).deleteKey == nil)
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+        let field = NSTextField(frame: .init(x: 0, y: 0, width: 100, height: 20)), slider = NSSlider(frame: .init(x: 0, y: 30, width: 100, height: 20))
+        for v in [field, slider] { window.contentView?.addSubview(v) }
+        #expect(window.makeFirstResponder(slider) && window.focusIsInAField)
+        #expect(window.makeFirstResponder(nil) && !window.focusIsInAField)
+    }
+
     /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.
     @Test func menusReadAClosedWindowsFeaturesWithoutCrashing() {
         var window: ViewerModel? = ViewerModel()
