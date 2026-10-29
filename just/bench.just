@@ -38,3 +38,8 @@ bench-load *inputs:
 bench-render *args: _bindings-present
     swift build -j {{xcode_jobs}} -c release --package-path app/SupportFinsViewer --product viewer-bench
     tools/lock/lock.py --bench bench-render -- swift run --skip-build -c release --package-path app/SupportFinsViewer viewer-bench {{args}}
+
+# Sway click timing on a synthetic million-face tower (first click builds the triangle index): median ms per `sway_at_face`, with an output hash for A/B runs.
+bench-sway:
+    cargo build --release -q -p sf-testkit --example bench_sway
+    tools/lock/lock.py --bench bench-sway -- target/release/examples/bench_sway
