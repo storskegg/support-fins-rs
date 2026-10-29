@@ -182,8 +182,8 @@ struct FeatureSetTests {
         view.append("  Show Frame Time")
         #endif
         view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]", "  -", "  Section View"]
-        let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
-                     "  Lay a Face Flat", "  -", "  Move", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
+        let model = ["Model", "  Rotate 90° About X [r]", "  Rotate 90° About Y [⌥⌘r]", "  Rotate 90° About Z [⌃⌘r]", "  Reset Rotation", "  -",
+                     "  Lay a Face Flat", "  -", "  Move", "  Arrange", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
         let edit = ["Edit", "  Remove Model from Plate"]
         // no window focused
