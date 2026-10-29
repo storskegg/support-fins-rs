@@ -126,6 +126,7 @@ fn prop_value(q: &PropRecord) -> Value {
                 tag(q.rim),
                 tag(q.downhill),
                 tag(q.curved),
+                tag(q.flush),
             ]),
         ),
     ])

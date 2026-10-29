@@ -537,3 +537,84 @@ fn the_export_carries_the_drawn_walls_between_the_fins_and_the_pad() {
     .unwrap();
     assert_eq!(stl_triangles(&with), stl_triangles(&plain) + drawn_tris);
 }
+
+/// tests/part_wall_ends.test.js's recessed box (a 50 mm deep section run 70 mm along x, lips 16 mm
+/// over the floor), as the triangles an STL carries.
+fn recessed_box() -> Vec<[f64; 3]> {
+    const SECTION: [[f64; 2]; 12] = [
+        [-25.0, 0.0],
+        [25.0, 0.0],
+        [25.0, 25.0],
+        [11.0, 25.0],
+        [11.0, 20.0],
+        [21.0, 20.0],
+        [21.0, 4.0],
+        [-21.0, 4.0],
+        [-21.0, 20.0],
+        [-11.0, 20.0],
+        [-11.0, 25.0],
+        [-25.0, 25.0],
+    ];
+    const CAPS: [[f64; 4]; 5] = [
+        [-25.0, 25.0, 0.0, 4.0],
+        [21.0, 25.0, 4.0, 25.0],
+        [-25.0, -21.0, 4.0, 25.0],
+        [11.0, 21.0, 20.0, 25.0],
+        [-21.0, -11.0, 20.0, 25.0],
+    ];
+    let (x0, x1) = (-35.0, 35.0);
+    let mut t: Vec<[f64; 3]> = Vec::new();
+    let mut tri = |a: [f64; 3], b: [f64; 3], c: [f64; 3], n: [f64; 3]| {
+        let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        let m = [
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        ];
+        if m[0] * n[0] + m[1] * n[1] + m[2] * n[2] >= 0.0 {
+            t.extend([a, b, c]);
+        } else {
+            t.extend([a, c, b]);
+        }
+    };
+    for (i, &[ya, za]) in SECTION.iter().enumerate() {
+        let [yb, zb] = SECTION[(i + 1) % SECTION.len()];
+        let n = [0.0, zb - za, -(yb - ya)];
+        tri([x0, ya, za], [x1, ya, za], [x1, yb, zb], n);
+        tri([x0, ya, za], [x1, yb, zb], [x0, yb, zb], n);
+    }
+    for [y0, y1, z0, z1] in CAPS {
+        for (x, n) in [(x0, [-1.0, 0.0, 0.0]), (x1, [1.0, 0.0, 0.0])] {
+            tri([x, y0, z0], [x, y1, z0], [x, y1, z1], n);
+            tri([x, y0, z0], [x, y1, z1], [x, y0, z1], n);
+        }
+    }
+    t
+}
+
+#[test]
+fn placing_a_wall_whose_ends_sit_against_a_side_wall_is_refused_with_the_webs_words() {
+    // web/ui/walls.js placeWall passes the topology: a line drawn along the recessed box's end wall
+    // is refused at placement, and one that only runs up to it is checked as trimmed
+    let path = std::env::temp_dir().join(format!("sf-ffi-draw-{}-box.stl", std::process::id()));
+    std::fs::write(&path, write_binary_stl(&recessed_box(), "box")).unwrap();
+    let part = load_parts(path.to_string_lossy().into_owned())
+        .unwrap()
+        .remove(0);
+    let kit = DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), "{}".into()).unwrap();
+    let w = |p: [f64; 3]| kit.local_to_world(p.to_vec()).unwrap();
+    // (the part's own frame: the box as modelled)
+    let ok = kit
+        .check_wall(w([0.0, 12.0, 20.0]), w([0.0, 21.0, 20.0]), None)
+        .unwrap();
+    assert!(ok.ok(), "a line run to the end wall: {}", ok.reason());
+    let bad = kit
+        .check_wall(w([-20.0, 20.8, 20.0]), w([20.0, 20.8, 20.0]), None)
+        .unwrap();
+    assert!(!bad.ok());
+    assert_eq!(
+        bad.reason(),
+        "too close to the part’s side wall — draw the line a little further from it"
+    );
+}

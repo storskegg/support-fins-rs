@@ -114,7 +114,7 @@ fn enclosed_column(
 /// Since upstream `1e8558d` (#119) the outline is also measured, as `station_certified` measures a
 /// plate wall's: `nearestPart` at the wall's centre and both faces, refused when it `welds`.
 #[allow(clippy::too_many_arguments)]
-fn clear_between(
+pub fn clear_between(
     top: &[[f64; 3]],
     floor: &[FloorPt],
     k: usize,
@@ -162,6 +162,47 @@ fn clear_between(
         }
     }
     true
+}
+
+/// Port of `trimmedEnds` (web/prop/attached.js:105-116): a hand-drawn part wall's ends, trimmed the
+/// way Auto's are (#119 follow-up): stations are dropped from each end while `clear_between`
+/// refuses them, so the cap is never built flush against a side wall. Only the ENDS -- a line the
+/// user drew past a flank in the middle stays as drawn. Returns `[from, to)` into `top`, or `None`
+/// when too little is left.
+pub fn trimmed_ends(
+    top: &[[f64; 3]],
+    floor: &[FloorPt],
+    topo: &Topology,
+    rot: &Rot3,
+    offset: &Xyz,
+    cfg: &Config,
+) -> Option<[usize; 2]> {
+    let clear = |k: usize| {
+        clear_between(
+            top,
+            floor,
+            k,
+            topo,
+            rot,
+            offset,
+            cfg.prop.th,
+            cfg.prop.side_clear,
+            cfg.prop.gap,
+            cfg,
+        )
+    };
+    let (mut a, mut b) = (0usize, top.len());
+    while a < b && !clear(a) {
+        a += 1;
+    }
+    while b > a && !clear(b - 1) {
+        b -= 1;
+    }
+    if (b - a) as f64 >= cfg.prop.min_stations {
+        Some([a, b])
+    } else {
+        None
+    }
 }
 
 /// Why a part-attached refusal was counted: the plate path's own skip names (JS strings

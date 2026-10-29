@@ -242,16 +242,11 @@ pub struct PropConfig {
     // it is a cantilever. An ATTACHED edge (the part carries on) keeps its bridge.
     // grows with a nozzle's wider tip (nozzle.js)
     pub edge_inset: f64,
-    /// JS key `edgeFlatDeg`.
-    // ...on every overhang (up to 45deg from horizontal). It was only under a
-    // near-flat underside (30deg): a steeper face steps out just layerH / tan(angle)
-    // per layer down the slope, and flush walls then doubled a cube (3 -> 5). But
-    // the lip along a SIDE edge, running down the slope, is a full cantilever at any
-    // slope -- a cube at X35-X44 kept a 6.7 mm strip bare past each end wall (#269)
-    // -- and since #384 a flush end is one more row, never doubled (cube X40 3 -> 4).
-    pub edge_flat_deg: f64,
+    // (Flush end rows are a candidate layout the judge races per region, prop/endrows.js:
+    // a cube at X35-X44 kept a 6.7 mm strip bare past each end wall (#269); since #384 a
+    // flush end is one more row, never doubled. `PROP.edgeFlatDeg` (45deg) is gone.)
     /// JS key `edgeFlatDegSway`.
-    // With Sway on, the old 30deg: a sway brace keeps ~5 mm off any wall's foot, and a
+    // The one slope cutoff left: with Sway on, flush end rows only up to 30deg: a sway brace keeps ~5 mm off any wall's foot, and a
     // flush wall stands at the foot of the upright side it braces, so on a tilted box
     // the braces had nowhere to go (box X40, portal, tshape: 2 -> 0). Sway is the
     // user's own ask, so its braces win there (Matthew 2026-10-25).
@@ -419,7 +414,6 @@ impl Default for PropConfig {
             tube_two_sided_frac: 0.25,
             max_unsupported_span: 12.0,
             edge_inset: 0.6,
-            edge_flat_deg: 45.0,
             edge_flat_deg_sway: 30.0,
             tine_h: 0.2,
             tine_w: 0.5,

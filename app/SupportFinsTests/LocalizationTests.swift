@@ -115,6 +115,17 @@ struct LocalizationTests {
         #expect(JS.t("Lay a Face Flat", in: try lang("de")) == JS.t("Lay a face flat", in: try lang("de")))
     }
 
+    // tests/part_wall_ends_i18n.test.js: the reason drawnWall gives when a hand-drawn wall's ends sit against a side wall
+    // (shown through JS.t) is translated in every locale
+    @Test("the drawn part wall's side-wall refusal is translated in every locale")
+    func sideWallRefusal() throws {
+        let key = "too close to the part’s side wall — draw the line a little further from it"
+        for code in ["nl", "de", "pt", "zh-Hans", "ar"] {
+            let shown = JS.t(key, in: try lang(code))
+            #expect(shown != key, "\(code): missing \(key)")
+        }
+    }
+
     @Test("the tips are the web's, translated")
     func tips() throws {
         #expect(JS.t(Tip.finMode, in: try lang("de")) != Tip.finMode)

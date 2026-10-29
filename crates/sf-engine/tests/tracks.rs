@@ -134,6 +134,7 @@ fn a_bridge_turn_is_reported_and_the_unturned_pick_can_be_asked_for() {
         rot: &IDENTITY3,
         offset: &res.offset,
         sway: false,
+        rows_only: false,
     };
     let turned = patch_tracks(&pts, &tris, 1.0, Some(&sup), 12.0, None, true, &cfg());
     assert_eq!(turned.turned, Some([1.0, 0.0]));
@@ -163,6 +164,7 @@ fn a_free_edge_pulls_the_outermost_row_flush() {
         rot: &IDENTITY3,
         offset: &res.offset,
         sway: false,
+        rows_only: false,
     };
     let with = patch_tracks(&pts, &tris, 1.0, Some(&sup), 12.0, None, true, &cfg());
     let without = patch_tracks(&pts, &tris, 1.0, None, 12.0, None, true, &cfg());
@@ -178,8 +180,43 @@ fn a_free_edge_pulls_the_outermost_row_flush() {
 }
 
 #[test]
-fn sway_lowers_the_flatness_limit_for_free_edge_rows() {
-    // a gentle slope (about 38 deg) counts as flat for edgeFlatDeg 45 but not with Sway on (30)
+fn offered_end_rows_flag_the_free_edge_and_keep_the_mid_strip_rows() {
+    // rowsOnly (the race's base): the same deck, the mid-strip rows kept and the flush candidate
+    // only flagged `flushable` -- one row fewer than the laid candidate (it re-spreads, +1)
+    let topo = build_topology(soup(&[
+        block(-5.0, 5.0, -5.0, 5.0, 0.0, 20.0),
+        block(-5.0, 25.0, -8.0, 8.0, 20.0, 24.0),
+    ]));
+    let res = analyze(&topo, 45.0, &IDENTITY3);
+    let (_, tris, pts) = region_inputs(&topo, &res, &IDENTITY3, 0);
+    let laid = Support {
+        topo: &topo,
+        rot: &IDENTITY3,
+        offset: &res.offset,
+        sway: false,
+        rows_only: false,
+    };
+    let offer = Support {
+        rows_only: true,
+        ..laid
+    };
+    let a = patch_tracks(&pts, &tris, 1.0, Some(&laid), 12.0, None, true, &cfg());
+    let b = patch_tracks(&pts, &tris, 1.0, Some(&offer), 12.0, None, true, &cfg());
+    let none = patch_tracks(&pts, &tris, 1.0, None, 12.0, None, true, &cfg());
+    assert!(!a.flushable, "laid rows are not flagged");
+    assert!(b.flushable, "the free edges are flagged");
+    assert!(!none.flushable, "no part to probe: nothing to offer");
+    assert!(
+        b.lines.len() <= a.lines.len(),
+        "{} vs {}",
+        b.lines.len(),
+        a.lines.len()
+    );
+}
+
+#[test]
+fn sway_withholds_the_flush_candidate_past_its_cutoff() {
+    // a gentle slope (about 38 deg) is offered flush end rows, but not with Sway on (30 deg)
     let p = [
         [0.0, 0.0, 0.0],
         [20.0, 0.0, 15.5],
@@ -200,6 +237,7 @@ fn sway_lowers_the_flatness_limit_for_free_edge_rows() {
         rot: &IDENTITY3,
         offset: &off,
         sway: false,
+        rows_only: false,
     };
     let sway = Support {
         sway: true,
@@ -230,6 +268,22 @@ fn sway_lowers_the_flatness_limit_for_free_edge_rows() {
         b.lines.len().max(a.lines.len()).min(a.lines.len())
     );
     assert!(a.spacing.is_some() && b.spacing.is_some());
+    // offered under Sway past the cutoff: not even flagged
+    let offer_sway = Support {
+        rows_only: true,
+        ..sway
+    };
+    let c = patch_tracks(
+        &p,
+        &tris,
+        1.0,
+        Some(&offer_sway),
+        12.0,
+        Some([1.0, 0.0]),
+        true,
+        &cfg(),
+    );
+    assert!(!c.flushable);
 }
 
 // ----------------------------------------------------------------- split_region

@@ -172,6 +172,7 @@ fn summary(r: &PropsPass, full: bool, cap: Value) -> Value {
                         tag(q.rim),
                         tag(q.downhill),
                         tag(q.curved),
+                        tag(q.flush),
                     ]),
                 ),
             ])
@@ -239,6 +240,7 @@ fn opts_of(
         raster: bool_opt(plain, "raster"),
         sway_on: opt(plain, "sway").is_some_and(|s| bool_opt(s, "on") == Some(true)),
         rim_walls: bool_opt(plain, "rimWalls"),
+        end_rows: bool_opt(plain, "endRows"),
         downhill: bool_opt(plain, "downhill"),
         curved_walls: bool_opt(plain, "curvedWalls"),
         plate_only: bool_opt(plain, "plateOnly") == Some(true),
