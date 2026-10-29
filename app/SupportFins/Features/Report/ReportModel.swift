@@ -10,16 +10,19 @@ import SupportFinsCore
 final class ReportModel {
     enum CopyState { case idle, copied, failed }
 
-    @ObservationIgnored unowned let host: ViewerModel
+    @ObservationIgnored weak let host: ViewerModel?
     private(set) var copyState = CopyState.idle
     @ObservationIgnored private var resetTask: Task<Void, Never>?
 
     init(host: ViewerModel) { self.host = host }
 
+    /// The window closed: the Copied label's reset has nothing left to reset.
+    func close() { resetTask?.cancel() }
+
     /// The build on screen (`builtRequest()`, `ui/finbuild.js`): landed, not outdated by a newer request, for the one
     /// part on show. Nil while a newer one is pending or none is shown.
     private var shown: (build: BuildModel, result: BuildResult, request: BuildRequest)? {
-        guard let build = host.wiring?.build, !build.building, let result = build.latest,
+        guard let host, let build = host.wiring?.build, !build.building, let result = build.latest,
               let request = build.latestRequest, request == build.requested, host.session.parts.count == 1
         else { return nil }
         return (build, result, request)
@@ -31,13 +34,13 @@ final class ReportModel {
     /// The report of the build on screen, or nil when there is none (`current()`).
     func current() -> BuildReport? {
         guard let s = shown else { return nil }
-        let scale = host.features[ScaleFeature.self]?.model.scale ?? 1
+        let scale = host?.features[ScaleFeature.self]?.model.scale ?? 1
         return try? buildReport(result: s.result, scale: scale, optsJson: s.request.optionsJSON, tunablesJson: s.request.tunablesJSON)
     }
 
     /// The link: this build's settings and numbers, not the model (`report-link`).
     func issueURL() -> URL? {
-        guard let report = current() else { return nil }
+        guard let host, let report = current() else { return nil }
         let outcomes = host.features[DrawFeature.self]?.model.outcomes ?? [:]
         let drawn = host.session.drawnWalls.filter { outcomes[$0.id]?.ok == true }.count
         let text = report.url(site: Self.site, when: Self.today, drawn: UInt32(drawn),

@@ -8,7 +8,8 @@ import SwiftUI
 @MainActor
 protocol Feature: AnyObject {
     /// `host` is the window's shared models (session, controller, build wiring, toolbar). A feature keeps its own
-    /// state in itself, not in `ViewerModel`.
+    /// state in itself, not in `ViewerModel`, and holds the window weakly (`weak let host: ViewerModel?`): what it
+    /// starts (a Task, a timer, a closure the viewer calls) can outlive the window, and then finds nil and does nothing.
     init(host: ViewerModel)
 
     /// Items for the menu bar. The menu bar exists with no window focused, so this takes the instance of the
@@ -36,6 +37,8 @@ protocol Feature: AnyObject {
     /// again (after `partDidShow`). Nil: nothing to keep.
     func modelState() -> Any?
     func restoreModelState(_ state: Any)
+    /// The window is going (`ViewerModel`'s deinit): cancel the Tasks and timers the feature started, so none runs on.
+    func close()
 }
 
 extension Feature {
@@ -52,6 +55,7 @@ extension Feature {
     func partDidShow(_ parts: [LoadedPart]) {}
     func modelState() -> Any? { nil }
     func restoreModelState(_ state: Any) {}
+    func close() {}
 }
 
 extension [LoadedPart] {

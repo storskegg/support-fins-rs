@@ -18,7 +18,9 @@ import simd
 final class DrawModel {
     enum Shape: String, Sendable { case line, curve }
 
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
+    /// The window's session, kept here: a kit or sweep landing as the window closes still reads it.
+    let session: PartSession
 
     /// Line or Curve (`support_fins_draw_shape`, remembered).
     private(set) var shape: Shape
@@ -81,6 +83,7 @@ final class DrawModel {
 
     init(host: ViewerModel) {
         self.host = host
+        session = host.session
         shape = UserDefaults.standard.string(forKey: Self.shapeKey) == "curve" ? .curve : .line
         motion.onChange = { [weak self] in self?.refresh() }
         motion.onRings = { [weak self] fade in self?.controller?.ringFade = fade }
@@ -93,9 +96,8 @@ final class DrawModel {
         }
     }
 
-    var session: PartSession { host.session }
-    var controller: ViewerController? { host.controller }
-    private var build: BuildModel? { host.wiring?.build }
+    var controller: ViewerController? { host?.controller }
+    private var build: BuildModel? { host?.wiring?.build }
 
     // MARK: what is on
 
@@ -104,7 +106,7 @@ final class DrawModel {
     /// `braceActive`: Auto / Full with Sway braces on and no "+ Add" in progress.
     var braceActive: Bool {
         session.finsOn && session.settings.mode != .draw && !session.addByHand && session.settings.sway
-            && controller?.facePicking != true && host.wiring?.removal?.armed != true
+            && controller?.facePicking != true && host?.wiring?.removal?.armed != true
     }
     /// `drawShown`: the hand-placed supports are on screen and in the export.
     var drawShown: Bool {
@@ -146,13 +148,13 @@ final class DrawModel {
 
     /// The augment toggle (`augment-toggle`): no undo step, as the web.
     func toggleAugment() {
-        if host.wiring?.removal?.armed == true { host.wiring?.removal?.disarm(); host.wiring?.show() }
+        if host?.wiring?.removal?.armed == true { host?.wiring?.removal?.disarm(); host?.wiring?.show() }
         session.addByHand.toggle()
         message = ""
         clearPreview()
         sync()
         // the web re-runs the build (`settings.js` augment-toggle handler calls `refreshFins()`)
-        if session.finsOn { host.wiring?.scheduler?.refresh() }
+        if session.finsOn { host?.wiring?.scheduler?.refresh() }
     }
 
     // MARK: the window's changes (WindowModifier.onChange)
@@ -183,13 +185,13 @@ final class DrawModel {
                 walls: session.drawnWalls, finsOn: session.finsOn, mode: session.settings.mode, addByHand: session.addByHand,
                 swayOn: session.settings.sway, build: build?.latest.map { ObjectIdentifier($0) }, building: build?.building ?? false,
                 removed: session.removedFins, facePicking: controller?.facePicking ?? false,
-                removalArmed: host.wiring?.removal?.armed ?? false, dragging: session.ringDragging)
+                removalArmed: host?.wiring?.removal?.armed ?? false, dragging: session.ringDragging)
     }
 
     /// The window's state changed: which pointer mode is on, the kit for the pose, the sweep.
     func sync() {
         // Starting Remove fins ends "+ Add" (`remove.js:123`); fins off do too (`settings.js:416`).
-        if session.addByHand, host.wiring?.removal?.armed == true || !session.finsOn { session.addByHand = false }
+        if session.addByHand, host?.wiring?.removal?.armed == true || !session.finsOn { session.addByHand = false }
         if session.settings.mode == .draw, session.addByHand { session.addByHand = false }
         let mode: ViewerController.HandPicking = drawActive ? .walls : (braceActive ? .braces : .off)
         if mode != lastHandMode {
@@ -199,14 +201,23 @@ final class DrawModel {
         }
         controller?.handPicking = mode
         if mode == .off { motion.drop() }
-        host.wiring?.exporter?.drawn = { [weak self] in self?.exportDrawn ?? ExportModel.Drawn(sweep: nil, pending: false) }
-        if let board = host.features[PlatesFeature.self]?.board, let draw = host.features[DrawFeature.self] {
-            board.drawn = { [weak draw, unowned board] m in draw?.exportDrawn(m, board: board) }
-            board.walls = { [weak draw, unowned board] m in draw?.wallsOf(m, board: board) ?? [] }
+        host?.wiring?.exporter?.drawn = { [weak self] in self?.exportDrawn ?? ExportModel.Drawn(sweep: nil, pending: false) }
+        if let board = host?.features[PlatesFeature.self]?.board, let draw = host?.features[DrawFeature.self] {
+            board.drawn = { [weak draw, weak board] m in board.flatMap { draw?.exportDrawn(m, board: $0) } }
+            board.walls = { [weak draw, weak board] m in board.flatMap { draw?.wallsOf(m, board: $0) } ?? [] }
         }
         ensureKit()
         resweep()
         refresh()
+    }
+
+    /// The window closed: nothing it started (the kit, a ghost, a brace, the brace motion) goes on.
+    func close() {
+        kitTask?.cancel(); kitTask = nil
+        ghostTask?.cancel(); ghostTask = nil
+        braceTask?.cancel(); braceTask = nil
+        braceRest.cancel()
+        motion.stop()
     }
 
     /// A new part: the walls were the old part's.

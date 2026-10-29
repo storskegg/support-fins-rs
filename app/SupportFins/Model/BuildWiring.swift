@@ -107,6 +107,15 @@ final class BuildWiring {
         return kept
     }
 
+    /// The window closed: no watch, debounce, live build or spinner goes on, and the build in flight is dropped
+    /// (the engine stops it part-way; its delivery finds no one waiting).
+    func close() {
+        generation += 1
+        scheduler?.stop()
+        build?.cancel()
+        build?.onUpdate = nil
+    }
+
     /// The fins of the latest build on the viewer, minus the removed ones; the removal pointer re-armed to match.
     func show() {
         guard let build, let removal else { return }
