@@ -34,6 +34,7 @@ struct StatsCard: View {
                     if let info = fins?.info, !info.isEmpty {
                         Button { showFinInfo.toggle() } label: { Image(systemName: "info.circle") }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("About these supports")
                             .help("How these supports work, and what this pose leaves uncovered")
                             .popover(isPresented: $showFinInfo) {
                                 Text(info).padding().frame(width: 280, alignment: .leading)
@@ -117,6 +118,7 @@ struct StatusCard: View {
                         Text("of support material added").foregroundStyle(.secondary)
                         Button { showReceiptInfo.toggle() } label: { Image(systemName: "info.circle") }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("About the support material")
                             .help(FinReadout.receiptTip)
                             .popover(isPresented: $showReceiptInfo) {
                                 Text(FinReadout.receiptTip).padding().frame(width: 280, alignment: .leading)

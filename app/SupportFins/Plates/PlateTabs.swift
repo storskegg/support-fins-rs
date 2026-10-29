@@ -7,7 +7,17 @@ import Viewer
 struct PlateTabs: View {
     let board: PlateBoard
 
+    /// The strip as it is, or in a scroll view of the window's width when many plates make it wider than the window
+    /// (the web's `#plates` scrolls sideways at `max-width`).
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            strip
+            ScrollView(.horizontal, showsIndicators: false) { strip }.fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var strip: some View {
         HStack(spacing: 4) {
             ForEach(board.plates.indices, id: \.self) { i in tab(i) }
             Button { board.addPlate() } label: { Text("+").font(.system(size: 16)).padding(.horizontal, 6) }
