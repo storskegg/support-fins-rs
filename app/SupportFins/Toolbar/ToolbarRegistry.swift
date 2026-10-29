@@ -23,6 +23,8 @@ struct ToolbarBadge {
     /// A toggle badge (Move, `addBadge` with `setOn` and no popover, `ui/toolbar.js:134-136`): a tool with nothing to
     /// fold out, so a click just turns it on or off and any open popover stays as it is.
     var toggle: (isOn: () -> Bool, setOn: (Bool) -> Void)?
+    /// Text after the badge's title (Scale: the percent while it is not 100, `#scale-now`).
+    var detail: () -> String = { "" }
 
     init<Content: View>(isLit: @escaping () -> Bool = { false }, @ViewBuilder popover: @escaping () -> Content) {
         self.isLit = isLit
@@ -48,8 +50,10 @@ final class ToolbarRegistry {
     func register(_ slot: ToolbarSlot, badge: ToolbarBadge) { badges[slot] = badge }
 
     func register<Content: View>(_ slot: ToolbarSlot, isLit: @escaping () -> Bool = { false },
-                                 @ViewBuilder popover: @escaping () -> Content) {
-        badges[slot] = ToolbarBadge(isLit: isLit, popover: popover)
+                                 detail: @escaping () -> String = { "" }, @ViewBuilder popover: @escaping () -> Content) {
+        var badge = ToolbarBadge(isLit: isLit, popover: popover)
+        badge.detail = detail
+        badges[slot] = badge
     }
 
     /// Register a toggle badge: lit while the tool is on; it has no popover.

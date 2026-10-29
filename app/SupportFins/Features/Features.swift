@@ -8,6 +8,7 @@ enum Features {
         BuildSpinnerFeature.self,
         MoveFeature.self,
         RotateFeature.self,
+        ScaleFeature.self,
         SuggestFeature.self,
         StrengthFeature.self,
         ViewFeature.self,
