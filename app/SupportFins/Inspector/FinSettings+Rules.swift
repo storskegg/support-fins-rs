@@ -65,9 +65,9 @@ extension FinSettings {
     /// The Placement note under the segmented control (`MODE_NOTES`, `settings.js:79-83`).
     var modeNote: String {
         switch mode {
-        case .auto: "Places supports for you."
-        case .full: "Auto, plus walls under every overhang it leaves bare. More plastic."
-        case .draw: "You place each wall: click two points across an overhang."
+        case .auto: JS.t("Places supports for you.")
+        case .full: JS.t("Auto, plus walls under every overhang it leaves bare. More plastic.")
+        case .draw: JS.t("You place each wall: click two points across an overhang.")
         }
     }
 
@@ -117,7 +117,7 @@ extension FinSettings {
     /// `"2 changed"`, or empty when nothing is (`more.js:49-50`).
     var changedSummary: String {
         let n = changedFields.count
-        return n == 0 ? "" : "\(n) changed"
+        return n == 0 ? "" : JS.t("{n} changed", ["n": String(n)])
     }
 
     // MARK: collapsed summaries
@@ -126,10 +126,10 @@ extension FinSettings {
     /// layer height drops out while its field is hidden, and `interface` appears when one is chosen.
     var printerSummary: String {
         [
-            "\(Self.nozzleText(nozzle)) nozzle",
-            visibility.layerHeight ? "\(Self.numberText(layerHeight)) layers" : nil,
-            "\(Self.numberText(gap)) gap",
-            interfaceMaterial == .off ? nil : "interface",
+            "\(Self.nozzleText(nozzle)) \(JS.t("nozzle"))",
+            visibility.layerHeight ? "\(Self.numberText(layerHeight)) \(JS.t("layers"))" : nil,
+            "\(Self.numberText(gap)) \(JS.t("gap"))",
+            interfaceMaterial == .off ? nil : JS.t("interface"),
         ].compactMap { $0 }.joined(separator: " · ")
     }
 
@@ -138,9 +138,9 @@ extension FinSettings {
         if !tines { return "off" }
         let grip = tineDensity
         if tineDirection == .vertical {
-            return "\(grip <= 20 ? "fewer pins" : grip >= 80 ? "more pins" : "pins") · resin"
+            return "\(JS.t(grip <= 20 ? "fewer pins" : grip >= 80 ? "more pins" : "pins")) · \(JS.t("resin"))"
         }
-        return grip <= 20 ? "light grip" : grip >= 80 ? "firm grip" : "medium grip"
+        return grip <= 20 ? JS.t("light grip") : grip >= 80 ? JS.t("firm grip") : JS.t("medium grip")
     }
 
     // MARK: choices, limits and the rules that move a value

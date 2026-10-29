@@ -54,7 +54,7 @@ extension PlateBoard {
             return f.slot.xy == xy ? nil : (f.slot, xy)
         }
         guard !moves.isEmpty else { return }
-        session.pushMoves(moves.map { SlotMove(who: $0.slot.id, xy: $0.slot.xy) }, name: "Arrange")
+        session.pushMoves(moves.map { SlotMove(who: $0.slot.id, xy: $0.slot.xy) }, name: JS.t("Arrange"))
         placeSlots(moves.map { SlotMove(who: $0.slot.id, xy: $0.xy) })
     }
 

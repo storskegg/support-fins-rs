@@ -19,7 +19,7 @@ final class ReportFeature: Feature {
     static func menus(_ f: ReportFeature?) -> [MenuSection] {
         [MenuSection(menu: .edit, order: 20, entries: [
             .divider,
-            .item("Copy Build Settings", help: "Copy this build’s settings as JSON: with the model, they rebuild exactly these supports",
+            .item(JS.t("Copy Build Settings"), help: JS.t("Copy this build’s settings as JSON: with the model, they rebuild exactly these supports"),
                   enabled: f?.model.isAvailable == true) { f?.model.copySettings() },
         ])]
     }

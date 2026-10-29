@@ -29,6 +29,9 @@ struct ContentView: View {
             Color.clear
             if let controller = model.controller {
                 ViewerViewport(controller: controller)
+                    // the 3D view is never mirrored in a right-to-left language: the scene, its picking and the
+                    // orbit directions are the same as in English (the window around it mirrors)
+                    .environment(\.layoutDirection, .leftToRight)
                     .ignoresSafeArea()      // its accessibility identifier, `viewport`, is the view's own (ViewerViewport)
             }
         }
@@ -64,15 +67,19 @@ struct ContentView: View {
 /// The features' layers over the viewport, in `order`: each fills the window and aligns its content.
 private struct OverlayStack: View {
     var overlays: [WindowOverlay]
+    @Environment(\.layoutDirection) private var direction
 
     var body: some View {
         ZStack {
             ForEach(overlays) { layer in
-                if layer.ignoresSafeArea {
-                    layer.content().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: layer.alignment).ignoresSafeArea()
-                } else {
-                    layer.content().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: layer.alignment)
+                Group {
+                    if layer.ignoresSafeArea {
+                        layer.content().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: layer.alignment).ignoresSafeArea()
+                    } else {
+                        layer.content().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: layer.alignment)
+                    }
                 }
+                .environment(\.layoutDirection, layer.inViewportSpace ? .leftToRight : direction)
             }
         }
     }

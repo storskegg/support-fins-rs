@@ -124,12 +124,12 @@ final class DrawModel {
     /// The hint under the Line / Curve control (`syncDrawControls`).
     var hint: String {
         shape == .curve
-            ? "Click the two ends of a curved wall on the red faces, then a point it runs through — out past the ends for a bigger arc. Ends snap to another wall’s end, so two curves close a ring. Backspace takes back a point; Esc or right-click cancels."
-            : "Click two points across an overhang — straight onto the red faces — to lay a breakaway wall along that line. Hover an upright side to preview a sway brace: its top follows the cursor, and near the top of the side it runs full height. Click to stand it. Esc or right-click cancels."
+            ? JS.t("Click the two ends of a curved wall on the red faces, then a point it runs through — out past the ends for a bigger arc. Ends snap to another wall’s end, so two curves close a ring. Backspace takes back a point; Esc or right-click cancels.")
+            : JS.t("Click two points across an overhang — straight onto the red faces — to lay a breakaway wall along that line. Hover an upright side to preview a sway brace: its top follows the cursor, and near the top of the side it runs full height. Click to stand it. Esc or right-click cancels.")
     }
 
     /// The "+ Add walls by hand" button's text (`syncAugmentUI`).
-    var augmentTitle: String { session.addByHand ? "Done adding walls" : "+ Add walls by hand" }
+    var augmentTitle: String { session.addByHand ? JS.t("Done adding walls") : JS.t("+ Add walls by hand") }
 
     func setShape(_ new: Shape) {
         guard new != shape else { return }
@@ -535,7 +535,7 @@ final class DrawModel {
     private func showGhostMessage(_ msg: String) {
         guard msg != ghostMessage else { return }
         ghostMessage = msg
-        message = msg.isEmpty ? "" : "can’t place this curve: \(msg)"
+        message = msg.isEmpty ? "" : JS.t("can’t place this curve: {reason}", ["reason": JS.t(msg)])
     }
 
     private func mesh(_ buffer: GpuBuffer) -> OverlayMesh? {
@@ -687,12 +687,12 @@ final class DrawModel {
             // a curve too tight keeps its ends: the next click tries a wider bend
             if m != nil && r.reason().contains("too tight") { showGhostMessage(r.reason()); return }
             clearPreview()           // (clears a curve's live message first)
-            message = "couldn’t place that wall: \(r.reason())"
+            message = JS.t("couldn’t place that wall: {reason}", ["reason": JS.t(r.reason())])
             return
         }
         message = ""
         let wall = DrawnWall.wall(from: s, to: local(b), through: m.map(local))
-        session.perform("Draw Wall") { session.drawnWalls.append(wall) }
+        session.perform(JS.t("Draw Wall")) { session.drawnWalls.append(wall) }
         clearPreview()
         sync()
     }
@@ -705,13 +705,13 @@ final class DrawModel {
                                           autoBuild: session.finsOn && autoLike ? build?.latest : nil, removed: removedIDs()) else { return }
         dropGhost()
         guard spot.ok() else {
-            message = "couldn’t place that brace: \(spot.reason())"
+            message = JS.t("couldn’t place that brace: {reason}", ["reason": JS.t(spot.reason())])
             return
         }
         message = ""
         let p = spot.point()
         let wall = DrawnWall.brace(at: local(SIMD3(p[0], p[1], p[2])), face: hit.face, capped: !spot.full())
-        session.perform("Add Sway Brace") { session.drawnWalls.append(wall) }
+        session.perform(JS.t("Add Sway Brace")) { session.drawnWalls.append(wall) }
         sync()
     }
 
@@ -739,7 +739,7 @@ final class DrawModel {
     /// Remove selected (`removeSelected`): one undo step.
     func removeSelected() {
         guard let id = selectedID else { return }
-        session.perform("Remove Support") { session.drawnWalls.removeAll { $0.id == id } }
+        session.perform(JS.t("Remove Support")) { session.drawnWalls.removeAll { $0.id == id } }
         selectedID = nil
         message = ""
         sync()
@@ -748,7 +748,7 @@ final class DrawModel {
     /// Clear all (`draw-clear`): the hand-drawn walls, one undo step.
     func clearAll() {
         guard hasWalls else { return }
-        session.perform("Clear Walls") { session.drawnWalls = [] }
+        session.perform(JS.t("Clear Walls")) { session.drawnWalls = [] }
         message = ""
         clearPreview()
         sync()

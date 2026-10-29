@@ -24,7 +24,7 @@ struct PartDocument: FileDocument {
     var filename: String
 
     init(configuration: ReadConfiguration) throws {
-        filename = configuration.file.filename ?? "Part"
+        filename = configuration.file.filename ?? JS.t("Part")
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
