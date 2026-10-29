@@ -16,8 +16,9 @@ final class WhatsNewUITests: PartWindowUITestCase {
         app.launchArguments += ["-SFChangelogFixture", list.path]
         try openFixturePart()
 
-        menuBarItem("Help").click()
-        app.menuItems["What's new"].click()
+        let help = menuBarItem("Help")
+        help.click()
+        help.menuItems["What's new"].click()
 
         let heading = element("whatsnew-heading")
         XCTAssertTrue(heading.waitForExistence(timeout: 10), "the sheet's heading")

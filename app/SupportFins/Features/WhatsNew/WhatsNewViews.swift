@@ -101,6 +101,5 @@ struct WhatsNewSheet: View {
         }
         .padding(20)
         .frame(width: 480)
-        .accessibilityIdentifier("whatsnew-sheet")
     }
 }
