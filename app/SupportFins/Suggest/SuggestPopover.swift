@@ -53,6 +53,8 @@ struct SuggestRow: View {
             .foregroundStyle(row.cantPrint ? Color.red : Color.primary)
         }
         .buttonStyle(.plain)
+        // one element per row (its words as the label), so each row is queryable by its identifier whatever holds it
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("suggest-row")
     }
 }

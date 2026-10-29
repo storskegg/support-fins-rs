@@ -16,10 +16,26 @@ final class SuggestUITests: PartWindowUITestCase {
         XCTAssertFalse(popoverElement("suggest-row").exists, "opening the popover ranks nothing")
 
         button.click()
-        // the label is `Ranking…` (then `Ranking… 40%`) only while it runs: a small part may be done before it is read
-        waitFor("the ranking is listed", timeout: 60) { self.popoverElement("suggest-row").exists }
+        // On any failure below, the accessibility tree of the whole app is attached, so a failed run says what the
+        // popover held (rows missing, rows folded into another element, or the ranking's error text).
+        func attachTree(_ why: String) {
+            let tree = XCTAttachment(string: "\(why)\n\n\(self.app.debugDescription)")
+            tree.name = "accessibility tree: \(why)"
+            tree.lifetime = .keepAlways
+            self.add(tree)
+        }
+        // First the ranking itself: the label is `Ranking…` (then `Ranking… 40%`) only while it runs, and the fixture
+        // is tiny, so it may be over before the first read.
+        let rows = popoverElement("suggest-row")
+        let note = popoverElement("suggest-note")
+        let done = waitUntil(timeout: 60) { rows.exists || note.exists }
+        if !done || !rows.exists {
+            attachTree("no rows; popover button '\(button.label)', note '\(note.exists ? note.label : "(none)")', popover exists \(app.popovers.count)")
+        }
+        XCTAssertTrue(done, "the ranking produced neither rows nor a note within 60 s")
+        XCTAssertTrue(rows.exists, "the ranking is listed (note: \(note.exists ? note.label : "none"))")
         XCTAssertEqual(button.label, "Suggest orientation", "the button is back once the ranking is in")
         XCTAssertTrue(button.isEnabled)
-        XCTAssertTrue(popoverElement("suggest-note").exists)
+        XCTAssertTrue(note.exists)
     }
 }
