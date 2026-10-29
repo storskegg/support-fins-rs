@@ -103,6 +103,21 @@ struct SuggestModelTests {
         #expect(model.state == .idle && model.rows.isEmpty, "the answer to a dropped ranking never lands")
     }
 
+    /// The toolbar button sends the build's options (`FinSettings().optionsJSON()`), page extras and all
+    /// (`tallRibs`, `curvedWalls`, Draw's mode, the sway extras): the ranking must take them, not fail with
+    /// "unknown dialog option tallRibs" and show no rows (#206).
+    @Test(arguments: [FinSettings.Mode.auto, .full, .draw], [false, true])
+    func theAppsOwnOptionsRank(mode: FinSettings.Mode, sway: Bool) async throws {
+        var settings = FinSettings()
+        settings.mode = mode
+        settings.sway = sway
+        let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
+        model.rank(thresholdDegrees: 45, optionsJSON: settings.optionsJSON(), currentBore: 0, density: 1.24)
+        #expect(await eventually { !model.isRanking })
+        guard case .ready = model.state else { Issue.record("ranking failed: \(model.state)"); return }
+        #expect(!model.rows.isEmpty)
+    }
+
     @Test func badOptionsAreShownAsTheEnginesMessage() async throws {
         let model = SuggestModel(part: try TestParts.cube(), pose: FakePose().access)
         model.rank(thresholdDegrees: 45, optionsJSON: #"{"mode":"bogus"}"#, currentBore: 0, density: 1.24)

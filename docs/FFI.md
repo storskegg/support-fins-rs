@@ -192,7 +192,9 @@ impl Suggester {
 ```
 
 `opts_json` is the same `options.json` object a build takes: the finalists are built under that gap, pad and
-nozzle (the page hands the worker its `supportTunables()`). `SuggestResult` and `StrengthAdvice` carry the text
+nozzle (the page hands the worker its `supportTunables()`). The build's request extras (`tallRibs`, `curvedWalls`,
+`{"mode":"draw"}`, `sway.uncappedDepth`, `sway.crossRise`) are accepted and set aside as `Builder.build` does: they are
+not clearances, so the app sends `FinSettings.optionsJSON()` unchanged. `SuggestResult` and `StrengthAdvice` carry the text
 the page writes, so the row strings, badges and notes cannot drift from `ui/suggest.js`.
 
 **Readout data added to `summary_json()`** (all computed from the build, so Swift never touches geometry):

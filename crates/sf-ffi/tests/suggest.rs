@@ -172,6 +172,42 @@ fn a_pose_that_points_the_bores_up_earns_the_bores_clean_badge_only_when_the_cur
     }
 }
 
+/// The app sends Suggest the build's whole `opts_json` (`FinSettings.optionsJSON()`), page extras
+/// included: `tallRibs`, `curvedWalls`, Draw's `mode`, and with braces `sway.uncappedDepth` /
+/// `sway.crossRise`. The ranking takes them as the build does (they don't touch its clearances), never
+/// as "unknown dialog option tallRibs" (#206: the popover showed that error and no rows).
+#[test]
+fn the_apps_build_options_rank_like_the_dialogs_own() {
+    let part = load("lbracket");
+    // FinSettings() as the app sends it: Auto, the defaults, braces off
+    let dialog = r#""mode":"auto","threshold":45,"nozzle":0.4,"tines":true,"tineDensity":0,"tineDir":"horizontal","pinDepth":0.1,"layerHeight":0.2,"gap":0.2,"padStyle":"auto","cutout":"none","coverage":0.5,"plateOnly":false,"separateWalls":"off","longWalls":true"#;
+    let app = format!(r#"{{{dialog},"tallRibs":true,"curvedWalls":false,"sway.on":false}}"#);
+    let want = part
+        .suggest_orientations(45.0, format!(r#"{{{dialog},"sway.on":false}}"#), ctx())
+        .unwrap();
+    assert!(!want.rows.is_empty());
+    assert_eq!(
+        part.suggest_orientations(45.0, app.clone(), ctx()).unwrap(),
+        want
+    );
+    assert_eq!(
+        part.suggest_orientations_wide(45.0, app, ctx(), 1.0)
+            .unwrap(),
+        want
+    );
+    // braces on: the request extras ride beside the sway keys
+    let sway = r#"{"mode":"auto","tallRibs":false,"curvedWalls":true,"sway.on":true,"sway.gripFrom":0,"sway.tineSpacing":6,"sway.reach":0.15,"sway.uncappedDepth":false,"sway.crossRise":0.5}"#;
+    assert!(part.suggest_orientations(45.0, sway.into(), ctx()).is_ok());
+    // Draw: options.json has no such mode; the page's finOpts sends it
+    let draw = r#"{"mode":"draw","tallRibs":true,"curvedWalls":false,"sway.on":false}"#;
+    assert!(part.suggest_orientations(45.0, draw.into(), ctx()).is_ok());
+    // a bad extra is still the build's error
+    assert!(
+        part.suggest_orientations(45.0, r#"{"tallRibs":1}"#.into(), ctx())
+            .is_err()
+    );
+}
+
 #[test]
 fn bad_input_is_an_engine_error() {
     let part = load("cube");

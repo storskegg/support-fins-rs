@@ -6,7 +6,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 
-use sf_cli::entry::{options_from_dialog, support_tunables};
+use sf_cli::entry::{PageRequest, options_from_dialog, support_tunables};
 use sf_engine::config::{Config, apply_tunables};
 use sf_engine::fins::seating::SeatingKind;
 use sf_engine::jsnum;
@@ -16,7 +16,7 @@ use sf_engine::orient::{
     suggest_orientations_wide_opts, suggest_strength_pose,
 };
 
-use crate::builder::dialog_values;
+use crate::builder::split_options;
 use crate::part::{FfiError, Part};
 
 /// What the page knows beyond the part when it ranks (`suggestCurBore`, `materialDensity`).
@@ -268,7 +268,11 @@ impl Part {
         if !threshold_deg.is_finite() {
             return Err(engine("threshold must be a finite number of degrees"));
         }
-        let options = options_from_dialog(&dialog_values(opts_json)?).map_err(engine)?;
+        // `opts_json` is the build's (`FinSettings.optionsJSON()`): the page's request extras (`tallRibs`,
+        // `curvedWalls`, Draw's `mode`, the sway extras) are taken out as the build takes them. They are not
+        // clearances, so the ranking's tunables (`supportTunables()`, ui/finbuild.js) don't depend on them.
+        let (dialog, _) = split_options(opts_json, &mut PageRequest::default())?;
+        let options = options_from_dialog(&dialog).map_err(engine)?;
         let mut cfg = Config::default();
         apply_tunables(&mut cfg, Some(&support_tunables(&options).map_err(engine)?));
         let opts = SuggestOpts {
