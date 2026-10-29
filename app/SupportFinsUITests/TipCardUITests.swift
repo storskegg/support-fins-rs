@@ -5,6 +5,8 @@ import XCTest
 /// the window and the helpers are `PartWindowUITestCase`'s.
 final class TipCardUITests: PartWindowUITestCase {
     private let tooltip = "Your printer: nozzle, layer height, support gap, interface material. Click to change."
+    private let gapTooltip = "Clearance between a support top and the part. Bigger = cleaner surface / easier removal; "
+        + "too big stops holding the overhang. Default 0.2mm."
 
     private var card: XCUIElement { popoverElement("tip-card") }
 
@@ -43,8 +45,9 @@ final class TipCardUITests: PartWindowUITestCase {
         app.typeKey(.tab, modifierFlags: .shift)   // out of the field
         app.typeKey(.tab, modifierFlags: [])       // and back in, by the keyboard
         XCTAssertTrue(card.waitForExistence(timeout: 5), "the card shows on keyboard focus")
-        XCTAssertTrue(card.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Clearance between a support top'")).count > 0,
-                      "it is the Support gap's tooltip")
+        // a SwiftUI Text's string is the static text's value on macOS (its label is empty), so match it whole, as the
+        // hover test does (`staticTexts[_]` matches the value too)
+        XCTAssertTrue(card.staticTexts[gapTooltip].exists, "it is the Support gap's tooltip")
     }
 }
 

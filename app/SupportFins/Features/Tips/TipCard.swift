@@ -10,9 +10,21 @@ struct TipCard: View {
     let pic: String?
     let text: String
 
+    /// The card's width with a picture: the 240-wide picture and the padding (the web's 260 px card, `.tip-card`).
+    static let width: CGFloat = 264
+
+    private var hasPicture: Bool { pic.map(TipPictures.has) ?? false }
+
+    /// A card without a picture is only as wide as its text, up to a card's width (the web's `.tip-card.plain`,
+    /// `width: max-content`).
+    static func plainWidth(_ text: String) -> CGFloat {
+        let line = NSAttributedString(string: text, attributes: [.font: NSFont.preferredFont(forTextStyle: .callout)]).size().width
+        return min(width, ceil(line) + 2 + 24)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let pic, TipPictures.has(pic) {
+            if hasPicture, let pic {
                 // the pictures have no words and are drawn as the web draws them, left to right in every language
                 TipPicture(key: pic).environment(\.layoutDirection, .leftToRight).frame(maxWidth: .infinity)
             }
@@ -21,7 +33,7 @@ struct TipCard: View {
             }
         }
         .padding(12)
-        .frame(width: 264, alignment: .leading)
+        .frame(width: hasPicture ? Self.width : Self.plainWidth(text), alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tip-card")
     }
