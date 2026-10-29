@@ -5,6 +5,7 @@ import Testing
 
 /// The Help Book (`Help/SupportFins.help`, built from the web's pages by `tools/helpbook`) is in the app and registered, so
 /// the system's Help > Support Fins Help opens it.
+@MainActor
 @Suite("Help Book")
 struct HelpBookTests {
     private var book: URL? { Bundle.main.url(forResource: "SupportFins", withExtension: "help") }
