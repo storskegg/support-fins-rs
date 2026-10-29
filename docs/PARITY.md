@@ -135,3 +135,18 @@ doubles, up to 1.8e-15). Rounded to f32 the vertices look identical, but the mes
 bits, and with Apple's libm 10 of the 23 meshes came out with other diagonals and another triangle order (the same vertices
 and counts). `tools/occt/` therefore builds OpenCascade and the shim with every maths call renamed to musl's
 (`wasm_math.h`, `libwasmmath.a` from Emscripten 3.1.69's sources), no fused multiply-add and no libm builtin rewriting.
+
+## Sessions (`session`)
+
+`parity/oracle/session.js` runs the page's session code (`web/ui/session.js`) on its real text, in Deno: a copy of the file in a
+temp directory whose imports point at small stand-ins for the page's state (`parity/oracle/lib/sessionpage.js`; the page's
+fields are parsed out of `index.html`, `FORM_IDS` and `VIEWER_IDS` out of `ui/history.js`, `renderImportNote` out of
+`ui/io.js`). It saves 10 models as `export-3mf` does (the real `sessionOf` over the real `writePlate3MF`: one model, hidden fins,
+a pose, Auto / Full / Draw, removed fins with the keys of the real `assignKeys`, hand-drawn walls and braces, a scaled part,
+every setting, a part away from the centre), a plate of two (no session), and 18 hand-built or older sessions (a form no field
+can take, a changed part, a malformed wall ...), and reads each file back (`readThreeMF`, `partObjectOf`, `restoreSession`,
+with and without `beside`). `parity/corpus/session/cases.json` holds, per case, what was saved (`write`: the model, the web's
+state, the session text, the file's size and FNV hash) and what the reader restored (`read`: the walls, the removed keys, the
+mode, the form, the import note and the note after a rescale); the `.3mf` files are beside it (the app's tests open them).
+Replays: `sf-io/tests/parity_session.rs` (reader, exact), `sf-ffi/tests/session.rs` (the FFI reader and the note; `export`
+writes the file's bytes; the page's reader, `parity/cli/session_check.js`, reads the native files).

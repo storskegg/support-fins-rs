@@ -197,6 +197,7 @@ final class DrawModel {
         host.wiring?.exporter?.drawn = { [weak self] in self?.exportDrawn ?? ExportModel.Drawn(sweep: nil, pending: false) }
         if let board = host.features[PlatesFeature.self]?.board, let draw = host.features[DrawFeature.self] {
             board.drawn = { [weak draw, unowned board] m in draw?.exportDrawn(m, board: board) }
+            board.walls = { [weak draw, unowned board] m in draw?.wallsOf(m, board: board) ?? [] }
         }
         ensureKit()
         resweep()
