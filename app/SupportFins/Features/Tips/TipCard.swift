@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// A tip card (`web/ui/tips.js`, GH #351): a setting's tooltip under its 240 x 130 diagram (`web/ui/tippics.js`), shown
@@ -43,6 +44,11 @@ private struct TipCardModifier: ViewModifier {
                     shown = false
                 }
             }
+            // keyboard focus shows it too, as the web's `focusin` does when the last input was a key (`tips.js`)
+            .background(FocusProbe { focused in
+                wait?.cancel()
+                shown = focused
+            })
             .onDisappear { wait?.cancel(); shown = false }
             .popover(isPresented: $shown, arrowEdge: .leading) { TipCard(pic: pic, text: text) }
             .accessibilityHint(text)
@@ -53,5 +59,47 @@ extension View {
     /// The setting's tip card instead of a plain tooltip: `pic` is its picture's key in `TipPictures` (`data-tip-pic`).
     func tipCard(pic: String? = nil, _ text: String) -> some View {
         modifier(TipCardModifier(pic: pic, text: text))
+    }
+}
+
+/// Reports when keyboard focus moves into or out of the view it sits behind: the window's first responder lies within the
+/// view's frame, and focus got there by a key (Tab), not a click (`byKey` in `web/ui/tips.js`: a click in a field also
+/// counts as `:focus-visible` there, and must not raise the card).
+private struct FocusProbe: NSViewRepresentable {
+    let onChange: @MainActor (Bool) -> Void
+
+    func makeNSView(context: Context) -> ProbeView {
+        let v = ProbeView()
+        v.onChange = onChange
+        return v
+    }
+
+    func updateNSView(_ v: ProbeView, context: Context) { v.onChange = onChange }
+
+    final class ProbeView: NSView {
+        var onChange: (@MainActor (Bool) -> Void)?
+        private var observation: NSKeyValueObservation?
+        private var inside = false
+
+        override func viewDidMoveToWindow() {
+            observation = window?.observe(\.firstResponder, options: [.new]) { [weak self] window, _ in
+                MainActor.assumeIsolated { self?.responderChanged(window) }
+            }
+        }
+
+        private func responderChanged(_ window: NSWindow) {
+            guard let r = window.firstResponder as? NSView, r !== self else { set(false); return }
+            let mine = convert(bounds, to: nil)
+            let theirs = r.convert(r.bounds, to: nil)
+            let within = mine.contains(CGPoint(x: theirs.midX, y: theirs.midY))
+            // focus that arrived by a click leaves the card alone; focus leaving always hides it
+            if within { if NSApp.currentEvent?.type == .keyDown { set(true) } } else { set(false) }
+        }
+
+        private func set(_ on: Bool) {
+            guard on != inside else { return }
+            inside = on
+            onChange?(on)
+        }
     }
 }
