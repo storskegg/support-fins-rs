@@ -77,6 +77,9 @@ final class PlateBoard {
                                 build: build, offset: controller.renderer.offset, flags: controller.renderer.flagBuffer(part: 0),
                                 settings: settings)
         stash.build.onUpdate = { [weak self] in self?.sync() }
+        for f in host.features.instances {
+            if let state = f.modelState() { stash.featureStates[ObjectIdentifier(type(of: f))] = state }
+        }
         m.stash = stash
         session.install(parts: [], pose: .identity, removedFins: [], owner: nil)
         controller.show([], name: "")
@@ -101,6 +104,9 @@ final class PlateBoard {
         host.openedName = s.openedName
         m.stash = nil
         host.features.partDidShow([LoadedPart(name: s.name, mesh: s.part)])
+        for f in host.features.instances {
+            if let state = s.featureStates[ObjectIdentifier(type(of: f))] { f.restoreModelState(state) }
+        }
     }
 
     /// Swap the live model for slot `k` of the plate being edited. The world shifts by the difference of their

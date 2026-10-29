@@ -679,6 +679,9 @@ pub struct PageRequest {
     pub uncapped_depth: Option<bool>,
     /// `swayOpts().crossRise` (a fraction).
     pub cross_rise: Option<f64>,
+    /// `opts.mode` where the dialog has no value for it: `draw`, which builds only the seating verdict and
+    /// the bed pad (`buildFins`; the page's Draw places its own walls). `options.json` has no such mode.
+    pub mode: Option<String>,
 }
 
 /// A build request ready for `build_fins`: the options, the overhang threshold and whether the
@@ -757,7 +760,10 @@ pub fn engine_request(
         r
     });
     let opts = FinsOpts {
-        mode: Some(m.mode.clone()),
+        mode: Some(
+            page.and_then(|p| p.mode.clone())
+                .unwrap_or_else(|| m.mode.clone()),
+        ),
         // `opts.bedPad && opts.padStyle !== 'off'` (bedPad is always true here)
         bed_pad: Some(m.pad_style != "off"),
         tines: Some(m.tines),

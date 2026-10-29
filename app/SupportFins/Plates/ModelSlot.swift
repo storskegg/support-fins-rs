@@ -60,6 +60,8 @@ final class ParkedModel {
     var flags: MTLBuffer?
     /// The plate's settings when it was parked: a model put back onto a plate that has none keeps them.
     let settings: PlateSettings
+    /// What the features keep per model (`Feature.modelState`), by feature type.
+    var featureStates: [ObjectIdentifier: Any] = [:]
     @ObservationIgnored private var layer: (result: ObjectIdentifier, layer: SupportLayer)?
 
     init(part: CorePart, openedName: String?, pose: Pose, removedFins: Set<FinKey>, build: BuildModel, offset: SIMD3<Float>,

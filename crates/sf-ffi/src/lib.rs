@@ -6,6 +6,7 @@
 #![allow(unsafe_code)]
 
 mod builder;
+mod draw;
 mod footprint;
 mod gpu;
 mod part;
@@ -14,8 +15,9 @@ mod suggest;
 
 pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, build_part, build_part_cancellable, export,
-    export_file_name,
+    export_file_name, export_with_drawn,
 };
+pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
 pub use footprint::{
     Footprint, footprint_clash_cells, footprint_of_build, footprint_of_part, footprint_spot,
     footprint_union, plate_under,

@@ -191,4 +191,26 @@ struct PlateBoardTests {
         #expect(await eventually { board.plate.live == 0 })
         #expect(model.session.parts[0].info.name.hasPrefix("first"))
     }
+
+    @Test func theStrengthLoadAndTheSuggestListAreKeptPerModel() async throws {
+        let (model, board) = try await window(name: "first")
+        let strength = try #require(model.features[StrengthFeature.self])
+        let suggest = try #require(model.features[SuggestFeature.self])
+        try #require(strength.model != nil && suggest.model != nil)
+        strength.model?.setLoad(.right)
+        let load = try #require(strength.model?.loadLocal)
+        suggest.model?.rank(thresholdDegrees: 45, optionsJSON: "{}", currentBore: 0, density: 1.24)
+        #expect(await eventually { suggest.model?.kept != nil })
+        let ranked = try #require(suggest.model?.kept)
+        suggest.model?.pick(0)
+        try await add(model, "second")
+        // the new model has neither
+        #expect(strength.model?.loadLocal == nil && suggest.model?.kept == nil)
+        #expect(model.controller?.loadDirection == nil)
+        board.select(0)
+        #expect(strength.model?.loadLocal == load && model.controller?.loadDirection != nil)
+        #expect(suggest.model?.kept?.result.rows.count == ranked.result.rows.count && suggest.model?.kept?.picked == 0)
+        board.select(1)
+        #expect(strength.model?.loadLocal == nil && suggest.model?.kept == nil)
+    }
 }
