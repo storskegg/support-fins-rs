@@ -18,5 +18,6 @@ enum Features {
         PlatesFeature.self,
         ExportFeature.self,
         ReadoutFeature.self,
+        CalibrationFeature.self,
     ]
 }
