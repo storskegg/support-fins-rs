@@ -155,6 +155,18 @@ pub fn plate_under(
         .unwrap_or_default()
 }
 
+/// Arrange (`arrange`, `ui/arrange.js`): where each model of the plate goes on a `bx` x `by` bed, `gap` mm apart --
+/// the biggest first, each at the free spot nearest the centre, a model with no room left in a row past the bed's
+/// right edge. Flat `x, y` per footprint, in the order given.
+#[uniffi::export]
+pub fn footprint_arrange(grids: Vec<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Vec<f64> {
+    let refs: Vec<&Grid> = grids.iter().map(|f| &f.grid).collect();
+    fp::arrange(&refs, bx, by, gap)
+        .into_iter()
+        .flatten()
+        .collect()
+}
+
 /// Move's step (`dragStep`, `ui/footprint.js:248-265`; the probe is `clashAt`, `ui/arrange.js:101-110`): where a
 /// model whose own footprint is `grid` goes when it stands at `at` and the pointer asks for `to`, given the
 /// `others` (each already placed where it stands). The clash at a spot is the cells the model would share with the

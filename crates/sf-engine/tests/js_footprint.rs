@@ -311,3 +311,25 @@ fn plate_under_the_edited_plate_a_gap_or_past_the_row_is_nothing() {
     );
     assert!(under([560.0, 0.0]).is_none(), "past the last plate");
 }
+
+// arrange.js:153-165 (not covered by the JS tests): pack's spots, and a row past the right edge for what has no room
+#[test]
+fn arrange_puts_what_has_no_room_in_a_row_past_the_bed() {
+    let g = ras(&bx(-40.0, -40.0, 40.0, 40.0));
+    let at = sf_engine::footprint::arrange(&[&g, &g, &g], 100.0, 100.0, 10);
+    let packed = pack(&[Some(&g), Some(&g), Some(&g)], 100.0, 100.0, 10);
+    assert_eq!(
+        at[0],
+        [packed[0].unwrap()[0] as f64, packed[0].unwrap()[1] as f64]
+    );
+    // the other two: x from the bed's right edge plus the gap, each `w + gap` further on; y centred on the bed's middle row
+    let (w, h) = (g.w as f64, g.h as f64);
+    assert_eq!(
+        at[1],
+        [
+            (60.0 - g.x0 as f64),
+            sf_engine::jsnum::round(-(g.y0 as f64 + h / 2.0))
+        ]
+    );
+    assert_eq!(at[2][0], 60.0 + w + 10.0 - g.x0 as f64);
+}

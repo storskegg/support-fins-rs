@@ -651,6 +651,175 @@ pub fn export_with_drawn(
     export_impl(&path, &parts, &builds, tris, &options_json)
 }
 
+/// One model of a plate to write (`gs` of `plateGeometry`, `ui/export.js`): its part and the build whose fins it
+/// carries (none: the part alone, seated from `pose` at `threshold`, nine numbers column-major), the hand-placed
+/// walls drawn for it, the fins removed by hand (record ids) and where it stands on the plate (`x`, `y`, mm).
+#[derive(uniffi::Record)]
+pub struct PlateModel {
+    pub part: Arc<Part>,
+    pub build: Option<Arc<BuildResult>>,
+    pub drawn: Option<Arc<crate::draw::DrawnSweep>>,
+    pub pose: Vec<f64>,
+    pub threshold: f64,
+    pub removed: Vec<u64>,
+    pub x: f64,
+    pub y: f64,
+}
+
+/// One plate's file of Export all plates: its name in the zip and its models.
+#[derive(uniffi::Record)]
+pub struct PlateFile {
+    pub name: String,
+    pub models: Vec<PlateModel>,
+}
+
+/// A plate's 3MF (`FORMATS['export-3mf']` over `plateGeometry`, `ui/export.js`; `writePlate3MF`, `web/threemf.js`):
+/// every model its own objects where it stands, the plate's centre the bed's, titled with the first model's name.
+fn plate_3mf_bytes(models: &[PlateModel], bed: Option<Bed>) -> Result<Vec<u8>, FfiError> {
+    let Some(first) = models.first() else {
+        return Err(engine("a plate with no models has nothing to write"));
+    };
+    let mut written = Vec::with_capacity(models.len());
+    for m in models {
+        let pose = if m.build.is_some() {
+            IDENTITY3
+        } else {
+            rot9(&m.pose)?
+        };
+        let drawn = m.drawn.as_ref().map_or(&[][..], |d| d.tris());
+        let (rot, offset, added) = seat_and_added(
+            &m.part,
+            m.build.as_ref(),
+            drawn,
+            &m.removed,
+            pose,
+            m.threshold,
+        );
+        written.push(plate_model(&m.part, rot, offset, &added, [m.x, m.y]));
+    }
+    Ok(write_plate_3mf(
+        &written,
+        first.part.stem(),
+        true,
+        None,
+        bed,
+    ))
+}
+
+fn plate_bed(options_json: &str) -> Result<Option<Bed>, FfiError> {
+    Ok(export_options(options_json)?.bed.map(|(x, y)| Bed { x, y }))
+}
+
+fn write_file(path: &str, bytes: Vec<u8>) -> Result<(), FfiError> {
+    std::fs::write(path, bytes).map_err(|e| FfiError::Io {
+        message: format!("{path}: {e}"),
+    })
+}
+
+/// Write a plate of several models as one 3MF (`export-3mf` with a plate of more than one): each model's part, its
+/// supports (its build's fins less the removed ones, its drawn walls, its pad) and its slicer parts, at its spot,
+/// `options_json` `{ "bed": [x, y] }` the build volume the spots are on. The bytes are `writePlate3MF`'s.
+#[uniffi::export]
+pub fn export_plate(
+    path: String,
+    models: Vec<PlateModel>,
+    options_json: String,
+) -> Result<(), FfiError> {
+    let bytes = plate_3mf_bytes(&models, plate_bed(&options_json)?)?;
+    write_file(&path, bytes)
+}
+
+/// Export all plates (`exportAll`, `ui/plates.js`): each plate's 3MF as `plate.name` in one .zip (`zipStore`).
+#[uniffi::export]
+pub fn export_plates(
+    path: String,
+    plates: Vec<PlateFile>,
+    options_json: String,
+) -> Result<(), FfiError> {
+    let bed = plate_bed(&options_json)?;
+    let mut files = Vec::with_capacity(plates.len());
+    for p in &plates {
+        files.push(sf_io::zip::ZipFile {
+            name: p.name.clone(),
+            data: sf_io::zip::ZipData::Bytes(plate_3mf_bytes(&p.models, bed)?),
+        });
+    }
+    write_file(&path, sf_io::zip::zip_store(&files))
+}
+
+/// The pose, the seating offset and the supports a model is written with (`modelGeometry`, `ui/export.js`): with a
+/// `build`, the build's own (its fins less the `removed` ones, the `drawn` walls, the pad); without, the part alone
+/// seated from an analysis of `pose` at `threshold`.
+fn seat_and_added(
+    part: &Part,
+    build: Option<&Arc<BuildResult>>,
+    drawn: &[sf_engine::types::V4],
+    removed: &[u64],
+    pose: [f64; 9],
+    threshold: f64,
+) -> (Option<[f64; 9]>, Xyz, Vec<sf_engine::types::V4>) {
+    match build {
+        Some(b) => (b.rot, b.offset, b.kept_added(removed, drawn)),
+        None => {
+            let rot = (pose != IDENTITY3).then_some(pose);
+            let a = analyze(part.topology(), threshold, &pose);
+            (rot, a.offset, vec![])
+        }
+    }
+}
+
+/// One model of a plate's 3MF, standing at `at` (`placed` + the 3MF `FORMATS` closure, `ui/export.js`): the part, its
+/// supports as their own object with the interface crest split off, a slicer's own parts uncut beside it, its paint.
+fn plate_model(
+    part: &Part,
+    rot: Option<[f64; 9]>,
+    offset: Xyz,
+    added: &[sf_engine::types::V4],
+    at: [f64; 2],
+) -> Model {
+    let topo = part.topology();
+    let print = |flat: &[f64]| -> Vec<[f64; 3]> {
+        pose_matrix(flat, rot)
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|p| [p[0] + offset.x, p[1] + offset.y, p[2] + offset.z])
+            .collect()
+    };
+    let shift = |v: Vec<[f64; 3]>| -> Vec<[f64; 3]> {
+        v.into_iter()
+            .map(|p| [p[0] + at[0], p[1] + at[1], p[2]])
+            .collect()
+    };
+    // a file with a slicer's own parts goes out as the file had it: the part uncut beside its negative
+    // parts, modifiers and blockers, all posed the same way (the fins are for the cut part)
+    let (part_tris, colors, extras) = match part.slicer() {
+        Some(s) => (
+            shift(print(&s.positions)),
+            s.colors.clone(),
+            s.extras
+                .iter()
+                .map(|e| ExtraPart {
+                    kind: e.kind,
+                    name: e.name.clone(),
+                    settings: e.settings.clone(),
+                    tris: shift(print(&e.positions)),
+                })
+                .collect(),
+        ),
+        None => (shift(print(&topo.pos)), part.colors().cloned(), vec![]),
+    };
+    let (body, iface) = split_interface(added);
+    Model {
+        part_tris,
+        fin_tris: xyz4(&body, at),
+        name: part.stem().to_string(),
+        iface: xyz4(&iface, at),
+        colors,
+        extras,
+    }
+}
+
 fn export_impl(
     path: &str,
     parts: &[Arc<Part>],
@@ -687,14 +856,14 @@ fn export_impl(
     }
     let topo = part.topology();
     // the pose, the seating and the supports (print space already)
-    let (rot, offset, added): (Option<[f64; 9]>, Xyz, Vec<sf_engine::types::V4>) = if o.fins {
-        let b = &builds[0];
-        (b.rot, b.offset, b.kept_added(&o.removed, drawn))
-    } else {
-        let rot = (o.pose != IDENTITY3).then_some(o.pose);
-        let a = analyze(topo, o.threshold, &o.pose);
-        (rot, a.offset, vec![])
-    };
+    let (rot, offset, added) = seat_and_added(
+        part,
+        builds.first().filter(|_| o.fins),
+        drawn,
+        &o.removed,
+        o.pose,
+        o.threshold,
+    );
     if o.fins_only && added.is_empty() {
         return Err(engine("no fins, nothing written"));
     }
@@ -708,39 +877,7 @@ fn export_impl(
             .collect()
     };
     let bytes = if three_mf {
-        let at = o.placed;
-        let shift = |v: Vec<[f64; 3]>| -> Vec<[f64; 3]> {
-            v.into_iter()
-                .map(|p| [p[0] + at[0], p[1] + at[1], p[2]])
-                .collect()
-        };
-        // a file with a slicer's own parts goes out as the file had it: the part uncut beside its negative
-        // parts, modifiers and blockers, all posed the same way (the fins are for the cut part)
-        let (part_tris, colors, extras) = match part.slicer() {
-            Some(s) => (
-                shift(print(&s.positions)),
-                s.colors.clone(),
-                s.extras
-                    .iter()
-                    .map(|e| ExtraPart {
-                        kind: e.kind,
-                        name: e.name.clone(),
-                        settings: e.settings.clone(),
-                        tris: shift(print(&e.positions)),
-                    })
-                    .collect(),
-            ),
-            None => (shift(print(&topo.pos)), part.colors().cloned(), vec![]),
-        };
-        let (body, iface) = split_interface(&added);
-        let model = Model {
-            part_tris,
-            fin_tris: xyz4(&body, at),
-            name: name.to_string(),
-            iface: xyz4(&iface, at),
-            colors,
-            extras,
-        };
+        let model = plate_model(part, rot, offset, &added, o.placed);
         let bed = o.bed.map(|(x, y)| Bed { x, y });
         write_plate_3mf(&[model], name, true, None, bed)
     } else if o.fins_only {

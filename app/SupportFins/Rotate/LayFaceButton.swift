@@ -22,7 +22,8 @@ struct LayFaceHint: View {
             Text(LocalizedStringKey(model.title))
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .glassEffect(.regular, in: .capsule)
-                .padding(.top, 12)
+                // under the plate tabs and the clash banner, which share the top of the view (`Plates/`)
+                .padding(.top, 96)
                 .allowsHitTesting(false)
                 .accessibilityIdentifier("lay-face-hint")
         }

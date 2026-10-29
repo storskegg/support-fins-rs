@@ -8,8 +8,8 @@ struct PlateFit: Equatable {
     var spot: SIMD2<Double> = .zero
     /// `parkedOff` (`ui/models.js:193`).
     var parkedOff = false
-    /// `overlapping` (`ui/arrange.js:97`): computed here from the footprints. The clash PR draws the red cells and the
-    /// banner from the same cells (`footprintClashCells`); the row's text is this.
+    /// `overlapping` (`ui/arrange.js:97`): the same cells the red cells, the banner and the Export menu's note use
+    /// (`computeClash`, `PlateBoard+Arrange`).
     var clash = false
 }
 
@@ -20,11 +20,7 @@ extension PlateBoard {
     }
 
     /// Two models of the plate share a cell of the bed (`checkOverlap`): only with several models on show.
-    var overlapping: Bool {
-        guard hasLive, plate.models.count > 1 else { return false }
-        let placed = plate.models.compactMap { m in footprint(of: m)?.placed(x: m.xy.x, y: m.xy.y) }
-        return placed.count > 1 && !footprintClashCells(placed: placed).isEmpty
-    }
+    var overlapping: Bool { !computeClash().isEmpty }
 
     /// A parked model of the plate being edited hangs off the bed (dragged there), its fins counted
     /// (`parkedOff`, `ui/models.js:193-200`).
