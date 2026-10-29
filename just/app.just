@@ -88,3 +88,8 @@ tippics-gen *args:
 # What's new (web/changelog.json) as the app's changelog.json and its version (app/Version.xcconfig); `--check` is in `just gate`.
 whatsnew-gen *args:
     deno run -A --no-config tools/whatsnew/gen.js {{args}}
+
+# The app's Swift compiler warnings against tools/gate/swift-warnings.baseline: a new one fails (S-09). Builds the app from
+# clean in `.dd-warnings` (an incremental build only reports what it recompiles), under the machine lock. Part of `just gate`.
+swift-warnings: app-core app-project
+    tools/gate/swift_warnings.py
