@@ -28,7 +28,7 @@ struct HelpBookTests {
         #expect(home.contains("<title>Support Fins Help</title>"))
         for page in pages {
             let text = try String(contentsOf: lproj.appending(path: page), encoding: .utf8)
-            #expect(text.contains("<h1>"), page)
+            #expect(text.contains("<h1>"), "\(page)")
             let links = text.matches(of: /href="([^"]+)"/).map { String($0.1) }.filter { !$0.hasPrefix("http") }
             for link in links {
                 let file = link.split(separator: "#").first.map(String.init) ?? link
