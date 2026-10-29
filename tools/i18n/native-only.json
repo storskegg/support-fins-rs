@@ -426,5 +426,9 @@
     "pt": "Copiar configurações da geração",
     "ar": "نسخ إعدادات البناء",
     "nl": "Instellingen van de opbouw kopiëren"
+  },
+  "Search Settings": {
+    "why": "Edit menu item that focuses the settings search box (title case)",
+    "like": "Search settings"
   }
 }

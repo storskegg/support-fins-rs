@@ -6,43 +6,54 @@ struct TinesSection: View {
     @Environment(PartSession.self) private var session
     @Binding var settings: FinSettings
     @Binding var open: Bool
+    @Environment(SettingsSearch.self) private var search: SettingsSearch?
 
     static var resinNote: String { JS.t("Not tested on a resin printer yet. Tell us how it prints on GitHub issue #309.") }
 
     var body: some View {
+        FindBlock(.tines) { group }
+    }
+
+    private var group: some View {
         let v = settings.visibility
-        DisclosureGroup(isExpanded: $open) {
+        return DisclosureGroup(isExpanded: search?.expandedBinding(.tines, user: $open) ?? $open) {
             if v.tineGrip {
                 // "Tine grip light - firm"; for Vertical it spaces pins: "Pins per wall fewer - more"
                 // (`index.html:380`, `settings.js:172-195`).
-                LabeledContent(settings.pins ? "Pins per wall" : "Tine grip") {
-                    HStack {
-                        Text(settings.pins ? "fewer" : "light").font(.caption).foregroundStyle(.secondary)
-                        Slider(value: $settings.tineDensity, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
-                            .accessibilityIdentifier("tine-density")
-                            .accessibilityLabel(settings.pins ? "Pins per wall" : "Tine grip")
-                            .accessibilityValue(JS.t("{n} percent", ["n": String(Int(settings.tineDensity))]))
-                        Text(settings.pins ? "more" : "firm").font(.caption).foregroundStyle(.secondary)
+                FindRow("tinegrip-fld") {
+                    LabeledContent(settings.pins ? "Pins per wall" : "Tine grip") {
+                        HStack {
+                            Text(settings.pins ? "fewer" : "light").font(.caption).foregroundStyle(.secondary)
+                            Slider(value: $settings.tineDensity, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
+                                .accessibilityIdentifier("tine-density")
+                                .accessibilityLabel(settings.pins ? "Pins per wall" : "Tine grip")
+                                .accessibilityValue(JS.t("{n} percent", ["n": String(Int(settings.tineDensity))]))
+                            Text(settings.pins ? "more" : "firm").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
+                    .help(settings.pins ? Self.pinSpacingTip : Tip.tineDensity)
                 }
-                .help(settings.pins ? Self.pinSpacingTip : Tip.tineDensity)
             }
             if v.tineDirection {
-                Picker("Direction", selection: Binding(get: { settings.tineDirection }, set: { settings.chooseTineDirection($0) })) {
-                    Text("Horizontal (FDM)").tag(FinSettings.TineDirection.horizontal)
-                    Text("Vertical (resin)").tag(FinSettings.TineDirection.vertical)
+                FindRow("tinedir-fld") {
+                    Picker("Direction", selection: Binding(get: { settings.tineDirection }, set: { settings.chooseTineDirection($0) })) {
+                        Text("Horizontal (FDM)").tag(FinSettings.TineDirection.horizontal)
+                        Text("Vertical (resin)").tag(FinSettings.TineDirection.vertical)
+                    }
+                    .help(Tip.tineDir)
                 }
-                .help(Tip.tineDir)
             }
             if v.pinDepth {
-                NumberField(title: "Pin depth", value: $settings.pinDepth, limits: FinSettings.pinDepthLimits, help: Tip.pinDepth)
+                FindRow("pindepth-fld") {
+                    NumberField(title: "Pin depth", value: $settings.pinDepth, limits: FinSettings.pinDepthLimits, help: Tip.pinDepth)
+                }
             }
             if v.resinNote {
                 Text(Self.resinNote).font(.caption).foregroundStyle(.secondary)
             }
         } label: {
             HStack {
-                Toggle(isOn: $settings.tines) { ChangedLabel("Tines", detail: "grip the part", changed: false) }.help(Tip.tines)
+                FindRow("tines", hides: false) { Toggle(isOn: $settings.tines) { ChangedLabel("Tines", detail: "grip the part", changed: false) }.help(Tip.tines) }
                 Spacer()
                 if !open { Text(settings.tinesSummary).font(.caption).foregroundStyle(.secondary) }
             }
