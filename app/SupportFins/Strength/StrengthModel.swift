@@ -178,6 +178,7 @@ final class StrengthModel {
         let send: @Sendable (Event) -> Void
         init(_ send: @escaping @Sendable (Event) -> Void) { self.send = send }
         func suggested(generation: UInt64, result: SuggestResult) {}
+        func progress(generation: UInt64, fraction: Double) {}
         func strength(generation: UInt64, advice: StrengthAdvice) { send(.advice(generation, advice)) }
         func failed(generation: UInt64, err: FfiError) { send(.failed(generation, err.engineMessage)) }
     }

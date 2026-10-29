@@ -12,7 +12,8 @@ use sf_engine::fins::seating::SeatingKind;
 use sf_engine::jsnum;
 use sf_engine::orient::{
     Candidate, Confidence, Posture, layer_verdict, load_alignment as engine_load_alignment,
-    suggest_orientations_cancellable, suggest_orientations_wide, suggest_strength_pose,
+    SuggestOpts, suggest_orientations_cancellable_opts, suggest_orientations_wide_opts,
+    suggest_strength_pose,
 };
 
 use crate::builder::dialog_values;
@@ -46,11 +47,13 @@ pub struct Suggestion {
     /// The row's line, e.g. `40 mm · 4 fins · 2 rough holes`.
     pub line: String,
     pub height: f64,
-    pub fins: u64,
+    /// `None` when the ranking skipped the fin builds (a part over `RANK_CHEAP_FACES`): no fin count
+    /// was measured. `bore` and `volume` likewise.
+    pub fins: Option<u64>,
     pub rough_holes: u64,
     pub regions: u64,
-    pub bore: u64,
-    pub volume: f64,
+    pub bore: Option<u64>,
+    pub volume: Option<f64>,
     /// Seated on a point: shown as a bad row.
     pub cant_print: bool,
     pub tier: SuggestTier,
@@ -121,7 +124,7 @@ fn fmt_grams(g: f64) -> String {
     }
 }
 
-/// `noSupportVerdict` (web/ui/suggest.js:42-62): `(tier, badge, note)` or `None` for an ordinary pose.
+/// `noSupportVerdict` (web/ui/suggest.js:42-63): `(tier, badge, note)` or `None` for an ordinary pose.
 fn no_support_verdict(
     c: &Candidate,
     ctx: &SuggestContext,
@@ -143,8 +146,9 @@ fn no_support_verdict(
             format!("This way up it needs no fins, 0 g.{rough_caveat}{strength_caveat}"),
         ));
     }
-    if c.bore == 0 && ctx.current_bore > 0 {
-        let grams = c.volume * ctx.density / 1000.0;
+    // bore is None when Suggest ranked without fin builds (a huge part): unknown, no claim
+    if c.bore == Some(0) && ctx.current_bore > 0 {
+        let grams = c.volume.unwrap_or(0.0) * ctx.density / 1000.0;
         return Some((
             SuggestTier::HoleClean,
             "Bores clean".into(),
@@ -158,16 +162,19 @@ fn no_support_verdict(
 }
 
 fn row(i: usize, c: &Candidate, ctx: &SuggestContext) -> Suggestion {
-    let point = c.seating == SeatingKind::Point;
+    let point = c.seating == Some(SeatingKind::Point);
     let verdict = if point {
         None
     } else {
         no_support_verdict(c, ctx)
     };
-    let fins = if c.walls == 0 {
-        "no fins".to_string()
-    } else {
-        tn(c.walls, "fin", "fins")
+    // walls is None when Suggest ranked a huge part without fin builds: no count to show (a pose
+    // with no overhang at all still reads "no fins": regions comes from analysis)
+    let walls = c.walls.or(if c.regions == 0 { Some(0) } else { None });
+    let fins = match walls {
+        None => String::new(),
+        Some(0) => " · no fins".to_string(),
+        Some(n) => format!(" · {}", tn(n, "fin", "fins")),
     };
     let tail = if point {
         " · can’t print (on a point)".to_string()
@@ -187,12 +194,12 @@ fn row(i: usize, c: &Candidate, ctx: &SuggestContext) -> Suggestion {
         } else {
             format!("#{}", i + 1)
         },
-        line: format!("{} mm · {fins}{tail}", jsnum::to_fixed(c.height, 0)),
+        line: format!("{} mm{fins}{tail}", jsnum::to_fixed(c.height, 0)),
         height: c.height,
-        fins: c.walls as u64,
+        fins: c.walls.map(|n| n as u64),
         rough_holes: c.holes as u64,
         regions: c.regions as u64,
-        bore: c.bore as u64,
+        bore: c.bore.map(|n| n as u64),
         volume: c.volume,
         cant_print: point,
         tier,
@@ -241,13 +248,14 @@ impl Part {
         ctx: &SuggestContext,
     ) -> Result<SuggestResult, FfiError> {
         Ok(self
-            .rank_poses_with(threshold_deg, opts_json, ctx, None, &|| false)?
+            .rank_poses_with(threshold_deg, opts_json, ctx, None, &|| false, None)?
             .expect("never cancelled"))
     }
 
     /// [`Part::rank_poses`] over the web's candidate set (`density: None`) or the wide set
     /// (`Some(density)`: that many times the web's candidate budget, same scoring and wording).
     /// `cancelled` is polled between candidates, from several threads; `Ok(None)` is a cancelled run.
+    /// `on_progress(f)` gets the fraction done after every pose scored (from several threads).
     pub fn rank_poses_with(
         &self,
         threshold_deg: f64,
@@ -255,6 +263,7 @@ impl Part {
         ctx: &SuggestContext,
         density: Option<f64>,
         cancelled: &(dyn Fn() -> bool + Sync),
+        on_progress: Option<&(dyn Fn(f64) + Sync)>,
     ) -> Result<Option<SuggestResult>, FfiError> {
         if !threshold_deg.is_finite() {
             return Err(engine("threshold must be a finite number of degrees"));
@@ -262,13 +271,28 @@ impl Part {
         let options = options_from_dialog(&dialog_values(opts_json)?).map_err(engine)?;
         let mut cfg = Config::default();
         apply_tunables(&mut cfg, Some(&support_tunables(&options).map_err(engine)?));
+        let opts = SuggestOpts {
+            on_progress,
+            ..Default::default()
+        };
         let ranked = match density {
-            None => {
-                suggest_orientations_cancellable(self.topology(), 3, threshold_deg, &cfg, cancelled)
-            }
-            Some(d) => {
-                suggest_orientations_wide(self.topology(), 3, threshold_deg, &cfg, d, cancelled)
-            }
+            None => suggest_orientations_cancellable_opts(
+                self.topology(),
+                3,
+                threshold_deg,
+                &cfg,
+                cancelled,
+                &opts,
+            ),
+            Some(d) => suggest_orientations_wide_opts(
+                self.topology(),
+                3,
+                threshold_deg,
+                &cfg,
+                d,
+                cancelled,
+                &opts,
+            ),
         };
         let Some(ranked) = ranked else {
             return Ok(None);
@@ -368,9 +392,14 @@ impl Part {
         density: f64,
     ) -> Result<SuggestResult, FfiError> {
         Ok(self
-            .rank_poses_with(threshold_deg, &opts_json, &context, Some(density), &|| {
-                false
-            })?
+            .rank_poses_with(
+                threshold_deg,
+                &opts_json,
+                &context,
+                Some(density),
+                &|| false,
+                None,
+            )?
             .expect("never cancelled"))
     }
 
@@ -390,6 +419,10 @@ impl Part {
 #[uniffi::export(callback_interface)]
 pub trait SuggestListener: Send + Sync {
     fn suggested(&self, generation: u64, result: SuggestResult);
+    /// How far a ranking has got, 0..1, after every pose it scores (`onProgress` of the web's
+    /// `suggestOrientations`, shown on the Suggest button). Rising only; never delivered for a
+    /// superseded ranking. Called from the engine's worker threads.
+    fn progress(&self, generation: u64, fraction: f64);
     fn strength(&self, generation: u64, advice: StrengthAdvice);
     fn failed(&self, generation: u64, err: FfiError);
 }
@@ -443,10 +476,24 @@ impl Suggester {
                             opts_json,
                             context,
                             density,
-                        } => part
-                            .rank_poses_with(*threshold_deg, opts_json, context, *density, &|| {
-                                latest.load(Ordering::SeqCst) != job.generation
-                            })
+                        } => {
+                            // rising only, and silent once a newer request has replaced this one
+                            let high = AtomicU64::new(0f64.to_bits());
+                            let report = |f: f64| {
+                                if latest.load(Ordering::SeqCst) == job.generation
+                                    && high.fetch_max(f.to_bits(), Ordering::SeqCst) < f.to_bits()
+                                {
+                                    job.listener.progress(job.generation, f);
+                                }
+                            };
+                            part.rank_poses_with(
+                                *threshold_deg,
+                                opts_json,
+                                context,
+                                *density,
+                                &|| latest.load(Ordering::SeqCst) != job.generation,
+                                Some(&report),
+                            )
                             .map(|r| match r {
                                 Some(r) => {
                                     Box::new(move |g, l: &dyn SuggestListener| l.suggested(g, r))
@@ -454,7 +501,8 @@ impl Suggester {
                                 }
                                 // stopped early: a newer request replaced it, so nothing is delivered
                                 None => Box::new(|_, _: &dyn SuggestListener| {}) as Delivery,
-                            }),
+                            })
+                        }
                         Work::Strength {
                             dir_local,
                             dir_world,
@@ -550,5 +598,76 @@ impl Suggester {
             listener,
         });
         generation
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sf_engine::types::Xyz;
+
+    /// A pose ranked without fin builds (a part over `RANK_CHEAP_FACES`): walls, coverage, volume,
+    /// bore are `None`, seating unknown.
+    fn cheap(regions: usize, holes: usize) -> Candidate {
+        Candidate {
+            rot: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            over_area: 0.0,
+            bed_area: 100.0,
+            height: 40.4,
+            size: Xyz {
+                x: 10.0,
+                y: 10.0,
+                z: 40.4,
+            },
+            regions,
+            walls: None,
+            coverage: None,
+            volume: None,
+            seating: None,
+            holes,
+            bore: None,
+            score: 1.0,
+        }
+    }
+    fn ctx(current_bore: u64) -> SuggestContext {
+        SuggestContext {
+            current_bore,
+            density: 1.24,
+        }
+    }
+
+    // web/ui/suggest.js:81-83: no fin count when Suggest ranked without fin builds
+    #[test]
+    fn a_ranking_without_fin_builds_leaves_the_fin_count_out_of_the_line() {
+        let r = row(0, &cheap(3, 0), &ctx(0));
+        assert_eq!(r.line, "40 mm");
+        assert_eq!((r.fins, r.bore, r.volume), (None, None, None));
+        let r = row(1, &cheap(3, 2), &ctx(0));
+        assert_eq!(r.line, "40 mm · 2 rough holes");
+    }
+
+    // ... a pose with no overhang at all still reads "no fins": regions comes from analysis
+    #[test]
+    fn a_pose_with_no_overhang_still_reads_no_fins_when_the_build_was_skipped() {
+        let r = row(0, &cheap(0, 0), &ctx(0));
+        assert_eq!(r.line, "40 mm · no fins");
+        assert_eq!(r.tier, SuggestTier::Free);
+        assert_eq!(r.fins, None);
+    }
+
+    // web/ui/suggest.js:65: "Bores clean" needs a measured bore count of 0
+    #[test]
+    fn bores_clean_needs_a_measured_bore_count_of_zero() {
+        let mut c = cheap(3, 0);
+        let r = row(0, &c, &ctx(2));
+        assert_eq!((r.tier, r.badge), (SuggestTier::Ordinary, None));
+        c.bore = Some(0);
+        c.volume = Some(5000.0);
+        c.walls = Some(4);
+        let r = row(0, &c, &ctx(2));
+        assert_eq!(r.tier, SuggestTier::HoleClean);
+        assert_eq!(r.badge.as_deref(), Some("Bores clean"));
+        c.bore = Some(1);
+        assert_eq!(row(0, &c, &ctx(2)).tier, SuggestTier::Ordinary);
     }
 }

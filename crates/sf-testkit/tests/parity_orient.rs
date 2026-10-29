@@ -90,68 +90,139 @@ fn suggest_strength_pose_replays() {
     assert!(none > 0 && some > 0);
 }
 
+fn opt_usize(v: &Value) -> usize {
+    v.num() as usize
+}
+
+/// The recorded options: `top`, `threshold` and the optional `cheapAbove`.
+fn suggest_opts(o: &Value) -> SuggestOpts<'static> {
+    let mut opts = SuggestOpts::default();
+    if let Value::Obj(kv) = o {
+        if let Some((_, c)) = kv.iter().find(|(k, _)| k == "cheapAbove") {
+            opts.cheap_above = c.num();
+        }
+    }
+    opts
+}
+
+fn seating_value(s: Option<sf_engine::fins::seating::SeatingKind>) -> Value {
+    use sf_engine::fins::seating::SeatingKind;
+    Value::from(match s {
+        Some(SeatingKind::Face) => "face",
+        Some(SeatingKind::Edge) => "edge",
+        Some(SeatingKind::Point) => "point",
+        None => "unknown",
+    })
+}
+
+fn opt_num(v: Option<f64>) -> Value {
+    v.map_or(Value::Null, Value::Num)
+}
+
+fn suggestions_value(r: &Suggestions) -> Value {
+    obj(vec![
+        (
+            "candidates",
+            Value::Arr(
+                r.candidates
+                    .iter()
+                    .map(|k| {
+                        obj(vec![
+                            ("rot", num_value(&k.rot)),
+                            ("overArea", Value::Num(k.over_area)),
+                            ("bedArea", Value::Num(k.bed_area)),
+                            ("height", Value::Num(k.height)),
+                            (
+                                "size",
+                                obj(vec![
+                                    ("x", Value::Num(k.size.x)),
+                                    ("y", Value::Num(k.size.y)),
+                                    ("z", Value::Num(k.size.z)),
+                                ]),
+                            ),
+                            ("regions", Value::Num(k.regions as f64)),
+                            ("walls", opt_num(k.walls.map(|n| n as f64))),
+                            ("coverage", opt_num(k.coverage)),
+                            ("volume", opt_num(k.volume)),
+                            ("seating", seating_value(k.seating)),
+                            ("holes", Value::Num(k.holes as f64)),
+                            ("bore", opt_num(k.bore.map(|n| n as f64))),
+                            ("score", Value::Num(k.score)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("confidence", Value::from(r.confidence.as_str())),
+    ])
+}
+
 #[test]
 fn suggest_orientations_replays() {
     let cases = load_cases("orient", "suggestOrientations");
-    assert!(cases.len() > 30);
+    assert!(cases.len() > 90);
     let mut conf = std::collections::BTreeSet::new();
+    let (mut cheap, mut built) = (0, 0);
     for c in &cases {
         let a = resolve_args(&c.args);
         let o = a[1].plain();
         let cfg = cfg_of(&a);
-        let r = suggest_orientations(
+        let r = suggest_orientations_opts(
             a[0].topo(),
-            o.get("top").num() as usize,
+            opt_usize(o.get("top")),
             o.get("threshold").num(),
             &cfg,
+            &suggest_opts(o),
         );
         conf.insert(r.confidence.as_str());
-        let actual = obj(vec![
-            (
-                "candidates",
-                Value::Arr(
-                    r.candidates
-                        .iter()
-                        .map(|k| {
-                            obj(vec![
-                                ("rot", num_value(&k.rot)),
-                                ("overArea", Value::Num(k.over_area)),
-                                ("bedArea", Value::Num(k.bed_area)),
-                                ("height", Value::Num(k.height)),
-                                (
-                                    "size",
-                                    obj(vec![
-                                        ("x", Value::Num(k.size.x)),
-                                        ("y", Value::Num(k.size.y)),
-                                        ("z", Value::Num(k.size.z)),
-                                    ]),
-                                ),
-                                ("regions", Value::Num(k.regions as f64)),
-                                ("walls", Value::Num(k.walls as f64)),
-                                ("coverage", Value::Num(k.coverage)),
-                                ("volume", Value::Num(k.volume)),
-                                (
-                                    "seating",
-                                    Value::from(match k.seating {
-                                        sf_engine::fins::seating::SeatingKind::Face => "face",
-                                        sf_engine::fins::seating::SeatingKind::Edge => "edge",
-                                        sf_engine::fins::seating::SeatingKind::Point => "point",
-                                    }),
-                                ),
-                                ("holes", Value::Num(k.holes as f64)),
-                                ("bore", Value::Num(k.bore as f64)),
-                                ("score", Value::Num(k.score)),
-                            ])
-                        })
-                        .collect(),
-                ),
-            ),
-            ("confidence", Value::from(r.confidence.as_str())),
-        ]);
-        check("suggestOrientations", c, &actual, &Tol::Exact);
+        if r.candidates.iter().any(|k| k.walls.is_none()) {
+            cheap += 1;
+        } else {
+            built += 1;
+        }
+        check("suggestOrientations", c, &suggestions_value(&r), &Tol::Exact);
     }
     assert!(
         conf.len() >= 2,
         "the corpus must reach several confidences: {conf:?}"
     );
+    // both rankings are in the corpus, and the exact-threshold cases (`cheapAbove` = nFaces builds,
+    // nFaces - 1 does not) are among them
+    assert!(cheap > 20 && built > 20, "cheap {cheap}, built {built}");
+    assert!(
+        conf.contains("medium") || conf.contains("low"),
+        "a cheap ranking caps at medium: {conf:?}"
+    );
+}
+
+/// `onProgress` of `suggestOrientations`: the JS calls it in order after every pose; Rust scores on
+/// several threads, so the calls can interleave. The recorded fractions must be exactly the ones
+/// received (as a multiset), and the largest is 1.
+#[test]
+fn suggest_progress_replays() {
+    use std::sync::Mutex;
+    let cases = load_cases("orient", "suggestProgress");
+    assert!(cases.len() > 40);
+    for c in &cases {
+        let a = resolve_args(&c.args);
+        let o = a[1].plain();
+        let cfg = cfg_of(&a);
+        let seen = Mutex::new(Vec::<f64>::new());
+        let record = |f: f64| seen.lock().unwrap().push(f);
+        let mut opts = suggest_opts(o);
+        opts.on_progress = Some(&record);
+        suggest_orientations_opts(
+            a[0].topo(),
+            opt_usize(o.get("top")),
+            o.get("threshold").num(),
+            &cfg,
+            &opts,
+        );
+        let mut got = seen.into_inner().unwrap();
+        got.sort_by(f64::total_cmp);
+        let mut want: Vec<f64> = c.out.as_ref().expect("out").get("progress").arr().iter().map(Value::num).collect();
+        want.sort_by(f64::total_cmp);
+        assert_eq!(got, want, "{}: progress calls", c.id);
+        assert_eq!(got.last().copied(), Some(1.0), "{}: ends at 1", c.id);
+    }
 }

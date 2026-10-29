@@ -17,11 +17,14 @@ final class SuggestModel {
     private(set) var state = State.idle
     /// The row whose pose the part is in (highlighted), or nil.
     private(set) var picked: Int?
+    /// How far the ranking in flight has got, 0...1 (`onProgress` of `suggestOrientations`), or nil before the
+    /// first pose is scored. Only rises.
+    private(set) var progress: Double?
 
     @ObservationIgnored private let suggester: Suggester?
     @ObservationIgnored private let pose: PoseAccess
     @ObservationIgnored private var sink: Sink!
-    @ObservationIgnored private var wanted: UInt64?
+    @ObservationIgnored private(set) var wanted: UInt64?
 
     /// `part` is the part to rank; nil (no part loaded) makes `rank` do nothing.
     init(part: Part?, pose: PoseAccess) {
@@ -41,8 +44,14 @@ final class SuggestModel {
     /// The note is the "no support" win, styled good.
     var noteIsGood: Bool { if case .ready(let r) = state { r.noteGood } else { false } }
     var isRanking: Bool { state == .ranking }
-    /// The button's label (`Ranking…` while it runs, as the page's).
-    var buttonTitle: String { isRanking ? JS.t("Ranking…") : JS.t("Suggest orientation") }
+    /// The button's label (`Ranking…` while it runs, then `Ranking… 40%` once the engine reports, as the page's
+    /// `progress` in `ui/suggest.js`: a long ranking reads as working, not stuck).
+    var buttonTitle: String {
+        guard isRanking else { return JS.t("Suggest orientation") }
+        guard let progress else { return JS.t("Ranking…") }
+        // `Math.round(f * 100)`: halves round up
+        return "\(JS.t("Ranking…")) \(Int((progress * 100 + 0.5).rounded(.down)))%"
+    }
 
     /// The wide search's candidate density: ten times the web's candidate poses, in less wall time than the web
     /// (docs/PERF-M5.md, "Suggest").
@@ -54,6 +63,7 @@ final class SuggestModel {
         guard let suggester, !isRanking else { return }
         state = .ranking
         picked = nil
+        progress = nil
         wanted = suggester.suggestWide(
             thresholdDeg: thresholdDegrees, optsJson: optionsJSON,
             context: SuggestContext(currentBore: UInt64(max(0, currentBore)), density: density),
@@ -85,6 +95,7 @@ final class SuggestModel {
     /// Put a kept ranking back once its model is on show again (`restoreSuggestions`).
     func restore(_ result: SuggestResult, picked: Int?) {
         wanted = nil
+        progress = nil
         state = .ready(result)
         self.picked = picked
     }
@@ -93,23 +104,32 @@ final class SuggestModel {
     func reset() {
         wanted = nil
         picked = nil
+        progress = nil
         state = .idle
     }
 
-    fileprivate enum Event: Sendable {
+    enum Event: Sendable {
+        case progress(UInt64, Double)
         case ranked(UInt64, SuggestResult)
         case failed(UInt64, String)
     }
 
-    private func deliver(_ event: Event) {
+    /// An engine event, on the main actor (the sink hops here; tests call it directly).
+    func deliver(_ event: Event) {
         switch event {
+        case .progress(let g, let fraction):
+            // the engine scores on several threads, so the hops to the main actor can arrive out of order
+            guard g == wanted, isRanking else { return }
+            progress = max(progress ?? 0, fraction)
         case .ranked(let g, let result):
             guard g == wanted else { return }
             wanted = nil
+            progress = nil
             state = .ready(result)
         case .failed(let g, let message):
             guard g == wanted else { return }
             wanted = nil
+            progress = nil
             state = .failed(message)
         }
     }
@@ -118,6 +138,7 @@ final class SuggestModel {
         let send: @Sendable (Event) -> Void
         init(_ send: @escaping @Sendable (Event) -> Void) { self.send = send }
         func suggested(generation: UInt64, result: SuggestResult) { send(.ranked(generation, result)) }
+        func progress(generation: UInt64, fraction: Double) { send(.progress(generation, fraction)) }
         func strength(generation: UInt64, advice: StrengthAdvice) {}
         func failed(generation: UInt64, err: FfiError) { send(.failed(generation, err.engineMessage)) }
     }

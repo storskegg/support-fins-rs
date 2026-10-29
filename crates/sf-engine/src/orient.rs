@@ -19,12 +19,13 @@
 //! Candidates need no convex-hull kernel: a part rests on a flat face, so the large-area normal
 //! clusters ARE its stable down-faces.
 //!
-//! Line numbers are at the checkout's commit (299ef49).
+//! Line numbers are at the checkout's commit (23039e2).
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 use crate::config::Config;
 use crate::fins::build::{FinsOpts, build_fins};
@@ -279,12 +280,15 @@ pub struct Candidate {
     /// Full `{x, y, z}` so callers can run `layerVerdict` on the pose.
     pub size: Xyz,
     pub regions: usize,
-    pub walls: usize,
-    pub coverage: f64,
-    pub volume: f64,
-    pub seating: SeatingKind,
+    /// `walls`, `coverage`, `volume`, `bore` and `seating` are JS `null` / `'unknown'` (`None`) when
+    /// the ranking skipped the fin builds (a part over [`RANK_CHEAP_FACES`]): nothing measured them.
+    pub walls: Option<usize>,
+    pub coverage: Option<f64>,
+    pub volume: Option<f64>,
+    /// `None` is JS's `'unknown'`.
+    pub seating: Option<SeatingKind>,
     pub holes: usize,
-    pub bore: usize,
+    pub bore: Option<usize>,
     pub score: f64,
 }
 
@@ -328,7 +332,36 @@ fn cmp_diff(d: f64) -> std::cmp::Ordering {
     }
 }
 
-/// Port of `suggestOrientations` (web/orient.js:136-218): rank orientations for printability.
+/// Above this many faces Suggest ranks on pass 1 alone, with no fin build per finalist. Port of
+/// `RANK_CHEAP_FACES` (web/orient.js:128-135). Each build is ~40 s on a 2.3M-face mask and several
+/// minutes in a browser Worker short on memory, so the five finalists left "Ranking…" up for 15+
+/// minutes. Those candidates carry walls/coverage/volume/bore = `None` and seating `None`
+/// (`'unknown'`: no build measured them); the list then shows no fin count. The comparison is
+/// strict (`topo.nFaces > cheapAbove`): a part of exactly this many faces is still built.
+pub const RANK_CHEAP_FACES: f64 = 1_000_000.0;
+
+/// The options of `suggestOrientations` beyond `top` and `threshold` (web/orient.js:143):
+/// `cheapAbove` (default [`RANK_CHEAP_FACES`]) and `onProgress`.
+#[derive(Clone, Copy)]
+pub struct SuggestOpts<'a> {
+    /// `cheapAbove`: a part with more faces than this is ranked without fin builds.
+    pub cheap_above: f64,
+    /// `onProgress(f)`: called with the fraction done (0..1) after every pose it scores (a finalist's
+    /// fin build weighs 20 poses). Pass 1 and the builds run on several threads, so calls can arrive
+    /// out of order from different threads; the values are the same set the JS produces, in order.
+    pub on_progress: Option<&'a (dyn Fn(f64) + Sync)>,
+}
+
+impl Default for SuggestOpts<'_> {
+    fn default() -> Self {
+        SuggestOpts {
+            cheap_above: RANK_CHEAP_FACES,
+            on_progress: None,
+        }
+    }
+}
+
+/// Port of `suggestOrientations` (web/orient.js:138-234): rank orientations for printability.
 /// Returns up to `top` candidates, best first, each with the metrics the UI shows and a
 /// `confidence`. JS defaults `top = 3`, `threshold = 45`; callers pass them. `cfg` is the config
 /// the finalists' `buildFins` runs under.
@@ -346,8 +379,19 @@ pub fn suggest_orientations(
     threshold: f64,
     cfg: &Config,
 ) -> Suggestions {
+    suggest_orientations_opts(topo, top, threshold, cfg, &SuggestOpts::default())
+}
+
+/// [`suggest_orientations`] with its `cheapAbove` and `onProgress` options.
+pub fn suggest_orientations_opts(
+    topo: &Arc<Topology>,
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+    opts: &SuggestOpts,
+) -> Suggestions {
     let downs = candidate_downs(topo, 12);
-    rank_downs(topo, &downs, top, threshold, cfg, &|| false).expect("never cancelled")
+    rank_downs(topo, &downs, top, threshold, cfg, &|| false, opts).expect("never cancelled")
 }
 
 /// The wide search: `suggestOrientations` over [`wide_candidate_downs`] (`density` times the web's
@@ -362,8 +406,29 @@ pub fn suggest_orientations_wide(
     density: f64,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> Option<Suggestions> {
+    suggest_orientations_wide_opts(
+        topo,
+        top,
+        threshold,
+        cfg,
+        density,
+        cancelled,
+        &SuggestOpts::default(),
+    )
+}
+
+/// [`suggest_orientations_wide`] with its `cheapAbove` and `onProgress` options.
+pub fn suggest_orientations_wide_opts(
+    topo: &Arc<Topology>,
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+    density: f64,
+    cancelled: &(dyn Fn() -> bool + Sync),
+    opts: &SuggestOpts,
+) -> Option<Suggestions> {
     let downs = wide_candidate_downs(topo, density);
-    rank_downs(topo, &downs, top, threshold, cfg, cancelled)
+    rank_downs(topo, &downs, top, threshold, cfg, cancelled, opts)
 }
 
 /// [`suggest_orientations`] with a cancel flag polled between candidates.
@@ -374,8 +439,34 @@ pub fn suggest_orientations_cancellable(
     cfg: &Config,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> Option<Suggestions> {
+    suggest_orientations_cancellable_opts(
+        topo,
+        top,
+        threshold,
+        cfg,
+        cancelled,
+        &SuggestOpts::default(),
+    )
+}
+
+/// [`suggest_orientations_cancellable`] with its `cheapAbove` and `onProgress` options.
+pub fn suggest_orientations_cancellable_opts(
+    topo: &Arc<Topology>,
+    top: usize,
+    threshold: f64,
+    cfg: &Config,
+    cancelled: &(dyn Fn() -> bool + Sync),
+    opts: &SuggestOpts,
+) -> Option<Suggestions> {
     let downs = candidate_downs(topo, 12);
-    rank_downs(topo, &downs, top, threshold, cfg, cancelled)
+    rank_downs(topo, &downs, top, threshold, cfg, cancelled, opts)
+}
+
+/// A pose after pass 1.
+struct Scored {
+    rot: Rot3,
+    a: Analysis,
+    cheap: f64,
 }
 
 /// The two passes over a candidate list. Both fan out over Rayon's global pool and collect in
@@ -388,13 +479,25 @@ fn rank_downs(
     threshold: f64,
     cfg: &Config,
     cancelled: &(dyn Fn() -> bool + Sync),
+    opts: &SuggestOpts,
 ) -> Option<Suggestions> {
+    let cheap_only = topo.n_faces as f64 > opts.cheap_above;
+    // A finalist's fin build costs far more than an analyze() -- ~20x on a 2M-face part -- so
+    // progress weighs it that much more. (Integer weights: the sum is exact in any order.)
+    let n_final = if cheap_only {
+        0
+    } else {
+        downs.len().min(top.saturating_add(2).max(5))
+    };
+    let total = (downs.len() + n_final * 20) as f64;
+    let done = AtomicU64::new(0);
+    let tick = |w: u64| {
+        let d = done.fetch_add(w, AtomicOrdering::SeqCst) + w;
+        if let Some(f) = opts.on_progress {
+            f(jsnum::min(1.0, d as f64 / total));
+        }
+    };
     // pass 1: cheap analyze() on every candidate
-    struct Scored {
-        rot: Rot3,
-        a: Analysis,
-        cheap: f64,
-    }
     let last = downs.len().saturating_sub(1);
     let scored: Vec<Option<Scored>> = downs
         .par_iter()
@@ -418,6 +521,7 @@ fn rank_downs(
                 + jsnum::max(0.0, 200.0 - a.bed_area) * 0.25
                 + a.size.z * 2.0
                 + holes * 2.0;
+            tick(1);
             // Only the last candidate's flags are ever read (the aliasing below), so the others
             // give theirs back: a wide search would otherwise hold hundreds of face-flag sets.
             if i != last {
@@ -435,8 +539,11 @@ fn rank_downs(
         .map(|s| (s.a.over.clone(), s.a.kept.clone(), s.a.on_bed.clone()));
     scored.sort_by(|p, r| cmp_diff(p.cheap - r.cheap));
 
+    if cheap_only {
+        return Some(rank_cheap(&scored, top));
+    }
+
     // pass 2: full fin build on the finalists, to measure real finnable coverage
-    let n_final = jsnum::max((top + 2) as f64, 5.0) as usize;
     scored.truncate(n_final);
     let built: Vec<Option<Candidate>> = scored
         .into_par_iter()
@@ -460,6 +567,7 @@ fn rank_downs(
                 },
                 cfg,
             );
+            tick(20);
             // buildFins reports `unserved` = overhang regions that took NO wall; coverage is
             // DISPLAY only (how many fins the user will get), never a score driver -- rewarding
             // coverage rewards ADDING supports, and printability wants fewer.
@@ -496,12 +604,12 @@ fn rank_downs(
                 height: s.a.size.z,
                 size: s.a.size,
                 regions: s.a.regions.len(),
-                walls: b.props.len(),
-                coverage,
-                volume: b.volume,
-                seating: b.seating.kind,
+                walls: Some(b.props.len()),
+                coverage: Some(coverage),
+                volume: Some(b.volume),
+                seating: Some(b.seating.kind),
                 holes,
-                bore,
+                bore: Some(bore),
                 score,
             })
         })
@@ -516,7 +624,7 @@ fn rank_downs(
     let mut confidence = Confidence::High;
     match (built.first(), built.get(1)) {
         (None, _) => confidence = Confidence::None,
-        (Some(best), _) if best.seating == SeatingKind::Point => confidence = Confidence::None,
+        (Some(best), _) if best.seating == Some(SeatingKind::Point) => confidence = Confidence::None,
         (Some(best), Some(second)) => {
             let sep = (second.score - best.score) / jsnum::max(1.0, best.score);
             confidence = if sep > 0.25 {
@@ -536,7 +644,58 @@ fn rank_downs(
     })
 }
 
-/// Port of `crossFraction` (web/orient.js:233-236): cos of the angle between two unit-ish
+/// Port of `rankCheap` (web/orient.js:236-259): `suggestOrientations`' answer from pass 1 alone (a
+/// part over [`RANK_CHEAP_FACES`]): the same candidate fields, the fin-build ones `None`, and
+/// confidence from the pass-1 scores, capped at 'medium' since no build checked them. No build
+/// means no 'point' seating check either, so it is never 'none' for a pose; pass 1's small-bed
+/// penalty is all that holds a pose balanced on a point down.
+fn rank_cheap(scored: &[Scored], top: usize) -> Suggestions {
+    let candidates: Vec<Candidate> = scored
+        .iter()
+        .take(top)
+        .map(|s| {
+            let a = &s.a;
+            Candidate {
+                rot: s.rot,
+                over_area: a.over_area,
+                bed_area: a.bed_area,
+                height: a.size.z,
+                size: a.size,
+                regions: a.regions.len(),
+                walls: None,
+                coverage: None,
+                volume: None,
+                seating: None,
+                holes: a.raw_region_count - a.regions.len(),
+                bore: None,
+                score: s.cheap,
+            }
+        })
+        .collect();
+    let (best, second) = (candidates.first(), candidates.get(1));
+    let mut confidence = if best.is_some() {
+        Confidence::High
+    } else {
+        Confidence::None
+    };
+    if let (Some(best), Some(second)) = (best, second) {
+        let sep = (second.score - best.score) / jsnum::max(1.0, best.score);
+        confidence = if sep > 0.08 {
+            Confidence::Medium
+        } else {
+            Confidence::Low
+        };
+    }
+    if best.is_some() && second.is_none() {
+        confidence = Confidence::Medium;
+    }
+    Suggestions {
+        candidates,
+        confidence,
+    }
+}
+
+/// Port of `crossFraction` (web/orient.js:281-284): cos of the angle between two unit-ish
 /// directions in the same frame. `None` is JS's `null`.
 fn cross_fraction(dir: V3) -> Option<f64> {
     let n = jsnum::hypot(&[dir[0], dir[1], dir[2]]);
@@ -573,7 +732,7 @@ pub struct Align {
     pub text: &'static str,
 }
 
-/// Port of `alignQuality` (web/orient.js:239-255): bucket a cross-fraction into an honest
+/// Port of `alignQuality` (web/orient.js:287-303): bucket a cross-fraction into an honest
 /// three-step verdict + copy.
 fn align_quality(cross: f64) -> Align {
     // cross = |load . build-Z|: 0 = load lies in the layer plane (strong),
@@ -616,7 +775,7 @@ impl Posture {
     }
 }
 
-/// Port of `layerVerdict` (web/orient.js:266-274): how the CURRENT pose lays the part down, as a
+/// Port of `layerVerdict` (web/orient.js:314-322): how the CURRENT pose lays the part down, as a
 /// posture only. A printed part is weakest across its layer lines -- the flat, horizontal planes
 /// -- so it splits most easily when pulled straight up the build axis: standing the longest span
 /// up the layers is the classic weak print, lying it flat is the strong one. The always-on text
@@ -656,7 +815,7 @@ pub struct LoadAlignment {
     pub text: &'static str,
 }
 
-/// Port of `loadAlignment` (web/orient.js:284-288): qualitative strength readout for a load in
+/// Port of `loadAlignment` (web/orient.js:332-336): qualitative strength readout for a load in
 /// the CURRENT pose. `dir_world` is the load direction in seated print space (so world +Z is the
 /// build axis). Pull model only: the critical tensile direction IS the applied force. (Lever --
 /// where the part bends and the tensile stress runs along the beam, perpendicular to the push --
@@ -684,7 +843,7 @@ pub struct StrengthPose {
     pub bed_area: f64,
 }
 
-/// Port of `suggestStrengthPose` (web/orient.js:300-337): the strongest PRINTABLE pose for a
+/// Port of `suggestStrengthPose` (web/orient.js:348-385): the strongest PRINTABLE pose for a
 /// given load. The arrow is anchored to a feature, so its direction is fixed in the part's own
 /// (as-loaded) frame; as we try candidate orientations that direction swings relative to the
 /// build axis and we want the pose that lays it most in-plane.

@@ -226,3 +226,107 @@ fn suggest_orientations_candidates_are_ranked_best_first_and_well_formed() {
         );
     }
 }
+
+// orient.test.js:118-139: A part over RANK_CHEAP_FACES (a 2.3M-face mask: 15+ minutes of fin builds in a
+// browser Worker) is ranked on pass 1 alone. Forced here with cheapAbove on a small part: the ranking
+// still lands the flat pose, the fin-build fields are null (not 0 -- the list must not claim "no
+// fins"), and progress still reaches 1.
+#[test]
+fn suggest_orientations_a_huge_part_ranks_without_fin_builds() {
+    use std::sync::Mutex;
+    let tilted = Arc::new(tilted_block_topo(0.0, 60.0, 0.0, 40.0, 0.0, 12.0, 60.0));
+    let cfg = Config::default();
+    let cheap = SuggestOpts {
+        cheap_above: 0.0,
+        ..Default::default()
+    };
+    let r = suggest_orientations_opts(&tilted, 3, 45.0, &cfg, &cheap);
+    assert!(!r.candidates.is_empty(), "no candidates");
+    for c in &r.candidates {
+        assert!(
+            c.walls.is_none() && c.coverage.is_none() && c.volume.is_none() && c.bore.is_none(),
+            "fin-build fields should be null: {c:?}"
+        );
+        assert!(
+            c.seating.is_none() && c.score.is_finite() && c.rot.len() == 9,
+            "malformed candidate"
+        );
+    }
+    assert!(
+        matches!(r.confidence, Confidence::Medium | Confidence::Low),
+        "cheap ranking claimed {:?} confidence",
+        r.confidence
+    );
+    // same flat-pose pick the full ranking makes on this part
+    let full = suggest_orientations(&tilted, 1, 45.0, &cfg);
+    assert_eq!(
+        r.candidates[0].rot, full.candidates[0].rot,
+        "cheap pick differs from the full one"
+    );
+    // and a real part: progress climbs to 1 with no build steps
+    let torus = Arc::new(sf_testkit::load_model("torus"));
+    let seen = Mutex::new(Vec::<f64>::new());
+    let record = |f: f64| seen.lock().unwrap().push(f);
+    let opts = SuggestOpts {
+        cheap_above: 0.0,
+        on_progress: Some(&record),
+    };
+    suggest_orientations_opts(&torus, 3, 45.0, &cfg, &opts);
+    let seen = seen.into_inner().unwrap();
+    let last = seen.iter().copied().fold(0.0, f64::max);
+    assert!(
+        !seen.is_empty() && (last - 1.0).abs() < 1e-9,
+        "progress ended at {last}"
+    );
+}
+
+// 9551cf9 (orient.test.js:118): the cap. A cheap ranking never claims 'high'; one pose is 'medium'; no
+// pose is 'none'; the separation bands are 0.08 only.
+#[test]
+fn a_ranking_without_fin_builds_caps_its_confidence_at_medium() {
+    let cfg = Config::default();
+    let cheap = SuggestOpts {
+        cheap_above: 0.0,
+        ..Default::default()
+    };
+    // every model, every top: never 'high'
+    for name in ["cube", "wedge", "lbracket", "torus", "arch", "ramp", "sphere"] {
+        let topo = Arc::new(sf_testkit::load_model(name));
+        for top in 0..=4 {
+            let r = suggest_orientations_opts(&topo, top, 45.0, &cfg, &cheap);
+            let want = match r.candidates.len() {
+                0 => Confidence::None,
+                1 => Confidence::Medium,
+                _ => {
+                    let sep = (r.candidates[1].score - r.candidates[0].score)
+                        / r.candidates[0].score.max(1.0);
+                    if sep > 0.08 {
+                        Confidence::Medium
+                    } else {
+                        Confidence::Low
+                    }
+                }
+            };
+            assert_eq!(r.confidence, want, "{name} top {top}");
+        }
+    }
+}
+
+// The threshold compares strictly (`topo.nFaces > cheapAbove`): a part of exactly that many faces is
+// still built.
+#[test]
+fn the_cheap_threshold_is_strictly_greater_than_the_face_count() {
+    let cfg = Config::default();
+    let topo = Arc::new(sf_testkit::load_model("torus"));
+    let n = topo.n_faces as f64;
+    let at = |cheap_above: f64| {
+        let o = SuggestOpts {
+            cheap_above,
+            ..Default::default()
+        };
+        suggest_orientations_opts(&topo, 3, 45.0, &cfg, &o)
+    };
+    assert!(at(n).candidates.iter().all(|c| c.walls.is_some()));
+    assert!(at(n - 1.0).candidates.iter().all(|c| c.walls.is_none()));
+    assert_eq!(RANK_CHEAP_FACES, 1_000_000.0);
+}

@@ -58,10 +58,10 @@ fn suggest_orientations_equals_the_engine_ranking() {
             assert_eq!(
                 (r.fins, r.rough_holes, r.regions, r.bore),
                 (
-                    c.walls as u64,
+                    c.walls.map(|n| n as u64),
                     c.holes as u64,
                     c.regions as u64,
-                    c.bore as u64
+                    c.bore.map(|n| n as u64)
                 )
             );
             assert_eq!(r.volume, c.volume);
@@ -74,7 +74,7 @@ fn suggest_orientations_equals_the_engine_ranking() {
                 }
             );
             // the line the page writes: height, fins, rough holes
-            let fins = match c.walls {
+            let fins = match c.walls.unwrap() {
                 0 => "no fins".to_string(),
                 1 => "1 fin".to_string(),
                 n => format!("{n} fins"),
@@ -168,7 +168,7 @@ fn a_pose_that_points_the_bores_up_earns_the_bores_clean_badge_only_when_the_cur
                 .unwrap()
                 .starts_with("This way up the bores point up")
         );
-        assert_eq!(r.bore, 0);
+        assert_eq!(r.bore, Some(0));
     }
 }
 
@@ -269,6 +269,7 @@ fn suggest_strength_pose_equals_the_engine_and_says_when_it_is_already_strongest
 // ---- Suggester: the same generation-drop pattern as Builder -----------------------------------------
 
 enum Event {
+    Progress(u64, f64),
     Suggested(u64, SuggestResult),
     Strength(u64, StrengthAdvice),
     Failed(u64, FfiError),
@@ -277,6 +278,9 @@ struct Listener(Mutex<mpsc::Sender<Event>>);
 impl SuggestListener for Listener {
     fn suggested(&self, g: u64, r: SuggestResult) {
         let _ = self.0.lock().unwrap().send(Event::Suggested(g, r));
+    }
+    fn progress(&self, g: u64, f: f64) {
+        let _ = self.0.lock().unwrap().send(Event::Progress(g, f));
     }
     fn strength(&self, g: u64, a: StrengthAdvice) {
         let _ = self.0.lock().unwrap().send(Event::Strength(g, a));
@@ -311,6 +315,43 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
         rx1.recv_timeout(Duration::from_millis(300)),
         Err(mpsc::RecvTimeoutError::Disconnected)
     ));
+}
+
+// suggest_worker.test.js:47 -- the page shows the worker's progress on the Suggest button, so it must
+// report after every pose, climbing to 1 before the ranking arrives (and never go backwards, though
+// the engine scores on several threads).
+#[test]
+fn a_ranking_reports_progress_after_every_pose_climbing_to_1() {
+    for density in [None, Some(10.0)] {
+        let part = load("torus");
+        let s = Suggester::new(part.clone());
+        let (l, rx) = listener();
+        let g = match density {
+            None => s.suggest(45.0, "{}".into(), ctx(), l),
+            Some(d) => s.suggest_wide(45.0, "{}".into(), ctx(), d, l),
+        };
+        let mut seen = vec![];
+        loop {
+            match rx.recv_timeout(Duration::from_secs(120)).unwrap() {
+                Event::Progress(pg, f) => {
+                    assert_eq!(pg, g, "progress without its generation");
+                    seen.push(f);
+                }
+                Event::Suggested(sg, r) => {
+                    assert_eq!(sg, g);
+                    assert!(!r.rows.is_empty(), "no ranking");
+                    break;
+                }
+                _ => panic!("unexpected event"),
+            }
+        }
+        assert!(seen.len() >= 6, "only {} progress messages", seen.len());
+        assert!(
+            seen.windows(2).all(|w| w[1] > w[0]),
+            "progress went backwards: {seen:?}"
+        );
+        assert!((seen.last().unwrap() - 1.0).abs() < 1e-9, "ended at {seen:?}");
+    }
 }
 
 #[test]

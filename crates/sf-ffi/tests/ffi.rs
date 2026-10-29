@@ -34,7 +34,7 @@ fn f32s(b: &GpuBuffer) -> Vec<f32> {
 fn engine_version_names_the_crate_and_the_upstream_commit() {
     let v = engine_version();
     assert!(v.starts_with(env!("CARGO_PKG_VERSION")), "{v}");
-    assert!(v.contains("upstream 299ef49"), "{v}");
+    assert!(v.contains("upstream 23039e2"), "{v}");
 }
 
 #[test]

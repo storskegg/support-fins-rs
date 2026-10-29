@@ -40,7 +40,7 @@ private func floats(_ buffer: MTLBuffer, count: Int) -> [Float] {
 private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
 
 @Test func engineVersionNamesTheUpstreamCommit() {
-    #expect(engineVersion().contains("upstream 299ef49"))
+    #expect(engineVersion().contains("upstream 23039e2"))
 }
 
 @Test func loadsAStressModelThroughThePackage() throws {

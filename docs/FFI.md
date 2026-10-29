@@ -134,8 +134,9 @@ the same keys.
 #[derive(uniffi::Record)] struct Suggestion {
     rot: Vec<f64>,          // 9, column-major: apply it to the part
     rank: String,           // "Best", "#2", "#3"
-    line: String,           // "40 mm · 4 fins · 2 rough holes" or "... · can’t print (on a point)"
-    height: f64, fins: u64, rough_holes: u64, regions: u64, bore: u64, volume: f64, // the raw numbers behind `line`
+    line: String,           // "40 mm · 4 fins · 2 rough holes" or "... · can’t print (on a point)"; "40 mm" (no fin count) when fins is None
+    height: f64, fins: Option<u64>, rough_holes: u64, regions: u64, bore: Option<u64>, volume: Option<f64>, // the raw numbers behind `line`
+                            // fins/bore/volume are None when the ranking skipped the fin builds (a part over 1M faces, see below)
     cant_print: bool,       // seating is a point: shown as a bad row
     tier: SuggestTier,      // Free (green row, "no fins") | HoleClean (badge) | Ordinary
     badge: Option<String>,  // "Bores clean" for HoleClean
@@ -155,6 +156,11 @@ impl Part { fn suggest_orientations_wide(&self, threshold_deg: f64, opts_json: S
 //   step: the cluster cap grows by `density`, the normal bucket and the near-duplicate angle shrink by sqrt(density).
 //   A part with few distinct face normals (a box) has no more stable down-faces and keeps its handful of poses.
 
+//   A part over RANK_CHEAP_FACES (1,000,000 faces; strictly more) is ranked on the analysis pass alone, with no fin build per
+//   finalist (web/orient.js rankCheap), by both searches: its rows carry fins/bore/volume = None, the line leaves the fin count
+//   out ("40 mm", or "40 mm · no fins" for a pose with no overhang region), "Bores clean" needs a measured bore count of 0,
+//   and the confidence is capped at "medium" (one pose: "medium"; two or more: "medium" above 8% separation, else "low").
+
 // Strength (ui/strength.js; web/orient.js loadAlignment / suggestStrengthPose)
 #[derive(uniffi::Record)] struct LoadAlignment { cross: f64, quality: String /* good|mixed|poor */, text: String, can_suggest: bool }
 fn load_alignment(dir_world: Vec<f64>) -> Result<Option<LoadAlignment>, FfiError>;  // world +Z is the build axis; None: no direction
@@ -170,6 +176,7 @@ impl Part { fn suggest_strength_pose(&self, dir_local: Vec<f64>, dir_world: Vec<
 // Off the main thread, with a generation counter like Builder: a newer request drops an older, unfinished one.
 #[uniffi::export(callback_interface)] trait SuggestListener: Send + Sync {
     fn suggested(&self, generation: u64, result: SuggestResult);
+    fn progress(&self, generation: u64, fraction: f64); // 0..1 after every pose scored, rising only (the button's "Ranking… 40%"); never for a superseded ranking
     fn strength(&self, generation: u64, advice: StrengthAdvice);
     fn failed(&self, generation: u64, err: FfiError);
 }
