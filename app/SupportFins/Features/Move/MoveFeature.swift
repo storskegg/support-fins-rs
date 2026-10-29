@@ -41,11 +41,7 @@ final class MoveFeature: Feature {
     }
 
     var escapeHandlers: [EscapeHandler] {
-        [EscapeHandler(id: "move", priority: EscapeHandler.windowMode + 10) {
-            guard self.model.isOn else { return false }
-            self.model.setOn(false)
-            return true
-        }]
+        [EscapeHandler(id: "move", priority: EscapeHandler.windowMode + 10) { self.escape(NSApp.currentEvent) }]
     }
 
     /// M toggles the tool, Esc leaves it, wherever the focus is but in a text field (`keydown`, `ui/move.js:182-196`);
@@ -54,13 +50,17 @@ final class MoveFeature: Feature {
         guard let controller = host.controller, controller.isInKeyWindow, host.hasPart,
               event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
         if let r = event.window?.firstResponder, r is NSText || r is NSTextField { return false }
-        if event.keyCode == 53 {                                   // Esc
-            guard model.isOn, host.toolbar.open == nil else { return false }
-            model.setOn(false)
-            return true
-        }
+        if event.keyCode == 53 { return escape(event) }           // Esc
         guard event.charactersIgnoringModifiers?.lowercased() == "m", !event.isARepeat else { return false }
         model.toggle()
+        return true
+    }
+
+    /// Esc leaves Move, unless the Esc is an open popover's to fold (`ui/move.js:190-193`): open now, or folded by
+    /// this same key a moment ago (the toolbar's key monitor can run before this one). True when it left Move.
+    func escape(_ event: NSEvent?) -> Bool {
+        guard model.isOn, !host.toolbar.escapeIsThePopovers(event) else { return false }
+        model.setOn(false)
         return true
     }
 

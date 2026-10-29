@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The floating bottom toolbar: a glass capsule over the view with Undo, Redo, then the badge slots
@@ -23,7 +24,7 @@ struct ViewToolbar: View {
             .glassEffect(.regular, in: .capsule)
         }
         .padding(.bottom, 14)
-        .onExitCommand { registry.fold() }
+        .background(EscapeFolds(registry: registry))
     }
 }
 
@@ -66,7 +67,7 @@ private struct SlotButton: View {
             }
         }
         .accessibilityIdentifier("toolbar-\(slot.id)")
-        .modifier(OnOffValue(state: badge?.toggle.map { $0.isOn() ? "on" : "off" }))
+        .modifier(OnOffValue(state: (badge?.toggle ?? badge?.tool).map { $0.isOn() ? "on" : "off" }))
         .popover(isPresented: Binding(get: { registry.open == slot && badge != nil },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {
@@ -75,7 +76,52 @@ private struct SlotButton: View {
     }
 }
 
-/// A toggle badge says whether its tool is on to the accessibility tree (a UI test reads it as selected); other badges
+/// Esc folds the open popover away, wherever the key focus is (`ui/toolbar.js:104-114`: a keydown listener on the
+/// page's window, so it runs whatever has the focus, and the page's other Esc listeners still run after it).
+///
+/// SwiftUI's `onExitCommand` can't do this. It reaches only the focused view and its ancestors, and the toolbar's
+/// plain buttons never hold the focus: the Esc goes to the popover's own window, to the viewer (which keeps Esc for
+/// an armed mode), or to whatever else in the window has the keys. None of those is inside the toolbar (the
+/// Section UI test's Esc did nothing). So this watches the app's key events (a local monitor, one per window's toolbar) and folds when
+/// the Esc is for this window: its own keys, or those of a window it owns that cannot become main (the popover's).
+/// The event is passed on untouched, so the window's Esc cascade (`ContentView`) still ends an armed mode, as the
+/// web's `app.js` listener does next to the toolbar's.
+private struct EscapeFolds: NSViewRepresentable {
+    let registry: ToolbarRegistry
+
+    func makeNSView(context: Context) -> Probe {
+        let v = Probe()
+        v.registry = registry
+        return v
+    }
+
+    func updateNSView(_ v: Probe, context: Context) { v.registry = registry }
+
+    final class Probe: NSView {
+        weak var registry: ToolbarRegistry?
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+                MainActor.assumeIsolated { self?.escape(e) }
+                return e
+            }
+        }
+
+        private func escape(_ e: NSEvent) {
+            guard e.keyCode == 53, let registry, registry.open != nil, let own = window, let to = e.window else { return }
+            guard to === own || to.parent === own || (own.isMainWindow && !to.canBecomeMain) else { return }
+            registry.fold(byEscape: e)
+        }
+    }
+}
+
+/// A badge with a tool (Move's toggle, Section's tool: `aria-pressed` for every `setOn` badge, `ui/toolbar.js:40`) says whether
+/// its tool is on to the accessibility tree (a UI test reads it as selected); other badges
 /// say nothing.
 private struct OnOffValue: ViewModifier {
     let state: String?

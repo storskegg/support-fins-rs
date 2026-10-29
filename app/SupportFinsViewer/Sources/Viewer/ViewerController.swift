@@ -153,10 +153,16 @@ public final class ViewerController {
         renderer = r
         r.setVolume(volume)
         r.onCameraChange = { [weak self] in MainActor.assumeIsolated { self?.cameraRevision &+= 1 } }
+        // the section plane's handle takes the part's rings' place while it is up (`planeHandleShown`)
+        r.section.onChange = { [weak self] in MainActor.assumeIsolated { self?.updateGizmo(); self?.clearHover() } }
+        r.section.onCursorChange = { [weak self] in MainActor.assumeIsolated { self?.onCursorChange?() } }
         // Move takes the press on a model, and the rotate rings would take it first: they step aside (`setMove`)
         r.move.onChange = { [weak self] in MainActor.assumeIsolated { self?.updateGizmo(); self?.clearHover() } }
         r.move.onCursorChange = { [weak self] in MainActor.assumeIsolated { self?.onCursorChange?() } }
     }
+
+    /// The section view (`web/ui/section.js`).
+    public var section: SectionTool { renderer.section }
 
     /// The Move tool (`web/ui/move.js`).
     public var move: MoveTool { renderer.move }
@@ -355,13 +361,13 @@ public final class ViewerController {
     }
 
     func updateGizmo() {
-        guard showRings, !supportPicking, !facePicking, !renderer.move.isOn, handPicking != .walls, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
+        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.move.isOn, handPicking != .walls, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
         renderer.setGizmo(GizmoDisplay(center: drag?.center ?? gizmoCenter, hover: ringHover, active: ringDragging, fade: ringFade))
     }
 
     /// The ring under a pixel, if the rings are on.
     public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoHandle? {
-        guard showRings, !supportPicking, !facePicking, !renderer.move.isOn, handPicking != .walls, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
+        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.move.isOn, handPicking != .walls, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
         return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
                                                     width: Float(width), height: Float(height))
     }
@@ -408,6 +414,9 @@ public final class ViewerController {
 
     /// Pointer moved over the view: light the ring under it, otherwise pick the face.
     public func pointerMoved(x: Int, y: Int, width: Int, height: Int) {
+        // the section plane's handle owns the pointer: no pick lights up through it (`planeBusy`)
+        section.pointerMoved(x: x, y: y, width: width, height: height)
+        if section.busy { clearHover(); return }
         let ring = ringAt(x: x, y: y, width: width, height: height)
         if ring != ringHover { ringHover = ring }
         // over the rings without a drag a sway brace is still previewed: a drag there turns the part, a click stands it
@@ -452,12 +461,22 @@ public final class ViewerController {
                     // Move: the model under the pointer, for the grab cursor and the press (`modelAt`)
                     let pick = await renderer.pickModel(x: p.x, y: p.y, width: p.w, height: p.h)
                     if move.isOn, !move.dragging { move.setHover(pick) }
+                    // the section's sheet is not grabbed over the visible part either (`sheetPoint` skips the cut
+                    // half, which Move's pick does not)
+                    if section.isOn {
+                        let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
+                        section.overPart = face != nil
+                    }
                     continue
                 }
                 if supportPicking {
                     let tri = await renderer.pickSupport(x: p.x, y: p.y, width: p.w, height: p.h)
                     guard supportPicking else { continue }
                     hoverSupportTriangle = tri
+                    if section.isOn {
+                        let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
+                        section.overPart = tri != nil || face != nil
+                    }
                     hoveringSupport = tri != nil
                     onSupportHover?(tri)
                     continue
@@ -470,6 +489,11 @@ public final class ViewerController {
                 }
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
                 let before = hoveringFaceToLay
+                // the sheet is grabbed only off the model (`sheetPoint` casts at the MODEL layer: the part and the
+                // fins too), and both picks skip the cut half
+                var fin = false
+                if section.isOn, face == nil { fin = await renderer.pickSupport(x: p.x, y: p.y, width: p.w, height: p.h) != nil }
+                section.overPart = face != nil || fin
                 hoverFace = face
                 // the web lights the hovered face only while Lay a face flat is armed (`web/ui/pose.js layHover`)
                 renderer.setHover(facePicking ? face : nil)
@@ -481,6 +505,7 @@ public final class ViewerController {
 
     public func clearHover() {
         pendingPick = nil
+        section.overPart = false
         if !move.dragging { move.setHover(nil) }
         let wasLit = hoveringFaceToLay
         hoverFace = nil

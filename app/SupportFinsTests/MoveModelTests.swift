@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SupportFinsCore
 import Testing
@@ -160,6 +161,35 @@ struct MoveModelTests {
         item.isOn.wrappedValue = true
         #expect(move.isOn)
         #expect(host.features.escape())
+        #expect(!move.isOn)
+    }
+
+    /// Esc with Move on and a popover open folds the popover and leaves Move on (`ui/move.js:190-193`), whichever
+    /// key monitor sees the Esc first: Move's (the popover is open) or the toolbar's (this Esc just folded it).
+    /// The next Esc, with nothing open, leaves Move.
+    @Test func escWithAPopoverOpenFoldsItAndLeavesMoveOn() async throws {
+        let (host, _, move, _) = try await twoModels()
+        let feature = try #require(host.features[MoveFeature.self])
+        func esc(_ t: TimeInterval) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: t, windowNumber: 0,
+                                          context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                                          isARepeat: false, keyCode: 53))
+        }
+        move.setOn(true)
+        // Move's monitor first: the popover is open, so the key is the popover's
+        host.toolbar.toggle(.rotate)
+        let first = try esc(10)
+        #expect(!feature.escape(first))
+        host.toolbar.fold(byEscape: first)
+        #expect(move.isOn && host.toolbar.open == nil)
+        // the toolbar's monitor first: it folds, then Move sees the same Esc and leaves it alone
+        host.toolbar.toggle(.rotate)
+        let second = try esc(11)
+        host.toolbar.fold(byEscape: second)
+        #expect(!feature.escape(second))
+        #expect(move.isOn && host.toolbar.open == nil)
+        // a later Esc with nothing open: Move goes off
+        #expect(feature.escape(try esc(12)))
         #expect(!move.isOn)
     }
 
