@@ -4,16 +4,16 @@
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 
 use sf_cli::entry::{options_from_dialog, support_tunables};
 use sf_engine::config::{Config, apply_tunables};
 use sf_engine::fins::seating::SeatingKind;
 use sf_engine::jsnum;
 use sf_engine::orient::{
-    Candidate, Confidence, Posture, layer_verdict, load_alignment as engine_load_alignment,
-    SuggestOpts, suggest_orientations_cancellable_opts, suggest_orientations_wide_opts,
-    suggest_strength_pose,
+    Candidate, Confidence, Posture, SuggestOpts, layer_verdict,
+    load_alignment as engine_load_alignment, suggest_orientations_cancellable_opts,
+    suggest_orientations_wide_opts, suggest_strength_pose,
 };
 
 use crate::builder::dialog_values;
@@ -477,12 +477,14 @@ impl Suggester {
                             context,
                             density,
                         } => {
-                            // rising only, and silent once a newer request has replaced this one
-                            let high = AtomicU64::new(0f64.to_bits());
+                            // rising only, and silent once a newer request has replaced this one. The
+                            // engine scores on several threads: the lock makes "newer than the last
+                            // one sent" and the send one step, so the listener sees them in order.
+                            let sent = Mutex::new(0.0_f64);
                             let report = |f: f64| {
-                                if latest.load(Ordering::SeqCst) == job.generation
-                                    && high.fetch_max(f.to_bits(), Ordering::SeqCst) < f.to_bits()
-                                {
+                                let mut last = sent.lock().unwrap();
+                                if f > *last && latest.load(Ordering::SeqCst) == job.generation {
+                                    *last = f;
                                     job.listener.progress(job.generation, f);
                                 }
                             };

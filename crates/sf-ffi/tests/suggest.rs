@@ -289,6 +289,26 @@ impl SuggestListener for Listener {
         let _ = self.0.lock().unwrap().send(Event::Failed(g, e));
     }
 }
+/// The next event that is not a progress report (those come first, for as long as a ranking runs).
+fn next_event(rx: &mpsc::Receiver<Event>, timeout: Duration) -> Event {
+    loop {
+        match rx.recv_timeout(timeout).unwrap() {
+            Event::Progress(..) => {}
+            e => return e,
+        }
+    }
+}
+/// Nothing but progress reports ever reach a listener whose ranking was replaced (`Ok` while the
+/// older one still ran as the latest, `Disconnected` once the worker dropped it): never its answer.
+fn assert_never_answered(rx: &mpsc::Receiver<Event>) {
+    loop {
+        match rx.recv_timeout(Duration::from_millis(300)) {
+            Ok(Event::Progress(..)) => {}
+            Ok(_) => panic!("a replaced ranking was delivered"),
+            Err(_) => return,
+        }
+    }
+}
 fn listener() -> (Box<Listener>, mpsc::Receiver<Event>) {
     let (tx, rx) = mpsc::channel();
     (Box::new(Listener(Mutex::new(tx))), rx)
@@ -303,7 +323,7 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
     let g1 = s.suggest(45.0, "{}".into(), ctx(), l1);
     let g2 = s.suggest(45.0, "{}".into(), ctx(), l2);
     assert_eq!((g1, g2), (1, 2));
-    let Event::Suggested(g, r) = rx2.recv_timeout(Duration::from_secs(60)).unwrap() else {
+    let Event::Suggested(g, r) = next_event(&rx2, Duration::from_secs(60)) else {
         panic!("not a suggestion")
     };
     assert_eq!(g, 2);
@@ -311,10 +331,7 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
         r,
         part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap()
     );
-    assert!(matches!(
-        rx1.recv_timeout(Duration::from_millis(300)),
-        Err(mpsc::RecvTimeoutError::Disconnected)
-    ));
+    assert_never_answered(&rx1);
 }
 
 // suggest_worker.test.js:47 -- the page shows the worker's progress on the Suggest button, so it must
@@ -350,7 +367,10 @@ fn a_ranking_reports_progress_after_every_pose_climbing_to_1() {
             seen.windows(2).all(|w| w[1] > w[0]),
             "progress went backwards: {seen:?}"
         );
-        assert!((seen.last().unwrap() - 1.0).abs() < 1e-9, "ended at {seen:?}");
+        assert!(
+            (seen.last().unwrap() - 1.0).abs() < 1e-9,
+            "ended at {seen:?}"
+        );
     }
 }
 
@@ -396,14 +416,11 @@ fn a_stale_wide_search_stops_early_and_the_newer_one_is_delivered() {
     let g1 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l1);
     let g2 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l2);
     assert_eq!((g1, g2), (1, 2));
-    let Event::Suggested(g, _) = rx2.recv_timeout(Duration::from_secs(120)).unwrap() else {
+    let Event::Suggested(g, _) = next_event(&rx2, Duration::from_secs(120)) else {
         panic!("not a suggestion")
     };
     assert_eq!(g, 2);
-    assert!(matches!(
-        rx1.recv_timeout(Duration::from_millis(300)),
-        Err(mpsc::RecvTimeoutError::Disconnected)
-    ));
+    assert_never_answered(&rx1);
 }
 
 #[test]

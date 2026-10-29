@@ -290,7 +290,9 @@ fn a_ranking_without_fin_builds_caps_its_confidence_at_medium() {
         ..Default::default()
     };
     // every model, every top: never 'high'
-    for name in ["cube", "wedge", "lbracket", "torus", "arch", "ramp", "sphere"] {
+    for name in [
+        "cube", "wedge", "lbracket", "torus", "arch", "ramp", "sphere",
+    ] {
         let topo = Arc::new(sf_testkit::load_model(name));
         for top in 0..=4 {
             let r = suggest_orientations_opts(&topo, top, 45.0, &cfg, &cheap);

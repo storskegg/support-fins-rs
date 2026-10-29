@@ -624,7 +624,9 @@ fn rank_downs(
     let mut confidence = Confidence::High;
     match (built.first(), built.get(1)) {
         (None, _) => confidence = Confidence::None,
-        (Some(best), _) if best.seating == Some(SeatingKind::Point) => confidence = Confidence::None,
+        (Some(best), _) if best.seating == Some(SeatingKind::Point) => {
+            confidence = Confidence::None
+        }
         (Some(best), Some(second)) => {
             let sep = (second.score - best.score) / jsnum::max(1.0, best.score);
             confidence = if sep > 0.25 {

@@ -97,10 +97,10 @@ fn opt_usize(v: &Value) -> usize {
 /// The recorded options: `top`, `threshold` and the optional `cheapAbove`.
 fn suggest_opts(o: &Value) -> SuggestOpts<'static> {
     let mut opts = SuggestOpts::default();
-    if let Value::Obj(kv) = o {
-        if let Some((_, c)) = kv.iter().find(|(k, _)| k == "cheapAbove") {
-            opts.cheap_above = c.num();
-        }
+    if let Value::Obj(kv) = o
+        && let Some((_, c)) = kv.iter().find(|(k, _)| k == "cheapAbove")
+    {
+        opts.cheap_above = c.num();
     }
     opts
 }
@@ -180,7 +180,12 @@ fn suggest_orientations_replays() {
         } else {
             built += 1;
         }
-        check("suggestOrientations", c, &suggestions_value(&r), &Tol::Exact);
+        check(
+            "suggestOrientations",
+            c,
+            &suggestions_value(&r),
+            &Tol::Exact,
+        );
     }
     assert!(
         conf.len() >= 2,
@@ -220,7 +225,15 @@ fn suggest_progress_replays() {
         );
         let mut got = seen.into_inner().unwrap();
         got.sort_by(f64::total_cmp);
-        let mut want: Vec<f64> = c.out.as_ref().expect("out").get("progress").arr().iter().map(Value::num).collect();
+        let mut want: Vec<f64> = c
+            .out
+            .as_ref()
+            .expect("out")
+            .get("progress")
+            .arr()
+            .iter()
+            .map(Value::num)
+            .collect();
         want.sort_by(f64::total_cmp);
         assert_eq!(got, want, "{}: progress calls", c.id);
         assert_eq!(got.last().copied(), Some(1.0), "{}: ends at 1", c.id);
