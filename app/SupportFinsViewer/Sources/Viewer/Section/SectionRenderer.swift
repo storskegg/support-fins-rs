@@ -127,12 +127,10 @@ extension ViewerRenderer {
                depth: gizmoDepthState, uniforms: &u, with: enc)
         if g.showsArrow {
             let color: SIMD3<Float> = lit(.arrow) ? GizmoDisplay.highlight : SIMD3(0, 0, 1)
-            let ends = g.shaft()
-            stroke(ends, color: color, alpha: 1, width: w, depth: gizmoDepthState, uniforms: &u, with: enc)
-            // the cones at both ends
-            let n = g.plane.normal, len = 0.1 * g.unit()
-            for (tip, dir) in [(ends[1], n), (ends[0], -n)] {
-                stroke([tip - dir * len, tip], color: color, alpha: 1, width: 3 * w, depth: gizmoDepthState, uniforms: &u, with: enc)
+            stroke(g.shaft(), color: color, alpha: 1, width: w, depth: gizmoDepthState, uniforms: &u, with: enc)
+            // the cones, pointing out at both ends
+            for c in g.cones() {
+                stroke([c.base, c.tip], color: color, alpha: 1, width: 3 * w, depth: gizmoDepthState, uniforms: &u, with: enc)
             }
         }
     }

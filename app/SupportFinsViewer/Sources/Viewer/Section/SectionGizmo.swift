@@ -10,8 +10,12 @@ struct SectionGizmo {
     var camera: OrbitCamera
 
     static let segments = 64
+    /// The shaft runs from the centre to 0.5 on the kept side (`lineGeometry2`, a 0.5 cylinder moved up by
+    /// 0.25), and a 0.1 cone (`arrowGeometry`) points out from 0.5 to 0.6 at either end.
     static let arrowReach: Float = 0.5
-    /// The pick geometry of the arrow is a cone of radius 0.2 over 0.6 either way.
+    static let coneLength: Float = 0.1
+    /// The pick geometry of the arrow is two cones (`pickerTranslate.Z`, `CylinderGeometry(0.2, 0, 0.6)` at +-0.3),
+    /// each from a point at the centre to a radius of 0.2 at 0.6 either way.
     static let arrowPickReach: Float = 0.6
     static let arrowPickRadius: Float = 0.2
     static let axisRadius: Float = 0.5
@@ -32,10 +36,17 @@ struct SectionGizmo {
     /// The arrow is drawn and grabbable unless it points down the view.
     var showsArrow: Bool { abs(simd_dot(plane.normal, eye)) <= Self.axisHide }
 
-    /// The shaft's two ends.
+    /// The shaft's two ends: the centre and 0.5 along the normal.
     func shaft() -> [SIMD3<Float>] {
-        let r = Self.arrowReach * unit()
-        return [center - plane.normal * r, center + plane.normal * r]
+        [center, center + plane.normal * (Self.arrowReach * unit())]
+    }
+
+    /// The two cones as (base, tip): from 0.5 to 0.6 along the normal, and the same the other way.
+    func cones() -> [(base: SIMD3<Float>, tip: SIMD3<Float>)] {
+        let u = unit()
+        return [plane.normal, -plane.normal].map { d in
+            (center + d * (Self.arrowReach * u), center + d * ((Self.arrowReach + Self.coneLength) * u))
+        }
     }
 
     /// The near half of the ring about local axis `.ringX` or `.ringY` as `segments + 1` world points.
@@ -76,7 +87,11 @@ struct SectionGizmo {
             let reach = Self.arrowPickReach * unit()
             let a = screen(center - plane.normal * reach, width: width, height: height)
             let b = screen(center + plane.normal * reach, width: width, height: height)
-            if RotateGizmo.distance(p, from: a, to: b) <= Self.arrowPickRadius * ppu { return .arrow }
+            // the nearest point of the axis on screen, and the cones' radius there (0 at the centre, 0.2 at the ends)
+            let ab = b - a, l2 = simd_length_squared(ab)
+            let t = l2 > 0 ? Swift.min(Swift.max(simd_dot(p - a, ab) / l2, 0), 1) : 0
+            let radius = Self.arrowPickRadius * abs(2 * t - 1)
+            if simd_length(p - (a + t * ab)) <= radius * ppu { return .arrow }
         }
         var best: (SectionHandle, Float)?
         func consider(_ h: SectionHandle, _ pts: [SIMD3<Float>]) {

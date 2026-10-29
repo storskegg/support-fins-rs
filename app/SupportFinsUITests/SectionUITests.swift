@@ -18,9 +18,10 @@ final class SectionUITests: PartWindowUITestCase {
         element("section-reset").click()
         XCTAssertTrue(hide.exists, "still open")
 
-        // Esc goes to the popover's own control (the popover is the key window while its buttons are being used)
-        hide.typeKey(.escape, modifierFlags: [])
-        waitFor("Esc folds the popover", timeout: 5) { !ghost.exists && !element("section-flip").exists }
+        // Esc folds the popover whichever window has the keys (the toolbar watches the app's key events)
+        app.typeKey(.escape, modifierFlags: [])
+        let flip = element("section-flip")
+        waitFor("Esc folds the popover", timeout: 5) { !ghost.exists && !flip.exists }
         badge.click()                                   // the lit badge brings its settings back
         XCTAssertTrue(ghost.waitForExistence(timeout: 5))
         badge.click()                                   // with the popover open: off

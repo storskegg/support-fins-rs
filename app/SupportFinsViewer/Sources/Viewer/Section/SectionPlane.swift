@@ -76,7 +76,7 @@ public struct SectionPlane: Equatable, Sendable {
     public static func rotation(from a: SIMD3<Float>, to b: SIMD3<Float>) -> simd_quatf {
         var r = simd_dot(a, b) + 1
         var q: SIMD4<Float>
-        if r < Float.ulpOfOne {
+        if r < 1e-8 {     // three.js' epsilon (`Quaternion.setFromUnitVectors`, three r185)
             r = 0
             q = abs(a.x) > abs(a.z) ? SIMD4(-a.y, a.x, 0, r) : SIMD4(0, -a.z, a.y, r)
         } else {

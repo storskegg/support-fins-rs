@@ -388,7 +388,11 @@ public final class ViewerController {
                 }
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
                 let before = hoveringFaceToLay
-                section.overPart = face != nil
+                // the sheet is grabbed only off the model (`sheetPoint` casts at the MODEL layer: the part and the
+                // fins too), and both picks skip the cut half
+                var fin = false
+                if section.isOn, face == nil { fin = await renderer.pickSupport(x: p.x, y: p.y, width: p.w, height: p.h) != nil }
+                section.overPart = face != nil || fin
                 hoverFace = face
                 // the web lights the hovered face only while Lay a face flat is armed (`web/ui/pose.js layHover`)
                 renderer.setHover(facePicking ? face : nil)

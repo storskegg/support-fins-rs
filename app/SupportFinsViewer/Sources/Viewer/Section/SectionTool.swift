@@ -220,7 +220,10 @@ public final class SectionTool {
         enum Kind {
             /// `pointStart` (relative to the handle), the handle's start, its axis.
             case arrow(start: SIMD3<Float>, position: SIMD3<Float>, axis: SIMD3<Float>, planeNormal: SIMD3<Float>)
-            case ring(handle: SectionHandle, start: SIMD3<Float>, eye: SIMD3<Float>, speed: Float, orientation: simd_quatf)
+            /// `facing` is the pointer plane's normal: the camera's view axis (`TransformControlsPlane` lays the
+            /// rotate plane parallel to the camera), not `eye`, the direction from the centre to the camera.
+            case ring(handle: SectionHandle, start: SIMD3<Float>, eye: SIMD3<Float>, facing: SIMD3<Float>, speed: Float,
+                      orientation: simd_quatf)
             case sheet(p0: SIMD3<Float>, h0: SIMD3<Float>, n: SIMD3<Float>, y0: Int, wpp: Float)
         }
         var kind: Kind
@@ -243,9 +246,10 @@ public final class SectionTool {
                 guard simd_length(pn) > 1e-6, let p = Self.hit(ray, planeNormal: simd_normalize(pn), through: center) else { return false }
                 drag = Drag(kind: .arrow(start: p - center, position: center, axis: axis, planeNormal: simd_normalize(pn)))
             case .ringX, .ringY, .screen:
-                guard let p = Self.hit(ray, planeNormal: eye, through: center) else { return false }
+                let facing = r.camera.basis.forward
+                guard let p = Self.hit(ray, planeNormal: facing, through: center) else { return false }
                 // `ROTATION_SPEED = 20 / distance(camera, centre)`
-                drag = Drag(kind: .ring(handle: handle, start: p - center, eye: eye,
+                drag = Drag(kind: .ring(handle: handle, start: p - center, eye: eye, facing: facing,
                                         speed: 20 / simd_length(r.camera.eye - center), orientation: plane.orientation))
             }
             dragging = handle
@@ -281,9 +285,9 @@ public final class SectionTool {
             guard let p = Self.hit(ray, planeNormal: pn, through: position) else { return }
             let offset = (p - position) - start
             plane.position = position + axis * simd_dot(offset, axis)       // `offset.projectOnVector(axis)`
-        case .ring(let handle, let start, let eye, let speed, let q0):
+        case .ring(let handle, let start, let eye, let facing, let speed, let q0):
             let center = plane.position
-            guard let p = Self.hit(ray, planeNormal: eye, through: center) else { return }
+            guard let p = Self.hit(ray, planeNormal: facing, through: center) else { return }
             let end = p - center
             let offset = end - start
             let local: SIMD3<Float> = handle == .ringX ? SIMD3(1, 0, 0) : handle == .ringY ? SIMD3(0, 1, 0) : SIMD3(0, 0, 1)

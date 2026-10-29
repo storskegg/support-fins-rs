@@ -89,6 +89,17 @@ struct SectionModelTests {
         #expect(item.isOn.wrappedValue)
     }
 
+    @Test func switchingTheCutOffFromTheMenuFoldsItsPopover() throws {
+        let (host, feature, tool) = try window()
+        defer { withExtendedLifetime(host) {} }
+        host.toolbar.toggle(.section)
+        guard case .toggle(let item) = SectionFeature.menus(feature)[0].entries[1] else { Issue.record("no toggle"); return }
+        item.isOn.wrappedValue = false
+        #expect(!tool.isOn && host.toolbar.open == nil)
+        item.isOn.wrappedValue = true                 // back on from the menu: the popover stays folded
+        #expect(tool.isOn && host.toolbar.open == nil)
+    }
+
     @Test func tiltingAndPushingTheCutNeverTouchesThePose() throws {
         let (host, _, tool) = try window()
         let pose = host.session.pose
