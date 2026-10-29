@@ -8,3 +8,7 @@ dashboard:
 # Keep ~/RustRoverProjects/sfrs-wt small: remove worktrees whose work is on GitHub, drop build output of idle kept ones (dry run; `just tidy --apply` does it).
 tidy *args:
     python3 tools/tidy/tidy.py {{args}}
+
+# Rebuild the Help Book (app/SupportFins/Help/SupportFins.help) from the web's docs at the pinned upstream commit; needs pandoc and hiutil.
+helpbook:
+    deno run --allow-read --allow-write --allow-run=git,pandoc,hiutil --allow-env --node-modules-dir=none tools/helpbook/build.js

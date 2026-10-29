@@ -30,7 +30,11 @@ targets:
     sources:
       - path: SupportFins
         excludes:
+          - Help
           - Resources/Calibration
+      # the Help Book (built from the web's pages by tools/helpbook), kept whole: the Help Viewer reads the folder as is
+      - path: SupportFins/Help/SupportFins.help
+        type: folder
       # the test prints and their estimates (web/calibration/), kept as a folder: file names stay as the page serves them
       - path: SupportFins/Resources/Calibration
         type: folder
@@ -54,6 +58,8 @@ targets:
     info:
       path: SupportFins/Info.plist
       properties:
+        CFBundleHelpBookFolder: SupportFins.help
+        CFBundleHelpBookName: com.storskegg.SupportFins.help
         CFBundleDocumentTypes:
           - CFBundleTypeName: STL model
             CFBundleTypeRole: Viewer

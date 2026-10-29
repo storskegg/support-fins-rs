@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rounded support feet</title>
+<meta name="AppleTitle" content="Rounded support feet">
+<meta name="robots" content="anchors">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../shrd/help.css">
+</head>
+<body>
+<p class="nav"><a href="index.html">Support Fins Help</a></p><main>
+<h1>Rounded support feet</h1>
+<p><strong>Rounded feet</strong> optionally rounds the corners of FDM bed-standing wall, squat, wedge and Sway feet inside their existing clearance envelope. It starts off, so existing geometry stays unchanged. Vertical/resin pin mode keeps its own windowed/undercut feet, even if the setting is saved as on. The choice is undoable and saved in 3MF sessions. Engine callers opt in with <code>tunables: { roundFeet: true }</code>; direct Sway callers use <code>roundFeet: true</code>. Omitted/false restores ordinary feet. Segment joints overlap inside the foot contour rather than meeting face to face. Rounding removes corner area; plate adhesion and tall-print stability have not been physically compared. Check the sliced first layers and print-test before using it for tall parts.</p>
+
+</main>
+</body>
+</html>

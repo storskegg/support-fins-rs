@@ -186,7 +186,7 @@ struct FeatureSetTests {
                      "  Lay a Face Flat", "  -", "  Move", "  Arrange", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
         let edit = ["Edit", "  Remove Model from Plate", "  -", "  Copy Build Settings", "  -", "  Search Settings [⌥⌘f]"]
-        let help = ["Help", "  Calibration Prints…", "  Full Calibration Guide"]
+        let help = ["Help", "  Calibration Prints…", "  Full Calibration Guide", "  -", "  Support Fins on GitHub", "  Support the project", "  Report a problem"]
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit + help)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
