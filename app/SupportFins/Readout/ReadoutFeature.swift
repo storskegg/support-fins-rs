@@ -12,7 +12,8 @@ final class ReadoutFeature: Feature {
             if let controller = self.host.controller {
                 ReadoutSections(controller: controller, session: self.host.session, build: self.host.wiring?.build,
                                 extraLines: self.host.features.statusLines,
-                                statsRows: self.host.features.inspectorSections(.stats))
+                                statsRows: self.host.features.inspectorSections(.stats),
+                                plateFit: { self.host.features[PlatesFeature.self]?.board.fit ?? PlateFit() })
             }
         }]
     }

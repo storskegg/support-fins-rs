@@ -92,6 +92,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     private var plateBuffers: [MTLBuffer?] = [nil, nil, nil, nil]
     /// The beds of the plates, the models parked beside the live one and the clash cells (`PlateScene.swift`).
     public internal(set) var plateScene = PlateScene()
+    /// The Move tool's pointer (`Move/MoveTool.swift`).
+    public let move = MoveTool()
     var clashBuffer: (MTLBuffer, Int)?
     var idTexture: MTLTexture?
     var idDepth: MTLTexture?
@@ -198,6 +200,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         readback = device.makeBuffer(length: 4, options: .storageModeShared)!
         plate = PlateGeometry(volume: .standard)
         super.init()
+        move.renderer = self
         uploadPlate()
     }
 
