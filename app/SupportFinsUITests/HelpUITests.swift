@@ -6,12 +6,13 @@ import XCTest
 final class HelpUITests: PartWindowUITestCase {
     func testTheHelpMenuHasTheHelpBookAndTheAppsItems() throws {
         try openFixturePart()
-        menuBarItem("Help").click()
-        let help = app.menuItems["Support Fins Help"]
+        let menu = menuBarItem("Help")
+        menu.click()
+        let help = menu.menuItems["Support Fins Help"]
         XCTAssertTrue(help.waitForExistence(timeout: 5), "the system's Help item")
         XCTAssertTrue(help.isEnabled, "the Help Book is registered")
         for title in ["Calibration Prints…", "Full Calibration Guide", "Support Fins on GitHub", "Support the project", "Report a problem"] {
-            XCTAssertTrue(app.menuItems[title].exists, title)
+            XCTAssertTrue(menu.menuItems[title].exists, title)
         }
         app.typeKey(.escape, modifierFlags: [])
     }
