@@ -8,7 +8,8 @@ build output (target/, .dd/, .build/) of worktrees that are kept but idle.
 A worktree is removed only when all of these hold:
   - git has not touched it for --idle minutes (default 20), so an agent's live worktree is safe;
   - it has no modified or staged files, and no untracked file that isn't also on origin/main;
-  - every commit in it is on a remote branch, a merge, or inside a merged or closed PR's head.
+  - every commit in it is on a remote branch, a merge, or inside a merged or closed PR's head;
+  - it does not hold an open PR's head (that PR's author comes back to it for review fixes).
 Kept worktrees idle for --clean-after hours (default 2) lose only their build output, which rebuilds.
 Folders that are not worktrees (e.g. a demo build) are left alone, unless their name ends in `.dd`.
 """
@@ -53,6 +54,7 @@ def main():
     prs = json.loads(subprocess.run(["gh", "pr", "list", "--state", "all", "--limit", "500", "--json", "headRefOid,state"],
                                     cwd=REPO, capture_output=True, text=True).stdout or "[]")
     done_heads = {p["headRefOid"] for p in prs if p["state"] in ("MERGED", "CLOSED")}
+    open_heads = {p["headRefOid"] for p in prs if p["state"] == "OPEN"}
     main_files = set(git(REPO, "ls-tree", "-r", "--name-only", "origin/main").splitlines())
     now = time.time()
     remove, clean, keep = [], [], []
@@ -76,6 +78,11 @@ def main():
             idle_min = 1e9
         if idle_min < a.idle:
             keep.append((wt, "in use"))
+            continue
+        # an open PR's worktree waits for review and fixes: its author comes back to it, so it stays (build output too)
+        if any(subprocess.run(["git", "-C", str(wt), "merge-base", "--is-ancestor", h, "HEAD"],
+                              capture_output=True).returncode == 0 for h in open_heads):
+            keep.append((wt, "open PR"))
             continue
         status = [l for l in git(wt, "status", "--porcelain").splitlines() if l]
         local = [l for l in status if not (l.startswith("?? ") and (l[3:].rstrip("/") in main_files
