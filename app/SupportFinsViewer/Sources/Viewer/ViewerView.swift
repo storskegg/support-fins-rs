@@ -182,7 +182,9 @@ public final class ViewerMTKView: MTKView {
     @MainActor private func navigate(_ button: NavPreset.Button, _ e: NSEvent) {
         guard let c = controller else { return }
         let chord = !e.modifierFlags.isDisjoint(with: [.shift, .control, .command])
-        c.navigate(c.navPreset.dragAction(button, modifier: chord), dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height)
+        let action = c.navPreset.dragAction(button, modifier: chord, option: e.modifierFlags.contains(.option),
+                                            shift: e.modifierFlags.contains(.shift))
+        c.navigate(action, dx: e.deltaX, dy: e.deltaY, viewHeight: bounds.height)
     }
 
     public override func layout() {
@@ -211,7 +213,12 @@ public final class ViewerMTKView: MTKView {
     }
 
     public override func magnify(with e: NSEvent) {
-        MainActor.assumeIsolated { controller?.zoom(magnification: e.magnification) }
+        MainActor.assumeIsolated {
+            let p = convert(e.locationInWindow, from: nil)
+            guard bounds.width > 0, bounds.height > 0 else { return }
+            controller?.zoom(magnification: e.magnification,
+                             towardNDC: SIMD2(Float(p.x / bounds.width * 2 - 1), Float(p.y / bounds.height * 2 - 1)))
+        }
     }
 
     /// Two-finger double tap: frame the part.
