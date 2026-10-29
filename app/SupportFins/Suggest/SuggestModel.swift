@@ -57,15 +57,16 @@ final class SuggestModel {
     /// (docs/PERF-M5.md, "Suggest").
     static let searchDensity = 10.0
 
-    /// Rank the part's poses. `currentBore` is `summary_json`'s `boreWalls` for the pose on screen; `density` the
-    /// material's g/cm³.
-    func rank(thresholdDegrees: Double, optionsJSON: String, currentBore: Int, density: Double) {
+    /// Rank the part's poses under the build's options and tunables (`FinSettings.optionsJSON()` / `tunablesJSON()` of
+    /// the session's settings: the page's Worker scores with `supportTunables()`, its current gap, pad and nozzle).
+    /// `currentBore` is `summary_json`'s `boreWalls` for the pose on screen; `density` the material's g/cm³.
+    func rank(thresholdDegrees: Double, optionsJSON: String, tunablesJSON: String, currentBore: Int, density: Double) {
         guard let suggester, !isRanking else { return }
         state = .ranking
         picked = nil
         progress = nil
         wanted = suggester.suggestWide(
-            thresholdDeg: thresholdDegrees, optsJson: optionsJSON,
+            thresholdDeg: thresholdDegrees, optsJson: optionsJSON, tunablesJson: tunablesJSON,
             context: SuggestContext(currentBore: UInt64(max(0, currentBore)), density: density),
             density: Self.searchDensity, listener: sink)
     }

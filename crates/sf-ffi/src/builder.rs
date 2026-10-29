@@ -281,7 +281,9 @@ pub(crate) fn split_options(
 }
 
 /// The page's `tunables` object (`{}` or empty text: none). Unknown keys are ignored, as `applyTunables` does.
-fn page_tunables(tunables_json: &str) -> Result<Option<sf_engine::config::Tunables>, FfiError> {
+pub(crate) fn page_tunables(
+    tunables_json: &str,
+) -> Result<Option<sf_engine::config::Tunables>, FfiError> {
     if tunables_json.trim().is_empty() {
         return Ok(None);
     }

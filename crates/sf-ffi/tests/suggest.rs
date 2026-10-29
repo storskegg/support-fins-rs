@@ -44,7 +44,9 @@ fn engine_cfg() -> Config {
 fn suggest_orientations_equals_the_engine_ranking() {
     for name in ["lbracket", "sphere", "lowledge", "cube"] {
         let part = load(name);
-        let got = part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap();
+        let got = part
+            .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
+            .unwrap();
         let want = orient::suggest_orientations(part.topology(), 3, 45.0, &engine_cfg());
         assert_eq!(got.confidence, want.confidence.as_str(), "{name}");
         if want.confidence == Confidence::None {
@@ -99,7 +101,7 @@ fn suggest_orientations_equals_the_engine_ranking() {
 #[test]
 fn a_part_that_needs_no_fins_gets_the_green_row_and_the_win_as_its_note() {
     let r = load("cube")
-        .suggest_orientations(45.0, "{}".into(), ctx())
+        .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
         .unwrap();
     let best = &r.rows[0];
     assert_eq!(best.rank, "Best");
@@ -120,7 +122,7 @@ fn a_part_that_needs_no_fins_gets_the_green_row_and_the_win_as_its_note() {
 #[test]
 fn an_ordinary_best_pose_says_to_click_a_pose() {
     let r = load("lbracket")
-        .suggest_orientations(45.0, "{}".into(), ctx())
+        .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
         .unwrap();
     if r.rows[0].tier == SuggestTier::Ordinary {
         assert!(!r.note_good);
@@ -141,7 +143,9 @@ fn a_pose_that_points_the_bores_up_earns_the_bores_clean_badge_only_when_the_cur
     let part = load_parts(path.to_string_lossy().into_owned())
         .unwrap()
         .remove(0);
-    let none = part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap();
+    let none = part
+        .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
+        .unwrap();
     assert!(
         none.rows.iter().all(|r| r.tier != SuggestTier::HoleClean),
         "no bores in the current pose: no bore verdict"
@@ -149,6 +153,7 @@ fn a_pose_that_points_the_bores_up_earns_the_bores_clean_badge_only_when_the_cur
     let with = part
         .suggest_orientations(
             45.0,
+            "{}".into(),
             "{}".into(),
             SuggestContext {
                 current_bore: 2,
@@ -183,28 +188,99 @@ fn the_apps_build_options_rank_like_the_dialogs_own() {
     let dialog = r#""mode":"auto","threshold":45,"nozzle":0.4,"tines":true,"tineDensity":0,"tineDir":"horizontal","pinDepth":0.1,"layerHeight":0.2,"gap":0.2,"padStyle":"auto","cutout":"none","coverage":0.5,"plateOnly":false,"separateWalls":"off","longWalls":true"#;
     let app = format!(r#"{{{dialog},"tallRibs":true,"curvedWalls":false,"sway.on":false}}"#);
     let want = part
-        .suggest_orientations(45.0, format!(r#"{{{dialog},"sway.on":false}}"#), ctx())
+        .suggest_orientations(
+            45.0,
+            format!(r#"{{{dialog},"sway.on":false}}"#),
+            "{}".into(),
+            ctx(),
+        )
         .unwrap();
     assert!(!want.rows.is_empty());
     assert_eq!(
-        part.suggest_orientations(45.0, app.clone(), ctx()).unwrap(),
+        part.suggest_orientations(45.0, app.clone(), "{}".into(), ctx())
+            .unwrap(),
         want
     );
     assert_eq!(
-        part.suggest_orientations_wide(45.0, app, ctx(), 1.0)
+        part.suggest_orientations_wide(45.0, app, "{}".into(), ctx(), 1.0)
             .unwrap(),
         want
     );
     // braces on: the request extras ride beside the sway keys
     let sway = r#"{"mode":"auto","tallRibs":false,"curvedWalls":true,"sway.on":true,"sway.gripFrom":0,"sway.tineSpacing":6,"sway.reach":0.15,"sway.uncappedDepth":false,"sway.crossRise":0.5}"#;
-    assert!(part.suggest_orientations(45.0, sway.into(), ctx()).is_ok());
+    assert!(
+        part.suggest_orientations(45.0, sway.into(), "{}".into(), ctx())
+            .is_ok()
+    );
     // Draw: options.json has no such mode; the page's finOpts sends it
     let draw = r#"{"mode":"draw","tallRibs":true,"curvedWalls":false,"sway.on":false}"#;
-    assert!(part.suggest_orientations(45.0, draw.into(), ctx()).is_ok());
+    assert!(
+        part.suggest_orientations(45.0, draw.into(), "{}".into(), ctx())
+            .is_ok()
+    );
     // a bad extra is still the build's error
     assert!(
-        part.suggest_orientations(45.0, r#"{"tallRibs":1}"#.into(), ctx())
+        part.suggest_orientations(45.0, r#"{"tallRibs":1}"#.into(), "{}".into(), ctx())
             .is_err()
+    );
+}
+
+/// The page's tunables (`FinSettings.tunablesJSON()`, the web's `finOpts().tunables` that `supportTunables()`
+/// hands the suggest Worker) reach the ranking: it equals the engine's ranking under the build's tunables
+/// (the dialog's clearances with the page's laid over them), and a changed gap, nozzle or custom pad changes it.
+#[test]
+fn the_pages_tunables_reach_the_ranking() {
+    // a page with a 0.4 mm gap, a 0.8 mm nozzle at 3 wall lines and a thick custom pad
+    let page = r#"{"roundFeet":true,"padH":0.5,"padGrab":0.05,"padStyle":"custom","padCustom":{"h":1,"gap":0.5,"grip":0.3,"margin":12},"propGap":0.4,"tallRibsHeight":100,"cutout":"none","iface":false,"tineDir":"horizontal","pinDepth":0.1,"nozzle":0.8,"wallLines":3}"#;
+    let page_tunables = sf_io::fins_opts::tunables_from_json(&parse(page).unwrap());
+    let request = sf_cli::entry::engine_request(
+        &EngineOptions::default(),
+        Some(&sf_cli::entry::PageRequest {
+            tunables: page_tunables,
+            ..Default::default()
+        }),
+    )
+    .unwrap();
+    let mut cfg = Config::default();
+    apply_tunables(&mut cfg, request.opts.tunables.as_ref());
+    let mut changed = Vec::new();
+    for name in ["lbracket", "tshape", "lowledge", "portal"] {
+        let part = load(name);
+        let got = part
+            .suggest_orientations(45.0, "{}".into(), page.into(), ctx())
+            .unwrap();
+        let want = orient::suggest_orientations(part.topology(), 3, 45.0, &cfg);
+        assert_eq!(got.confidence, want.confidence.as_str(), "{name}");
+        assert_eq!(got.rows.len(), want.candidates.len(), "{name}");
+        for (r, c) in got.rows.iter().zip(&want.candidates) {
+            assert_eq!(
+                (r.rot.clone(), r.volume),
+                (c.rot.to_vec(), c.volume),
+                "{name}"
+            );
+        }
+        // `{}` and empty text: the dialog's clearances alone
+        let plain = part
+            .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
+            .unwrap();
+        assert_eq!(
+            part.suggest_orientations(45.0, "{}".into(), "".into(), ctx())
+                .unwrap(),
+            plain
+        );
+        if got != plain {
+            changed.push(name);
+        }
+    }
+    assert!(
+        !changed.is_empty(),
+        "the page's tunables changed no ranking"
+    );
+    assert!(
+        load("cube")
+            .suggest_orientations(45.0, "{}".into(), "[]".into(), ctx())
+            .is_err(),
+        "tunables must be a JSON object"
     );
 }
 
@@ -212,12 +288,15 @@ fn the_apps_build_options_rank_like_the_dialogs_own() {
 fn bad_input_is_an_engine_error() {
     let part = load("cube");
     assert!(matches!(
-        part.suggest_orientations(f64::NAN, "{}".into(), ctx()),
+        part.suggest_orientations(f64::NAN, "{}".into(), "{}".into(), ctx()),
         Err(FfiError::Engine { .. })
     ));
-    assert!(part.suggest_orientations(45.0, "[]".into(), ctx()).is_err());
     assert!(
-        part.suggest_orientations(45.0, "{\"mode\":\"bogus\"}".into(), ctx())
+        part.suggest_orientations(45.0, "[]".into(), "{}".into(), ctx())
+            .is_err()
+    );
+    assert!(
+        part.suggest_orientations(45.0, "{\"mode\":\"bogus\"}".into(), "{}".into(), ctx())
             .is_err()
     );
     assert!(
@@ -356,8 +435,8 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
     let s = Suggester::new(part.clone());
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = s.suggest(45.0, "{}".into(), ctx(), l1);
-    let g2 = s.suggest(45.0, "{}".into(), ctx(), l2);
+    let g1 = s.suggest(45.0, "{}".into(), "{}".into(), ctx(), l1);
+    let g2 = s.suggest(45.0, "{}".into(), "{}".into(), ctx(), l2);
     assert_eq!((g1, g2), (1, 2));
     let Event::Suggested(g, r) = next_event(&rx2, Duration::from_secs(60)) else {
         panic!("not a suggestion")
@@ -365,7 +444,8 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
     assert_eq!(g, 2);
     assert_eq!(
         r,
-        part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap()
+        part.suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
+            .unwrap()
     );
     assert_never_answered(&rx1);
 }
@@ -380,8 +460,8 @@ fn a_ranking_reports_progress_after_every_pose_climbing_to_1() {
         let s = Suggester::new(part.clone());
         let (l, rx) = listener();
         let g = match density {
-            None => s.suggest(45.0, "{}".into(), ctx(), l),
-            Some(d) => s.suggest_wide(45.0, "{}".into(), ctx(), d, l),
+            None => s.suggest(45.0, "{}".into(), "{}".into(), ctx(), l),
+            Some(d) => s.suggest_wide(45.0, "{}".into(), "{}".into(), ctx(), d, l),
         };
         let mut seen = vec![];
         loop {
@@ -414,13 +494,15 @@ fn a_ranking_reports_progress_after_every_pose_climbing_to_1() {
 fn the_wide_search_ranks_more_poses_and_density_one_is_the_web_search() {
     for name in ["sphere", "torus", "cone"] {
         let part = load(name);
-        let web = part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap();
+        let web = part
+            .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
+            .unwrap();
         let one = part
-            .suggest_orientations_wide(45.0, "{}".into(), ctx(), 1.0)
+            .suggest_orientations_wide(45.0, "{}".into(), "{}".into(), ctx(), 1.0)
             .unwrap();
         assert_eq!(web, one, "{name}: density 1 is the web's candidate set");
         let wide = part
-            .suggest_orientations_wide(45.0, "{}".into(), ctx(), 10.0)
+            .suggest_orientations_wide(45.0, "{}".into(), "{}".into(), ctx(), 10.0)
             .unwrap();
         let want = orient::suggest_orientations_wide(
             part.topology(),
@@ -449,8 +531,8 @@ fn a_stale_wide_search_stops_early_and_the_newer_one_is_delivered() {
     let s = Suggester::new(part.clone());
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l1);
-    let g2 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l2);
+    let g1 = s.suggest_wide(45.0, "{}".into(), "{}".into(), ctx(), 10.0, l1);
+    let g2 = s.suggest_wide(45.0, "{}".into(), "{}".into(), ctx(), 10.0, l2);
     assert_eq!((g1, g2), (1, 2));
     let Event::Suggested(g, _) = next_event(&rx2, Duration::from_secs(120)) else {
         panic!("not a suggestion")
@@ -488,7 +570,7 @@ fn strength_and_failures_arrive_through_the_same_listener() {
             .unwrap()
     );
     let (l, rx) = listener();
-    let g = s.suggest(45.0, "{\"mode\":\"bogus\"}".into(), ctx(), l);
+    let g = s.suggest(45.0, "{\"mode\":\"bogus\"}".into(), "{}".into(), ctx(), l);
     let Event::Failed(fg, FfiError::Engine { .. }) =
         rx.recv_timeout(Duration::from_secs(60)).unwrap()
     else {

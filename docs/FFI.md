@@ -149,8 +149,8 @@ enum SuggestTier { Free, HoleClean, Ordinary }
     note: String,           // the line under the list (empty list: why)
     note_good: bool,        // the note is the "no support" win (styled good)
 }
-impl Part { fn suggest_orientations(&self, threshold_deg: f64, opts_json: String, context: SuggestContext) -> Result<SuggestResult, FfiError>; } // blocking: call off the main thread
-impl Part { fn suggest_orientations_wide(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, density: f64) -> Result<SuggestResult, FfiError>; }
+impl Part { fn suggest_orientations(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext) -> Result<SuggestResult, FfiError>; } // blocking: call off the main thread
+impl Part { fn suggest_orientations_wide(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, density: f64) -> Result<SuggestResult, FfiError>; }
 //   The wide search (M5): the same ranking, scoring and wording over `density` times the web's candidate budget
 //   (10 is the wide default; 1 is exactly suggest_orientations). The candidate generator is the web's, at a finer
 //   step: the cluster cap grows by `density`, the normal bucket and the near-duplicate angle shrink by sqrt(density).
@@ -183,8 +183,8 @@ impl Part { fn suggest_strength_pose(&self, dir_local: Vec<f64>, dir_world: Vec<
 #[derive(uniffi::Object)] struct Suggester;                  // one per part, one worker
 impl Suggester {
     fn new(part: Arc<Part>) -> Arc<Self>;
-    fn suggest(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> u64;
-    fn suggest_wide(&self, threshold_deg: f64, opts_json: String, context: SuggestContext, density: f64, listener: Box<dyn SuggestListener>) -> u64;
+    fn suggest(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> u64;
+    fn suggest_wide(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, density: f64, listener: Box<dyn SuggestListener>) -> u64;
     fn strength(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64, listener: Box<dyn SuggestListener>) -> u64;
 }
 // Scoring runs on Rayon's global pool (candidates in parallel, results collected in candidate order, so the ranking and its
@@ -194,7 +194,11 @@ impl Suggester {
 `opts_json` is the same `options.json` object a build takes: the finalists are built under that gap, pad and
 nozzle (the page hands the worker its `supportTunables()`). The build's request extras (`tallRibs`, `curvedWalls`,
 `{"mode":"draw"}`, `sway.uncappedDepth`, `sway.crossRise`) are accepted and set aside as `Builder.build` does: they are
-not clearances, so the app sends `FinSettings.optionsJSON()` unchanged. `SuggestResult` and `StrengthAdvice` carry the text
+not clearances, so the app sends `FinSettings.optionsJSON()` unchanged. `tunables_json` is the build's too
+(`FinSettings.tunablesJSON()`, the page's `finOpts().tunables`): laid over the dialog's clearances exactly as `Builder.build`
+lays it (`engine_request`), so the ranking scores with the window's custom pad, rounded feet, interface and wall lines,
+as the page's Worker does with `supportTunables()`. `{}` or empty text: the dialog's clearances alone. The app sends the
+window's settings (`session.settings`), never a fresh `FinSettings()`. `SuggestResult` and `StrengthAdvice` carry the text
 the page writes, so the row strings, badges and notes cannot drift from `ui/suggest.js`.
 
 **Readout data added to `summary_json()`** (all computed from the build, so Swift never touches geometry):

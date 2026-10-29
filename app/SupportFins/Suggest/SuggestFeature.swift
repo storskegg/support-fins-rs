@@ -27,14 +27,24 @@ final class SuggestFeature: Feature {
     private struct Kept { var result: SuggestResult; var picked: Int? }
 
     func registerTools(in toolbar: ToolbarRegistry) {
-        guard let controller = host.controller, let suggest = model else { toolbar.unregister(.suggest); return }
+        guard host.controller != nil, let suggest = model else { toolbar.unregister(.suggest); return }
+        // captures the host as it always has (other features' `unowned` references rely on the window living on)
         toolbar.register(.suggest) { [host] in
-            SuggestPopover(model: suggest) {
-                suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: FinSettings().optionsJSON(),
-                             currentBore: host.wiring?.build?.summary?.boreWalls ?? 0,
-                             density: FinReadout.materialDensity)
-            }
+            SuggestPopover(model: suggest) { Self.rank(suggest, in: host) }
         }
+    }
+
+    /// The button's click: rank under the window's current settings, the build's options and tunables, as the page's
+    /// Worker scores with `supportTunables()` (`ui/suggest.js`: its gap, pad, nozzle and wall lines).
+    func rank() { if let model { Self.rank(model, in: host) } }
+
+    private static func rank(_ suggest: SuggestModel, in host: ViewerModel) {
+        guard let controller = host.controller else { return }
+        let settings = host.session.settings
+        suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: settings.optionsJSON(),
+                     tunablesJSON: settings.tunablesJSON(),
+                     currentBore: host.wiring?.build?.summary?.boreWalls ?? 0,
+                     density: FinReadout.materialDensity)
     }
 
     var modifiers: [WindowModifier] {
