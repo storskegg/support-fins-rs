@@ -52,7 +52,7 @@ enum L10n {
         for (name, rest) in names { format += (name == "n" ? "%lld" : "%@") + esc(rest) }
         if hiddenCount != nil { format += "%lld" }
         let missing = "\u{1}missing"
-        let found = (language?.bundle ?? Bundle.main).localizedString(forKey: format, value: missing, table: "Localizable")
+        let found = (language?.bundle ?? Bundle.main).localizedString(forKey: format, value: missing, table: nil)
         return found != missing && found != format
     }
 
