@@ -602,12 +602,34 @@ fn read_part(
             slicer: None,
         });
     }
+    // Not in cli.js (the JS command line cannot read STEP): the native app's STEP import, through
+    // `sf-step`. Several bodies pick like an OBJ's objects (--object); help text and the error below
+    // stay the JS's, so `cli-parity` still compares byte for byte.
+    if lower.ends_with(".step") || lower.ends_with(".stp") {
+        let objs: Vec<Obj> = sf_step::read_step(bytes)?
+            .into_iter()
+            .map(|o| Obj {
+                name: o.name,
+                positions: o.positions,
+                extras: Vec::new(),
+            })
+            .collect();
+        let i = if objs.len() == 1 && object.is_none() {
+            0
+        } else {
+            pick_object(&objs, object)?
+        };
+        return Ok(Read {
+            positions: objs[i].positions.clone(),
+            slicer: None,
+        });
+    }
     Err("reads .stl, .3mf and .obj only".into())
 }
 
 fn strip_ext(s: &str) -> String {
     let lower = s.to_ascii_lowercase();
-    for e in [".stl", ".3mf", ".obj"] {
+    for e in [".stl", ".3mf", ".obj", ".step", ".stp"] {
         if lower.ends_with(e) {
             return s[..s.len() - e.len()].to_string();
         }
