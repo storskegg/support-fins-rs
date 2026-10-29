@@ -143,12 +143,12 @@ struct FeatureSetTests {
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
         let model = ViewerModel()
-        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "plate-toast"]
+        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "clash-banner", "plate-toast"]
         #if DEBUG
         expected.insert("frame-time", at: 0)
         #endif
         #expect(model.features.overlays.map(\.id) == expected)
-        #expect(model.toolbar.slots.map(\.id) == ["move", "rotate", "scale-badge", "suggest", "strength", "view"])
+        #expect(model.toolbar.slots.map(\.id) == ["move", "arrange", "rotate", "scale-badge", "suggest", "strength", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)

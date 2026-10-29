@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import Viewer
 
+extension ToolbarSlot {
+    static let arrange = ToolbarSlot(id: "arrange", title: "Arrange", systemImage: "square.grid.2x2",
+                                     help: "Pack this plate's models apart on the bed, biggest in the middle. Undo puts them back.", order: 5)
+}
+
 /// Several models on one plate (`ui/models.js`, `ui/plates.js`): File > Add Model to Plate…, Edit > Remove Model from
 /// Plate, a click on a parked model to edit it, and the Undo toast of a removal. The state is `PlateBoard`.
 @MainActor
@@ -13,6 +18,19 @@ final class PlatesFeature: Feature {
         self.host = host
         board = PlateBoard(host: host)
         host.controller?.onTap = { [board] x, y, w, h in board.tapped(x: x, y: y, width: w, height: h) }
+    }
+
+    // MARK: the toolbar's Arrange
+
+    var toolbarSlots: [ToolbarSlot] { [.arrange] }
+
+    /// Arrange (`#arrange-btn`, `ui/arrange.js` `syncButton`): there only while a model is on show and the plate has
+    /// more than one; a click packs the plate (`PlateBoard.arrange`), the button greyed while it waits for the builds.
+    func registerTools(in toolbar: ToolbarRegistry) {
+        guard host.controller != nil else { return }
+        toolbar.registerAction(.arrange, isShown: { [board] in board.arrangeShown }, isEnabled: { [board] in !board.arranging && !board.busy }) {
+            [board] in Task { await board.arrange() }
+        }
     }
 
     // MARK: a part arrives
@@ -31,6 +49,7 @@ final class PlatesFeature: Feature {
         [
             WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true) { PlateLabels(board: self.board) },
             WindowOverlay("plate-tabs", order: 65, alignment: .top) { PlateTabs(board: self.board) },
+            WindowOverlay("clash-banner", order: 66, alignment: .top) { ClashBanner(board: self.board) },
             WindowOverlay("plate-toast", order: 70, alignment: .bottom) { PlateToast(board: self.board) },
         ]
     }
@@ -45,9 +64,29 @@ final class PlatesFeature: Feature {
         [
             // the plate's settings: a change rebuilds the parked models' fins (`scheduleParked`)
             .onChange("plates-settings", of: { SettingsKey(session: self.host.session) }) { _, _ in self.board.scheduleParked() },
+            // the models' footprints change with a turn, a fin rebuild, a removal, or the seating the analysis lands:
+            // the clash cells and the banner follow (`checkOverlap`)
+            .onChange("plates-clash", of: { FootprintKey(host: self.host) }) { _, _ in self.board.sync() },
             // the beds follow the build volume
             .onChange("plates-volume", of: { self.host.controller?.volume }) { _, _ in self.board.sync() },
         ]
+    }
+
+    /// What the live model's footprint is made from.
+    struct FootprintKey: Equatable {
+        var pose: Pose
+        var finsOn: Bool
+        var build: ObjectIdentifier?
+        var removed: Set<FinKey>
+        var size: SIMD3<Float>
+
+        @MainActor init(host: ViewerModel) {
+            pose = host.session.pose
+            finsOn = host.session.finsOn
+            build = host.wiring?.build?.latest.map(ObjectIdentifier.init)
+            removed = host.session.removedFins
+            size = host.controller?.posedSize ?? .zero
+        }
     }
 
     /// What a support build follows: the options, the tunables, the mode and fins on or off (`settingsKey`).

@@ -30,7 +30,7 @@ final class PlateBoard {
     var plates = [Plate()]
     var active = 0
     /// Export is switching through the models: the board holds still (`busy`, `ui/plates.js`).
-    private(set) var busy = false
+    var busy = false
     /// The text of the Undo toast while a removal can be undone.
     var toast: String?
 
@@ -39,6 +39,18 @@ final class PlateBoard {
     /// The plate of each of `parkedSlots` (the row shows every plate's models).
     @ObservationIgnored var parkedPlates: [Int] = []
     @ObservationIgnored var trash: Trash?
+    /// The models collide (as of the last `sync`): the red cells, the banner and the Export menu's note.
+    var clashing = false
+    @ObservationIgnored var clashCells: [SIMD2<Int64>] = []
+    /// Arrange is waiting for the fin builds to land (`waiting`, `ui/arrange.js`).
+    var arranging = false
+    /// The hand-placed walls drawn for a model, in print space about its own spot (Draw): what an export writes with
+    /// its fins. The Draw feature sets it; no walls until it does.
+    @ObservationIgnored var drawn: (ModelSlot) -> DrawnSweep? = { _ in nil }
+    /// Why the last plate export failed (the engine's message), or nil.
+    var exportError: String?
+    /// Where an export asks for its file (a stub in tests).
+    @ObservationIgnored var savePanel: any SavePanel = SystemSavePanel()
     /// The last move to another plate, for the toast's Undo (`moved`, `ui/plates.js`).
     @ObservationIgnored var moved: Moved?
     /// The board is bringing a model in itself (a swap, an Undo): the features' `partWillShow` is its own.
@@ -71,6 +83,8 @@ final class PlateBoard {
         self.host = host
         host.session.isOnPlate = { [weak self] id in self?.plate.models.contains { $0.id == id } ?? true }
         host.session.focus = { [weak self] id in self?.focus(id) }
+        host.session.slotSpot = { [weak self] id in self?.plate.models.first { $0.id == id }?.xy }
+        host.session.placeSlots = { [weak self] moves in self?.placeSlots(moves) }
         host.session.owner = plates[0].liveSlot.id
     }
 

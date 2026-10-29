@@ -505,3 +505,27 @@ pub fn clash_cells(grids: &[Option<&Grid>]) -> Vec<[i64; 2]> {
     }
     cells
 }
+
+/// Port of the placement in `arrange` (web/ui/arrange.js:153-165). Where each of `grids` (models' own footprints,
+/// about their spots, none empty) goes on a `bx` x `by` bed, `gap` mm apart: [`pack`]'s spots, and a model the bed
+/// has no room left for goes in a row past the bed's right edge, in the order they came.
+pub fn arrange(grids: &[&Grid], bx: f64, by: f64, gap: i64) -> Vec<[f64; 2]> {
+    let refs: Vec<Option<&Grid>> = grids.iter().map(|g| Some(*g)).collect();
+    let at = pack(&refs, bx, by, gap);
+    let mut x = bx / 2.0 + gap as f64;
+    grids
+        .iter()
+        .zip(at)
+        .map(|(g, spot)| match spot {
+            Some(s) => [s[0] as f64, s[1] as f64],
+            None => {
+                let out = [
+                    jsnum::ceil(x - g.x0 as f64),
+                    jsnum::round(-(g.y0 as f64 + g.h as f64 / 2.0)),
+                ];
+                x += g.w as f64 + gap as f64;
+                out
+            }
+        })
+        .collect()
+}

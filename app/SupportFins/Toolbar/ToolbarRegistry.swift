@@ -23,6 +23,11 @@ struct ToolbarBadge {
     /// A toggle badge (Move, `addBadge` with `setOn` and no popover, `ui/toolbar.js:134-136`): a tool with nothing to
     /// fold out, so a click just turns it on or off and any open popover stays as it is.
     var toggle: (isOn: () -> Bool, setOn: (Bool) -> Void)?
+    /// A plain button badge (Arrange, `ui/arrange.js`): a click runs `action`; there is nothing to fold out and nothing
+    /// to switch. `isShown` hides it (Arrange is only there with several models), `isEnabled` greys it.
+    var action: (() -> Void)?
+    var isShown: () -> Bool = { true }
+    var isEnabled: () -> Bool = { true }
     /// Text after the badge's title (Scale: the percent while it is not 100, `#scale-now`).
     var detail: () -> String = { "" }
 
@@ -63,12 +68,23 @@ final class ToolbarRegistry {
         badges[slot] = badge
     }
 
+    /// Register a plain button badge (a click runs `action`; see `ToolbarBadge.action`).
+    func registerAction(_ slot: ToolbarSlot, isShown: @escaping () -> Bool = { true }, isEnabled: @escaping () -> Bool = { true },
+                        action: @escaping () -> Void) {
+        var badge = ToolbarBadge { EmptyView() }
+        badge.action = action
+        badge.isShown = isShown
+        badge.isEnabled = isEnabled
+        badges[slot] = badge
+    }
+
     func unregister(_ slot: ToolbarSlot) {
         badges[slot] = nil
         if open == slot { open = nil }
     }
 
     func toggle(_ slot: ToolbarSlot) {
+        if let a = badges[slot]?.action { a(); return }
         if let t = badges[slot]?.toggle { t.setOn(!t.isOn()); return }
         open = open == slot ? nil : slot
     }

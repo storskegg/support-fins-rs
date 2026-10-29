@@ -18,6 +18,7 @@ const { CUT } = await import(`${WEB}/cutout.js`);
 const { readSTL, writeBinarySTL } = await import(`${WEB}/stl.js`);
 const { readThreeMF, writePlate3MF } = await import(`${WEB}/threemf.js`);
 const { cutNegatives } = await import(`${WEB}/cut.js`);
+const { zipStore } = await import(`${WEB}/zip.js`);
 const { FIN, PAD, buildFins } = fins;
 
 const DEFAULTS = {
@@ -133,5 +134,58 @@ async function cases() {
   await record({ ...common, name: "bambu.3mf, STL", kind: "stl", options: {} }, g);
 }
 
+// Plates (ui/export.js plateGeometry + FORMATS['export-3mf'] over several models, ui/plates.js exportAll): several models
+// on one plate, each where it stands, written by the real writePlate3MF; and the zip of two plates' 3MFs (zipStore).
+const plates = [];
+async function plateModel(spec) {
+  const pos = readSTL(await Deno.readFile(`${STRESS}${spec.model}.stl`));
+  const topo = topoOf(pos);
+  const rot = rotX(spec.rotX);
+  const res = analyze(topo, 45, rot);
+  let added = [];
+  if (spec.fins) {
+    const request = { mode: "auto", bedPad: true, plateOnly: false, longWalls: true, separateWalls: false, tallRibs: true, tines: true,
+      tineDensity: 1, layerHeight: 0.2, coverage: 0.5, tunables: { ...DEFAULTS, iface: spec.iface ?? false } };
+    const built = buildFins(topo, res, rot, request);
+    if (spec.removeFirst) {
+      const gone = built.fins[0].id;
+      for (const f of built.fins) if (f.id !== gone) for (const [lo, hi] of f.triRanges) for (let t = lo; t < hi; t++) added.push(built.triangles[t]);
+      added.push(...built.padTriangles);
+      spec.removed = [gone];
+    } else added = [...built.triangles, ...built.padTriangles];
+  }
+  const g = placed(geometry({ pos: topo.pos, rot, offset: res.offset, base: spec.model, added }), spec.placed);
+  const { body, iface } = splitInterface(g.finTris);
+  return { model: { partTris: g.partTris, finTris: body, name: g.base, iface, colors: g.colors, extras: [] },
+    json: { part: { model: spec.model }, rot, dialog: { tineDensity: 1, layerHeight: 0.2, coverage: 0.5, mode: "auto", tallRibs: true },
+      tunables: { iface: spec.iface ?? false }, fins: spec.fins, removed: spec.removed ?? [], placed: spec.placed } };
+}
+async function plateCase(name, specs, bed) {
+  const ms = [];
+  for (const sp of specs) ms.push(await plateModel(sp));
+  const blob = writePlate3MF(ms.map((m) => m.model), { title: ms[0].model.name, separate: true, bed: { x: bed[0], y: bed[1], z: 250 }, session: null });
+  const bytes = await bytesOf(await blob);
+  console.log(`plate ${name}: ${bytes.length} bytes`);
+  return { name, bed, models: ms.map((m) => m.json), bytes: bytes.length, hash: fnv64(bytes), data: bytes };
+}
+{
+  const a = await plateCase("sphere + lbracket", [
+    { model: "sphere", rotX: 30, fins: true, placed: [-60, 10] },
+    { model: "lbracket", rotX: 35, fins: true, iface: "all", placed: [55, -20] },
+  ], [256, 256]);
+  const b = await plateCase("three, one fin removed and one part alone", [
+    { model: "lbracket", rotX: 35, fins: true, removeFirst: true, placed: [0, 0] },
+    { model: "sphere", rotX: 30, fins: false, placed: [80.5, 12.25] },
+    { model: "cube", rotX: 0, fins: false, placed: [-80, -40] },
+  ], [250, 220]);
+  const c = await plateCase("one model", [{ model: "sphere", rotX: 30, fins: true, placed: [3, -4] }], [256, 256]);
+  for (const p of [a, b, c]) plates.push(p);
+  const zip = zipStore([{ name: "plate-1-sphere-and-1-more-fins-0.4nozzle-0.2layer.3mf", data: a.data }, { name: "plate-2-sphere-fins-0.4nozzle-0.2layer.3mf", data: c.data }]);
+  const zbytes = new Uint8Array(await zip.arrayBuffer ? await zip.arrayBuffer() : zip);
+  plates.push({ name: "zip of two plates (both on a 256 bed)", zip: [{ name: "plate-1-sphere-and-1-more-fins-0.4nozzle-0.2layer.3mf", plate: 0 }, { name: "plate-2-sphere-fins-0.4nozzle-0.2layer.3mf", plate: 2 }],
+    bytes: zbytes.length, hash: fnv64(zbytes) });
+  for (const p of plates) delete p.data;
+}
+
 await cases();
-Deno.writeTextFileSync(new URL("../corpus/ffiexport/cases.json", import.meta.url), JSON.stringify({ upstream: Deno.readTextFileSync(new URL("../../UPSTREAM", import.meta.url)).match(/commit=(\w+)/)[1], cases: out }));
+Deno.writeTextFileSync(new URL("../corpus/ffiexport/cases.json", import.meta.url), JSON.stringify({ upstream: Deno.readTextFileSync(new URL("../../UPSTREAM", import.meta.url)).match(/commit=(\w+)/)[1], cases: out, plates }));

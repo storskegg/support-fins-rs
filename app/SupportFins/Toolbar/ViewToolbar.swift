@@ -15,7 +15,8 @@ struct ViewToolbar: View {
                               enabled: session.canRedo) { session.redo() }
                 Divider().frame(height: 18).padding(.horizontal, 2)
                 ForEach(registry.slots) { slot in
-                    SlotButton(slot: slot, registry: registry)
+                    // a slot whose badge says it is not shown has no button (Arrange without several models)
+                    if registry.badges[slot]?.isShown() ?? true { SlotButton(slot: slot, registry: registry) }
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
@@ -55,7 +56,7 @@ private struct SlotButton: View {
     var body: some View {
         let badge = registry.badges[slot]
         ToolbarButton(title: slot.title, systemImage: slot.systemImage, help: slot.help,
-                      enabled: badge != nil, detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
+                      enabled: badge != nil && (badge?.isEnabled() ?? true), detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
             registry.toggle(slot)
         }
         .overlay(alignment: .top) {

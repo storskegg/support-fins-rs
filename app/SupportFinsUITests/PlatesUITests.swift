@@ -80,4 +80,46 @@ final class PlatesUITests: PartWindowUITestCase {
             tab2.exists && self.text(name).hasPrefix("second") && !toast.exists
         }
     }
+
+    /// Export > All plates (3MF): two plates, the menu item, the Save panel, a .zip in the temp directory.
+    func testExportAllPlatesWritesAZip() throws {
+        let first = try writeSTL("first.stl", slab: 30)
+        let second = try writeSTL("second.stl", slab: 20)
+        try openPart(first)
+        let name = element("stat-name")
+        waitFor("the File row names the first model", timeout: 20) { self.text(name).hasPrefix("first") }
+        element("plate-add").click()
+        let importButton = element("empty-import")
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5), "an empty plate offers Import")
+        importButton.click()
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel for the new plate")
+        chooseInPanel(second.path)
+        waitFor("the File row follows the new plate's model", timeout: 20) { self.text(name).hasPrefix("second") }
+
+        element("export-menu").click()
+        let all = app.menuItems.matching(identifier: "All plates (3MF)").allElementsBoundByIndex.first { $0.isHittable }
+        try XCTUnwrap(all, "the export menu's All plates item").click()
+        XCTAssertTrue(panelExists("save-panel", timeout: 10), "the Save panel")
+        saveInPanel(into: dir)
+        XCTAssertNotNil(waitForFile(in: dir, timeout: 30, minSize: 100) { $0.pathExtension == "zip" }, "the zip is written")
+    }
+
+    /// The toolbar's Arrange appears with the second model (`toolbar-arrange`) and a click on it is harmless on a plate
+    /// that has nothing to pack together.
+    func testArrangeBadgeAppearsWithSeveralModels() throws {
+        let first = try writeSTL("first.stl", slab: 30)
+        let second = try writeSTL("second.stl", slab: 20)
+        try openPart(first)
+        let name = element("stat-name")
+        waitFor("the File row names the first model", timeout: 20) { self.text(name).hasPrefix("first") }
+        XCTAssertFalse(element("toolbar-arrange").exists, "no Arrange with one model")
+        element("add-part").click()
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel for Add model")
+        chooseInPanel(second.path)
+        waitFor("the File row follows the new model", timeout: 20) { self.text(name).hasPrefix("second") }
+        let arrange = element("toolbar-arrange")
+        XCTAssertTrue(arrange.waitForExistence(timeout: 10), "Arrange with two models")
+        arrange.click()
+        XCTAssertTrue(element("toolbar-arrange").exists)
+    }
 }
