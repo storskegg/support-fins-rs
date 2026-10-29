@@ -14,19 +14,31 @@ extension PlateBoard {
         let shift = SIMD2<Float>(Float(-live.xy.x), Float(-live.xy.y))
         let device = controller.renderer.device
         var parked: [ParkedDrawable] = []
+        var beds: [SIMD2<Float>] = []
         parkedSlots = []
-        for (k, m) in plate.models.enumerated() where k != plate.live {
-            guard let s = m.stash, let flags = s.flags ?? zeroFlags(s.part, device) else { continue }
-            let layer = session.finsOn ? s.supportLayer(device: device) : nil
-            let drawn = host.features[DrawFeature.self]?.parkedDrawn(s) { [weak self] in self?.sync() }
-            parked.append(ParkedDrawable(
-                mesh: s.part, flags: flags, rotation: s.pose.float3x3, offset: s.offset,
-                origin: SIMD2(Float(m.xy.x), Float(m.xy.y)) + shift,
-                supports: layer, hiddenFins: layer == nil ? [] : s.build.hiddenRanges(removed: s.removedFins),
-                drawn: drawn?.mesh, stale: isStale(s)))
-            parkedSlots.append(m)
+        parkedPlates = []
+        // the row: plate i stands (i - active) * pitch along X from the one being edited (`drawRow`)
+        let p = Float(pitch)
+        for (pi, pl) in plates.enumerated() {
+            let bed = SIMD2<Float>(Float(pi - active) * p, 0) + shift
+            beds.append(bed)
+            for (k, m) in pl.models.enumerated() where !(pi == active && k == pl.live) {
+                guard let s = m.stash, let flags = s.flags ?? zeroFlags(s.part, device) else { continue }
+                // another plate's fins stay as they were left, under its own settings
+                let finsOn = pi == active ? session.finsOn : (pl.settings?.finsOn ?? false)
+                let layer = finsOn ? s.supportLayer(device: device) : nil
+                let plateSettings = pi == active ? session.settings : (pl.settings?.settings ?? session.settings)
+                let drawn = host.features[DrawFeature.self]?.parkedDrawn(s, settings: plateSettings, finsOn: finsOn) { [weak self] in self?.sync() }
+                parked.append(ParkedDrawable(
+                    mesh: s.part, flags: flags, rotation: s.pose.float3x3, offset: s.offset,
+                    origin: SIMD2(Float(m.xy.x), Float(m.xy.y)) + bed,
+                    supports: layer, hiddenFins: layer == nil ? [] : s.build.hiddenRanges(removed: s.removedFins),
+                    drawn: drawn?.mesh, stale: pi == active && isStale(s)))
+                parkedSlots.append(m)
+                parkedPlates.append(pi)
+            }
         }
-        controller.renderer.setPlateScene(PlateScene(beds: [shift], edited: 0, parked: parked))
+        controller.renderer.setPlateScene(PlateScene(beds: beds, edited: active, parked: parked))
     }
 
     private func zeroFlags(_ part: CorePart, _ device: MTLDevice) -> MTLBuffer? {
@@ -52,7 +64,7 @@ extension PlateBoard {
         } else if let s = m.stash {
             let latest = session.finsOn ? s.build.latest : nil
             let ids = latest == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
-            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.parkedDrawn(s) { [weak self] in self?.sync() }?.sweep
+            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.parkedDrawn(s, settings: session.settings, finsOn: session.finsOn) { [weak self] in self?.sync() }?.sweep
             key = FootprintKey(pose: s.pose.columnMajor, offset: s.offset, build: latest.map(ObjectIdentifier.init), removed: ids,
                                drawn: drawn.map(ObjectIdentifier.init))
             part = s.part.part

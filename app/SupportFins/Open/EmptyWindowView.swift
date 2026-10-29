@@ -23,6 +23,7 @@ struct EmptyWindowView: View {
             }
             Button("Import a model", action: onImport)
                 .buttonStyle(.borderedProminent).controlSize(.large)
+                .accessibilityIdentifier("empty-import")
             Text("or drop it anywhere on the page").font(.callout).foregroundStyle(.secondary)
         }
         .padding(32)

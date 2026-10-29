@@ -56,7 +56,7 @@ struct DrawParkedTests {
         // while parked its wall is stood for its pose and shown with it
         var shown: (sweep: DrawnSweep?, mesh: OverlayMesh?)?
         try await eventually("the parked wall") {
-            shown = draw.parkedDrawn(stash) { board.sync() }
+            shown = draw.parkedDrawn(stash, settings: window.session.settings, finsOn: true) { board.sync() }
             return shown?.mesh != nil
         }
         #expect((shown?.sweep?.triangles().count() ?? 0) > 0)

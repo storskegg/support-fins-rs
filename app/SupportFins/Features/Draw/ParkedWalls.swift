@@ -65,9 +65,10 @@ final class ParkedWalls {
 extension DrawFeature {
     /// A parked model's re-stood walls, when it has any and the fins are on (`walls.length && (draw || autoLike)` is every
     /// mode).
-    func parkedDrawn(_ s: ParkedModel, landed: @escaping @MainActor () -> Void) -> (sweep: DrawnSweep?, mesh: OverlayMesh?)? {
-        guard host.session.finsOn, let p = s.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls, !p.walls.isEmpty else { return nil }
-        return p.standing(for: s, settings: host.session.settings, device: host.controller?.renderer.device, landed: landed)
+    func parkedDrawn(_ s: ParkedModel, settings: FinSettings, finsOn: Bool, landed: @escaping @MainActor () -> Void)
+        -> (sweep: DrawnSweep?, mesh: OverlayMesh?)? {
+        guard finsOn, let p = s.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls, !p.walls.isEmpty else { return nil }
+        return p.standing(for: s, settings: settings, device: host.controller?.renderer.device, landed: landed)
     }
 
     /// `takeState`: the walls and the add-by-hand state go with the model when it is parked.
