@@ -72,6 +72,27 @@ struct CameraTests {
         #expect(c.distance == OrbitCamera.maxDistance)
     }
 
+    @Test func pinchZoomKeepsThePointUnderThePointerWhereItIs() {
+        var c = OrbitCamera.home(distance: 200, aspect: 1.5)
+        c.target = [5, 5, 20]
+        let ndc = SIMD2<Float>(0.6, -0.3)
+        func spot(_ c: OrbitCamera) -> SIMD3<Float> {
+            let r = c.ray(ndcX: ndc.x, ndcY: ndc.y), f = c.basis.forward
+            return r.origin + r.direction * (simd_dot(c.target - r.origin, f) / simd_dot(r.direction, f))
+        }
+        let before = spot(c)
+        c.zoom(by: 1.8, towardNDC: ndc)
+        #expect(near(c.distance, 200 / 1.8, 1e-2))
+        // the point of the focus plane the pointer was over is still under it
+        let r = c.ray(ndcX: ndc.x, ndcY: ndc.y)
+        let toPoint = simd_normalize(before - r.origin)
+        #expect(near(toPoint, r.direction, 1e-3))
+        // a pinch at the middle is the plain zoom
+        var d = OrbitCamera.home(distance: 200), e = d
+        d.zoom(by: 1.8, towardNDC: .zero); e.zoom(by: 1.8)
+        #expect(near(d.target, e.target, 1e-2) && near(d.distance, e.distance))
+    }
+
     @Test func frameBacksOffToSeeThePart() {
         var c = OrbitCamera.home(aspect: 1.6)
         c.frame(size: [100, 40, 60])

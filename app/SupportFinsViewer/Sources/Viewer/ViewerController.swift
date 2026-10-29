@@ -436,6 +436,11 @@ public final class ViewerController {
     }
 
     public func zoom(magnification: CGFloat) { stopGlide(); renderer.camera.zoom(by: Float(1 + magnification)) }
+    /// A pinch at `ndc` (-1...1, y up): zooms toward the pointer.
+    public func zoom(magnification: CGFloat, towardNDC ndc: SIMD2<Float>) {
+        stopGlide()
+        renderer.camera.zoom(by: Float(1 + magnification), towardNDC: ndc)
+    }
     public func zoom(wheelDelta: CGFloat) { stopGlide(); renderer.camera.zoom(wheelDelta: Float(wheelDelta)) }
 
     /// Perform a preset's action for a drag of (`dx`, `dy`) points; a dolly zooms by the drag's height, as
