@@ -138,11 +138,20 @@ final class PlatesFeature: Feature {
         }
     }
 
+    static let arrangeHelp = "Pack this plate's models apart on the bed, biggest in the middle. Undo puts them back."
     static let addHelp = "Put another model on this plate, beside this one. Click a model to edit it."
     static let removeHelp = "Take this model off the plate, to import another without reloading the page."
 
     static func menus(_ f: PlatesFeature?) -> [MenuSection] {
         [
+            // after Move, before Scale (docs/UI-MAP.md 8.1); the toolbar's Arrange shows with several models, this is
+            // greyed without them
+            MenuSection(menu: .model, order: 3, entries: [
+                .item("Arrange", help: arrangeHelp,
+                      enabled: (f?.board.arrangeShown ?? false) && !(f?.board.arranging ?? true) && !(f?.board.busy ?? true)) {
+                    if let board = f?.board { Task { await board.arrange() } }
+                },
+            ]),
             MenuSection(menu: .fileExport, order: 10, entries: [
                 .item("Add Model to Plate…", help: addHelp, enabled: f != nil) { f?.addModels() },
             ]),

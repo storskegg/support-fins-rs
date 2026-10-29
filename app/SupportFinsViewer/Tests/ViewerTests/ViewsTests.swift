@@ -250,6 +250,14 @@ struct ViewsTests {
         #expect(NavPreset.fusion.hint == "Shift + middle-drag orbits, middle-drag pans, wheel zooms.")
     }
 
+    @Test func optionDragOrbitsWhereTheLeftButtonIsLeftToPicking() {
+        #expect(NavPreset.fusion.dragAction(.left, modifier: false, option: true) == .orbit)
+        #expect(NavPreset.blender.dragAction(.left, modifier: true, option: true, shift: true) == .pan)
+        #expect(NavPreset.onshape.dragAction(.left, modifier: false) == .none)
+        #expect(NavPreset.default.dragAction(.left, modifier: false, option: true) == .orbit)
+        #expect(NavPreset.fusion.dragAction(.middle, modifier: false, option: true) == .pan)      // a real button is not changed
+    }
+
     @Test func modifierChordsSwapOrbitAndPan() {
         #expect(NavPreset.fusion.dragAction(.middle, modifier: true) == .orbit)       // Shift + middle orbits
         #expect(NavPreset.onshape.dragAction(.right, modifier: true) == .pan)         // Ctrl + right pans

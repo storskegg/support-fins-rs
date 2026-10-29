@@ -1,5 +1,6 @@
 import Foundation
 import Metal
+import Observation
 import SupportFinsCore
 import Viewer
 import simd
@@ -7,9 +8,12 @@ import simd
 /// A `Part` of the engine as the viewer's `MeshSource`. The mesh and the flags are the Rust allocations
 /// themselves (`GpuBuffer.metalBuffer`, no copy); the analysis runs on a background thread.
 @MainActor
+@Observable
 final class CorePart: MeshSource {
     let part: Part
-    let info: PartInfo
+    /// The engine's description of the part. The import note changes once, when a saved session is restored onto it
+    /// (`refreshInfo`), so it is observed.
+    private(set) var info: PartInfo
     let vertexBuffer: MTLBuffer
     let vertexStride = 24
     let faceCount: Int
@@ -19,12 +23,16 @@ final class CorePart: MeshSource {
     init?(part: Part, device: MTLDevice) {
         self.part = part
         self.device = device
-        info = part.info()
+        let described = part.info()
+        info = described
         guard let buffer = part.mesh().metalBuffer(device: device) else { return nil }
         vertexBuffer = buffer
-        faceCount = Int(info.triangles)
+        faceCount = Int(described.triangles)
         bounds = Self.bounds(of: buffer, vertices: faceCount * 3)
     }
+
+    /// The part's description again: its import note says what a session restored (`restoreSession`, `afterLoad`).
+    func refreshInfo() { info = part.info() }
 
     /// The unit normal of face `face` in the model frame: the engine's own (winding-derived, not the file's),
     /// which rides in the mesh buffer next to each vertex (`docs/FFI.md` `Part::mesh`), as `topology.nrm`
