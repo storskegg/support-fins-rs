@@ -137,7 +137,9 @@ struct WindowLifetimeTests {
             after.append(Int(residentMB()))
         }
         print("LIFETIME resident MB after each close \(after)")
-        #expect(after.last! - after.first! <= 20, "resident MB after each close \(after)")
+        // from the second close: the first runs before the allocator reaches its high-water mark, so it reads low after a long
+        // test run (415 then 468, 473, 473, 473); a leak would keep growing
+        #expect(after.last! - after[1] <= 20, "resident MB after each close \(after)")
     }
 
     // MARK: closed while busy
