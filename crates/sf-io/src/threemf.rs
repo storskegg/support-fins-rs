@@ -1095,6 +1095,35 @@ struct ObjectDef {
     pindex: Option<String>,
     paint: Vec<Option<Arc<Paint>>>,
     rgb: Vec<Option<String>>,
+    /// `withComponents` only: the `<object>` attributes, a triangle's attributes beyond v1-v3
+    /// (sparse, by triangle index) and, once the part is parsed, the shared source (`cur.source`).
+    attributes: Attrs,
+    tri_attrs: Vec<Option<Attrs>>,
+    source: Option<Arc<SourceMesh>>,
+}
+
+/// An XML element of a model part's `<resources>` outside any `<object>` (a material table, a
+/// colour group, an extension's resource): `{ name, attributes, children }`, tag name as written.
+#[derive(Debug, Clone, PartialEq)]
+pub struct XmlNode {
+    pub name: String,
+    pub attributes: Attrs,
+    pub children: Vec<XmlNode>,
+}
+
+/// The source mesh of a leaf object (`obj.source`, web/threemf.js `parseModelXML` withComponents):
+/// `{ attributes, vertices, indices, triangleAttributes, properties, modelAttributes }`. Every
+/// occurrence of the object shares it. Attribute values are the XML-escaped text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SourceMesh {
+    pub attributes: Attrs,
+    pub vertices: Vec<f64>,
+    /// the `v1 v2 v3` of each triangle, flat (`+a.v1`: NaN when absent)
+    pub indices: Vec<f64>,
+    /// a triangle's attributes beyond `v1`, `v2`, `v3`, by triangle index (`None`: it has none)
+    pub triangle_attributes: Vec<Option<Attrs>>,
+    pub properties: Arc<Vec<XmlNode>>,
+    pub model_attributes: Option<Attrs>,
 }
 
 #[derive(Debug, Clone)]
@@ -1109,6 +1138,13 @@ struct ModelPart {
     objects: IndexMap<String, ObjectDef>,
     items: Vec<Item>,
     unit: String,
+}
+
+/// A property element as the parser holds it while the tree is open: children by index.
+struct PropData {
+    name: String,
+    attributes: Attrs,
+    children: Vec<usize>,
 }
 
 fn is_digits(s: &str) -> bool {
@@ -1142,11 +1178,26 @@ struct ModelParser {
     /// key of the <basematerials>/<colorgroup> being filled
     group: Option<String>,
     in_vertices: bool,
+    /// `withComponents`: retain source topology and property resources
+    with_components: bool,
+    prop_nodes: Vec<PropData>,
+    prop_roots: Vec<usize>,
+    prop_stack: Vec<usize>,
+    in_resources: bool,
+    in_object: bool,
+    model_attributes: Option<Attrs>,
 }
 
 impl ModelParser {
-    fn new(strict: bool) -> Self {
+    fn new(strict: bool, with_components: bool) -> Self {
         ModelParser {
+            with_components,
+            prop_nodes: Vec::new(),
+            prop_roots: Vec::new(),
+            prop_stack: Vec::new(),
+            in_resources: false,
+            in_object: false,
+            model_attributes: None,
             strict,
             objects: IndexMap::new(),
             items: Vec::new(),
@@ -1159,7 +1210,30 @@ impl ModelParser {
         }
     }
 
-    fn finish(self) -> ModelPart {
+    fn prop_tree(&self, i: usize) -> XmlNode {
+        let n = &self.prop_nodes[i];
+        XmlNode {
+            name: n.name.clone(),
+            attributes: n.attributes.clone(),
+            children: n.children.iter().map(|&c| self.prop_tree(c)).collect(),
+        }
+    }
+
+    fn finish(mut self) -> ModelPart {
+        if self.with_components {
+            let properties: Arc<Vec<XmlNode>> =
+                Arc::new(self.prop_roots.iter().map(|&r| self.prop_tree(r)).collect());
+            for o in self.objects.values_mut() {
+                o.source = Some(Arc::new(SourceMesh {
+                    attributes: o.attributes.clone(),
+                    vertices: o.verts.clone(),
+                    indices: o.tris.clone(),
+                    triangle_attributes: std::mem::take(&mut o.tri_attrs),
+                    properties: properties.clone(),
+                    model_attributes: self.model_attributes.clone(),
+                }));
+            }
+        }
         ModelPart {
             objects: self.objects,
             items: self.items,
@@ -1212,7 +1286,40 @@ impl ModelParser {
         }
     }
 
+    /// What `withComponents` keeps of an opening tag: the `<resources>` elements outside objects.
+    fn track_open(&mut self, tag: &str, a: &Attrs, self_closing: bool) {
+        let name = local(tag);
+        if name == "resources" {
+            self.in_resources = !self_closing;
+        } else if name == "object" {
+            self.in_object = !self_closing;
+        } else if self.in_resources && !self.in_object {
+            let i = self.prop_nodes.len();
+            self.prop_nodes.push(PropData {
+                name: tag.to_string(),
+                attributes: a.clone(),
+                children: Vec::new(),
+            });
+            match self.prop_stack.last() {
+                Some(&top) => self.prop_nodes[top].children.push(i),
+                None => self.prop_roots.push(i),
+            }
+            if !self_closing {
+                self.prop_stack.push(i);
+            }
+        }
+    }
+
     fn event(&mut self, ev: XmlEvent) -> Result<(), String> {
+        if self.with_components
+            && let XmlEvent::Open {
+                name,
+                attrs,
+                self_closing,
+            } = &ev
+        {
+            self.track_open(name, attrs, *self_closing);
+        }
         match ev {
             XmlEvent::Open {
                 name: tag,
@@ -1220,6 +1327,9 @@ impl ModelParser {
                 self_closing,
             } => match local(tag) {
                 "model" => {
+                    if self.with_components {
+                        self.model_attributes = Some(a.clone());
+                    }
                     if let Some(u) = a.get("unit").filter(|u| !u.is_empty()) {
                         self.unit = u.clone();
                     }
@@ -1268,6 +1378,13 @@ impl ModelParser {
                             pindex: a.get("pindex").cloned(),
                             paint: Vec::new(),
                             rgb: Vec::new(),
+                            attributes: if self.with_components {
+                                a.clone()
+                            } else {
+                                Attrs::new()
+                            },
+                            tri_attrs: Vec::new(),
+                            source: None,
                         },
                     );
                     self.cur = if self_closing { None } else { Some(key) };
@@ -1307,6 +1424,16 @@ impl ModelParser {
                     for k in ["v1", "v2", "v3"] {
                         o.tris
                             .push(a.get(k).map_or(f64::NAN, |v| jsnum::string_to_number(v)));
+                    }
+                    if self.with_components {
+                        let attrs: Attrs = a
+                            .iter()
+                            .filter(|(k, _)| !matches!(k.as_str(), "v1" | "v2" | "v3"))
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .collect();
+                        if !attrs.is_empty() {
+                            set_at(&mut o.tri_attrs, t, attrs);
+                        }
                     }
                     // A slicer's painted colours (PAINT_ATTRS), kept verbatim: the string
                     // subdivides THIS triangle against its own vertex order, which the whole
@@ -1366,12 +1493,28 @@ impl ModelParser {
                 }
                 _ => {}
             },
-            XmlEvent::Close(tag) => match local(tag) {
-                "object" => self.cur = None,
-                "vertices" => self.in_vertices = false,
-                "basematerials" | "colorgroup" => self.group = None,
-                _ => {}
-            },
+            XmlEvent::Close(tag) => {
+                let t = local(tag);
+                if self.with_components {
+                    if t == "object" {
+                        self.in_object = false;
+                    } else if t == "resources" {
+                        self.in_resources = false;
+                    } else if self
+                        .prop_stack
+                        .last()
+                        .is_some_and(|&top| self.prop_nodes[top].name == tag)
+                    {
+                        self.prop_stack.pop();
+                    }
+                }
+                match t {
+                    "object" => self.cur = None,
+                    "vertices" => self.in_vertices = false,
+                    "basematerials" | "colorgroup" => self.group = None,
+                    _ => {}
+                }
+            }
         }
         Ok(())
     }
@@ -1379,8 +1522,8 @@ impl ModelParser {
 
 /// Parse one 3D/*.model part into { objects, items, unit } (web/threemf.js:589-690). `strict`
 /// (the CLI's single-item read) throws on malformed ids, vertices, triangles and transforms.
-fn parse_model_xml(xml: &str, strict: bool) -> Result<ModelPart, String> {
-    let mut p = ModelParser::new(strict);
+fn parse_model_xml(xml: &str, strict: bool, with_components: bool) -> Result<ModelPart, String> {
+    let mut p = ModelParser::new(strict, with_components);
     scan_xml(xml, &mut |ev| p.event(ev))?;
     Ok(p.finish())
 }
@@ -1395,6 +1538,7 @@ fn parse_model_bytes(
     data: &[u8],
     strict: bool,
     pieces: Option<usize>,
+    with_components: bool,
 ) -> Result<ModelPart, String> {
     use crate::xmlscan::{Item as Chunked, scan_chunks};
     let n = pieces.unwrap_or_else(|| {
@@ -1405,10 +1549,11 @@ fn parse_model_bytes(
         }
     });
     if !strict
+        && !with_components
         && (n > 1 || pieces.is_some())
         && let Some(chunks) = scan_chunks(data, n)
     {
-        let mut p = ModelParser::new(false);
+        let mut p = ModelParser::new(false, false);
         for c in chunks {
             let (mut v, mut t) = (0, 0);
             for item in &c.items {
@@ -1436,7 +1581,7 @@ fn parse_model_bytes(
         }
         return Ok(p.finish());
     }
-    parse_model_xml(&decode(data), strict)
+    parse_model_xml(&decode(data), strict, with_components)
 }
 
 /// Whether the chunked scan accepts `data` cut into `pieces` (it gives up on anything it cannot
@@ -1455,9 +1600,9 @@ pub fn model_parse_digest(
     chunked: bool,
 ) -> Result<String, String> {
     let part = if chunked {
-        parse_model_bytes(data, false, pieces)?
+        parse_model_bytes(data, false, pieces, false)?
     } else {
-        parse_model_xml(&decode(data), false)?
+        parse_model_xml(&decode(data), false, false)?
     };
     Ok(format!(
         "{:?} {:?} {:?}",
@@ -1511,6 +1656,89 @@ fn is_placement_key(k: &str) -> bool {
         || k.strip_prefix("source_").is_some_and(|r| {
             !r.is_empty() && r.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
         })
+}
+
+/// Port of `bambuComponentSettings` (web/threemf.js): raw Bambu part attributes/settings,
+/// including normal parts, by object id. Keeps duplicate records and XML-escaped values: an
+/// exporter must resolve ambiguity explicitly, not silently choose a material or discard
+/// metadata. Used only withComponents.
+fn bambu_component_settings(xml: Option<&str>) -> IndexMap<String, BambuObjectSettings> {
+    let mut objects: IndexMap<String, BambuObjectSettings> = IndexMap::new();
+    let Some(xml) = xml.filter(|x| !x.is_empty()) else {
+        return objects;
+    };
+    // the object being filled (its id; `None` when the id was absent, which nothing can look up)
+    let mut object: Option<Option<String>> = None;
+    let mut part: Option<usize> = None;
+    let mut anon = BambuObjectSettings::default();
+    let _ = scan_xml(xml, &mut |ev| {
+        match ev {
+            XmlEvent::Open {
+                name,
+                attrs,
+                self_closing,
+            } => match local(name) {
+                "object" => {
+                    let id = attrs.get("id").cloned();
+                    match &id {
+                        Some(i) => {
+                            objects.insert(i.clone(), BambuObjectSettings::default());
+                        }
+                        None => anon = BambuObjectSettings::default(),
+                    }
+                    object = if self_closing { None } else { Some(id) };
+                    part = None;
+                }
+                "part" if object.is_some() => {
+                    let o = match object.as_ref().unwrap() {
+                        Some(i) => &mut objects[i.as_str()],
+                        None => &mut anon,
+                    };
+                    o.parts.push(BambuPartSettings {
+                        attributes: attrs.clone(),
+                        metadata: Vec::new(),
+                    });
+                    part = if self_closing {
+                        None
+                    } else {
+                        Some(o.parts.len() - 1)
+                    };
+                }
+                "metadata" if object.is_some() && attrs.contains_key("key") => {
+                    let o = match object.as_ref().unwrap() {
+                        Some(i) => &mut objects[i.as_str()],
+                        None => &mut anon,
+                    };
+                    let pair = (
+                        attrs["key"].clone(),
+                        attrs.get("value").cloned().unwrap_or_default(),
+                    );
+                    match part {
+                        Some(p) => o.parts[p].metadata.push(pair),
+                        None => o.metadata.push(pair),
+                    }
+                }
+                _ => {}
+            },
+            XmlEvent::Close(name) => match local(name) {
+                "part" => part = None,
+                "object" => {
+                    object = None;
+                    part = None;
+                }
+                _ => {}
+            },
+        }
+        Ok(())
+    });
+    objects
+}
+
+/// An object of `bambu_component_settings`: its own `<metadata>` and its `<part>`s.
+#[derive(Debug, Default)]
+struct BambuObjectSettings {
+    metadata: Vec<(String, String)>,
+    parts: Vec<BambuPartSettings>,
 }
 
 /// A root object's filament (paintcode.js), from whichever slicer config says (web/threemf.js
@@ -1928,6 +2156,8 @@ struct Emit<'a> {
     parts: &'a IndexMap<String, Vec<u8>>,
     parsed: IndexMap<String, Option<Rc<ModelPart>>>,
     strict: bool,
+    /// `withComponents`: parts keep their source mesh and property resources
+    with_components: bool,
     root_name: String,
     prusa_vols: IndexMap<String, Vec<PrusaVol>>,
     filaments: Filaments,
@@ -1935,6 +2165,24 @@ struct Emit<'a> {
     arena: Vec<Role>,
     main: Soup,
     extra: IndexMap<RoleKey, Soup>,
+    /// `withComponents`: one record per leaf mesh occurrence, for the build item being read
+    components: Option<Vec<CompRec>>,
+}
+
+/// One leaf mesh occurrence while `emitObject` runs (`record` in web/threemf.js `emitObject`);
+/// `target` is the soup its triangles went to (`None`: the main one).
+struct CompRec {
+    path: String,
+    object_id: String,
+    part_id: Option<String>,
+    route: Vec<usize>,
+    kind: &'static str,
+    transform: Option<Matrix>,
+    corner_order: [u8; 3],
+    source: Option<Arc<SourceMesh>>,
+    source_faces: Vec<u32>,
+    first_triangle: usize,
+    target: Option<RoleKey>,
 }
 
 impl Emit<'_> {
@@ -1945,7 +2193,12 @@ impl Emit<'_> {
             return Ok(p.clone());
         }
         let p = match self.parts.get(name) {
-            Some(data) => Some(Rc::new(parse_model_bytes(data, self.strict, None)?)),
+            Some(data) => Some(Rc::new(parse_model_bytes(
+                data,
+                self.strict,
+                None,
+                self.with_components,
+            )?)),
             None => None,
         };
         self.parsed.insert(name.to_string(), p.clone());
@@ -2015,6 +2268,8 @@ fn emit_object(
     roles: Roles,
     orient: bool,
     mut fil: f64,
+    route: &[usize],
+    part_id: Option<&str>,
 ) -> Result<(), String> {
     let part = e.get_part(path)?;
     let Some(obj) = part.as_ref().and_then(|p| p.objects.get(id)) else {
@@ -2065,6 +2320,39 @@ fn emit_object(
         };
     }
     let mirrored = orient && m.is_some_and(|m| det(&m) < 0.0);
+    // `groups`: the record of each role this object's triangles went to, by role
+    let mut groups: IndexMap<Option<RoleKey>, usize> = IndexMap::new();
+    let mut record = |e: &mut Emit, r: Option<RoleKey>| -> usize {
+        if let Some(&i) = groups.get(&r) {
+            return i;
+        }
+        let kind = match &r {
+            None => "model",
+            Some(RoleKey::Arena(i)) => e.arena[*i].kind.as_str(),
+            Some(RoleKey::Vol(id, i)) => e.prusa_vols[id.as_str()][*i].kind.as_str(),
+        };
+        let first_triangle = e.sink(r.clone()).out.len() / 9;
+        let comps = e.components.as_mut().unwrap();
+        comps.push(CompRec {
+            path: path.to_string(),
+            object_id: id.to_string(),
+            part_id: part_id.map(String::from),
+            route: route.to_vec(),
+            kind,
+            transform: m,
+            corner_order: if mirrored { [0, 2, 1] } else { [0, 1, 2] },
+            source: obj.source.clone(),
+            source_faces: Vec::new(),
+            first_triangle,
+            target: r.clone(),
+        });
+        groups.insert(r, comps.len() - 1);
+        comps.len() - 1
+    };
+    // Keep empty leaf occurrences visible to a strict project caller.
+    if e.components.is_some() && tris.is_empty() && obj.components.is_empty() {
+        record(e, role.map(RoleKey::Arena));
+    }
     if ranges.is_none() && role.is_none() {
         // the whole mesh lands in the main soup: size it once instead of doubling it
         e.main.out.reserve(tris.len() / 3 * 9);
@@ -2092,6 +2380,12 @@ fn emit_object(
             },
             None => role.map(RoleKey::Arena),
         };
+        if e.components.is_some() {
+            let i = record(e, r.clone());
+            e.components.as_mut().unwrap()[i]
+                .source_faces
+                .push((t / 3) as u32);
+        }
         let is_main = r.is_none();
         if is_main {
             part_tris += 1;
@@ -2147,8 +2441,12 @@ fn emit_object(
         stats.meshes += 1;
     }
 
-    for c in &obj.components {
+    for (component_index, c) in obj.components.iter().enumerate() {
         let child_path = c.path.as_deref().map_or(path, part_name).to_string();
+        let mut child_route = route.to_vec();
+        if e.components.is_some() {
+            child_route.push(component_index);
+        }
         let child_role = match named(&mut e.arena, roles.parts.and_then(|p| p.get(&c.objectid))) {
             Some(r) => Some(r),
             None => role,
@@ -2175,6 +2473,12 @@ fn emit_object(
             },
             orient,
             child_fil,
+            &child_route,
+            if route.is_empty() {
+                Some(&c.objectid)
+            } else {
+                part_id
+            },
         )?;
     }
     seen.shift_remove(&key);
@@ -2287,6 +2591,44 @@ pub struct ReadExtra {
     pub positions: Vec<f64>,
 }
 
+/// A Bambu `<part>` of `model_settings.config`, raw (web/threemf.js `bambuComponentSettings`):
+/// its attributes and every `<metadata key value>` in order, XML-escaped values kept.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BambuPartSettings {
+    pub attributes: Attrs,
+    pub metadata: Vec<(String, String)>,
+}
+
+/// One leaf mesh occurrence of a build item (`withComponents`, web/threemf.js `readThreeMFParts`
+/// doc comment): where it came from, its source mesh, and its triangles in the item's positions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComponentInfo {
+    /// the model part the leaf lives in
+    pub path: String,
+    pub object_id: String,
+    /// the root component's object id this occurrence sits under (`None` at the item itself)
+    pub part_id: Option<String>,
+    /// the component index at each level, from the build item down
+    pub route: Vec<usize>,
+    /// `model`, or the kind of the non-printing part
+    pub kind: &'static str,
+    /// composed BEFORE `unit_scale`
+    pub transform: Option<[f64; 12]>,
+    /// which source corner each emitted corner is
+    pub corner_order: [u8; 3],
+    pub source: Option<Arc<SourceMesh>>,
+    /// relative to the main mesh or that extra's mesh
+    pub first_triangle: usize,
+    pub build_index: usize,
+    pub unit_scale: f64,
+    /// the original triangle index of each emitted triangle
+    pub source_faces: Vec<u32>,
+    /// world-mm positions of those triangles (a copy of the item's)
+    pub positions: Vec<f64>,
+    pub settings: Vec<BambuPartSettings>,
+    pub object_settings: Vec<(String, String)>,
+}
+
 /// One entry of `readThreeMF(..).objects`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThreeMfObject {
@@ -2301,6 +2643,8 @@ pub struct ThreeMfObject {
     /// `null`, or the object's colours by triangle index (see PartColors)
     pub colors: Option<PartColors>,
     pub extras: Vec<ReadExtra>,
+    /// `withComponents` only
+    pub components: Option<Vec<ComponentInfo>>,
 }
 
 /// What `readThreeMF` returns.
@@ -2338,7 +2682,7 @@ fn read_package(bytes: &[u8], merge: bool) -> Result<ThreeMf, String> {
     let pre = match find_root_part(&parts) {
         Some(name) if parts.contains_key(&name) => {
             let data = std::mem::take(parts.get_mut(&name).unwrap());
-            let part = parse_model_bytes(&data, false, None)?;
+            let part = parse_model_bytes(&data, false, None, false)?;
             Some((name, part))
         }
         _ => None,
@@ -2356,6 +2700,9 @@ pub struct ReadOpts {
     pub double_precision: bool,
     /// flip triangles under a mirrored transform so they stay outward for analysis
     pub outward_winding: bool,
+    /// add one record per leaf mesh occurrence (`ThreeMfObject::components`); opt-in: ordinary
+    /// callers neither retain this data nor pay for its parsing
+    pub with_components: bool,
 }
 
 /// Port of `readThreeMFParts` (web/threemf.js:1068-1196): already opened package members. The CLI
@@ -2388,6 +2735,7 @@ fn read_three_mf_core(
         parts,
         parsed: IndexMap::new(),
         strict,
+        with_components: opts.with_components,
         root_name: root_name.clone(),
         prusa_vols: IndexMap::new(),
         filaments: Filaments::new(),
@@ -2398,6 +2746,7 @@ fn read_three_mf_core(
             col: None,
         },
         extra: IndexMap::new(),
+        components: None,
     };
     if let Some((name, part)) = pre {
         e.parsed.insert(name, Some(Rc::new(part)));
@@ -2408,6 +2757,9 @@ fn read_three_mf_core(
     let text = |name: &str| parts.get(name).map(|d| decode(d));
     let bambu = text("Metadata/model_settings.config");
     let (names, mut slicer_parts) = parse_bambu_config(bambu.as_deref(), &mut e.filaments);
+    let component_settings = opts
+        .with_components
+        .then(|| bambu_component_settings(bambu.as_deref()));
     add_prusa3_parts(
         text("Metadata/PrusaSlicer3_project.json").as_deref(),
         &mut slicer_parts,
@@ -2471,6 +2823,7 @@ fn read_three_mf_core(
         };
         e.extra = IndexMap::new();
         e.arena = Vec::new();
+        e.components = opts.with_components.then(Vec::new);
         let mut stats = Stats {
             meshes: 0,
             skipped: 0,
@@ -2494,6 +2847,8 @@ fn read_three_mf_core(
             roles,
             opts.outward_winding,
             filament.as_ref().map_or(0.0, |f| f.object),
+            &[],
+            None,
         )?;
         if strict && (stats.missing != 0 || stats.dropped != 0 || stats.cycles != 0) {
             return Err("selected object has missing resources, cyclic components or invalid triangle references".to_string());
@@ -2517,11 +2872,58 @@ fn read_three_mf_core(
             .cloned()
             .or_else(|| root_obj.map(|o| o.name.clone()).filter(|n| !n.is_empty()))
             .unwrap_or_else(|| format!("Object {}", objects.len() + 1));
+        let mut extra_positions: IndexMap<&RoleKey, Vec<f64>> =
+            e.extra.iter().map(|(k, s)| (k, to_mm(&s.out))).collect();
+        let components: Option<Vec<ComponentInfo>> = e.components.take().map(|recs| {
+            let config = component_settings
+                .as_ref()
+                .and_then(|c| c.get(&item.objectid));
+            recs.into_iter()
+                .map(|c| {
+                    let all: &[f64] = match &c.target {
+                        None => &positions,
+                        Some(k) => &extra_positions[k],
+                    };
+                    // `subarray` clamps both ends to the array
+                    let lo = (c.first_triangle * 9).min(all.len());
+                    let hi = ((c.first_triangle + c.source_faces.len()) * 9).min(all.len());
+                    ComponentInfo {
+                        settings: config
+                            .map(|o| {
+                                o.parts
+                                    .iter()
+                                    .filter(|p| {
+                                        c.part_id.is_some()
+                                            && p.attributes.get("id").map(String::as_str)
+                                                == c.part_id.as_deref()
+                                    })
+                                    .cloned()
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                        object_settings: config.map(|o| o.metadata.clone()).unwrap_or_default(),
+                        positions: all[lo..hi.max(lo)].to_vec(),
+                        path: c.path,
+                        object_id: c.object_id,
+                        part_id: c.part_id,
+                        route: c.route,
+                        kind: c.kind,
+                        transform: c.transform,
+                        corner_order: c.corner_order,
+                        source: c.source,
+                        first_triangle: c.first_triangle,
+                        build_index: index,
+                        unit_scale: scale,
+                        source_faces: c.source_faces,
+                    }
+                })
+                .collect()
+        });
         let extras: Vec<ReadExtra> = e
             .extra
             .iter()
             .filter(|(_, s)| !s.out.is_empty())
-            .map(|(k, s)| {
+            .map(|(k, _s)| {
                 let (kind, name, settings) = match k {
                     RoleKey::Arena(i) => {
                         let r = &e.arena[*i];
@@ -2543,7 +2945,7 @@ fn read_three_mf_core(
                     kind,
                     name,
                     settings,
-                    positions: to_mm(&s.out),
+                    positions: extra_positions.swap_remove(k).unwrap(),
                 }
             })
             .collect();
@@ -2556,6 +2958,7 @@ fn read_three_mf_core(
             bbox: bbox(&positions),
             colors: (!col.paint.is_empty() || !col.rgb.is_empty()).then_some(col),
             extras,
+            components,
             positions,
         });
     }
