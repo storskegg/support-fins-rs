@@ -33,7 +33,7 @@ struct SearchEngine {
     }
 
     /// `localize` turns an English piece into the language on screen (the identity in English).
-    var localize: (String) -> String = { String(localized: String.LocalizationValue($0)) }
+    var localize: (String) -> String = { JS.t($0) }
 
     /// `nameOf`: the name as shown plus the English it came from, folded.
     func name(of row: SearchEntry, _ ctx: SearchContext) -> String {

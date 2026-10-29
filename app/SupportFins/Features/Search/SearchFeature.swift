@@ -42,7 +42,7 @@ final class SearchFeature: Feature {
     static func menus(_ f: SearchFeature?) -> [MenuSection] {
         [MenuSection(menu: .edit, order: 30, entries: [
             .divider,
-            .item("Search Settings", shortcut: "f", modifiers: [.command, .option], help: "Search settings",
+            .item(JS.t("Search Settings"), shortcut: "f", modifiers: [.command, .option], help: JS.t("Search settings"),
                   enabled: f?.host.hasPart == true) { f?.model.requestFocus() },
         ])]
     }
