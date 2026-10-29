@@ -32,7 +32,7 @@ final class ScaleUITests: XCTestCase {
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(toggle.waitForExistence(timeout: 20), "the part's window opened")
 
-        let badge = element("toolbar-scale-badge")
+        let badge = app.buttons["toolbar-scale-badge"].firstMatch
         XCTAssertTrue(badge.waitForExistence(timeout: 10))
         badge.click()
         let field = element("scale-pct"), reset = element("scale-reset")
@@ -54,7 +54,10 @@ final class ScaleUITests: XCTestCase {
 
     // MARK: helpers
 
-    private func badgeText(_ badge: XCUIElement) -> String { (badge.value as? String) ?? badge.label }
+    /// The badge's text ("Scale" + `#scale-now`) is its label. A button has no accessibility value, and XCUITest
+    /// hands that back as a non-nil empty value, so `value as? String ?? label` read "" and never the label
+    /// (`ToolbarAccessibilityTests` pins the label and the missing value).
+    private func badgeText(_ badge: XCUIElement) -> String { badge.label }
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func waitFor(_ what: String, timeout: TimeInterval, _ condition: @escaping () -> Bool) {
