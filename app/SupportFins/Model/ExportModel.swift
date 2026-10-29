@@ -77,6 +77,8 @@ final class ExportModel {
         var bed: [Double]
         /// the model's spot on the plate (`liveXY()`, `ui/models.js:38`): `[0, 0]` until Move and Arrange (M6)
         var placed: [Double] = [0, 0]
+        /// The session a 3MF carries (`SessionFile.json`; `ui/export.js` `session`), nil: none.
+        var session: String? = nil
     }
 
     struct Availability: Equatable {
@@ -169,6 +171,7 @@ final class ExportModel {
         if format == .threeMF {
             o["bed"] = s.bed
             o["placed"] = s.placed
+            if let text = s.session, let session = try? JSONSerialization.jsonObject(with: Data(text.utf8)) { o["session"] = session }
         }
         guard let data = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]) else { return nil }
         return String(decoding: data, as: UTF8.self)

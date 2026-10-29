@@ -15,7 +15,7 @@ extension UTType {
     static let stepBySuffix = ["step", "stp"].compactMap { UTType(filenameExtension: $0, conformingTo: .data) }
 }
 
-/// A part file opened read-only (a part import: sessions come in M7). The window loads the file from its URL
+/// A part file opened read-only (a part import; a 3MF with a session restores it, `Session/`). The window loads the file from its URL
 /// through the engine; the document itself keeps only the name.
 struct PartDocument: FileDocument {
     static let readableContentTypes: [UTType] = [.stl, .obj, .threeMF, .step] + (UTType.threeMFBySuffix.map { [$0] } ?? []) + UTType.stepBySuffix

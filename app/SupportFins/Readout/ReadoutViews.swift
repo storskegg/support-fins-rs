@@ -106,6 +106,7 @@ struct StatusCard: View {
             Section("Status") {
                 ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
                     Text(note.text).font(.callout).foregroundStyle(note.color)
+                        .accessibilityIdentifier(note.text == importNote ? "import-note" : "status-note")
                         .padding(.leading, note.bar == nil ? 0 : 9)
                         .overlay(alignment: .leading) {
                             if let bar = note.bar { RoundedRectangle(cornerRadius: 1.5).fill(bar).frame(width: 3) }

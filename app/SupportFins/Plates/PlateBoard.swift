@@ -47,6 +47,8 @@ final class PlateBoard {
     /// The hand-placed walls drawn for a model, in print space about its own spot (Draw): what an export writes with
     /// its fins. The Draw feature sets it; no walls until it does.
     @ObservationIgnored var drawn: (ModelSlot) -> DrawnSweep? = { _ in nil }
+    /// The hand-placed walls of a model, in its own frame, for the session a plate of one model writes (Draw sets it).
+    @ObservationIgnored var walls: (ModelSlot) -> [DrawnWall] = { _ in [] }
     /// Why the last plate export failed (the engine's message), or nil.
     var exportError: String?
     /// Where an export asks for its file (a stub in tests).
