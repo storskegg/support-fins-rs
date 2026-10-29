@@ -25,6 +25,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     let queue: MTLCommandQueue
     let meshPipeline: MTLRenderPipelineState
     let idPipeline: MTLRenderPipelineState
+    /// Like `idPipeline`, one id for the whole draw (which model of the plate a pick lands on).
+    let idFlatPipeline: MTLRenderPipelineState
     let linePipeline: MTLRenderPipelineState
     let supportPipeline: MTLRenderPipelineState
     let staleSupportPipeline: MTLRenderPipelineState
@@ -90,9 +92,12 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
 
     private var plate: PlateGeometry
     private var plateBuffers: [MTLBuffer?] = [nil, nil, nil, nil]
-    private var idTexture: MTLTexture?
-    private var idDepth: MTLTexture?
-    private let readback: MTLBuffer
+    /// The beds of the plates, the models parked beside the live one and the clash cells (`PlateScene.swift`).
+    public internal(set) var plateScene = PlateScene()
+    var clashBuffer: (MTLBuffer, Int)?
+    var idTexture: MTLTexture?
+    var idDepth: MTLTexture?
+    let readback: MTLBuffer
     private var lastDrawTime: Double?
     /// Bumped whenever something drawn changes; a test or a caller can see whether a frame was needed.
     public internal(set) var changeCount = 0
@@ -117,6 +122,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             id.colorAttachments[0].pixelFormat = .r32Uint
             id.depthAttachmentPixelFormat = Self.depthFormat
             idPipeline = try device.makeRenderPipelineState(descriptor: id)
+            id.vertexFunction = lib.makeFunction(name: "id_flat_vertex")
+            idFlatPipeline = try device.makeRenderPipelineState(descriptor: id)
 
             let line = MTLRenderPipelineDescriptor()
             line.vertexFunction = lib.makeFunction(name: "line_vertex")
@@ -254,17 +261,23 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         changeCount += 1
     }
 
-    private func rebuildResidency() {
+    func rebuildResidency() {
         if let old = residency { queue.removeResidencySet(old) }
         residency = nil
-        guard !meshes.isEmpty || supports != nil else { return }
+        guard !meshes.isEmpty || supports != nil || !plateScene.parked.isEmpty else { return }
         let d = MTLResidencySetDescriptor()
-        d.initialCapacity = meshes.count * 2 + 2
+        d.initialCapacity = (meshes.count + plateScene.parked.count) * 3 + 2
         guard let set = try? device.makeResidencySet(descriptor: d) else { return }
         for m in meshes { set.addAllocation(m.vertexBuffer) }
         for f in flagBuffers { set.addAllocation(f) }
         if let b = supports?.fins { set.addAllocation(b) }
         if let b = supports?.pad { set.addAllocation(b) }
+        for p in plateScene.parked {
+            set.addAllocation(p.mesh.vertexBuffer)
+            set.addAllocation(p.flags)
+            if let b = p.supports?.fins { set.addAllocation(b) }
+            if let b = p.supports?.pad { set.addAllocation(b) }
+        }
         set.commit()
         queue.addResidencySet(set)
         residency = set
@@ -303,6 +316,10 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         hoverFace = face
         changeCount += 1
     }
+
+    /// The flags buffer of a part as it stands: a model parked beside the live ones keeps its overhang colours
+    /// (`ParkedDrawable.flags`).
+    public func flagBuffer(part: Int) -> MTLBuffer? { part < flagBuffers.count ? flagBuffers[part] : nil }
 
     /// The flags buffer of a part (for tests).
     func flagBufferForTest(part: Int) -> MTLBuffer { flagBuffers[part] }
@@ -355,15 +372,32 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             enc.setDepthBias(0, slopeScale: 0, clamp: 0)
         }
         if let supports { encodeSupports(supports, into: enc) }
+        encodeParked(u.viewProj, into: enc)
         u.params.w = 0
         enc.setRenderPipelineState(linePipeline)
         enc.setDepthStencilState(lineDepthState)
-        enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
         let a = { (c: SIMD3<Float>, o: Float) in SIMD4(c, o) }
-        draw(lines: plateBuffers[0], count: plate.minor.count, color: a(Palette.gridMinor, 0.9), with: enc)
-        draw(lines: plateBuffers[1], count: plate.major.count, color: a(Palette.gridMajor, 1), with: enc)
-        draw(lines: plateBuffers[2], count: plate.edge.count, color: a(Palette.plateEdge, 1), with: enc)
-        draw(lines: plateBuffers[3], count: plate.box.count, color: a(Palette.volumeBox, 0.55), with: enc)
+        // each plate's bed: grid and outline, and the build-volume box only on the plate being edited (`drawRow`)
+        let bedList = plateScene.beds.isEmpty ? [SIMD2<Float>.zero] : plateScene.beds
+        let viewProj = u.viewProj
+        for (i, origin) in bedList.enumerated() {
+            u.viewProj = viewProj * simd_float4x4(translation: SIMD3(origin, 0))
+            enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+            draw(lines: plateBuffers[0], count: plate.minor.count, color: a(Palette.gridMinor, 0.9), with: enc)
+            draw(lines: plateBuffers[1], count: plate.major.count, color: a(Palette.gridMajor, 1), with: enc)
+            draw(lines: plateBuffers[2], count: plate.edge.count, color: a(Palette.plateEdge, 1), with: enc)
+            if i == min(plateScene.edited, bedList.count - 1) {
+                draw(lines: plateBuffers[3], count: plate.box.count, color: a(Palette.volumeBox, 0.55), with: enc)
+            }
+        }
+        u.viewProj = viewProj
+        enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+        encodeTarget(viewProj, into: enc)
+        encodeClash(viewProj, into: enc)
+        // the lines' state again for the gizmo and the HUD after the plate overlays
+        enc.setRenderPipelineState(linePipeline)
+        enc.setDepthStencilState(lineDepthState)
+        enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
         if let g = gizmo, g.visible { drawGizmo(g, uniforms: &u, with: enc) }
         encodeHUD(into: enc)
         encodeIslandMarkers(into: enc)

@@ -57,6 +57,24 @@ struct History<State: Equatable & Sendable>: Sendable {
         return next
     }
 
+    /// The newest undo step `ok` accepts: the steps it passes over stay in the stack (`step` in `ui/history.js`: a
+    /// step of a model no longer on the plate is passed over, and comes back with the model on its Undo).
+    func undoIndex(accepting ok: (State) -> Bool) -> Int? { canUndo ? undoStack.lastIndex(where: ok) : nil }
+    func redoIndex(accepting ok: (State) -> Bool) -> Int? { canRedo ? redoStack.lastIndex(where: ok) : nil }
+
+    /// Step back over the step at `index` (`undoIndex`), with `current` going onto the redo stack.
+    mutating func undo(at index: Int, current: State) -> State {
+        let previous = undoStack.remove(at: index)
+        redoStack.append(current)
+        return previous
+    }
+
+    mutating func redo(at index: Int, current: State) -> State {
+        let next = redoStack.remove(at: index)
+        undoStack.append(current)
+        return next
+    }
+
     /// A new part: undo history does not carry across parts (`resetHistory`).
     mutating func reset() {
         undoStack.removeAll()

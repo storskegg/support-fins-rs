@@ -6,14 +6,15 @@
 Always: fmt, clippy, test (cargo test --workspace), deno (the oracle library tests), cli-parity.
 When app/ or the bindings (crates/sf-ffi/) differ from origin/main (committed or not), also:
 app-core (regenerate the Swift bindings, swift test), app-project (XcodeGen), app-test (the viewer
-package's `swift test`, then the app's xcodebuild tests; takes the machine lock). app-core and app-project
-always run before app-test (even with --only), because the generated Xcode project goes stale when Swift files
-are added; the table prints the test count so a silent skip shows.
+package's `swift test`, then the app's xcodebuild tests; takes the machine lock), app-uibuild (compile the UI
+tests without running them, so one that does not compile cannot reach review). app-core and app-project
+always run before app-test and app-uibuild (even with --only), because the generated Xcode project goes stale
+when Swift files are added; the table prints the test count so a silent skip shows.
 `--all` forces the app gates, `--no-app` skips them, `--only` runs just the named ones.
 
 Every gate runs even when an earlier one fails, with its output live and also in
 target/gate/<name>.log. `app-uitest` is deliberately not here: it takes over the user's mouse and
-keyboard, and only the orchestrator runs it.
+keyboard, and only the orchestrator runs it. `app-uibuild` only compiles those tests.
 """
 import os
 import subprocess
@@ -34,7 +35,10 @@ APP = [
     ("app-core", ["just", "app-core"]),
     ("app-project", ["just", "app-project"]),
     ("app-test", ["just", "--no-deps", "app-test"]),
+    ("app-uibuild", ["just", "--no-deps", "app-uibuild"]),
 ]
+# the gates that need fresh bindings and a fresh Xcode project first
+NEEDS_PROJECT = ("app-test", "app-uibuild")
 APP_PATHS = ("app/", "crates/sf-ffi/")
 
 
@@ -90,11 +94,11 @@ def main(argv):
         print("gate: app/ and the bindings are unchanged vs origin/main; app gates skipped", flush=True)
     if only is not None:
         gates = [g for g in BASE + APP if g[0] in only]
-    if any(g[0] == "app-test" for g in gates):
+    if any(g[0] in NEEDS_PROJECT for g in gates):
         # the Xcode project is generated and gitignored: a stale one silently skips test files added since it was
         # made (201 tests run of 211). So the app tests are always preceded by a fresh bindings + project generation.
         have = [g[0] for g in gates]
-        gates = [g for g in APP if g[0] != "app-test" and g[0] not in have] + gates
+        gates = [g for g in APP if g[0] not in NEEDS_PROJECT and g[0] not in have] + gates
         gates.sort(key=lambda g: [n for n, _ in BASE + APP].index(g[0]))
     os.makedirs("target/gate", exist_ok=True)
     results = []

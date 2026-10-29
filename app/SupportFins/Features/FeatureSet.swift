@@ -101,12 +101,12 @@ struct FeatureCommands: Commands {
     /// The entries are made in a view's body, not here, so what they read (the exporter, the badges) is observed
     /// by that view: the focused value (the window's `FeatureSet`) does not change when they do.
     private func menu(_ id: MenuID) -> some View { FeatureMenuContent(menu: id, features: features) }
-    private static var menus: [MenuID] { FeatureSet.menuIDs().filter { !$0.isFileGroup && !$0.isEditGroup } }
+    private static var menus: [MenuID] { FeatureSet.menuIDs().filter { !$0.isFileGroup } }
 
     var body: some Commands {
         let menus = Self.menus
         CommandGroup(after: .newItem) { menu(.fileExport) }
-        CommandGroup(after: .pasteboard) { menu(.edit) }
+        CommandGroup(after: .undoRedo) { menu(.edit) }
         if menus.count > 0 { CommandMenu(menus[0].title) { menu(menus[0]) } }
         if menus.count > 1 { CommandMenu(menus[1].title) { menu(menus[1]) } }
         if menus.count > 2 { CommandMenu(menus[2].title) { menu(menus[2]) } }

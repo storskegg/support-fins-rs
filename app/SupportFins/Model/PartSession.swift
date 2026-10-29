@@ -14,6 +14,9 @@ struct SessionSnapshot: Equatable, Sendable {
     /// history snapshot holds both (`ui/history.js` `snapshot`).
     var drawnWalls: [DrawnWall] = []
     var addByHand = false
+    /// Which model of the plate the step edits (`who` in `ui/history.js`'s snapshot): undoing it edits that model
+    /// again. Nil with one model (`Plates/`).
+    var owner: UUID?
 }
 
 /// The state of one window's part: its objects, the pose, the settings, the fins the user removed, and the
@@ -36,6 +39,11 @@ final class PartSession {
     var drawnWalls: [DrawnWall] = []
     /// "+ Add walls by hand" is on (`drawAugment`).
     var addByHand = false
+    /// The model on show among a plate's several (`Plates/`): an undo step records it, and an undo or redo brings
+    /// that model back first (`focus`) unless it is no longer on the plate (`isOnPlate`), when the step is passed over.
+    var owner: UUID?
+    @ObservationIgnored var focus: ((UUID) -> Void)?
+    @ObservationIgnored var isOnPlate: ((UUID) -> Bool)?
     private(set) var history = History<SessionSnapshot>()
     /// A rotate ring is being dragged (set by `RingEdits`). Not part of the history: the drag is one step, taken
     /// when it ends. The window rebuilds the fins live while this is true (`BuildWiring`).
@@ -60,7 +68,7 @@ final class PartSession {
     }
 
     var snapshot: SessionSnapshot {
-        SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins, finsOn: finsOn, drawnWalls: drawnWalls, addByHand: addByHand)
+        SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins, finsOn: finsOn, drawnWalls: drawnWalls, addByHand: addByHand, owner: owner)
     }
     var canUndo: Bool { history.canUndo }
     var canRedo: Bool { history.canRedo }
@@ -75,6 +83,30 @@ final class PartSession {
         history.reset()
         if !keepingSettings { settings = FinSettings() }
         undoManager?.removeAllActions(withTarget: self)
+    }
+
+    /// Another model of the plate is on show: its own pose and removed fins, under the plate's settings and
+    /// history, which go on as they are (`unpark`, `ui/models.js`).
+    func install(parts: [CorePart], pose: Pose, removedFins: Set<FinKey>, owner: UUID?) {
+        self.parts = parts
+        self.pose = pose
+        self.removedFins = removedFins
+        self.owner = owner
+    }
+
+    /// The plate's undo history, taken away when the plate is left (`takeHistory`, `ui/history.js`).
+    func takeHistory() -> History<SessionSnapshot> {
+        let h = history
+        history = History()
+        undoManager?.removeAllActions(withTarget: self)
+        return h
+    }
+
+    /// A plate's history again (`setHistory`): the system's Undo menu follows with one entry per step.
+    func setHistory(_ h: History<SessionSnapshot>) {
+        history = h
+        undoManager?.removeAllActions(withTarget: self)
+        for _ in h.undoStack { register(nil) }
     }
 
     // MARK: edits
@@ -138,14 +170,19 @@ final class PartSession {
     }
 
     private func performUndo() {
-        guard let s = history.undo(current: snapshot) else { return }
-        restore(s)
+        let accept: (SessionSnapshot) -> Bool = { [isOnPlate] in $0.owner.map { isOnPlate?($0) ?? true } ?? true }
+        guard let i = history.undoIndex(accepting: accept) else { return }
+        // edit the step's model first, then take the state it leaves for the redo (`step`, `ui/history.js`)
+        if let o = history.undoStack[i].owner, o != owner { focus?(o) }
+        restore(history.undo(at: i, current: snapshot))
         undoManager?.registerUndo(withTarget: self) { $0.performRedo() }
     }
 
     private func performRedo() {
-        guard let s = history.redo(current: snapshot) else { return }
-        restore(s)
+        let accept: (SessionSnapshot) -> Bool = { [isOnPlate] in $0.owner.map { isOnPlate?($0) ?? true } ?? true }
+        guard let i = history.redoIndex(accepting: accept) else { return }
+        if let o = history.redoStack[i].owner, o != owner { focus?(o) }
+        restore(history.redo(at: i, current: snapshot))
         undoManager?.registerUndo(withTarget: self) { $0.performUndo() }
     }
 

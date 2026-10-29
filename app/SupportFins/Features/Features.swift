@@ -12,6 +12,7 @@ enum Features {
         ViewFeature.self,
         RemoveFinsFeature.self,
         DrawFeature.self,
+        PlatesFeature.self,
         ExportFeature.self,
         ReadoutFeature.self,
     ]

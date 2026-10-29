@@ -110,6 +110,9 @@ public final class ViewerController {
     @ObservationIgnored public var onHandClick: (@MainActor (HandPointer) -> Void)?
     /// `escape`: the key (which also deselects), not a right click. True when the event was the mode's.
     @ObservationIgnored public var onHandCancel: (@MainActor (_ escape: Bool) -> Bool)?
+    /// A click (a press that did not drag) while no pointer mode is armed, at a pixel of the drawable (origin top
+    /// left) of a `width x height` view: the plates read it (a click on a parked model edits it).
+    @ObservationIgnored public var onTap: (@MainActor (_ x: Int, _ y: Int, _ width: Int, _ height: Int) -> Void)?
     @ObservationIgnored public var onSupportHover: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onSupportClick: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onCancelArmed: (@MainActor () -> Void)?
@@ -206,6 +209,28 @@ public final class ViewerController {
     }
 
     public func stopGlide() { glideTask?.cancel(); glideTask = nil }
+
+    /// Ease the camera from `start` (a target and the offset from it) to where it is now, 450 ms: the plates glide
+    /// along the row, and to another model of the plate (`glide` in `ui/plateview.js`). Position and target are
+    /// each interpolated in a straight line, as the web does.
+    public func glideCamera(fromTarget: SIMD3<Float>, fromEye: SIMD3<Float>) {
+        stopGlide()
+        let toTarget = renderer.camera.target, toEye = renderer.camera.eye
+        renderer.camera.target = fromTarget
+        renderer.camera.setOffset(fromEye - fromTarget)
+        let start = ContinuousClock.now
+        glideTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled, let self {
+                let t = Float(min(1, (ContinuousClock.now - start) / .seconds(CameraGlide.seconds)))
+                let e = CameraGlide.ease(t)
+                let target = fromTarget + (toTarget - fromTarget) * e
+                renderer.camera.target = target
+                renderer.camera.setOffset((fromEye + (toEye - fromEye) * e) - target)
+                if t >= 1 { break }
+                try? await Task.sleep(for: .milliseconds(4))
+            }
+        }
+    }
 
     /// Front, Back, Left, Right, Top or Bottom: the View popover's buttons and the View menu.
     public func apply(_ view: CameraView) { glide(toward: view.direction) }
@@ -467,7 +492,11 @@ public final class ViewerController {
             }
             return
         }
-        guard supportPicking else { return }
+        guard supportPicking else {
+            // no pointer mode armed: a click on the plates (a parked model, another plate's bed)
+            onTap?(x, y, width, height)
+            return
+        }
         Task { @MainActor in
             let tri = await renderer.pickSupport(x: x, y: y, width: width, height: height)
             guard supportPicking else { return }

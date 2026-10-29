@@ -17,7 +17,7 @@ final class DrawFeature: Feature {
 
     var overlays: [WindowOverlay] {
         // over the viewport, which fills the window under the toolbar: the label's coordinates are the view's
-        [WindowOverlay("brace-tip", order: 70, alignment: .topLeading, ignoresSafeArea: true) { BraceTipView(motion: self.model.motion) }]
+        [WindowOverlay("brace-tip", order: 80, alignment: .topLeading, ignoresSafeArea: true) { BraceTipView(motion: self.model.motion) }]
     }
 
     var modifiers: [WindowModifier] {
@@ -40,7 +40,7 @@ final class DrawFeature: Feature {
     /// Edit > Delete (⌫): take back the last point of the wall being drawn, or remove the selected support
     /// (`app.js:63-74`). Disabled when it would do nothing.
     static func menus(_ f: DrawFeature?) -> [MenuSection] {
-        [MenuSection(menu: .edit, order: 0, entries: [
+        [MenuSection(menu: .edit, order: 20, entries: [
             .item("Delete", shortcut: .delete, help: "Take back the last point of the wall you're drawing, or remove the selected support.",
                   enabled: f?.model.canDelete ?? false) {
                 // a text field has the keys: ⌫ is its own

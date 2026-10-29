@@ -12,7 +12,8 @@ final class ReadoutFeature: Feature {
             if let controller = self.host.controller {
                 ReadoutSections(controller: controller, session: self.host.session, build: self.host.wiring?.build,
                                 extraLines: self.host.features.statusLines,
-                                draw: self.host.features[DrawFeature.self]?.model.readoutState)
+                                draw: self.host.features[DrawFeature.self]?.model.readoutState,
+                                statsRows: self.host.features.inspectorSections(.stats))
             }
         }]
     }
