@@ -57,6 +57,54 @@ final class PlatesUITests: XCTestCase {
         waitFor("the second model is back", timeout: 10) { self.text(name).hasPrefix("second") && !toast.exists }
     }
 
+    /// Plates: add one, import a model into it, switch between the tabs, delete a plate and Undo. Identifiers:
+    /// `plate-add`, `plate-tab-N` (value "selected" for the plate being edited), `plate-x-N`, `empty-import`,
+    /// `stat-name`, `toast`, `toast-text`, `toast-undo`. No window title and no window coordinates: the File row names
+    /// the model on show.
+    func testAddAPlateSwitchDeleteAndUndo() throws {
+        let first = try writeSTL("first.stl", slab: 30)
+        let second = try writeSTL("second.stl", slab: 20)
+        app.launch()
+        if !panelExists("open-panel", timeout: 5) && !element("add-part").exists { app.typeKey("o", modifierFlags: .command) }
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
+        chooseInPanel(first.path)
+        let name = element("stat-name")
+        XCTAssertTrue(name.waitForExistence(timeout: 20), "the part's window opened")
+        waitFor("the File row names the first model", timeout: 20) { self.text(name).hasPrefix("first") }
+
+        // + adds an empty plate, which is the one edited; the import button fills it
+        let tab1 = element("plate-tab-1"), tab2 = element("plate-tab-2")
+        XCTAssertTrue(tab1.waitForExistence(timeout: 5), "the first plate's tab")
+        element("plate-add").click()
+        XCTAssertTrue(tab2.waitForExistence(timeout: 5), "the second plate's tab")
+        waitFor("the second plate is the one edited", timeout: 5) { self.text(tab2) == "selected" }
+        let importButton = element("empty-import")
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5), "an empty plate offers Import")
+        importButton.click()
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel for the new plate")
+        chooseInPanel(second.path)
+        waitFor("the File row follows the new plate's model", timeout: 20) { self.text(name).hasPrefix("second") }
+
+        // a click on the first plate's tab edits it, and back
+        tab1.click()
+        waitFor("the first plate is edited, with its own model", timeout: 10) {
+            self.text(tab1) == "selected" && self.text(name).hasPrefix("first")
+        }
+        tab2.click()
+        waitFor("the second plate again", timeout: 10) { self.text(tab2) == "selected" && self.text(name).hasPrefix("second") }
+
+        // × deletes the plate: the toast, then Undo brings it back
+        element("plate-x-2").click()
+        let toast = element("toast")
+        XCTAssertTrue(toast.waitForExistence(timeout: 5), "the toast")
+        XCTAssertEqual(text(element("toast-text")), "Deleted plate 2")
+        waitFor("one plate is left, the first", timeout: 10) { !tab2.exists && self.text(name).hasPrefix("first") }
+        element("toast-undo").click()
+        waitFor("the second plate is back, with its model", timeout: 10) {
+            tab2.exists && self.text(name).hasPrefix("second") && !toast.exists
+        }
+    }
+
     // MARK: helpers
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
