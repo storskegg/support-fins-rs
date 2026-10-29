@@ -152,10 +152,10 @@ final class PartSession {
     func setPose(_ p: Pose, name: String? = nil) { perform(name) { pose = p } }
 
     /// The 90° buttons: a turn about a world axis (`rotate90`, `ui/pose.js:227`).
-    func rotate90(about axis: Pose.Axis) { setPose(pose.rotated90(about: axis), name: "Rotate 90° About \(axis.label)") }
+    func rotate90(about axis: Pose.Axis) { setPose(pose.rotated90(about: axis), name: JS.t("Rotate 90° About {axis}", ["axis": axis.label])) }
 
     /// Reset Rotation (`ui/pose.js:279`).
-    func resetPose() { setPose(.identity, name: "Reset Rotation") }
+    func resetPose() { setPose(.identity, name: JS.t("Reset Rotation")) }
 
     /// Open a gesture: the changes made until `commitGesture` are one undo step.
     func beginGesture() { history.beginGesture(from: snapshot) }
@@ -182,7 +182,7 @@ final class PartSession {
 
     /// A Slider's `onEditingChanged`: true when the thumb goes down, false when it is released.
     func settingsEditing(_ on: Bool) {
-        if on { beginGesture() } else { commitGesture(name: "Change Settings") }
+        if on { beginGesture() } else { commitGesture(name: JS.t("Change Settings")) }
     }
 
     // MARK: undo / redo

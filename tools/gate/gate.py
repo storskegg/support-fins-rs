@@ -7,7 +7,8 @@ Always: fmt, clippy, test (cargo test --workspace), deno (the oracle library tes
 When app/ or the bindings (crates/sf-ffi/) differ from origin/main (committed or not), also:
 app-core (regenerate the Swift bindings, swift test), app-project (XcodeGen), app-test (the viewer
 package's `swift test`, then the app's xcodebuild tests; takes the machine lock), app-uibuild (compile the UI
-tests without running them, so one that does not compile cannot reach review). app-core and app-project
+tests without running them, so one that does not compile cannot reach review), i18n-check (every string the app shows is
+a web string or a listed native one, and every web translation is in the String Catalog: tools/i18n). app-core and app-project
 always run before app-test and app-uibuild (even with --only), because the generated Xcode project goes stale
 when Swift files are added; the table prints the test count so a silent skip shows.
 `--all` forces the app gates, `--no-app` skips them, `--only` runs just the named ones.
@@ -29,6 +30,7 @@ BASE = [
     ("test", ["cargo", "test", "--workspace"]),
     ("deno", DENO),
     ("cli-parity", ["just", "cli-parity"]),
+    ("i18n-catalog", ["just", "i18n-catalog"]),
 ]
 # --no-deps: the gate runs app-core and app-project itself, so app-test must not run them again
 APP = [
@@ -36,6 +38,8 @@ APP = [
     ("app-project", ["just", "app-project"]),
     ("app-test", ["just", "--no-deps", "app-test"]),
     ("app-uibuild", ["just", "--no-deps", "app-uibuild"]),
+    # reads the strings app-uibuild's build extracted (.dd-ui): after it
+    ("i18n-check", ["just", "--no-deps", "i18n-check"]),
 ]
 # the gates that need fresh bindings and a fresh Xcode project first
 NEEDS_PROJECT = ("app-test", "app-uibuild")

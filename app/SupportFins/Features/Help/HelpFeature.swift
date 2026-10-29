@@ -20,13 +20,13 @@ final class HelpFeature: Feature {
     static func menus(_ f: HelpFeature?) -> [MenuSection] {
         [MenuSection(menu: .help, order: 20, entries: [
             .divider,
-            .item("Support Fins on GitHub", help: "Source code on GitHub. Runs entirely in your browser; no file ever leaves your machine.") {
+            .item(JS.t("Support Fins on GitHub"), help: JS.t("Source code on GitHub. Runs entirely in your browser; no file ever leaves your machine.")) {
                 NSWorkspace.shared.open(Link.github)
             },
-            .item("Support the project", help: "Support Fins is free and open source — buy me a coffee on Ko-fi.") {
+            .item(JS.t("Support the project"), help: JS.t("Support Fins is free and open source — buy me a coffee on Ko-fi.")) {
                 NSWorkspace.shared.open(Link.kofi)
             },
-            .item("Report a problem", help: "Opens a GitHub issue form for a bug.") { NSWorkspace.shared.open(Link.report) },
+            .item(JS.t("Report a problem")) { NSWorkspace.shared.open(Link.report) },
         ])]
     }
 }

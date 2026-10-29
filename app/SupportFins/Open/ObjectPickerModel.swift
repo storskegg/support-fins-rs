@@ -17,7 +17,7 @@ final class ObjectPickerModel: Identifiable {
         /// `3,208 tris · 40×40×40 mm` (`io.js:166-168`).
         var meta: String {
             let n = triangles.formatted(.number)
-            return "\(n) tris · \(size[0])×\(size[1])×\(size[2]) mm"
+            return "\(n) \(JS.t("tris")) · \(size[0])×\(size[1])×\(size[2]) mm"
         }
     }
 
@@ -50,10 +50,10 @@ final class ObjectPickerModel: Identifiable {
     var canLoad: Bool { !selected.isEmpty }
 
     /// "Load", or "Merge 2 & load" (`io.js:173`).
-    var loadTitle: String { selected.count > 1 ? "Merge \(selected.count) & load" : "Load" }
+    var loadTitle: String { selected.count > 1 ? JS.t("Merge {n} & load", ["n": String(selected.count)]) : JS.t("Load") }
 
     /// "2 selected — merged into one part" (`io.js:174`).
-    var hint: String { selected.count > 1 ? "\(selected.count) selected — merged into one part" : "" }
+    var hint: String { selected.count > 1 ? JS.t("{n} selected — merged into one part", ["n": String(selected.count)]) : "" }
 
     func load() {
         guard canLoad else { return }

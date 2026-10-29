@@ -46,7 +46,7 @@ final class SuggestFeature: Feature {
         // opens its popover in the view toolbar (`ToolbarRegistry.open`); only a single part has it
         return [MenuSection(menu: .model, order: 10, entries: [
             .divider,
-            .item("Suggest Orientation", enabled: toolbar?.badges[.suggest] != nil) { toolbar?.open = .suggest },
+            .item(JS.t("Suggest Orientation"), enabled: toolbar?.badges[.suggest] != nil) { toolbar?.open = .suggest },
         ])]
     }
 }

@@ -77,7 +77,7 @@ final class RemovalModel {
     var canRestore: Bool { controlsShown && !removedHere.isEmpty }
 
     /// The button's label (`syncRemoveUI`).
-    var toggleLabel: String { armed ? "Click a fin — Esc done" : "Remove fins" }
+    var toggleLabel: String { armed ? JS.t("Click a fin — Esc done") : JS.t("Remove fins") }
 
     // MARK: arming
 
@@ -148,7 +148,7 @@ final class RemovalModel {
             stored = FinKey(raw: "\(key.raw)~\(n)")
             n += 1
         }
-        actionName = "Remove Fin"
+        actionName = JS.t("Remove Fin")
         removed.insert(stored)
         actionName = nil
         hoveredFin = nil
@@ -159,7 +159,7 @@ final class RemovalModel {
     func restoreAll() {
         let here = removedHere
         guard !here.isEmpty else { return }
-        actionName = "Restore Fins"
+        actionName = JS.t("Restore Fins")
         removed.subtract(here.values)
         actionName = nil
         hoveredFin = nil

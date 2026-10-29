@@ -152,7 +152,7 @@ extension PlateBoard {
             if i < active { active -= 1 }
             sync()
         }
-        trashed(slots, plate: nil, index: i, text: "Deleted plate \(i + 1)", own: own)
+        trashed(slots, plate: nil, index: i, text: JS.t("Deleted plate {n}", ["n": String(i + 1)]), own: own)
     }
 
     /// Bring the last removal back: to its plate if that is still there (into its slot when the plate is empty,
@@ -220,7 +220,7 @@ extension PlateBoard {
             self?.expire()
         }
         moved = Moved(slot: m, from: src, xy: back, timer: timer)
-        toast = own ? "Moved \(name) to plate \(j + 1)" : "Moved \(name) to plate \(j + 1): it takes that plate's settings"
+        toast = JS.t(own ? "Moved {name} to plate {n}" : "Moved {name} to plate {n}: it takes that plate's settings", ["name": name, "n": String(j + 1)])
         return true
     }
 

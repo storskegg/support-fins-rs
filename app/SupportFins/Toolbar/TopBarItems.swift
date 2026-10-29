@@ -113,7 +113,7 @@ struct OverhangSlider: View {
             Slider(value: threshold, in: 30...70, step: 1, onEditingChanged: session.settingsEditing) { Text("Overhang") }
                 .frame(width: 110)
                 .accessibilityIdentifier("thr")
-                .accessibilityValue("\(Int(session.settings.threshold)) degrees")
+                .accessibilityValue(JS.t("{n} degrees", ["n": String(Int(session.settings.threshold))]))
             Text("\(Int(session.settings.threshold))°").monospacedDigit().frame(minWidth: 32, alignment: .trailing)
         }
         .help("Surface angle from the plate below which a face needs support.")

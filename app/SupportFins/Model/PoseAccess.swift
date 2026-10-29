@@ -14,7 +14,7 @@ struct PoseAccess {
 extension PoseAccess {
     /// The window's `PartSession`: the pose it holds, and a turn applied as one undo step (`applySuggestion`
     /// does `histPush()` then turns the part, `ui/suggest.js:20`).
-    static func session(_ s: PartSession, name: String = "Turn Part") -> PoseAccess {
+    static func session(_ s: PartSession, name: String = JS.t("Turn Part")) -> PoseAccess {
         PoseAccess(
             rotation: { s.pose.columnMajor },
             apply: { nine in if let pose = Pose(columnMajor: nine) { s.setPose(pose, name: name) } })

@@ -55,6 +55,62 @@ impl Json {
         out
     }
 
+    /// `JSON.stringify(value, null, 2)`: two-space indent, `"key": value`, an empty array or
+    /// object as `[]` / `{}`.
+    pub fn stringify_pretty(&self) -> String {
+        let mut out = String::new();
+        self.write_pretty(&mut out, 0);
+        out
+    }
+
+    fn write_pretty(&self, out: &mut String, depth: usize) {
+        let pad = |out: &mut String, d: usize| {
+            out.push('\n');
+            for _ in 0..d {
+                out.push_str("  ");
+            }
+        };
+        match self {
+            Json::Arr(a) if !a.is_empty() => {
+                out.push('[');
+                for (i, v) in a.iter().enumerate() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    pad(out, depth + 1);
+                    v.write_pretty(out, depth + 1);
+                }
+                pad(out, depth);
+                out.push(']');
+            }
+            Json::Obj(kv) if !kv.is_empty() => {
+                out.push('{');
+                let mut idx: Vec<(u32, &(String, Json))> = Vec::new();
+                let mut rest: Vec<&(String, Json)> = Vec::new();
+                for e in kv {
+                    match array_index(&e.0) {
+                        Some(n) => idx.push((n, e)),
+                        None => rest.push(e),
+                    }
+                }
+                idx.sort_by_key(|(n, _)| *n);
+                let ordered = idx.into_iter().map(|(_, e)| e).chain(rest);
+                for (i, (k, v)) in ordered.enumerate() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    pad(out, depth + 1);
+                    write_str(k, out);
+                    out.push_str(": ");
+                    v.write_pretty(out, depth + 1);
+                }
+                pad(out, depth);
+                out.push('}');
+            }
+            other => other.write(out),
+        }
+    }
+
     fn write(&self, out: &mut String) {
         match self {
             Json::Null => out.push_str("null"),

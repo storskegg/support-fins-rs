@@ -1,0 +1,40 @@
+{
+  "profile": "PrusaSlicer, Core One, PLA, 0.2 mm layers",
+  "coupons": {
+    "angle-coupon.stl": {
+      "minutes": 19,
+      "grams": 7.2,
+      "sha256": "0369b52ee440ebf43b6bc847876737cd7c8452715d54eeb39b8f692644d91b65"
+    },
+    "gap-coupon.3mf": {
+      "minutes": 20,
+      "grams": 7.5,
+      "sha256": "2b1925e118e4526164776d51fc57febb7eec12531ad14ac6fed9fd636c2612d7"
+    },
+    "grip-coupon.3mf": {
+      "minutes": 63,
+      "grams": 24.3,
+      "sha256": "5307efbbdadac70189c640b2371b44925ce4d4a317513ce805b3dbf5d62ae3d7"
+    },
+    "pad-coupon.3mf": {
+      "minutes": 34,
+      "grams": 11.9,
+      "sha256": "f4315932fb6d46d5721078bdd4b4dac0b3fe515c3218440ee6fb4b1b41d29e0c"
+    },
+    "cutout-coupon.3mf": {
+      "minutes": 61,
+      "grams": 24.2,
+      "sha256": "80920c112e632fcfc1bd6c8f0186d8bcc3757670198dca0931252459722565fc"
+    },
+    "bore-coupon.3mf": {
+      "minutes": 39,
+      "grams": 18.0,
+      "sha256": "011e75a42295e425daca48ab3e31392ebe86c16ffdfd4b983f233cc204c9e848"
+    },
+    "sampler-coupon.3mf": {
+      "minutes": 96,
+      "grams": 43.7,
+      "sha256": "f9596511e6870a83c19450ab658bcea3e99efa5e31e62674d1befd6f270a387e"
+    }
+  }
+}

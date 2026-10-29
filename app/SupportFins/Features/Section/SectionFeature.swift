@@ -43,8 +43,8 @@ final class SectionFeature: Feature {
         let model = f?.model
         return [MenuSection(menu: .view, order: 20, entries: [
             .divider,
-            .check("Section View",
-                   help: "Cut the view with a plane to see and draw inside the part. View only: the export is whole.",
+            .check(JS.t("Section View"),
+                   help: JS.t("Cut the view with a plane to see and draw inside the part. Drag the arrow or the sheet (or Shift + scroll) to push the cut, the rings to tilt it. Click again to turn it off. View only: the export is whole."),
                    enabled: f?.host.hasPart == true,
                    isOn: Binding(get: { model?.isOn ?? false }, set: { f?.setOn($0) })),
         ])]
