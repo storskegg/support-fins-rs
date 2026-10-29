@@ -39,7 +39,7 @@ Web-only rows:
 | `finkeys.test.js` | 6 | fins, inside, overhangs, prop, stl, ui/finkeys | M4 | not ported |
 | `fins.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green |
 | `floating.test.js` | 5 | fins, inside, overhangs, pieces, prop, stl | M3 | green |
-| `footprint.test.js` | 15 | inside, overhangs, stl, ui/footprint | M4 | not ported |
+| `footprint.test.js` | 15 | inside, overhangs, stl, ui/footprint | M6 | green |
 | `free_edge.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
 | `glfail.test.js` | 1 | inside, overhangs, stl, ui/glfail | — | dropped (web-only) |
 | `glguard.test.js` | 2 | inside, overhangs, stl, ui/glguard | — | dropped (web-only) |
@@ -64,7 +64,7 @@ Web-only rows:
 | `perp_hole.test.js` | 3 | fins, inside, overhangs, prop, stl | M3 | green (js_perp_hole.rs) |
 | `pins.test.js` | 6 | fins, inside, overhangs, prop, prop/pins, stl | M3 | green (js_pins.rs) |
 | `plate_only.test.js` | 4 | draw, fins, inside, overhangs, prop, stl | M3 | green |
-| `platerow.test.js` | 2 | inside, overhangs, stl, ui/platerow | M4 | not ported |
+| `platerow.test.js` | 2 | inside, overhangs, stl, ui/platerow | M6 | green |
 | `raster.test.js` | 4 | fins, inside, overhangs, prop, prop/raster, stl | M3 | green (js_raster.rs) |
 | `resinfoot.test.js` | 3 | fins, inside, overhangs, prop, prop/resinfoot, stl | M3 | green (js_resinfoot.rs) |
 | `rim.test.js` | 5 | fins, inside, overhangs, prop, prop/rim, stl | M3 | green (js_rim.rs) |

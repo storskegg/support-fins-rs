@@ -80,9 +80,9 @@ final class CorePart: MeshSource {
     }
 }
 
-/// `load_parts`: STL, OBJ and 3MF (one `Part` per object).
+/// `load_parts`: STL, OBJ, 3MF and STEP (one `Part` per object).
 struct CoreLoader: PartLoading {
-    struct NoFile: LocalizedError { var errorDescription: String? { "Open an STL, OBJ or 3MF file." } }
+    struct NoFile: LocalizedError { var errorDescription: String? { "Open an STL, 3MF, STEP or OBJ file." } }
     struct Unreadable: LocalizedError { var errorDescription: String? { "The file's mesh could not be shared with the GPU." } }
 
     func load(url: URL?, device: MTLDevice) async throws -> [LoadedPart] {

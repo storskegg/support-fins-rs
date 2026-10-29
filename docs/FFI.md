@@ -35,9 +35,9 @@ sources and a thin hand-written Swift layer. The app depends on that package.
 #[derive(uniffi::Object)] struct GpuBuffer;                  // Rust-owned, page-aligned
 impl GpuBuffer { fn address(&self) -> u64; fn len_bytes(&self) -> u64; fn stride(&self) -> u32; fn count(&self) -> u32; }
 
-#[derive(uniffi::Record)] struct PartInfo { name: String, triangles: u64, size: [f64; 3] /* as Vec<f64> */, notes: Vec<String> /* import notes, ui/io.js */, import_note: String /* renderImportNote: "3MF: a; b." / "OBJ: ..." / empty */, weld_ms: f64 }
+#[derive(uniffi::Record)] struct PartInfo { name: String, triangles: u64, size: [f64; 3] /* as Vec<f64> */, notes: Vec<String> /* import notes, ui/io.js */, import_note: String /* renderImportNote: "3MF: a; b." / "OBJ: ..." / "STEP: ..." / empty */, weld_ms: f64 }
 #[derive(uniffi::Object)] struct Part;                       // Arc<Topology> + source soup
-fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF (one Part per object, negative parts cut out as ui/io.js does); STEP in M6
+fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF / STEP (one Part per object, negative parts cut out as ui/io.js does). STEP (.step/.stp, or any file whose content is "ISO-10303-21;") goes through sf-step: OpenCascade 7.6.1 at 0.01 mm / 0.1 rad as web/step.js, the assembly tree picks the objects (stepObjects), names come from the file, import_note is "STEP: [imported “X” of N objects; ]tessellated at 0.01 mm." A build without OpenCascade fails the load with "STEP import is not available in this build ..."
 fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; note "merged N of TOTAL objects into one part" (TOTAL = object_count, the file's); one part returns itself
 impl Part {
   fn info(&self) -> PartInfo;
@@ -282,3 +282,39 @@ fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError>
 - **Export.** `export_with_drawn(path, parts, builds, drawn: Option<Arc<DrawnSweep>>, options_json)` is `export` with the hand-placed supports
   in the file, between the auto fins and the pad (`activeAdded()`, `web/ui/export.js`); `None` is `export`. `DrawnSweep.added_json()` is what
   the supports add to the plate: `{ volumeMm3, bounds: { min, max } | null }` (the fit check's extent and the grams receipt's volume).
+
+## M6 additions: footprints on a plate (several models, Arrange)
+
+Several models on one plate must not collide (`ui/footprint.js`, `ui/arrange.js`, `ui/models.js`, local issue 052). The
+maths is `sf_engine::footprint` (a port of `ui/footprint.js` and `ui/platerow.js`, replayed against the JS in
+`crates/sf-engine/tests/parity_footprint.rs`, with the 17 ported JS tests in `tests/js_footprint.rs`); `sf-ffi` only turns
+a part, its pose and a build into the triangles the page rasterizes, and hands grids back as objects.
+
+```rust
+#[derive(uniffi::Object)] struct Footprint;   // the 1 mm cells of the bed a model covers at any height; never empty
+impl Footprint {
+  fn bounds(&self) -> Vec<i64>;                              // x0, y0, w, h in cells
+  fn area(&self) -> u64;                                     // cells set (mm²)
+  fn placed(&self, x: f64, y: f64) -> Arc<Footprint>;        // `placed`: standing at (x, y); off the mm grid it widens
+  fn shared(&self, other: Arc<Footprint>) -> Vec<i64>;       // `shared`: the cells both cover, flat x, y pairs
+  fn shared_count(&self, other: Arc<Footprint>) -> u64;
+  fn dilate(&self, r: i64) -> Arc<Footprint>;                // `dilate`: grown r cells every way
+}
+fn footprint_of_part(part: Arc<Part>, rot: Vec<f64>, offset: Vec<f64>) -> Result<Option<Arc<Footprint>>, FfiError>;
+//   the part's mesh through the pose (9 numbers, column-major) and the seating offset (3 numbers): `partGrid`
+fn footprint_of_build(build: Arc<BuildResult>, removed: Vec<u64>) -> Option<Arc<Footprint>>;
+//   what the build adds (`rasterize(flat(activeAdded()))`): the fins less the removed record ids, and the pad, f32-rounded
+fn footprint_union(a: Option<Arc<Footprint>>, b: Option<Arc<Footprint>>) -> Option<Arc<Footprint>>;
+fn footprint_spot(others: Vec<Arc<Footprint>>, grid: Option<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Vec<f64>;
+//   `spot` (ui/models.js): where a model goes on a bx x by bed, gap mm clear of `others` (placed): the free spot nearest
+//   the centre, else past the others' right edge. Two numbers.
+fn footprint_clash_cells(placed: Vec<Arc<Footprint>>) -> Vec<i64>;   // the cells any two share (`checkOverlap`), x, y pairs
+fn plate_under(x: f64, y: f64, active: u64, count: u64, pitch: f64, bx: f64, by: f64) -> Vec<f64>;   // `plateUnder`: [plate, x, y] or []
+```
+
+`sf_engine::footprint` also has `pack` (Arrange's packing) and `drag_step` (Move's clamp, with the clash probe as a closure),
+ported and replayed, for the Move and Arrange tools to put behind the FFI when they land.
+
+`BuildResult::kept_added(removed, drawn)` (crate-internal) is what the export writes and the footprint rasterizes: the fins
+less the removed ones, the drawn walls, then the pad. `footprint_of_build` passes no drawn walls until Draw's app side lands
+(the page's `activeAdded()` counts them).

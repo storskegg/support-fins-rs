@@ -370,6 +370,7 @@ enum Kind {
     Stl,
     Obj,
     ThreeMf,
+    Step,
 }
 
 /// `lastImportMeta` (`web/ui/io.js:273-285`): what the reader had to decide, for the import note.
@@ -419,6 +420,13 @@ impl ImportMeta {
                 if objects_len > 1 {
                     head(&mut n);
                 }
+            }
+            // `parseStep` (web/ui/io.js:313-350): the pick's note, then the tessellation tolerance
+            Kind::Step => {
+                if objects_len > 1 {
+                    head(&mut n);
+                }
+                n.push("tessellated at 0.01 mm".into());
             }
             Kind::ThreeMf => {
                 if objects_len > 1 {
@@ -487,6 +495,7 @@ impl ImportMeta {
         let tag = match self.kind {
             Kind::ThreeMf => "3MF",
             Kind::Obj => "OBJ",
+            Kind::Step => "STEP",
             Kind::Stl => return String::new(),
         };
         format!("{tag}: {}.", clauses.join("; "))
@@ -571,8 +580,13 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
                     .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
             );
         }
+    } else if lower.ends_with(".step") || lower.ends_with(".stp") || sf_step::is_step(&bytes) {
+        // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
+        for o in sf_step::read_step(&bytes).map_err(format)? {
+            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Step)));
+        }
     } else {
-        return Err(format("reads .stl, .3mf and .obj only".into()));
+        return Err(format("reads .stl, .3mf, .obj and .step only".into()));
     }
     parts.retain(|(_, p, _, _, _)| !p.is_empty());
     if parts.is_empty() {

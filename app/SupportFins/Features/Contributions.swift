@@ -61,6 +61,9 @@ struct WindowToolbarItem: Identifiable {
 enum InspectorSlot: Int, CaseIterable {
     /// Above everything: the stats and status cards.
     case top
+    /// Inside the stats card (Part), after Analysis: the web's `part-btns` (Add model, Remove model). The readout
+    /// draws these, not the inspector.
+    case stats
     /// In the settings block, after Cutouts and before More settings (Remove fins).
     case basics
     /// After the settings block.
@@ -116,7 +119,7 @@ struct EscapeHandler: Identifiable {
 
 /// A menu of the menu bar. Features that name the same menu share it; menus come in `order`. A menu macOS already
 /// has (File, Edit, View, ...) is never added again: its items go into the system menu at `group` (`fileExport`: after
-/// File > New; `view`: the top of View, above Show Toolbar and Enter Full Screen). A `CommandMenu("View")` would be a
+/// File > New; `edit`: after Undo and Redo; `view`: the top of View, above Show Toolbar and Enter Full Screen). A `CommandMenu("View")` would be a
 /// second View menu next to the system's.
 struct MenuID: Hashable, Identifiable {
     var title: String
@@ -129,13 +132,14 @@ struct MenuID: Hashable, Identifiable {
     enum SystemGroup: Hashable, CaseIterable {
         /// File, after New.
         case afterNewItem
+        /// Edit, after Undo and Redo.
+        case afterUndoRedo
         /// View, before the toolbar items.
         case beforeToolbar
     }
 
     /// A menu of the app's own, added to the bar (`CommandMenu`).
     var isOwnMenu: Bool { group == nil }
-    var isFileGroup: Bool { group == .afterNewItem }
 
     /// The menus macOS (and SwiftUI's document app) already put in the bar: a feature menu with one of these titles
     /// must fill a `group` of it, not add a menu of the same name.
@@ -144,6 +148,8 @@ struct MenuID: Hashable, Identifiable {
     static let view = MenuID(title: "View", order: 0, group: .beforeToolbar)
     static let model = MenuID(title: "Model", order: 10)
     static let fileExport = MenuID(title: "File", order: 100, group: .afterNewItem)
+    /// Items after Undo and Redo in the Edit menu (Remove Model from Plate).
+    static let edit = MenuID(title: "Edit", order: 110, group: .afterUndoRedo)
 }
 
 /// A run of one menu's entries from one feature. Sections of a menu come in `order`, so a feature's items sit

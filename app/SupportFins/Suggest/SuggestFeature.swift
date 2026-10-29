@@ -22,6 +22,10 @@ final class SuggestFeature: Feature {
         registerTools(in: host.toolbar)
     }
 
+    func modelState() -> Any? { model?.kept.map { Kept(result: $0.result, picked: $0.picked) } }
+    func restoreModelState(_ state: Any) { if let k = state as? Kept { model?.restore(k.result, picked: k.picked) } }
+    private struct Kept { var result: SuggestResult; var picked: Int? }
+
     func registerTools(in toolbar: ToolbarRegistry) {
         guard let controller = host.controller, let suggest = model else { toolbar.unregister(.suggest); return }
         toolbar.register(.suggest) { [host] in

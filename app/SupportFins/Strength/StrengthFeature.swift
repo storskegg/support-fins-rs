@@ -22,9 +22,13 @@ final class StrengthFeature: Feature {
             strength.threshold = controller.thresholdDegrees
             strength.loadChanged = { [weak controller] in controller?.loadDirection = $0.map { SIMD3<Float>(Float($0.x), Float($0.y), Float($0.z)) } }
         }
+        host.controller?.loadDirection = nil          // a new model has no load of its own
         model = strength
         registerTools(in: host.toolbar)
     }
+
+    func modelState() -> Any? { model?.loadLocal }
+    func restoreModelState(_ state: Any) { if let load = state as? SIMD3<Double> { model?.restore(load: load) } }
 
     func registerTools(in toolbar: ToolbarRegistry) {
         guard host.controller != nil, let strength = model else { toolbar.unregister(.strength); return }

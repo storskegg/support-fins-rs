@@ -58,8 +58,10 @@ class PartWindowUITestCase: XCTestCase {
 
     /// Launch with nothing open, open the fixture part through the Open panel (⇧⌘G to its path) and wait for its window:
     /// exactly one part window.
-    func openFixturePart() throws {
-        let part = try writeFixtureSTL()
+    func openFixturePart() throws { try openPart(writeFixtureSTL()) }
+
+    /// Launch with nothing open, open `part` (any file the Open panel takes) and wait for its window: exactly one.
+    func openPart(_ part: URL, timeout: TimeInterval = 20) throws {
         self.part = part
         app.launch()
         // the document app shows its Open panel at launch; nothing is restored
@@ -68,7 +70,7 @@ class PartWindowUITestCase: XCTestCase {
         if !panel { app.typeKey("o", modifierFlags: .command) }
         XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
         chooseInPanel(part.path)
-        XCTAssertTrue(partWindow.waitForExistence(timeout: 20), "the part's window opened")
+        XCTAssertTrue(partWindow.waitForExistence(timeout: timeout), "the part's window opened")
         XCTAssertEqual(partWindows.count, 1, "one part window")
     }
 
@@ -81,6 +83,13 @@ class PartWindowUITestCase: XCTestCase {
             app.typeKey("w", modifierFlags: .command)
             _ = waitUntil(timeout: 5) { !w.exists }
         }
+    }
+
+    /// A static text's string: its value, or its label when the value is empty.
+    func text(_ e: XCUIElement) -> String {
+        guard e.exists else { return "" }
+        if let v = e.value as? String, !v.isEmpty { return v }
+        return e.label
     }
 
     // MARK: waiting
@@ -186,13 +195,16 @@ class PartWindowUITestCase: XCTestCase {
     // MARK: the fixture
 
     /// A binary STL: a 10 mm stem under a 60 mm slab, so there is an overhang to put fins under.
-    func writeFixtureSTL() throws -> URL {
+    func writeFixtureSTL() throws -> URL { try writeSTL("bracket.stl", slab: 30) }
+
+    /// A binary STL named `name` in `dir`: a 10 mm stem under a slab of half-width `slab` mm.
+    func writeSTL(_ name: String, slab: Float) throws -> URL {
         func box(_ x0: Float, _ x1: Float, _ y0: Float, _ y1: Float, _ z0: Float, _ z1: Float) -> [[Float]] {
             let v: [[Float]] = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]]
             let faces = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]]
             return faces.map { f in f.flatMap { v[$0] } }
         }
-        let tris = box(-5, 5, -5, 5, 0, 20) + box(-30, 30, -30, 30, 20, 24)
+        let tris = box(-5, 5, -5, 5, 0, 20) + box(-slab, slab, -slab, slab, 20, 24)
         var data = Data(count: 80)
         var count = UInt32(tris.count)
         withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
@@ -200,7 +212,7 @@ class PartWindowUITestCase: XCTestCase {
             for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
             data.append(contentsOf: [0, 0])
         }
-        let url = dir.appending(path: "bracket.stl")
+        let url = dir.appending(path: name)
         try data.write(to: url)
         return url
     }

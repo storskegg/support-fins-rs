@@ -76,6 +76,19 @@ final class SuggestModel {
         if !same { picked = nil }
     }
 
+    /// The ranking on show and the row picked, kept with a parked model (`suggestState`, `ui/suggest.js`).
+    var kept: (result: SuggestResult, picked: Int?)? {
+        if case .ready(let r) = state, !r.rows.isEmpty { return (r, picked) }
+        return nil
+    }
+
+    /// Put a kept ranking back once its model is on show again (`restoreSuggestions`).
+    func restore(_ result: SuggestResult, picked: Int?) {
+        wanted = nil
+        state = .ready(result)
+        self.picked = picked
+    }
+
     /// A new part, an undo or a reset clears the ranking, and one still running is dropped.
     func reset() {
         wanted = nil
