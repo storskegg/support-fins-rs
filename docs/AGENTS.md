@@ -27,7 +27,7 @@ you start a ticket, and again whenever a review sends you back.
    ```
    Do all your work, builds and commits inside that directory.
 
-   **Heavy runs take the machine lock.** `app-test`, `app-uitest` and every `bench-*` recipe go
+   **Heavy runs take the machine lock.** `app-test`, `app-uibuild`, `app-uitest` and every `bench-*` recipe go
    through `tools/lock/lock.py`: one at a time on the Mac, whichever worktree starts them. If it
    prints "waiting for <holder>", wait; never work around it, and never wait for the load to drop
    (the Mac idles around 3). Benchmarks record the load before and during the run.
@@ -38,7 +38,10 @@ you start a ticket, and again whenever a review sends you back.
 
    **UI tests (`app-uitest`) are the orchestrator's only.** They take over the user's mouse and
    keyboard, and `FinsLoopUITests` is flaky under heavy load (a hit point while scrolling, `FinsLoopUITests.swift:51`; the lock exists partly to prevent that), so no agent runs them and `just gate` leaves them out. The headless
-   `EndToEndTests` in `app-test` covers the same loop.
+   `EndToEndTests` in `app-test` covers the same loop. **Do compile them:** `just app-uibuild`
+   (`xcodebuild build-for-testing` of the SupportFinsUI scheme, derived data in your worktree's `.dd-ui`)
+   drives nothing, and `just gate` runs it with the app gates, so add and extend UI tests freely, but a
+   UI test that doesn't compile fails the gate.
 
    **After merges the orchestrator runs `just tidy --apply`** to remove worktrees whose work is
    on GitHub. Don't delete your own worktree; say in your report when you're done with it.
