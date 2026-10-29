@@ -43,7 +43,7 @@ you start a ticket, and again whenever a review sends you back.
    drives nothing, and `just gate` runs it with the app gates, so add and extend UI tests freely, but a
    UI test that doesn't compile fails the gate. Every UI test subclasses `PartWindowUITestCase`
    (`app/SupportFinsUITests`): launch with nothing restored, `openFixturePart()`, `element(_:)` scoped to
-   the part's window, `scrollIntoView(_:)` instead of scrolling over a row, `waitForFile` for exports,
+   the part's window (`popoverElement(_:)` for a toolbar popover's), `scrollIntoView(_:)` instead of scrolling over a row, `waitForFile` for exports,
    `menuBarItem(_:)` for menus. Don't find elements app-wide or click by screen coordinates.
 
    **After merges the orchestrator runs `just tidy --apply`** to remove worktrees whose work is

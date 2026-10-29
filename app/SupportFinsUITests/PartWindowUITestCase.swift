@@ -56,6 +56,10 @@ class PartWindowUITestCase: XCTestCase {
     /// window's: query those from `app`.
     func element(_ id: String) -> XCUIElement { partWindow.descendants(matching: .any)[id].firstMatch }
 
+    /// An element of a toolbar popover (a popover is a window of its own, which may not sit under the part's window
+    /// in the accessibility tree): looked up in the app's popovers.
+    func popoverElement(_ id: String) -> XCUIElement { app.popovers.descendants(matching: .any)[id].firstMatch }
+
     /// Launch with nothing open, open the fixture part through the Open panel (⇧⌘G to its path) and wait for its window:
     /// exactly one part window.
     func openFixturePart() throws { try openPart(writeFixtureSTL()) }
