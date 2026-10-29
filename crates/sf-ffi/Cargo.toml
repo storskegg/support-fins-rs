@@ -24,6 +24,7 @@ uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]
 sf-testkit.workspace = true
+parity = { path = "../../parity" }
 
 [lints]
 workspace = true

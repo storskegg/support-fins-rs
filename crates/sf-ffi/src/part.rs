@@ -283,12 +283,15 @@ fn threshold(deg: f64) -> Result<f64, FfiError> {
 
 #[uniffi::export]
 impl Part {
-    /// This part scaled uniformly by `factor` about the centre of its box (`setScale`, `web/ui/scale.js:41-65`:
-    /// `scaleAbout(base.pos, s, [0, 0, 0], centre)` on the centred geometry is `centre + s * (p - centre)` on the
-    /// file-frame positions kept here), welded afresh. Call it on the part as loaded, never on a scaled one, so
-    /// every scale is taken from 100 % and never compounded. A slicer's own parts scale with it about the same
-    /// centre, so the 3MF export still puts them where the part is; the colours, the notes and the name are
-    /// the part's.
+    /// This part scaled uniformly by `factor` about the centre of its box (`setScale`, `web/ui/scale.js:41-65`),
+    /// welded afresh. Call it on the part as loaded, never on a scaled one, so every scale is taken from 100 %
+    /// and never compounded. The positions take the page's two f32 roundings, exactly: `setPart` centres the
+    /// loaded `Float32Array` (`web/ui/part.js:81-90`: the centre is `(min + max) / 2` in f64 of the box, each
+    /// position stored as `f32(p - centre)`), then `scaleAbout(centred, s, [0, 0, 0], centre)` stores
+    /// `f32(centre + s * centred)`. (`setPart` centres that result once more for the page; the Rust part stays in
+    /// the file frame, as the load does, so that last translation is not made.) A slicer's own parts are scaled
+    /// from the uncentred file frame, `scaleAbout(positions, s, centre)`, one rounding, as `scale.js:56-58` does;
+    /// the colours, the notes and the name are the part's.
     pub fn scaled(&self, factor: f64) -> Arc<Part> {
         let (lo, hi) = bbox(&self.topo.pos);
         let c = [
@@ -296,7 +299,14 @@ impl Part {
             (lo[1] + hi[1]) / 2.0,
             (lo[2] + hi[2]) / 2.0,
         ];
-        let positions = scale_about(&self.topo.pos, factor, c, c);
+        let centred: Vec<f64> = self
+            .topo
+            .pos
+            .iter()
+            .enumerate()
+            .map(|(i, p)| ((p - c[i % 3]) as f32) as f64)
+            .collect();
+        let positions = scale_about(&centred, factor, [0.0; 3], c);
         let slicer = self.slicer.as_ref().map(|sl| Slicer {
             positions: scale_about(&sl.positions, factor, c, c),
             colors: sl.colors.clone(),

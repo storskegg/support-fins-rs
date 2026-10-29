@@ -46,7 +46,7 @@ impl Part {
   fn mesh(&self) -> Arc<GpuBuffer>;                          // interleaved position+normal, f32, model frame
   fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> AnalysisSummary;   // rot: 9, column-major
   fn face_flags(&self, threshold_deg: f64, rot: Vec<f64>) -> Arc<GpuBuffer>; // u8 per face: over/kept/on_bed bits
-  fn scaled(&self, factor: f64) -> Arc<Part>;                // M6 Scale (ui/scale.js setScale): uniform scale about the box centre, welded afresh; slicer parts scale with it, colours/notes/name kept. Call it on the part as loaded (never on a scaled one: no compounding)
+  fn scaled(&self, factor: f64) -> Arc<Part>;                // M6 Scale (ui/scale.js setScale): uniform scale about the box centre with the page's two f32 roundings (centred `f32(p - c)`, then `f32(c + s * centred)`; exact vs the oracle `parity/oracle/setscale.js`), welded afresh; slicer parts scale with it, colours/notes/name kept. Call it on the part as loaded (never on a scaled one: no compounding)
 }
 #[derive(uniffi::Record)] struct AnalysisSummary { over_area: f64, bed_area: f64, over_face_count: u64, region_count: u64, offset: Vec<f64>, size: Vec<f64> }
 
