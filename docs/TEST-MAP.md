@@ -40,6 +40,7 @@ Web-only rows:
 | `fins.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green |
 | `floating.test.js` | 5 | fins, inside, overhangs, pieces, prop, stl | M3 | green |
 | `footprint.test.js` | 15 | inside, overhangs, stl, ui/footprint | M6 | green |
+| `end_rows.test.js` | 3 | fins, inside, overhangs, prop, prop/endrows, stl | M3 (catch-up to 23039e2) | green (sf-engine/tests/js_end_rows.rs) |
 | `free_edge.test.js` | 5 | fins, inside, overhangs, prop, stl | M3 | green |
 | `glfail.test.js` | 1 | inside, overhangs, stl, ui/glfail | — | dropped (web-only) |
 | `glguard.test.js` | 2 | inside, overhangs, stl, ui/glguard | — | dropped (web-only) |
@@ -103,7 +104,8 @@ Web-only rows:
 | `viewpresets.test.js` | 7 | inside, overhangs, stl, ui/viewpresets | M4 | not ported |
 | `wedge_clear.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green |
 | `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
-| `part_wall_ends.test.js` | 1 | prop/attached | M3 (catch-up to 299ef49) | green |
+| `part_wall_ends.test.js` | 2 | prop/attached, draw | M3 (catch-up to 299ef49, 23039e2) | green (sf-engine/tests/js_part_wall_ends.rs; the drawn-wall case is the 23039e2 catch-up) |
+| `part_wall_ends_i18n.test.js` | 1 |  | M7 (catch-up to 23039e2) | green (app/SupportFinsTests/LocalizationTests.swift `sideWallRefusal`: the page's `web/i18n/*.js` is the app's String Catalog) |
 | `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | 3 of 4 ported (sf-io/tests/js_report.rs); the locale case is the page's i18n (M7) |
 | `plugins/cli/tests/cli.test.js` | 17 | plugins/cli, plugins/shared/engine | M3 | 17 of 17 ported (sf-cli/tests/cli.rs); the negative-part cut (#104) is `sf-cut` |
 | `plugins/cli/tests/project.test.js` | 68 | plugins/cli/project* | M3 | 68 of 68 ported (sf-cli/tests/project.rs); the six "never falls back" cases are one test, and the killed-subprocess case polls the real binary for its first checkpoint instead of stopping it at a hook |

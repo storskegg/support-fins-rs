@@ -4,8 +4,8 @@
 //   splitRegion  args: [topo, faces, rot]                                out: [{faces, area}]
 //   tubeLine     args: [topo, faces, rot, pts, regionTris, step?]        out: [[[x,y,z]...]...] | null
 //   patchTracks  args: [pts, patchTris, step?, support?, span?, axis?, turn?]
-//                support: null or {topo: {$topo}, rot, offset, sway}
-//                out (direct): {lines, spacing, turned}  (the JS array's `spacing` / `turned` properties;
+//                support: null or {topo: {$topo}, rot, offset, sway, rowsOnly?}
+//                out (direct): {lines, spacing, turned, flushable}  (the JS array's `spacing` / `turned` properties;
 //                              `spacing` is undefined and `lines` empty on the early returns)
 //                out (captured): the bare array of tracks (the capture cannot carry the properties)
 //   *.soup       args: [pos (Float32Array), thresholdDeg, rot, ...] of a synthetic part; the replay
@@ -20,7 +20,7 @@ const PROP = cfgMods.PROP;
 
 const cases = { splitRegion: [], tubeLine: [], patchTracks: [] };
 const soup = { splitRegion: [], tubeLine: [], patchTracks: [] };
-const asTracks = (t) => ({ lines: Array.from(t, (l) => l), spacing: t.spacing, turned: t.turned });
+const asTracks = (t) => ({ lines: Array.from(t, (l) => l), spacing: t.spacing, turned: t.turned, flushable: t.flushable });
 
 for (const name of REGION_MODELS) {
   for (const deg of REGION_POSES) {
@@ -34,8 +34,8 @@ for (const name of REGION_MODELS) {
         if (step !== undefined) { a.push(step); real.push(step); }
         cases.tubeLine.push({ id: `${tag}|s${step}`, args: [...a, cfgRef("PROP")], out: tubeLine(...real) });
       }
-      const sup = (sway) => ({ topo: topoRef(name), rot: r.rot, offset: r.offset, sway });
-      const real = (sway) => ({ topo: r.topo, rot: r.rot, offset: r.offset, sway });
+      const sup = (sway, rowsOnly) => ({ topo: topoRef(name), rot: r.rot, offset: r.offset, sway, ...(rowsOnly ? { rowsOnly } : {}) });
+      const real = (sway, rowsOnly) => ({ topo: r.topo, rot: r.rot, offset: r.offset, sway, ...(rowsOnly ? { rowsOnly } : {}) });
       const variants = {
         defaults: [[r.pts, r.tris], [r.pts, r.tris]],
         sup: [[r.pts, r.tris, 1, sup(false), 12], [r.pts, r.tris, 1, real(false), 12]],
@@ -44,6 +44,10 @@ for (const name of REGION_MODELS) {
         dense: [[r.pts, r.tris, 0.75, sup(false), 4], [r.pts, r.tris, 0.75, real(false), 4]],
         axisX: [[r.pts, r.tris, 1, null, 12, [1, 0]], [r.pts, r.tris, 1, null, 12, [1, 0]]],
         axisY: [[r.pts, r.tris, 1, sup(false), 12, [0, 1]], [r.pts, r.tris, 1, real(false), 12, [0, 1]]],
+        // rowsOnly: the mid-strip rows kept and the flush end rows only flagged (`flushable`), for the race
+        offer: [[r.pts, r.tris, 1, sup(false, true), 12], [r.pts, r.tris, 1, real(false, true), 12]],
+        offerSparse: [[r.pts, r.tris, 2, sup(false, true), 40], [r.pts, r.tris, 2, real(false, true), 40]],
+        offerSway: [[r.pts, r.tris, 1.5, sup(true, true), 8], [r.pts, r.tris, 1.5, real(true, true), 8]],
         noturn: [[r.pts, r.tris, 1, sup(false), 12, null, false], [r.pts, r.tris, 1, real(false), 12, null, false]],
       };
       for (const [vtag, [shown, run]] of Object.entries(variants)) {

@@ -17,6 +17,7 @@ fn axis_of(parts: &[Vec<[f64; 3]>], step: f64) -> sf_engine::prop::bridge::FlatR
         rot: &IDENTITY3,
         offset: &res.offset,
         sway: false,
+        rows_only: false,
     };
     flat_run_axis(&pts, &tris, step, Some(&sup), &Config::default())
 }
@@ -50,6 +51,7 @@ fn a_footprint_with_no_extent_is_the_old_rule_even_with_a_part() {
         rot: &IDENTITY3,
         offset: &res.offset,
         sway: false,
+        rows_only: false,
     };
     let tris = sf_engine::tris::Tris::new(vec![]);
     let line_x = [[0.0, 0.0, 1.0], [5.0, 0.0, 1.0]];

@@ -60,7 +60,8 @@ function rng(seed) {
   let s = seed >>> 0;
   return () => ((s = Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x9e3779b9 >>> 0) / 2 ** 32);
 }
-const TAGS = ["raster", "circular", "rim", "downhill", "curved"];
+const TAGS = ["raster", "circular", "rim", "downhill", "curved", "flush"];
+const RACE_TAGS = TAGS.slice(0, 5);   // the draws below pick from the old five: the flush tag is set after them
 
 /** The walls of one pass, scripted around the real overhang faces. */
 function mkPass(r, faces, nRegions, capLen, kind, opts) {
@@ -112,7 +113,7 @@ for (let seed = 1; seed <= 320; seed++) {
       faces.push([cx, cy, cz, p.topo.area[f], ri, f]);
     }
   });
-  const tag = TAGS[pick(TAGS.length)];
+  let tag = RACE_TAGS[pick(RACE_TAGS.length)];
   const capOn = r() < 0.5;
   const capLen = capOn ? 6 + pick(6) : null;
   const normal = mkPass(r, faces, nR, capLen, "n", { maxPerRegion: 2 });
@@ -129,6 +130,10 @@ for (let seed = 1; seed <= 320; seed++) {
               sagRegions: r() < 0.3 ? [pick(nR)] : null,
               leaderOf: r() < 0.25 && nR > 1 ? Object.fromEntries(Array.from({ length: nR }, (_, i) => [i, pick(nR)]).map(([i, l]) => [i, l <= i ? l : i])) : null },
   };
+  // the end-row race's two extras (prop/raster.js `alone`, `hold`), drawn last so the cases above stay as they were
+  scenario.alone = r() < 0.2;
+  scenario.hold = r() < 0.2 ? "bigWalls" : null;
+  if (scenario.alone && r() < 0.6) scenario.tag = tag = "flush";
   cases.raceAgainst.push({ id: `seed${seed}|${name}|r${deg.join(",")}|${tag}`,
     args: [topoRef(name), analysisRef(name, 45, p.rot), p.rot, scenario, cfgRef("PROP")], out: runRace(p, scenario) });
 }
@@ -165,7 +170,8 @@ export function runRace(p, s) {
   let raced;
   try {
     raced = raceAgainst(topo, res, rot, opts, normal, s.capFrom, pass, s.tag, s.maxGrow, s.rel, lenient, s.equivalent,
-      { tried: s.tried ? new Set(s.tried) : null, ruler, price: s.price });
+      { tried: s.tried ? new Set(s.tried) : null, ruler, price: s.price, alone: !!s.alone,
+        hold: s.hold === "bigWalls" ? (qa, qb, ri) => qa.some((q) => q.volume > 20) && qb.length > ri % 2 : undefined });
   } finally {
     const cap = globalThis.__TINECAP;
     globalThis.__TINECAP = undefined;

@@ -50,6 +50,12 @@ fn tracks_value(t: &Tracks) -> Value {
             t.turned
                 .map_or(Value::Null, |a| Value::Arr(vec![a[0].into(), a[1].into()])),
         ),
+        // set with `spacing` on the full path only; the early returns have neither
+        (
+            "flushable".into(),
+            t.spacing
+                .map_or(Value::Undefined, |_| Value::Bool(t.flushable)),
+        ),
     ])
 }
 
@@ -250,11 +256,15 @@ fn pt_run(a: &[Resolved]) -> Tracks {
             let rot = rot3(get("rot").plain());
             let offset = xyz(get("offset").plain());
             let sway = matches!(get("sway").plain(), Value::Bool(true));
+            let rows_only = o
+                .iter()
+                .any(|(n, v)| n == "rowsOnly" && matches!(v.plain(), Value::Bool(true)));
             let sup = Support {
                 topo: &topo,
                 rot: &rot,
                 offset: &offset,
                 sway,
+                rows_only,
             };
             patch_tracks(
                 &pts,
@@ -290,6 +300,10 @@ fn patch_tracks_captured() {
             unreachable!()
         };
         props.remove(0); // `lines`: the array's items
+        // (JS assigns `flushable` before `turned`)
+        let ti = props.iter().position(|(k, _)| k == "turned").unwrap();
+        let fi = props.iter().position(|(k, _)| k == "flushable").unwrap();
+        props.swap(ti, fi);
         // `turned` is `undefined` on the empty-footprint return and `null` otherwise
         if let Some(Value::ArrProps(_, want)) = &c.out
             && let Some((_, wv)) = want.iter().find(|(k, _)| k == "turned")
@@ -327,6 +341,7 @@ fn patch_tracks_soup() {
             rot: &rot,
             offset: &res.offset,
             sway: false,
+            rows_only: false,
         };
         let support = matches!(c.args[5], Value::Str(_)).then_some(&sup);
         let got = patch_tracks(&pts, &tris, step, support, span, None, true, &cfg);

@@ -271,8 +271,9 @@ impl DrawKit {
         Ok(self.wall(a, b, &opts, true))
     }
 
-    /// `placeWall`'s check (web/ui/walls.js:316-324): the wall as `drawnWall` builds it with no options
-    /// but `through`; refused, it says why (and nothing is stored).
+    /// `placeWall`'s check (web/ui/walls.js:437-444): the wall as `drawnWall` builds it with no options
+    /// but `through` and the topology (a wall whose ends sit against a side wall is refused here);
+    /// refused, it says why (and nothing is stored).
     pub fn check_wall(
         &self,
         a: Vec<f64>,
@@ -281,8 +282,13 @@ impl DrawKit {
     ) -> Result<Arc<DrawnGhost>, FfiError> {
         let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
         let m = m.map(|m| v3(&m, "m")).transpose()?;
+        // (with the topology, so a wall the rebuild will refuse for its ends against a side wall
+        // is refused here, not listed as failed)
         let opts = DrawOpts {
             through: m,
+            topo: Some(self.part.topology()),
+            rot: Some(self.rot),
+            offset: Some(self.analysis.offset),
             ..Default::default()
         };
         Ok(self.wall(a, b, &opts, false))

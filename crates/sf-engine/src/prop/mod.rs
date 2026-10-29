@@ -13,6 +13,7 @@ pub mod crest;
 pub mod ctx;
 pub mod curved;
 pub mod downhill;
+pub mod endrows;
 pub mod judge;
 pub mod lattice;
 pub mod mold;

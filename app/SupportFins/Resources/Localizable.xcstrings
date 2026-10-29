@@ -8827,41 +8827,6 @@
         }
       }
     },
-    "Opening the 3MF, Bambu Studio and PrusaSlicer may note it has “no config” and load the geometry only — that’s expected. The file is pure geometry with no slicer profile baked in, so it opens the same in every slicer; your part comes in correctly oriented and sized. Just slice with supports off." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beim Öffnen der 3MF-Datei weisen Bambu Studio oder PrusaSlicer evtl. darauf hin, dass keine Konfiguration enthalten ist – das ist normal. Die Datei enthält reine Geometrie und öffnet in jedem Slicer korrekt ausgerichtet und skaliert. Einfach mit deaktivierten Stützen slicen."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开 3MF 时，Bambu Studio 和 PrusaSlicer 可能提示「无配置」并只加载几何——这是正常的。该文件是纯几何，不含切片配置，因此在每个切片软件中打开时朝向和尺寸都正确。切片时关闭支撑即可。"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ao abrir o 3MF, o Bambu Studio e o PrusaSlicer podem avisar que ele “não tem configuração” e carregar só a geometria — é esperado. O arquivo é só geometria, sem perfil de fatiador embutido, então abre igual em qualquer fatiador; a peça entra na orientação e no tamanho certos. É só fatiar com os suportes desligados."
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "عند فتح ملف 3MF، قد يشير Bambu Studio وPrusaSlicer إلى أنه «no config» ويحمّلان الهندسة فقط — وهذا متوقع. الملف يحتوي على بيانات هندسية فقط، من دون ملف تعريف لبرنامج التقطيع مضمّن فيه، لذا يُفتح بالطريقة نفسها في كل برنامج تقطيع؛ وتصل قطعتك بالوضعية والمقاس الصحيحين. قم بالتقطيع مع إيقاف الدعامات فقط."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bij het openen van het 3MF-bestand kunnen Bambu Studio en PrusaSlicer melden dat er ‘geen configuratie’ is en alleen de geometrie laden — dat is normaal. Het bestand bevat alleen geometrie, zonder ingebouwd slicerprofiel, en opent daarom in elke slicer op dezelfde manier; je onderdeel heeft de juiste oriëntatie en afmetingen. Slice het gewoon met supports uitgeschakeld."
-          }
-        }
-      }
-    },
     "Opens a GitHub issue filled in with this build’s settings and numbers (not your model: attach it there if you can)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11368,6 +11333,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Alles tonen"
+          }
+        }
+      }
+    },
+    "See all releases" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Versionen ansehen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看所有版本"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver todas as versões"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عرض كل الإصدارات"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle releases bekijken"
           }
         }
       }
@@ -14620,6 +14620,41 @@
         }
       }
     },
+    "Version" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإصدار"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versie"
+          }
+        }
+      }
+    },
     "Vertical (resin)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14931,6 +14966,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wanden hoger dan deze hoogte krijgen ribben aan beide zijden. Minimaal 5 cm, standaard 10 cm."
+          }
+        }
+      }
+    },
+    "What's new" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was ist neu"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新功能"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novidades"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ما الجديد"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wat is er nieuw"
           }
         }
       }
@@ -20277,6 +20347,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "perto demais da peça — o pé da parede cortaria a peça; desenhe a linha um pouco mais para fora"
+          }
+        }
+      }
+    },
+    "too close to the part’s side wall — draw the line a little further from it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "zu nah an der Seitenwand des Teils — zeichne die Linie etwas weiter davon entfernt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离零件侧壁太近 —— 请把线画得离它远一点"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "perto demais da parede lateral da peça — desenhe a linha um pouco mais longe dela"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قريب جدًا من الجدار الجانبي للقطعة — ارسم الخط بعيدًا عنه قليلًا"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "te dicht bij de zijwand van het onderdeel — teken de lijn iets verder ervandaan"
           }
         }
       }

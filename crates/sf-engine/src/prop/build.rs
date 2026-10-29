@@ -172,6 +172,8 @@ pub struct PropRecord {
     pub rim: Option<bool>,
     pub downhill: Option<bool>,
     pub curved: Option<bool>,
+    /// The flush end rows' race tag (prop/endrows.js, `q.flush`).
+    pub flush: Option<bool>,
     /// `fill: true`: a wall of the fill pass (web/fins.js `withFill`). JS gives it only `tines`, `span`,
     /// `height`, `line`, `triRanges`, `partAttached` and `squat` of the keys above; the rest is
     /// this record's default.
@@ -196,6 +198,9 @@ pub struct PropsPass {
     pub sag_risk: bool,
     /// `sagRegions`: only a raster pass has it.
     pub sag_regions: Option<IndexSet<usize>>,
+    /// `flushable`: the regions whose free edges the flush end rows would move (a rows-only
+    /// pass flags them; prop/endrows.js).
+    pub flushable: Vec<usize>,
     /// `leaderOf`: only a traced (curved) pass has it. Region -> its group's leader.
     pub leader_of: Option<IndexMap<usize, usize>>,
     pub volume: f64,
@@ -288,6 +293,8 @@ pub struct Tally {
     pub tines: usize,
     pub sag_risk: bool,
     pub sag_regions: IndexSet<usize>,
+    /// `flushable`: regions with a free edge the flush rows would move (rows-only passes).
+    pub flushable: IndexSet<usize>,
 }
 
 /// `opts.rasterVeto(q, normalProps)` (auto mode: fins/wedges.js `wedgeVeto`).
@@ -326,6 +333,10 @@ pub struct BuildOpts {
     pub plate_only: bool,
     /// `opts.shortWalls === true` (the last-resort pass).
     pub short_walls: bool,
+    /// `opts.endRows === false` builds the flush layout everywhere with no race (as before it).
+    pub end_rows: Option<bool>,
+    /// `opts.rowsOnly`: the mid-strip rows with the flush candidate only flagged (`flushable`).
+    pub rows_only: bool,
     /// `opts.onlyRegions`: build these regions only.
     pub only_regions: Option<IndexSet<usize>>,
     /// `opts.downhillRegions`: the downhill pass over these regions.
@@ -650,6 +661,7 @@ pub(crate) fn build_pass(
         rot,
         offset: off,
         sway: opts.sway_on,
+        rows_only: opts.rows_only,
     };
 
     // The support unit is the locally-straight sub-patch, not the connected region -- see
@@ -969,8 +981,12 @@ pub(crate) fn build_pass(
                 true,
                 cfg,
             );
+            let flushable = tr.flushable;
             lines = lines_of(tr.lines, tr.spacing, tr.turned);
             race.turned(&acc, i, &lines, &mut patches, ctx);
+            if flushable {
+                acc.tally.flushable.insert(patch.region);
+            }
             // Rim walls (prop/rim.js): for the regions in `opts.rimRegions` only -- the race in
             // buildProps decides -- a wall along the patch's free outline, the rows stopped short
             // of it.
@@ -1098,6 +1114,7 @@ pub(crate) fn build_pass(
         tines: acc.tally.tines,
         sag_risk: acc.tally.sag_risk,
         sag_regions: raster.map(|_| acc.tally.sag_regions.clone()),
+        flushable: acc.tally.flushable.iter().copied().collect(),
         leader_of: traced.map(|t| t.leader_of),
         props: acc.props,
         skipped: acc.skipped,
@@ -1555,7 +1572,80 @@ pub fn build_props(
         base
     } else {
         let compute_base = || -> PropsPass {
-            let normal = build_pass(topo, result, rot, opts, None, ctx);
+            // Flush end rows (prop/endrows.js) are a candidate: this base lays the mid-strip rows
+            // and flags the regions whose free edges the candidate would move (`flushable`).
+            let racing = opts.raster != Some(false) && opts.end_rows != Some(false);
+            let rows = build_pass(
+                topo,
+                result,
+                rot,
+                &BuildOpts {
+                    rows_only: racing,
+                    ..opts.clone()
+                },
+                None,
+                ctx,
+            );
+            let normal = if !racing || rows.flushable.is_empty() {
+                rows
+            } else {
+                // (the wedge veto guards raster walls, not these)
+                let flush_opts = BuildOpts {
+                    raster_veto: None,
+                    ..opts.clone()
+                };
+                let ruler = judge_ruler(topo, result, rot, &judge_cache, cfg);
+                // rows that serve a patch the flush layout leaves to a wedge drop that wedge
+                // (it grips from the bed): the flush layout stays (fins/wedges.js wedgeVeto)
+                let hold = |qa: &[&PropRecord], qb: &[&PropRecord], ri: usize| -> bool {
+                    let Some(veto) = &opts.raster_veto else {
+                        return false;
+                    };
+                    let after: Vec<PropRecord> = rows
+                        .props
+                        .iter()
+                        .filter(|q| q.region != Some(ri))
+                        .cloned()
+                        .chain(qb.iter().map(|q| (*q).clone()))
+                        .collect();
+                    qa.iter().any(|q| veto(q, &after))
+                };
+                // (`equivalent` and no price: a tie on the judge keeps the flush layout, as
+                // before the race -- only a layout the judge scores higher swaps away from it)
+                let flushable: IndexSet<usize> = rows.flushable.iter().copied().collect();
+                race_against(
+                    topo,
+                    result,
+                    rot,
+                    &flush_opts,
+                    rows.clone(),
+                    cap_from,
+                    &|regions| {
+                        build_pass(
+                            topo,
+                            result,
+                            rot,
+                            &BuildOpts {
+                                only_regions: Some(regions.clone()),
+                                ..opts.clone()
+                            },
+                            None,
+                            ctx,
+                        )
+                    },
+                    RaceTag::Flush,
+                    RaceArgs {
+                        rel: 0.0,
+                        equivalent: true,
+                        tried: Some(flushable),
+                        ruler: Some(&ruler),
+                        hold: opts.raster_veto.is_some().then_some(&hold),
+                        alone: true,
+                        ..Default::default()
+                    },
+                    ctx,
+                )
+            };
             let raster_base = if opts.raster == Some(false) {
                 normal
             } else {

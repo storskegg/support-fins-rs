@@ -276,6 +276,8 @@ pub enum RaceTag {
     Rim,
     Downhill,
     Curved,
+    /// The flush end rows' race (prop/endrows.js).
+    Flush,
 }
 
 impl RaceTag {
@@ -286,6 +288,7 @@ impl RaceTag {
             RaceTag::Rim => &mut q.rim,
             RaceTag::Downhill => &mut q.downhill,
             RaceTag::Curved => &mut q.curved,
+            RaceTag::Flush => &mut q.flush,
         };
         *slot = Some(v);
     }
@@ -296,6 +299,7 @@ impl RaceTag {
             RaceTag::Rim => q.rim,
             RaceTag::Downhill => q.downhill,
             RaceTag::Curved => q.curved,
+            RaceTag::Flush => q.flush,
         }
         .unwrap_or(false)
     }
@@ -363,7 +367,16 @@ pub struct RaceArgs<'a> {
     pub ruler: Option<Ruler<'a>>,
     /// `price` the held area per mm3 a swap must buy when it adds plastic.
     pub price: Option<f64>,
+    /// `hold(qa, qb, ri)`: true when the region's current walls would lose something the swap
+    /// keeps (a wedge).
+    pub hold: Option<Hold<'a>>,
+    /// `alone`: the swap replaces the region's walls and keeps none of them beside it (a layout
+    /// of the same rows, not a second wall -- the flush end rows).
+    pub alone: bool,
 }
+
+/// `hold(qa, qb, ri)` of `raceAgainst`'s last argument.
+pub type Hold<'a> = &'a dyn Fn(&[&PropRecord], &[&PropRecord], usize) -> bool;
 
 impl Default for RaceArgs<'_> {
     fn default() -> Self {
@@ -375,6 +388,8 @@ impl Default for RaceArgs<'_> {
             tried: None,
             ruler: None,
             price: None,
+            hold: None,
+            alone: false,
         }
     }
 }
@@ -475,6 +490,8 @@ pub fn race_against_counted(
         args.equivalent,
         ruler,
         args.price,
+        args.hold,
+        args.alone,
         cfg,
     );
     if swapped == 0 {
@@ -583,6 +600,7 @@ fn keepers<'a>(
     qb: &[&'a PropRecord],
     near: &[OverFace],
     force: bool,
+    alone: bool,
     cfg: &Config,
 ) -> Option<Vec<&'a PropRecord>> {
     let mut kept: Vec<&PropRecord> = qb.to_vec();
@@ -598,10 +616,14 @@ fn keepers<'a>(
     let mut order: Vec<&PropRecord> = qa.to_vec();
     order.sort_by(|x, y| ordering(grip_z(&[x]) - grip_z(&[y])));
     for q in order {
+        // (`alone`: the swap replaces the region's walls, none stay beside it)
+        if alone || q.line.is_empty() {
+            continue;
+        }
         let clear = kept
             .iter()
             .all(|r| plan_gap(&q.line, &r.line) >= half_foot(q, cfg) + half_foot(r, cfg) + 1.0);
-        if q.line.is_empty() || !clear {
+        if !clear {
             continue;
         }
         let adds_area = held_by(&bare, &q.line, cfg) >= RACE_ABS;
@@ -659,6 +681,8 @@ fn race_regions(
     equivalent: bool,
     ruler: Ruler,
     price: Option<f64>,
+    hold: Option<Hold>,
+    alone: bool,
     cfg: &Config,
 ) -> (PropsPass, usize) {
     let (aa, bb) = (by_region(&a.props), by_region(&b.props));
@@ -751,7 +775,7 @@ fn race_regions(
                 // forced (raceAgainst's `lenient`): the user asked for the curve; the normal
                 // walls that hold what it misses, or grip lower, stand beside it (keepers)
                 if hb > 0.0 {
-                    extra = keepers(&qa, &qb, &near, true, cfg);
+                    extra = keepers(&qa, &qb, &near, true, false, cfg);
                 }
             } else if b.leader_of.is_none() && wanted.is_none_or(|w| w.contains(&ri)) {
                 // a traced group only forces a curve
@@ -759,11 +783,14 @@ fn race_regions(
                 let too_heavy = (max_grow
                     .is_some_and(|g| !qa.is_empty() && vol(&qb) > g * vol(&qa)))
                     || price.is_some_and(|p| hb - ha < p * (vol(&qb) - vol(&qa)));
-                if !too_heavy
+                // (`hold`: the walls `a` would lose something the swap keeps -- a wedge --
+                // so it swaps whatever the ruler says)
+                if (!too_heavy
                     && (hb > ha + jsnum::max(RACE_ABS, rel * ha)
-                        || (equivalent && hb > 0.0 && hb >= ha - 1e-6))
+                        || (equivalent && hb > 0.0 && hb >= ha - 1e-6)))
+                    || hold.is_some_and(|h| hb > 0.0 && h(&qa, &qb, ri))
                 {
-                    extra = keepers(&qa, &qb, &near, false, cfg);
+                    extra = keepers(&qa, &qb, &near, false, alone, cfg);
                 }
             }
         }

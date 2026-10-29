@@ -119,7 +119,9 @@ fn set_prop(cfg: &mut Config, body: &Value) {
             "tubeTwoSidedFrac" => c.tube_two_sided_frac = val.num(),
             "maxUnsupportedSpan" => c.max_unsupported_span = val.num(),
             "edgeInset" => c.edge_inset = val.num(),
-            "edgeFlatDeg" => c.edge_flat_deg = val.num(),
+            // removed upstream (23039e2): flush end rows are raced, not slope-gated; corpora
+            // recorded at the old pin still carry it
+            "edgeFlatDeg" => {}
             "edgeFlatDegSway" => c.edge_flat_deg_sway = val.num(),
             "tineH" => c.tine_h = val.num(),
             "tineW" => c.tine_w = val.num(),

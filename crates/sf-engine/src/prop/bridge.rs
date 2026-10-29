@@ -20,13 +20,16 @@ const BRIDGED: f64 = 0.25;
 
 /// The `support` object `patchTracks` and `flatRunAxis` take (web/prop.js:450):
 /// `{ topo, rot, offset, sway }`. `flatRunAxis` reads the first three; `patchTracks` also
-/// reads `sway` (`!!opts.sway?.on`).
+/// reads `sway` (`!!opts.sway?.on`) and `rowsOnly`.
 #[derive(Clone, Copy, Debug)]
 pub struct Support<'a> {
     pub topo: &'a Topology,
     pub rot: &'a Rot3,
     pub offset: &'a Xyz,
     pub sway: bool,
+    /// `rowsOnly` (prop.js buildProps): lay the mid-strip rows and only flag the free ends the
+    /// flush-row candidate would move (`Tracks::flushable`), so the race can judge them.
+    pub rows_only: bool,
 }
 
 /// What `flatRunAxis` returns: a JS `[ux, uy]` array carrying `turned` and `old`

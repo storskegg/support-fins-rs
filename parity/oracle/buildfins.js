@@ -85,7 +85,7 @@ const flat4 = (tris) => {
   return { flat, tagged };
 };
 const nz = (x) => (x === undefined ? null : x);
-const TAGS = ["raster", "circular", "rim", "downhill", "curved"];
+const TAGS = ["raster", "circular", "rim", "downhill", "curved", "flush"];
 const propOf = (q) => ({
   region: nz(q.region), id: nz(q.id), tines: nz(q.tines), caps: nz(q.caps), grip: nz(q.grip), span: nz(q.span), height: nz(q.height),
   area: nz(q.area), stations: nz(q.stations), trimmed: nz(q.trimmed), volume: nz(q.volume), line: nz(q.line), triRanges: nz(q.triRanges),
