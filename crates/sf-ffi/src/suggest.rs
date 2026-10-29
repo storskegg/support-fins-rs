@@ -6,7 +6,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 
-use sf_cli::entry::{PageRequest, options_from_dialog, support_tunables};
+use sf_cli::entry::{PageRequest, engine_request, options_from_dialog, support_tunables};
 use sf_engine::config::{Config, apply_tunables};
 use sf_engine::fins::seating::SeatingKind;
 use sf_engine::jsnum;
@@ -16,7 +16,7 @@ use sf_engine::orient::{
     suggest_orientations_wide_opts, suggest_strength_pose,
 };
 
-use crate::builder::split_options;
+use crate::builder::{page_tunables, split_options};
 use crate::part::{FfiError, Part};
 
 /// What the page knows beyond the part when it ranks (`suggestCurBore`, `materialDensity`).
@@ -245,10 +245,19 @@ impl Part {
         &self,
         threshold_deg: f64,
         opts_json: &str,
+        tunables_json: &str,
         ctx: &SuggestContext,
     ) -> Result<SuggestResult, FfiError> {
         Ok(self
-            .rank_poses_with(threshold_deg, opts_json, ctx, None, &|| false, None)?
+            .rank_poses_with(
+                threshold_deg,
+                opts_json,
+                tunables_json,
+                ctx,
+                None,
+                &|| false,
+                None,
+            )?
             .expect("never cancelled"))
     }
 
@@ -260,6 +269,7 @@ impl Part {
         &self,
         threshold_deg: f64,
         opts_json: &str,
+        tunables_json: &str,
         ctx: &SuggestContext,
         density: Option<f64>,
         cancelled: &(dyn Fn() -> bool + Sync),
@@ -273,8 +283,26 @@ impl Part {
         // clearances, so the ranking's tunables (`supportTunables()`, ui/finbuild.js) don't depend on them.
         let (dialog, _) = split_options(opts_json, &mut PageRequest::default())?;
         let options = options_from_dialog(&dialog).map_err(engine)?;
+        // `tunables_json` is the build's too (`FinSettings.tunablesJSON()`): the page's `finOpts().tunables`,
+        // which `supportTunables()` hands the suggest Worker, laid over the dialog's clearances as
+        // `Builder.build` lays them, so the ranking scores with the custom pad, rounded feet, interface and
+        // wall lines the page has. `{}` (or empty) leaves the dialog's clearances alone.
+        let tunables = match page_tunables(tunables_json)? {
+            None => support_tunables(&options).map_err(engine)?,
+            Some(t) => {
+                let page = PageRequest {
+                    tunables: t,
+                    ..Default::default()
+                };
+                engine_request(&options, Some(&page))
+                    .map_err(engine)?
+                    .opts
+                    .tunables
+                    .expect("a request always carries its clearances")
+            }
+        };
         let mut cfg = Config::default();
-        apply_tunables(&mut cfg, Some(&support_tunables(&options).map_err(engine)?));
+        apply_tunables(&mut cfg, Some(&tunables));
         let opts = SuggestOpts {
             on_progress,
             ..Default::default()
@@ -380,9 +408,10 @@ impl Part {
         &self,
         threshold_deg: f64,
         opts_json: String,
+        tunables_json: String,
         context: SuggestContext,
     ) -> Result<SuggestResult, FfiError> {
-        self.rank_poses(threshold_deg, &opts_json, &context)
+        self.rank_poses(threshold_deg, &opts_json, &tunables_json, &context)
     }
 
     /// The wide search: [`Part::suggest_orientations`] over `density` times the web's candidate
@@ -392,6 +421,7 @@ impl Part {
         &self,
         threshold_deg: f64,
         opts_json: String,
+        tunables_json: String,
         context: SuggestContext,
         density: f64,
     ) -> Result<SuggestResult, FfiError> {
@@ -399,6 +429,7 @@ impl Part {
             .rank_poses_with(
                 threshold_deg,
                 &opts_json,
+                &tunables_json,
                 &context,
                 Some(density),
                 &|| false,
@@ -435,6 +466,7 @@ enum Work {
     Rank {
         threshold_deg: f64,
         opts_json: String,
+        tunables_json: String,
         context: SuggestContext,
         /// `None`: the web's candidate set; `Some(n)`: the wide search at `n` times the budget.
         density: Option<f64>,
@@ -478,6 +510,7 @@ impl Suggester {
                         Work::Rank {
                             threshold_deg,
                             opts_json,
+                            tunables_json,
                             context,
                             density,
                         } => {
@@ -495,6 +528,7 @@ impl Suggester {
                             part.rank_poses_with(
                                 *threshold_deg,
                                 opts_json,
+                                tunables_json,
                                 context,
                                 *density,
                                 &|| latest.load(Ordering::SeqCst) != job.generation,
@@ -539,6 +573,7 @@ impl Suggester {
         &self,
         threshold_deg: f64,
         opts_json: String,
+        tunables_json: String,
         context: SuggestContext,
         listener: Box<dyn SuggestListener>,
     ) -> u64 {
@@ -546,6 +581,7 @@ impl Suggester {
             Work::Rank {
                 threshold_deg,
                 opts_json,
+                tunables_json,
                 context,
                 density: None,
             },
@@ -559,6 +595,7 @@ impl Suggester {
         &self,
         threshold_deg: f64,
         opts_json: String,
+        tunables_json: String,
         context: SuggestContext,
         density: f64,
         listener: Box<dyn SuggestListener>,
@@ -567,6 +604,7 @@ impl Suggester {
             Work::Rank {
                 threshold_deg,
                 opts_json,
+                tunables_json,
                 context,
                 density: Some(density),
             },

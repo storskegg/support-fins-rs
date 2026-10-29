@@ -36,7 +36,7 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     let part = try #require(try loadParts(path: try modelPath("cube")).first)
     let suggester = Suggester(part: part)
     let collector = Collector()
-    let generation = suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: collector)
+    let generation = suggester.suggest(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, listener: collector)
     for await event in collector.stream {
         if case .progress = event { continue }  // the button's percentage; the ranking comes last
         guard case .suggested(let g, let result) = event else { Issue.record("not a suggestion"); return }
@@ -47,7 +47,7 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
         #expect(best.rot.count == 9)
         #expect(result.noteGood && result.note.hasPrefix("This way up it needs no fins, 0 g."))
         // the same ranking, blocking, equals the delivered one
-        #expect(try part.suggestOrientations(thresholdDeg: 45, optsJson: "{}", context: context) == result)
+        #expect(try part.suggestOrientations(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context) == result)
         break
     }
 }
@@ -60,8 +60,8 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
         let suggester = Suggester(part: part)
         let collector = Collector()
         let generation = density.map {
-            suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", context: context, density: $0, listener: collector)
-        } ?? suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: collector)
+            suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, density: $0, listener: collector)
+        } ?? suggester.suggest(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, listener: collector)
         var seen: [Double] = []
         for await event in collector.stream {
             switch event {
@@ -84,8 +84,8 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let suggester = Suggester(part: part)
     let first = Collector(), second = Collector()
-    _ = suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: first)
-    let g2 = suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: second)
+    _ = suggester.suggest(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, listener: first)
+    let g2 = suggester.suggest(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, listener: second)
     for await event in second.stream {
         if case .progress = event { continue }  // the button's percentage; the ranking comes last
         guard case .suggested(let g, _) = event else { Issue.record("not a suggestion"); return }
@@ -102,11 +102,11 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
 @Test func theWideSearchRanksTheSameWayOnMoreCandidates() async throws {
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     // density 1 is the web's own candidate set
-    let web = try part.suggestOrientations(thresholdDeg: 45, optsJson: "{}", context: context)
-    #expect(try part.suggestOrientationsWide(thresholdDeg: 45, optsJson: "{}", context: context, density: 1) == web)
+    let web = try part.suggestOrientations(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context)
+    #expect(try part.suggestOrientationsWide(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, density: 1) == web)
     let suggester = Suggester(part: part)
     let collector = Collector()
-    let generation = suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", context: context, density: 10, listener: collector)
+    let generation = suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", tunablesJson: "{}", context: context, density: 10, listener: collector)
     for await event in collector.stream {
         if case .progress = event { continue }  // the button's percentage; the ranking comes last
         guard case .suggested(let g, let result) = event else { Issue.record("not a suggestion"); return }

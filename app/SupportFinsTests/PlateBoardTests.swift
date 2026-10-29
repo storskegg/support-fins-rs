@@ -199,7 +199,7 @@ struct PlateBoardTests {
         try #require(strength.model != nil && suggest.model != nil)
         strength.model?.setLoad(.right)
         let load = try #require(strength.model?.loadLocal)
-        suggest.model?.rank(thresholdDegrees: 45, optionsJSON: "{}", currentBore: 0, density: 1.24)
+        suggest.model?.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
         #expect(await eventually { suggest.model?.kept != nil })
         let ranked = try #require(suggest.model?.kept)
         suggest.model?.pick(0)
