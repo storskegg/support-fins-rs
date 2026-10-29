@@ -65,6 +65,11 @@ final class DrawModel {
     @ObservationIgnored private var ghostTask: Task<Void, Never>?
     @ObservationIgnored private var braceRequest: (face: Int, point: SIMD3<Double>)?
     @ObservationIgnored private var braceTask: Task<Void, Never>?
+    /// The full brace is built once the cursor rests, not per move (`braceRest`, `web/ui/rest.js`): a new spot is tens of
+    /// ms on a big part, and the cursor dot already follows every move.
+    @ObservationIgnored private lazy var braceRest = Rest<(face: Int, point: SIMD3<Double>)> { [weak self] q in
+        self?.buildBrace(q)
+    }
     /// The brace key the ghost and tip show now (`braceShown`).
     @ObservationIgnored private var braceShown: String?
     @ObservationIgnored private var viewHeight = 1.0
@@ -443,7 +448,11 @@ final class DrawModel {
         refresh()
     }
 
-    private func braceQueued(_ r: (face: Int, point: SIMD3<Double>)?) { braceRequest = r }
+    /// Drops the brace waiting for the pointer to rest, and the one queued behind a running build (`braceRest.cancel()`).
+    private func braceQueued(_ r: (face: Int, point: SIMD3<Double>)?) {
+        braceRest.cancel()
+        braceRequest = r
+    }
 
     /// `braceAway`: the pointer left the part: the same grace as `slipOff`, then the preview and its dot go.
     private func braceAway() {
@@ -560,7 +569,7 @@ final class DrawModel {
     private func dropGhost() {
         ghostMesh = nil
         braceShown = nil
-        braceRequest = nil
+        braceQueued(nil)
         motion.drop()
     }
 
@@ -584,14 +593,20 @@ final class DrawModel {
 
     // MARK: the sway brace preview
 
-    /// Hovering an upright side with Sway braces on: ghost + tip for the brace a click there stands
-    /// (`updateBracePreview`). At most one brace build at a time, the newest request.
+    /// Hovering an upright side with Sway braces on: the dot and label follow the pointer; the ghost + tip for the brace a
+    /// click there stands are built once it rests (`updateBracePreview`).
     private func updateBracePreview(_ hit: Surface, _ p: ViewerController.HandPointer) {
         cursor = hit.point
         cursorVisible = true
         bandPoints = []
         motion.moveTip(to: CGPoint(x: p.location.x + 16, y: p.location.y + 16))
-        braceRequest = (hit.face, hit.point)
+        braceRest.poke((hit.face, hit.point))
+    }
+
+    /// The pointer has rested on `q`: build its brace. At most one build at a time, the newest request.
+    private func buildBrace(_ q: (face: Int, point: SIMD3<Double>)) {
+        // the model may have gone while the cursor rested (no kit)
+        braceRequest = q
         guard braceTask == nil, let kit else { return }
         let sweepNow = sweep
         braceTask = Task { @MainActor [weak self] in
@@ -699,7 +714,7 @@ final class DrawModel {
 
     /// Stand a sway brace on the upright face the user clicked: the one its preview showed (`placeSway`).
     private func placeBrace(_ hit: Surface) {
-        braceRequest = nil
+        braceQueued(nil)
         guard let kit,
               let spot = try? kit.braceAt(face: UInt64(hit.face), point: [hit.point.x, hit.point.y, hit.point.z], sweep: sweep,
                                           autoBuild: session.finsOn && autoLike ? build?.latest : nil, removed: removedIDs()) else { return }

@@ -12,6 +12,8 @@ pub struct Tris {
     pub v: Vec<f64>,
     /// `buildZGrid`'s grid (web/prop/surface.js:45), built on first use.
     pub(crate) z_grid: OnceLock<crate::prop::surface::ZGrid>,
+    /// `triIndex`'s XY grid (web/triindex.js), built on first use.
+    pub(crate) tri_index: OnceLock<crate::triindex::TriIndex>,
 }
 
 impl Tris {
@@ -19,6 +21,7 @@ impl Tris {
         Tris {
             v,
             z_grid: OnceLock::new(),
+            tri_index: OnceLock::new(),
         }
     }
     /// `tris.length`.

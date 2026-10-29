@@ -39,7 +39,7 @@ pub use suggest::{
 
 uniffi::setup_scaffolding!();
 
-/// The crate version and the pinned upstream commit, e.g. `0.1.0 (upstream 299ef49)`.
+/// The crate version and the pinned upstream commit, e.g. `0.1.0 (upstream 23039e2)`.
 #[uniffi::export]
 pub fn engine_version() -> String {
     let commit = include_str!("../../../UPSTREAM")
