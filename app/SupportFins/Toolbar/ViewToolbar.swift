@@ -31,12 +31,13 @@ private struct ToolbarButton: View {
     let systemImage: String
     let help: LocalizedStringKey
     var enabled = true
+    var detail = ""
     var lit = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
+            Label { Text(title) + Text(detail) } icon: { Image(systemName: systemImage) }
                 .labelStyle(.titleAndIcon)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(lit ? AnyShapeStyle(.tint.opacity(0.25)) : AnyShapeStyle(.clear), in: .capsule)
@@ -54,7 +55,7 @@ private struct SlotButton: View {
     var body: some View {
         let badge = registry.badges[slot]
         ToolbarButton(title: slot.title, systemImage: slot.systemImage, help: slot.help,
-                      enabled: badge != nil, lit: registry.open == slot || (badge?.isLit() ?? false)) {
+                      enabled: badge != nil, detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
             registry.toggle(slot)
         }
         .overlay(alignment: .top) {
@@ -63,6 +64,7 @@ private struct SlotButton: View {
                     .glassEffect(.regular, in: .capsule).offset(y: -30).allowsHitTesting(false)
             }
         }
+        .accessibilityIdentifier("toolbar-\(slot.id)")
         .popover(isPresented: Binding(get: { registry.open == slot && badge != nil },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {

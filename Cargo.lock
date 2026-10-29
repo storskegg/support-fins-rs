@@ -766,6 +766,7 @@ dependencies = [
 name = "sf-ffi"
 version = "0.1.0"
 dependencies = [
+ "parity",
  "sf-cli",
  "sf-cut",
  "sf-engine",
