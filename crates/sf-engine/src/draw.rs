@@ -28,7 +28,7 @@ use crate::config::Config;
 use crate::drawarc::{DRAW_MIN_RADIUS, arc_stations, arc_through};
 use crate::jsnum;
 use crate::overhangs::Topology;
-use crate::prop::attached::PART_BAND;
+use crate::prop::attached::{PART_BAND, trimmed_ends};
 use crate::prop::brace::{BraceKinds, brace_wall};
 use crate::prop::contact::{contour_top, lower_sag, settle_top};
 use crate::prop::crest::{Crest, crest_on};
@@ -523,7 +523,7 @@ pub fn drawn_wall(
     // stations degrade to z=0 on their own. This is what stops the "marched past the part
     // straight to the plate" bug: on the over-the-part case sweep-to-plate SUCCEEDS and silently
     // builds the tall stilt, so the fix must PREFER the floor.
-    let top_pa = drawn_line(
+    let mut top_pa = drawn_line(
         a,
         b,
         tris,
@@ -537,11 +537,11 @@ pub fn drawn_wall(
     // it read the part's own underside as its floor and stood the wall inside the part, floor to
     // top (local issue 033: a sphere's top, 296-384 vertices in). That line falls through to the
     // plate wall below.
-    if let Some(top_pa) = &top_pa
-        && top_pa.len() as f64 >= prop.min_stations
-        && !on_the_part(top_pa, tris)
+    if top_pa
+        .as_ref()
+        .is_some_and(|t| t.len() as f64 >= prop.min_stations && !on_the_part(t, tris))
     {
-        let floor = floor_line(top_pa, tris, 1.0, false, cfg);
+        let mut floor = floor_line(top_pa.as_ref().unwrap(), tris, 1.0, false, cfg);
         let mut floor_max = 0.0;
         for p in &floor {
             if p.z > floor_max {
@@ -555,6 +555,35 @@ pub fn drawn_wall(
                 "part of the model sits under this overhang, and Plate only is on — a support can’t stand on the part here",
             );
         }
+        // A wall standing on the part keeps its ends off the part's side walls, as Auto's do
+        // (#119: a line drawn to a recessed box's end wall built flush against it and welded).
+        // Needs the topology; the live preview omits it and stays as drawn.
+        if floor_max > prop.gap + 0.5
+            && let Some(topo) = opts.topo
+        {
+            let keep = trimmed_ends(
+                top_pa.as_ref().unwrap(),
+                &floor,
+                topo,
+                // JS passes `opts.rot` / `opts.offset` as given
+                &opts.rot.expect("drawnWall: opts.topo without opts.rot"),
+                &opts
+                    .offset
+                    .expect("drawnWall: opts.topo without opts.offset"),
+                cfg,
+            );
+            let Some(keep) = keep else {
+                return refuse(
+                    "too close to the part’s side wall — draw the line a little further from it",
+                );
+            };
+            let tp = top_pa.as_mut().unwrap();
+            tp.truncate(keep[1]);
+            tp.drain(..keep[0]);
+            floor.truncate(keep[1]);
+            floor.drain(..keep[0]);
+        }
+        let top_pa = top_pa.as_ref().unwrap();
         let mold = if floor_max > prop.gap + 0.5 {
             Some(mold_line(top_pa, tris, cfg))
         } else {

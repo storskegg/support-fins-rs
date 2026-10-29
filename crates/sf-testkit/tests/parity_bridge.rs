@@ -24,6 +24,7 @@ fn run(a: &[Resolved]) -> FlatRun {
                 rot: &rot,
                 offset: &offset,
                 sway: false,
+                rows_only: false,
             };
             flat_run_axis(&pts, &tris, step, Some(&sup), &cfg)
         }
@@ -119,6 +120,7 @@ fn flat_run_axis_soup() {
             rot: &rot,
             offset: &res.offset,
             sway: false,
+            rows_only: false,
         };
         let r = flat_run_axis(&pts, &Tris::new(tris), c.args[4].num(), Some(&sup), &cfg);
         let got = Value::Obj(vec![

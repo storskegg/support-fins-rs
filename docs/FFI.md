@@ -276,7 +276,7 @@ fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError>
   (`pickSupport`: the wall under the ray if nearer than the part's own hit; `keep`, the section's plane `[nx, ny, nz, w]`, passes over hits
   where `n . p + w < 0`, as `keptHit` does), `wall_triangles(i)` (the selection's highlight).
 - **`ghost`** is the live preview of the wall in progress (`updatePreview`'s `drawnWall`: `braceTall`, `through`, no tines), **`check_wall`**
-  `placeWall`'s test (`drawnWall` with `through` only). `DrawnGhost`: `ok()`, `reason()` (the web's text, e.g. "curve too tight - 3.0mm
+  `placeWall`'s test (`drawnWall` with `through` and the topology, rot and offset: a wall whose ends sit against the part's side wall is refused at placement with "too close to the part’s side wall — draw the line a little further from it"). `DrawnGhost`: `ok()`, `reason()` (the web's text, e.g. "curve too tight - 3.0mm
   radius, needs 5mm"), `triangles()`.
 - **`brace_at`** is `braceAt` (without its memo): the brace a click at `point` stands, `BraceSpot { ok(), reason(), full(), point(), key(),
   height(), triangles() }`. `key` is the web's memo key (equal keys are the same brace); `point` is what a placed brace stores. Pass the

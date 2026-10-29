@@ -7,12 +7,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config::Config;
-use crate::inside::inside_part;
 use crate::jsnum;
 use crate::overhangs::{Region, Topology};
 use crate::planes::face_adjacency;
 use crate::prop::bridge::{Support, flat_run_axis};
 use crate::prop::contact::{contact_line, straightness};
+use crate::prop::endrows::end_rows;
 use crate::prop::surface::surface_z_at;
 use crate::tris::Tris;
 use crate::types::Rot3;
@@ -345,6 +345,9 @@ pub struct Tracks {
     pub spacing: Option<f64>,
     /// The old-rule axis, when the bridge turned this patch (raced by prop/bridgerace.js).
     pub turned: Option<[f64; 2]>,
+    /// `kept.flushable` (web/prop/tracks.js:422): a rows-only pass that left a free end's
+    /// flush row to the race (prop/endrows.js). False on the early returns, where JS has none.
+    pub flushable: bool,
 }
 
 /// The contact polylines for one locally-flat sub-patch: straight parallel tracks sampled on
@@ -370,6 +373,7 @@ pub fn patch_tracks(
             lines: Vec::new(),
             spacing: None,
             turned: None,
+            flushable: false,
         };
     }
 
@@ -468,32 +472,40 @@ pub fn patch_tracks(
             lines: Vec::new(),
             spacing: None,
             turned,
+            flushable: false,
         };
     }
     let n_st = jsnum::max(2.0, jsnum::min(400.0, jsnum::ceil((u_hi - u_lo) / step))) as usize;
 
     // `span` is the requested row spacing from the coverage slider (see coverRowSpan).
     let row_span = jsnum::max(1.0, span);
-    // (free-edge rows only up to PROP.edgeFlatDeg -- a lower cutoff with Sway on)
-    let flat_deg = if support.is_some_and(|s| s.sway) {
-        prop.edge_flat_deg_sway
+    // Flush end rows at free edges are a candidate layout (prop/endrows.js): laid with
+    // `ends` true, offered (flagged `.flushable`, mid-strip rows kept) with 'offer' --
+    // buildProps races the two -- and withheld under Sway past its cutoff, where a
+    // flush wall stands where the braces go (Sway is the user's own ask, the judge
+    // doesn't see it).
+    let ends = if !support.is_some_and(|s| s.sway)
+        || slope <= jsnum::tan((prop.edge_flat_deg_sway * std::f64::consts::PI) / 180.0)
+    {
+        if support.is_some_and(|s| s.rows_only) {
+            Ends::Offer
+        } else {
+            Ends::Lay
+        }
     } else {
-        prop.edge_flat_deg
+        Ends::Off
     };
-    let flat = slope <= jsnum::tan((flat_deg * std::f64::consts::PI) / 180.0);
-    let probe = match support {
-        Some(s) if flat => Some(Probe {
-            support: s,
-            patch_tris,
-            ux,
-            uy,
-            vx,
-            vy,
-            u_lo,
-            u_hi,
-        }),
-        _ => None,
-    };
+    let probe = support.map(|s| Probe {
+        support: s,
+        patch_tris,
+        ux,
+        uy,
+        vx,
+        vy,
+        u_lo,
+        u_hi,
+        ends,
+    });
     let rows = row_offsets(v_lo, v_hi, row_span, probe.as_ref(), cfg);
 
     let mut tracks: Vec<Vec<[f64; 3]>> = Vec::new();
@@ -525,79 +537,78 @@ pub fn patch_tracks(
         lines: kept,
         spacing: Some(rows.spacing),
         turned,
+        flushable: rows.flushable,
     }
 }
 
+/// `probe.ends` (web/prop/tracks.js:391-394): whether the free-edge candidate (`endRows`)
+/// replaces the mid-strip rows (`true`), is only flagged (`'offer'`: the race decides), or is
+/// off (`false`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Ends {
+    Lay,
+    Offer,
+    Off,
+}
+
 /// The `probe` object `rowOffsets` takes (web/prop/tracks.js:394-396).
-struct Probe<'a> {
-    support: &'a Support<'a>,
-    patch_tris: &'a Tris,
-    ux: f64,
-    uy: f64,
-    vx: f64,
-    vy: f64,
-    u_lo: f64,
-    u_hi: f64,
+pub(crate) struct Probe<'a> {
+    pub support: &'a Support<'a>,
+    pub patch_tris: &'a Tris,
+    pub ux: f64,
+    pub uy: f64,
+    pub vx: f64,
+    pub vy: f64,
+    pub u_lo: f64,
+    pub u_hi: f64,
+    pub ends: Ends,
 }
 
 /// `rowOffsets`' array with its `.spacing`.
 struct Rows {
     rows: Vec<f64>,
     spacing: f64,
+    flushable: bool,
 }
 
 /// Where the rows go across a patch (v, perpendicular to the walls), with the widest gap
-/// between two rows as `spacing` (0 for one row).
+/// between two rows as `spacing` (0 for one row). The mid-strip layout puts each row vExt / n
+/// apart, half that from each edge; `probe.ends` says whether the free-edge candidate
+/// (`end_rows`) replaces it (`Lay`), is only flagged (`flushable`, `Offer`: the race decides),
+/// or is off.
 ///
-/// `rowOffsets(vLo, vHi, rowSpan, probe)` (web/prop/tracks.js:439-467).
+/// `rowOffsets(vLo, vHi, rowSpan, probe)` (web/prop/tracks.js:430-448).
 fn row_offsets(v_lo: f64, v_hi: f64, row_span: f64, probe: Option<&Probe>, cfg: &Config) -> Rows {
     let v_ext = v_hi - v_lo;
-    let e = cfg.prop.edge_inset;
     let n = jsnum::max(1.0, jsnum::round(v_ext / row_span)) as usize;
     let mut rows: Vec<f64> = (0..n)
         .map(|w| v_lo + (v_ext * (w as f64 + 0.5)) / n as f64)
         .collect();
-    let near = 2.0 * e; // an old row this close already sits at the end
+    let mut flushable = false;
     if let Some(pr) = probe
-        && v_ext > 2.0 * near
+        && pr.ends != Ends::Off
+        && let Some(f) = end_rows(&rows, v_lo, v_hi, pr, cfg)
     {
-        {
-            let lo = rows[0] - v_lo > near && free_edge(pr, v_lo, -1.0, cfg);
-            let hi = v_hi - rows[n - 1] > near && free_edge(pr, v_hi, 1.0, cfg);
-            if lo || hi {
-                let a = if lo { v_lo + e } else { rows[0] };
-                let b = if hi { v_hi - e } else { rows[n - 1] };
-                // one row can't stand at an end without leaving the rest bare
-                let cap = v_ext / n as f64;
-                let m = jsnum::max(n as f64, jsnum::ceil((b - a) / cap - 1e-9) + 1.0) as usize;
-                rows = if n == 1 {
-                    let mut r = Vec::new();
-                    if lo {
-                        r.push(a);
-                    }
-                    r.push(rows[0]);
-                    if hi {
-                        r.push(b);
-                    }
-                    r
-                } else {
-                    (0..m)
-                        .map(|w| a + ((b - a) * w as f64) / (m - 1) as f64)
-                        .collect()
-                };
-            }
+        if pr.ends == Ends::Lay {
+            rows = f;
+        } else {
+            flushable = true;
         }
     }
     if let Some(pr) = probe {
         let edges = low_edges(pr, v_lo, v_hi, cfg);
-        rows = low_edge_rows(rows, &edges, near, cfg);
+        rows = low_edge_rows(rows, &edges, 2.0 * cfg.prop.edge_inset, cfg);
     }
     let mut widest = 0.0f64;
     for i in 1..rows.len() {
         widest = jsnum::max(widest, rows[i] - rows[i - 1]);
     }
     let spacing = if rows.len() > 1 { widest } else { 0.0 };
-    Rows { rows, spacing }
+    Rows {
+        rows,
+        spacing,
+        flushable,
+    }
 }
 
 /// One row class of `lowEdges`.
@@ -751,49 +762,4 @@ fn low_edge_rows(rows: Vec<f64>, edges: &LowEdges, near: f64, cfg: &Config) -> V
         out.sort_by(|a, b| cmp_diff(a - b));
         out
     }
-}
-
-/// Does the patch end in AIR along its edge at v = `vEdge` (`dir` -1 for the low side, +1 for
-/// the high)?
-///
-/// `freeEdge(probe, vEdge, dir)` (web/prop/tracks.js:563-592).
-fn free_edge(probe: &Probe, v_edge: f64, dir: f64, cfg: &Config) -> bool {
-    let prop = &cfg.prop;
-    let support = probe.support;
-    let (mut air, mut part) = (0usize, 0usize);
-    for t in [0.1, 0.3, 0.5, 0.7, 0.9] {
-        let u = probe.u_lo + (probe.u_hi - probe.u_lo) * t;
-        let at = |v: f64| [probe.ux * u + probe.vx * v, probe.uy * u + probe.vy * v];
-        let [ix, iy] = at(v_edge - dir * 0.3);
-        let Some(z) = surface_z_at(probe.patch_tris, ix, iy) else {
-            continue;
-        };
-        // an edge down at the bed rests on it: no lip to curl
-        if z < prop.min_height_squat {
-            part += 1;
-            continue;
-        }
-        let [ox, oy] = at(v_edge + dir * 0.8);
-        let solid = [-2.0, -1.0, -0.3, 0.3, 1.0, 2.0]
-            .iter()
-            .any(|dz| inside_part(support.topo, support.rot, support.offset, ox, oy, z + dz));
-        if solid {
-            part += 1;
-            continue;
-        }
-        // the flush row's whole column must be clear too (both faces)
-        for side in [1.0, -1.0] {
-            let [cx, cy] =
-                at(v_edge - dir * prop.edge_inset + side * dir * (prop.th / 2.0 + prop.side_clear));
-            let mut zz = z - 0.5;
-            while zz > 0.3 {
-                if inside_part(support.topo, support.rot, support.offset, cx, cy, zz) {
-                    return false;
-                }
-                zz -= 1.0;
-            }
-        }
-        air += 1;
-    }
-    air >= 2 && air > part
 }

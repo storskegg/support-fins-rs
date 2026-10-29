@@ -7,7 +7,7 @@
 //             fins/coverage.js makes, recorded in full (its `excludedSupportFaces` is read by the
 //             curved-walls trace)
 //     opts    the keys the prop pipeline reads, as plain data: step, coverage, tines, tineDensity,
-//             layerHeight, raster, sway ({on}), rimWalls, downhill, curvedWalls, plateOnly;
+//             layerHeight, raster, sway ({on}), rimWalls, downhill, curvedWalls, plateOnly, endRows;
 //             `rasterVeto` (a function in the captured builds: fins/wedges.js wedgeVeto) is recorded as
 //             `rasterVetoLog`, the booleans it answered in call order, which the replay plays back
 //     crest   { part: $seated | null, layerHeight }: prop/crest.js's module state at the call
@@ -19,7 +19,7 @@
 //             (x, y, z, tag); the direct cases flagged `full` also carry `triangles` (Float64Array,
 //             4 per vertex). A prop is { region, id, tines, caps, grip, span, height, area, stations,
 //             trimmed, volume, line, triRanges, triRange, wallRange, members, rimWall, partAttached,
-//             inBore, squat, tags: [raster, circular, rim, downhill, curved] } with null for a key
+//             inBore, squat, tags: [raster, circular, rim, downhill, curved, flush] } with null for a key
 //             the wall does not have. `cap` is null (no capture) or { n, hash } of the capture after the call.
 // Replayed by crates/sf-testkit/tests/parity_build.rs with Tol::Exact.
 import { UPSTREAM_ROOT, assertPinned } from "./lib/pin.js";
@@ -65,7 +65,7 @@ const { PROP } = propCfg;
 // ---- the recorder ------------------------------------------------------------------------------
 const refs = new WeakMap();
 const state = { model: "", scene: "", counts: {}, crest: { part: null, layerHeight: undefined }, entries: { buildProps: [], buildShortWalls: [] } };
-const TAGS = ["raster", "circular", "rim", "downhill", "curved"];
+const TAGS = ["raster", "circular", "rim", "downhill", "curved", "flush"];
 
 const seedsOf = (cap) => (cap ? cap.map((c) => [c.x, c.y, c.z, c.biteX, c.biteY]) : null);
 function capSummary(cap) {
@@ -103,7 +103,7 @@ function summarize(r, full) {
   };
 }
 
-const PLAIN = ["step", "coverage", "tines", "tineDensity", "layerHeight", "raster", "rimWalls", "downhill", "curvedWalls", "plateOnly", "shortWalls"];
+const PLAIN = ["step", "coverage", "tines", "tineDensity", "layerHeight", "raster", "rimWalls", "downhill", "curvedWalls", "plateOnly", "shortWalls", "endRows"];
 const crestArg = () => ({ part: state.crest.part, layerHeight: state.crest.layerHeight === undefined ? { $u: 1 } : encode(state.crest.layerHeight) });
 globalThis.__sfBuild = {
   call(name, fn, self, args) {
@@ -178,6 +178,7 @@ try {
     downhill: { tines: true, downhill: true },
     curved: { tines: true, downhill: true, curvedWalls: true },
     norim: { tines: true, rimWalls: false },
+    noendrows: { tines: true, endRows: false },   // the flush layout everywhere, no race
     sparse: { coverage: 0.2, tineDensity: 0.5, layerHeight: 0.24 },
   };
   const FULL = new Set(["cube|40,0,0|noraster|off", "wedge|40,0,0|default|off", "lowledge|0,35,20|curved|flat", "ramp|90,0,0|norim|flat"]);

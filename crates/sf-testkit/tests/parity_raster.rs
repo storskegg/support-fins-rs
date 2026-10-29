@@ -84,6 +84,7 @@ fn run_tracks(a: &[Resolved]) -> sf_engine::prop::build::Lines {
         rot: &rot,
         offset: &offset,
         sway,
+        rows_only: false,
     };
     raster_tracks(
         &pts,
@@ -220,6 +221,7 @@ fn pass_of(b: &Value, is_normal: bool) -> PropsPass {
             o => panic!("{o:?}"),
         }),
         volume: opt(b, "volume").map_or(0.0, Value::num),
+        flushable: Vec::new(),
     }
 }
 
@@ -230,6 +232,7 @@ fn tag_of(s: &str) -> RaceTag {
         "rim" => RaceTag::Rim,
         "downhill" => RaceTag::Downhill,
         "curved" => RaceTag::Curved,
+        "flush" => RaceTag::Flush,
         o => panic!("{o}"),
     }
 }
@@ -299,6 +302,15 @@ fn race_against_matches_js() {
             Some(Value::Str(v)) if v == "tight" => Some(&tight),
             _ => None,
         };
+        // scripted like the recorder's: a big normal wall in the region, and the swap has walls to
+        // spare for it
+        let big_walls = |qa: &[&PropRecord], qb: &[&PropRecord], ri: usize| {
+            qa.iter().any(|q| q.volume > 20.0) && qb.len() > ri % 2
+        };
+        let hold: Option<sf_engine::prop::raster::Hold> = match opt(s, "hold") {
+            Some(Value::Str(_)) => Some(&big_walls),
+            _ => None,
+        };
         let args = RaceArgs {
             max_grow: opt(s, "maxGrow").map(Value::num),
             rel: s.get("rel").num(),
@@ -308,6 +320,8 @@ fn race_against_matches_js() {
                 .map(|v| nums(v).iter().map(|&x| x as usize).collect::<IndexSet<_>>()),
             ruler,
             price: opt(s, "price").map(Value::num),
+            hold,
+            alone: matches!(opt(s, "alone"), Some(Value::Bool(true))),
         };
         let tag = tag_of(s.get("tag").str());
         let normal_copy = normal.clone();
@@ -328,7 +342,7 @@ fn race_against_matches_js() {
         // compare in the recorder's shape
         let tags = |q: &PropRecord| {
             Value::Arr(
-                [q.raster, q.circular, q.rim, q.downhill, q.curved]
+                [q.raster, q.circular, q.rim, q.downhill, q.curved, q.flush]
                     .iter()
                     .map(|t| t.map_or(Value::Null, Value::from))
                     .collect(),
