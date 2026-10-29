@@ -204,3 +204,70 @@ struct MoveModelTests {
         #expect(slot.xy == from)
     }
 }
+
+/// The Volume row after a move (`updateFit`, `ui/part.js:472-505`): hangs off the bed, models overlap, fits.
+@MainActor
+@Suite("Fit after a move")
+struct FitAfterMoveTests {
+    func stl(_ name: String) throws -> URL {
+        URL(fileURLWithPath: try TestParts.write(TestParts.box(-10, 10, -10, 10, 0, 20), name: "\(name)-\(UUID().uuidString).stl"))
+    }
+
+    func rows(_ board: PlateBoard, _ host: ViewerModel) -> FitReadout {
+        let c = host.controller!
+        let f = board.fit
+        return FitReadout.make(FitInput(size: (20, 20, 20), volume: (Double(c.volume.x), Double(c.volume.y), Double(c.volume.z)),
+                                        spot: (f.spot.x, f.spot.y), parkedOff: f.parkedOff, clash: f.clash))
+    }
+
+    @Test func theRowSaysHangsOffTheBedAndFitsAgainAsTheLiveModelIsMoved() async throws {
+        let host = ViewerModel()
+        try #require(host.controller != nil, "no Metal device")
+        await host.load(url: try stl("fit-a"))
+        let board = try #require(host.features[PlatesFeature.self]?.board)
+        let move = try #require(host.features[MoveFeature.self]?.model)
+        let tool = try #require(host.controller?.move)
+        #expect(rows(board, host) == FitReadout(text: "fits", warn: false))
+        move.setOn(true)
+        let bed = Double(host.controller!.volume.x)
+        #expect(tool.onBegin?(.live, .zero) == true)
+        tool.onDrag?(SIMD2(bed / 2 + 5, 0))                     // past the bed's edge
+        tool.onEnd?()
+        #expect(rows(board, host) == FitReadout(text: "hangs off the bed", warn: true))
+        host.session.undo()
+        #expect(rows(board, host) == FitReadout(text: "fits", warn: false))
+    }
+
+    @Test func aParkedModelDraggedOffTheBedHangsOffToo() async throws {
+        let host = ViewerModel()
+        try #require(host.controller != nil, "no Metal device")
+        await host.load(url: try stl("fit-b"))
+        await host.load(url: try stl("fit-c"), adding: true)
+        let board = try #require(host.features[PlatesFeature.self]?.board)
+        let move = try #require(host.features[MoveFeature.self]?.model)
+        let tool = try #require(host.controller?.move)
+        #expect(!board.fit.parkedOff && !board.fit.clash)
+        move.setOn(true)
+        let parked = board.plate.models[0]
+        let bed = Double(host.controller!.volume.x)
+        let press = SIMD2(parked.xy.x - board.plate.liveSlot.xy.x, parked.xy.y - board.plate.liveSlot.xy.y)
+        #expect(tool.onBegin?(.parked(0), press) == true)
+        tool.onDrag?(press + SIMD2(0, bed))                      // far past the bed's back edge
+        tool.onEnd?()
+        #expect(board.fit.parkedOff)
+        #expect(rows(board, host).text == "hangs off the bed")
+    }
+
+    @Test func twoModelsSharingACellSayModelsOverlap() async throws {
+        let host = ViewerModel()
+        try #require(host.controller != nil, "no Metal device")
+        await host.load(url: try stl("fit-d"))
+        await host.load(url: try stl("fit-e"), adding: true)
+        let board = try #require(host.features[PlatesFeature.self]?.board)
+        #expect(!board.fit.clash, "Add model leaves them apart")
+        // put the live one on the parked one (what Arrange or a bad undo could do)
+        board.plate.liveSlot.xy = board.plate.models[0].xy
+        #expect(board.fit.clash)
+        #expect(rows(board, host) == FitReadout(text: "models overlap", warn: true))
+    }
+}
