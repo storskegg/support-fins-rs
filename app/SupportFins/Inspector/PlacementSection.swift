@@ -8,6 +8,10 @@ struct PlacementSection: View {
     private static let modes: [(FinSettings.Mode, String)] = [(.auto, "Auto"), (.full, "Full coverage"), (.draw, "Draw")]
 
     var body: some View {
+        FindRow("fin-mode-fld") { picker }
+    }
+
+    private var picker: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Placement")
             HStack(spacing: 0) {

@@ -163,6 +163,8 @@ struct MenuSection {
 struct MenuButton {
     var title: String
     var shortcut: KeyEquivalent?
+    /// With `shortcut`: the modifiers (⌘ alone by default).
+    var modifiers: EventModifiers = .command
     var help: String?
     var enabled: Bool
     var action: @MainActor () -> Void
@@ -184,9 +186,9 @@ indirect enum MenuEntry {
     case note(String)
     case submenu(String, [MenuEntry])
 
-    static func item(_ title: String, shortcut: KeyEquivalent? = nil, help: String? = nil, enabled: Bool = true,
-                     action: @escaping @MainActor () -> Void) -> MenuEntry {
-        .button(MenuButton(title: title, shortcut: shortcut, help: help, enabled: enabled, action: action))
+    static func item(_ title: String, shortcut: KeyEquivalent? = nil, modifiers: EventModifiers = .command, help: String? = nil,
+                     enabled: Bool = true, action: @escaping @MainActor () -> Void) -> MenuEntry {
+        .button(MenuButton(title: title, shortcut: shortcut, modifiers: modifiers, help: help, enabled: enabled, action: action))
     }
 
     static func check(_ title: String, help: String? = nil, enabled: Bool = true, isOn: Binding<Bool>) -> MenuEntry {
@@ -229,7 +231,7 @@ private struct MenuEntryView: View {
         switch entry {
         case .button(let b):
             Button(b.title, action: b.action)
-                .keyboardShortcut(b.shortcut.map { KeyboardShortcut($0) })
+                .keyboardShortcut(b.shortcut.map { KeyboardShortcut($0, modifiers: b.modifiers) })
                 .help(b.help ?? "")
                 .disabled(!b.enabled)
         case .toggle(let t):
