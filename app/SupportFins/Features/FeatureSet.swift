@@ -89,11 +89,12 @@ extension FocusedValues {
     }
 }
 
-/// The menu bar, composed from `Features.all`: the items after File > New, then every menu the features name in
-/// `MenuID.order` (View, Model, then any a feature adds), so the bar shows what `FeatureSet.menuSnapshot` lists.
+/// The menu bar, composed from `Features.all`: the items after File > New and at the top of View (the system's
+/// menus, `MenuID.group`), then every menu of the app's own the features name in `MenuID.order` (Model, then any a
+/// feature adds), so the bar shows what `FeatureSet.menuSnapshot` lists.
 /// SwiftUI cannot build `Commands` from a list, hence the fixed slots: `FeatureSetTests` checks there are enough.
 struct FeatureCommands: Commands {
-    /// How many menus the bar can show (View and Model take two).
+    /// How many menus of the app's own the bar can show (Model takes one).
     static let menuSlots = 5
 
     @FocusedValue(\.features) private var features
@@ -101,12 +102,13 @@ struct FeatureCommands: Commands {
     /// The entries are made in a view's body, not here, so what they read (the exporter, the badges) is observed
     /// by that view: the focused value (the window's `FeatureSet`) does not change when they do.
     private func menu(_ id: MenuID) -> some View { FeatureMenuContent(menu: id, features: features) }
-    private static var menus: [MenuID] { FeatureSet.menuIDs().filter { !$0.isFileGroup } }
+    private static var menus: [MenuID] { FeatureSet.menuIDs().filter(\.isOwnMenu) }
 
     var body: some Commands {
         let menus = Self.menus
         CommandGroup(after: .newItem) { menu(.fileExport) }
         CommandGroup(after: .undoRedo) { menu(.edit) }
+        CommandGroup(before: .toolbar) { menu(.view) }
         if menus.count > 0 { CommandMenu(menus[0].title) { menu(menus[0]) } }
         if menus.count > 1 { CommandMenu(menus[1].title) { menu(menus[1]) } }
         if menus.count > 2 { CommandMenu(menus[2].title) { menu(menus[2]) } }

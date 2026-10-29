@@ -21,6 +21,8 @@ in section `order`, so a feature's items sit where the menu has them).
 
 Ties in `order` keep the `Features.all` order. Menus come in `MenuID.order` (View 0, Model 10), so a menu of your own
 sits where its order puts it; `FeatureCommands` has room for `menuSlots` menus (a test fails when they run out).
+A menu macOS already has (File, Edit, View, ...) is never a `MenuID` of your own: `.view` and `.fileExport` fill a
+`group` of the system's menu (`MenuID.SystemGroup`), and `FeatureSetTests` fails on a second menu of a system name.
 A contribution's content is called in a view of its own (`ContributionView`, and each menu in its own view), so what it reads from
 `host` is observed there: read the models inside the content closure, not before it.
 `FeatureSetTests` pins the overlay, menu-item and Esc orders; a change to a menu changes its snapshot there.

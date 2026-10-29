@@ -2,50 +2,18 @@ import XCTest
 
 /// STEP import through the real window (M6): a `.step` opened from the Open panel is read through OpenCascade, the
 /// window opens, and the Status block carries the page's import note ("STEP: tessellated at 0.01 mm."). Run by the
-/// orchestrator, like `FinsLoopUITests` (it drives the Open panel).
+/// orchestrator, like `FinsLoopUITests` (it drives the Open panel); the launch and the window are
+/// `PartWindowUITestCase`'s.
 ///
 /// Elements are found by the accessibility identifiers the app sets: `fins-toggle`.
-final class StepImportUITests: XCTestCase {
-    private var app: XCUIApplication!
-    private var dir: URL!
-
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-        dir = FileManager.default.temporaryDirectory.appending(path: "sf-uitest-step-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        app = XCUIApplication()
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
-    }
-
-    override func tearDownWithError() throws {
-        app.terminate()
-        try? FileManager.default.removeItem(at: dir)
-    }
-
+final class StepImportUITests: PartWindowUITestCase {
     func testOpenAStepFile() throws {
         let part = dir.appending(path: "ball.step")
         try Self.sphereStep.write(to: part, atomically: true, encoding: .utf8)
-        app.launch()
-
-        let toggle = app.descendants(matching: .any)["fins-toggle"].firstMatch
-        if !panelExists("open-panel", timeout: 5) && !toggle.exists { app.typeKey("o", modifierFlags: .command) }
-        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
-        // the panel offers .step files: ⇧⌘G, the path, Return (go to it), Return (Open)
-        app.typeKey("g", modifierFlags: [.command, .shift])
-        app.typeText(part.path)
-        app.typeKey(.return, modifierFlags: [])
-        app.typeKey(.return, modifierFlags: [])
-
-        XCTAssertTrue(toggle.waitForExistence(timeout: 30), "the STEP file's window opened")
-        let note = app.staticTexts["STEP: tessellated at 0.01 mm."]
+        // the panel offers .step files; OpenCascade takes a moment
+        try openPart(part, timeout: 30)
+        let note = partWindow.staticTexts["STEP: tessellated at 0.01 mm."]
         XCTAssertTrue(note.waitForExistence(timeout: 10), "the import note")
-    }
-
-    private func panelExists(_ id: String, timeout: TimeInterval) -> Bool {
-        let shown = NSPredicate { _, _ in
-            self.app.dialogs.firstMatch.exists || self.app.sheets.firstMatch.exists || self.app.windows[id].exists
-        }
-        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: shown, object: nil)], timeout: timeout) == .completed
     }
 
     /// A 12 mm ball: one spherical face (OpenCascade's own export, `parity/step-fixtures/sphere.step`).
