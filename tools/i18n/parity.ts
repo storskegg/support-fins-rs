@@ -139,7 +139,8 @@ for (const e of Deno.readDirSync(tmp)) {
         if (depth > 0) { found.push({ key: it.key, where, kind: "js.t" }); continue; }
       }
     }
-    if (src.includes("/SupportFinsViewer/")) { viewerLits.push({ key: it.key, where: `${rel}:${it.location.startingLine}`, kind: "other" }); continue; }
+    // tables of web keys looked up through JS.t / JS.tn by their user: the viewer package and the import note
+    if (src.includes("/SupportFinsViewer/") || src.endsWith("/Session/ImportNote.swift")) { viewerLits.push({ key: it.key, where: `${rel}:${it.location.startingLine}`, kind: "other" }); continue; }
     if (!compiledAt.has(`${src.split("/").pop()}:${it.location.startingLine}:${it.key}`)) other.push({ key: it.key, where, kind: "other" });
   }
 }

@@ -48,7 +48,7 @@ what `docs/FFI.md` exposes.
 | `#toast`, `#clash-banner`, `#spinner`, `#fps` | `index.html:244-246, 83, 598` | An overlay banner / toast with Undo, a progress overlay on the view (appears after 300 ms of building, `ui/finbuild.js:101-106`), and the debug-only frame-time overlay. |
 
 **Documents.** One window per part file (`DocumentGroup`, read-only part import in M4a/M4b: STL, OBJ, 3MF, STEP). A plate with several models is one window (M6). Sessions (the supports a user placed by hand,
-stored inside the exported 3MF, `ui/session.js`) come back with M7.
+stored inside the exported 3MF, `ui/session.js`) come back with M7 (done: a 3MF this app or the site wrote restores its walls, mode, settings and removed fins; the import note says so; the web has no File menu item for sessions, the 3MF export carries one and Open restores it).
 
 ---
 
@@ -234,7 +234,7 @@ Groups' hints and mode gates: Pad numbers are shown only for Custom (`ui/setting
 | Control (`id`) | Type | Label | Default | Range / choices | Tooltip (verbatim) | Source | Native element | M |
 |---|---|---|---|---|---|---|---|---|
 | `r-info` | button | i |  |  | Grams assume PLA and count only the fins + pad the tool adds, printed near-solid, cross-checked against the builder's fin volume. In test prints, breakaway fins used 20–45% less plastic and printed ~30% faster than slicer supports. | index.html:615; index.html only (title tooltip) | Info button on the grams receipt: popover | M4b |
-| `report-link` | button | Something didn’t get supported? |  |  | Opens a GitHub issue filled in with this build’s settings and numbers (not your model: attach it there if you can) | index.html:621; ui/report.js:34 | Link button: opens a prefilled GitHub issue | M7 |
+| `report-link` | button | Something didn’t get supported? |  |  | Opens a GitHub issue filled in with this build’s settings and numbers (not your model: attach it there if you can) | index.html:621; ui/report.js:34 | Link button: opens a prefilled GitHub issue (`Features/Report`, M7 done) | M7 |
 | `report-copy` | button | Copy settings |  |  | Copy this build’s settings as JSON: with the model, they rebuild exactly these supports | index.html:623; ui/report.js:44 | Button: copies the build settings JSON (Edit > Copy Build Settings) | M7 |
 
 ---
@@ -386,7 +386,7 @@ New native shortcuts to propose (not in the web app; they use the menu bar, so t
 | `support_fins_draw_shape` | Line / Curve | `ui/walls.js:41-44, 618` | `UserDefaults` |
 | `support_fins_lang` | UI language | `ui/i18n.js:16-23` | system language |
 
-The other fin settings are not persisted in the web app (they come back from a session in the exported 3MF, `ui/session.js`): M7 persists them per document (`.supportfins` session in the 3MF as the web does, `Metadata/support_fins.json`).
+The other fin settings are not persisted in the web app (they come back from a session in the exported 3MF, `ui/session.js`): persisted per document in the 3MF's session, as the web does (`Metadata/support_fins.json`; done, `Session/`).
 
 ---
 

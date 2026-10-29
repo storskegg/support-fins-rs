@@ -338,7 +338,8 @@ fn footprint_arrange(grids: Vec<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> 
 
 `export_plate` writes a plate of several models as one 3MF (`FORMATS['export-3mf']` over `plateGeometry`, `ui/export.js`, through
 `writePlate3MF`): each model its own objects (the part, its supports with the interface crest split off, a slicer's own parts, its
-paint) standing at (`x`, `y`) on the plate, titled with the first model's name, no session yet. A model with a `build` carries its
+paint) standing at (`x`, `y`) on the plate, titled with the first model's name; a plate of one model carries its `session`
+(M7, "Sessions" below), a plate of several none. A model with a `build` carries its
 fins less the `removed` record ids, its `drawn` walls, and the pad -- the same `kept_added` the single-model `export` uses; with no
 `build` it is the part alone, seated from `pose` (nine numbers, column-major) at `threshold`. `options_json` is `{ "bed": [x, y] }`,
 the build volume the spots are on. `export_plates` writes each `PlateFile` as a 3MF entry named `name` of one .zip (`zipStore`,
@@ -346,3 +347,73 @@ the build volume the spots are on. `export_plates` writes each `PlateFile` as a 
 (fins, a fin removed, the part alone, the interface crest) and the zip through the real writers, and
 `crates/sf-ffi/tests/export.rs` compares them. `footprint_arrange` is `arrange`'s placement (`sf_engine::footprint::arrange`: `pack`'s
 spots, a model with no room in a row past the bed's right edge).
+
+## M7 additions: report links (`ui/report.js`, `web/report.js`)
+
+```rust
+#[uniffi::export] fn build_report(result: &BuildResult, scale: f64, opts_json: String, tunables_json: String) -> Result<Arc<BuildReport>, FfiError>;
+impl BuildReport {
+  fn settings_json(&self) -> String;                                    // JSON.stringify(rep, null, 2): what Copy settings copies
+  fn url(&self, site: String, when: String, drawn: u32, removed: u32) -> String;   // reportUrl: the prefilled GitHub issue link
+}
+```
+
+`result` is the build on screen; `scale` the part's scale (1 = as loaded); `opts_json` / `tunables_json` the two texts
+`Builder.build` took for it. The report's `opts` is the page's `finOpts()` request rebuilt from them
+(`sf_io::report::web_fin_opts`: `bedPad` is `padStyle !== 'off'`, `sway` gets `swayOpts()`'s keys with `crossAbove`
+the tall-wall height or `null`, `tunables` as sent). The part's size is the box of its Float32 positions and `faces`
+its triangle count; the threshold and the pose are the build's. `site` and `when` fill the "Site" line (the page
+sends `location.host`; the app sends `Support Fins for Mac <engine_version>`), `drawn` is the walls drawn by hand
+that built and `removed` the fins removed by hand. `crates/sf-ffi/tests/report.rs` compares both outputs with
+`parity/oracle/ffireport.js`, which runs the page's `finOpts` request, `buildFins`, `reportSettings`,
+`reportCoverage` and `reportUrl`, byte for byte.
+## M7 additions: sessions (the 3MF carries the supports drawn by hand and the settings)
+
+A 3MF the web exports holds a session beside the model (`Metadata/support_fins.json`, `web/ui/session.js`, #214): the drawn
+walls as points, the fin mode, fins on or off, the settings and the removed fins' keys. This app writes the same file and
+opens the web's, both ways. The maths is `sf_io::session` (a port of session.js: `session_of`, `part_object_of`,
+`restore_session`, `form_of`), the corpus `parity/corpus/session/` (`just oracle session`: 29 sessions saved by the page's own
+`sessionOf` and `writePlate3MF` and read back by its own `restoreSession`, run on the real source text of `ui/session.js`).
+
+```rust
+// reading
+impl Part {
+  fn has_session(&self) -> bool;                              // the 3MF this part came from carried a session still to be restored
+  fn restore_session(&self, beside: bool) -> SessionRestore;  // once, as the part arrives (afterLoad); a second call, or a part with none: why "none"
+}
+#[derive(uniffi::Record)] struct SessionRestore { why: Option<String> /* "changed" | "unreadable" | "none"; None: restored */,
+    walls: Vec<SessionWall>, removed: Vec<String>, fin_mode: Option<String>, fins_visible: Option<bool>, form: Vec<SessionField>, import_note: String }
+#[derive(uniffi::Record)] struct SessionWall { sway: bool, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>, face: u64, capped: bool }
+#[derive(uniffi::Record)] struct SessionField { id: String, flag: Option<bool>, text: Option<String> }
+fn js_number_text(x: f64) -> String;                          // String(x): a number setting as the page's field holds it
+```
+
+- **`load_parts`** returns just the part of a file that carries a session and whose objects are the part and its "<name> supports"
+  (`partObjectOf`): the supports come back from the session, not as a mesh, and the object picker is skipped (`io.js:238-241`).
+  Its import note counts all the file's objects ("imported “x” of 2 objects"), as the web's does.
+- **`restore_session(beside)`** is `restoreSession`. `why` is `changed` when the part read back is not the one saved (its size
+  differs by more than 0.05 mm) and `unreadable` when the session is malformed (an unknown fin mode, a wall without its points,
+  ...); the part then loads as a plain part and its note says so. Otherwise `walls` are the hand-placed supports **in the part's
+  own frame** (the web's centred frame shifted by the box centre, since the Rust part stays in the file's frame), a brace's `face`
+  the nearest face of the part (`nearestFace`), `removed` the keys of `FinKey`, `fin_mode` / `fins_visible` the saved ones (the
+  page's defaults when the file has none; `None` beside a plate, which keeps its own) and `form` the settings, each the
+  `FORM_IDS` id of the web's field with its value as the field holds it once the page has settled it (`settle`: a range input
+  snaps to its steps, `sway-cross-height` and `tall-ribs-height` are clamped by their change handlers). A value a field cannot
+  take (a menu option that no longer exists, a blank number) is left out, keeping the app's. The pose is not stored: the
+  exported part is already in that pose, so the restored pose is the identity. `beside`: added to a plate of models, whose
+  settings, mode and fins visibility the part takes (`form` is empty).
+- **`import_note`** is `renderImportNote` after the restore: the session clause ("restored N hand-placed supports and the
+  settings", "restored the settings", the "plate keeps its settings" forms beside a plate, "saved supports not loaded: ...") is
+  last. `Part::scaled` drops it (`forgetSessionNote`, `ui/scale.js`), as the rescaled part no longer has the supports.
+- **Writing.** `export`'s `options_json` takes `"session": { "finMode", "finsVisible", "form": [[id, value], ...], "walls": [...],
+  "removed": [...] }` (3MF only; an STL ignores it): `form` the part's settings as the web's fields hold them (strings and
+  checkbox booleans) **in `FORM_IDS` order** without the viewer's ids and the nozzle, `walls` as `DrawnWall.json` writes them
+  (`kind` `wall` or `sway`, in the part's own frame), `removed` the removed fins' keys. The file's session is `sessionOf`'s text
+  (points relative to the box centre of the part as written, 1e-5 mm, key order as the web's), so the bytes equal the web's for
+  the same state (`crates/sf-ffi/tests/session.rs`). `PlateModel.session` is the same JSON text; a plate of **one** model writes it
+  (`session: gs.length === 1 ? gs[0].session() : null`, `ui/export.js`), a plate of several none. A session that is not whole is
+  an `Engine` error before anything is written.
+- Tested against the page three ways: the native reader restores what the page's `restoreSession` restored from the page's own
+  files (`parity_session.rs`, `session.rs`); `export` writes the page's bytes for the same models; and Deno's real
+  `readThreeMF` + `partObjectOf` + `restoreSession` (`parity/cli/session_check.js`, run by `session.rs`) read the files the
+  native side wrote to the state they were written from.

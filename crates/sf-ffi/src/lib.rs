@@ -11,6 +11,8 @@ mod footprint;
 mod gpu;
 mod part;
 mod records;
+mod report;
+mod session;
 mod suggest;
 
 pub use builder::{
@@ -28,6 +30,8 @@ pub use part::{
     AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts, merge_parts,
     scale_from_percent_text, scale_percent_text,
 };
+pub use report::{BuildReport, build_report};
+pub use session::{SessionField, SessionRestore, SessionWall, js_number_text};
 pub use suggest::{
     LoadAlignment, StrengthAdvice, StrengthPose, SuggestContext, SuggestListener, SuggestResult,
     SuggestTier, Suggester, Suggestion, load_alignment,

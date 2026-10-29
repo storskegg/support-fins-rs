@@ -76,7 +76,8 @@ final class BuildWiring {
                     .init(partName: $0.info.name, part: $0.part, nozzle: session.settings.nozzle,
                           layerHeight: session.settings.layerHeight, pose: session.pose.columnMajor,
                           threshold: session.settings.threshold,
-                          bed: [Double(controller.volume.x), Double(controller.volume.y)])
+                          bed: [Double(controller.volume.x), Double(controller.volume.y)],
+                          session: session.sessionJSON)
                 }
             },
             removed: { [session] in session.removedFins })

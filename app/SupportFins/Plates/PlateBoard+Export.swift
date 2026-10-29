@@ -28,6 +28,7 @@ extension PlateBoard {
         guard plates.indices.contains(i) else { return nil }
         let p = plates[i], settings = plateSettings(i)
         var models: [PlateModel] = []
+        var sessions: [String] = []
         var first: String?
         for (k, m) in p.models.enumerated() {
             let part: CorePart, build: BuildModel?, pose: Pose, removed: Set<FinKey>
@@ -41,11 +42,14 @@ extension PlateBoard {
             }
             let result = settings.finsOn ? build?.latest : nil
             let ids = result == nil ? [] : (build?.matchedRemovals(of: removed).keys.sorted().map { UInt64($0) } ?? [])
+            // a plate of one model carries its session (`session: gs.length === 1 ? gs[0].session() : null`)
+            sessions.append(SessionFile.json(settings: settings.settings, finsOn: settings.finsOn, walls: walls(m), removed: removed))
             models.append(PlateModel(part: part.part, build: result, drawn: result == nil ? nil : drawn(m), pose: pose.columnMajor,
-                                     threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y))
+                                     threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y, session: nil))
             if first == nil { first = part.info.name }
         }
         guard let first else { return nil }
+        if models.count == 1 { models[0].session = sessions[0] }
         let base = ExportModel.base(of: first)
         let stem = models.count == 1 ? base : "\(base)-and-\(models.count - 1)-more"
         let name = exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.nozzle, layerHeight: settings.settings.layerHeight)

@@ -159,7 +159,7 @@ struct FeatureSetTests {
         #expect(model.features.overlays.map(\.id) == expected)
         #expect(model.toolbar.slots.map(\.id) == ["move", "arrange", "rotate", "scale-badge", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
-        #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
+        #expect(model.features.inspectorSections(.top).map(\.id) == ["readout", "report"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
         #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["augment", "remove-fins", "draw-controls"])
@@ -182,15 +182,30 @@ struct FeatureSetTests {
         view.append("  Show Frame Time")
         #endif
         view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]", "  -", "  Section View"]
-        let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
-                     "  Lay a Face Flat", "  -", "  Move", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
+        let model = ["Model", "  Rotate 90° About X [r]", "  Rotate 90° About Y [⌥⌘r]", "  Rotate 90° About Z [⌃⌘r]", "  Reset Rotation", "  -",
+                     "  Lay a Face Flat", "  -", "  Move", "  Arrange", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
-        let edit = ["Edit", "  Remove Model from Plate"]
+        let edit = ["Edit", "  Remove Model from Plate", "  -", "  Copy Build Settings"]
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
         let window = ViewerModel()
         #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file + edit)
+    }
+
+    /// Backspace and Delete are keys of the whole window (`app.js:56-74`), not of the 3D view: the key monitor takes them
+    /// while the focus is outside a text field, a slider or a pop-up.
+    @MainActor @Test func backspaceAndDeleteAreNamedAndSkipFields() throws {
+        func key(_ code: UInt16) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                          context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code))
+        }
+        #expect(try key(51).deleteKey == .backspace && key(117).deleteKey == .delete && key(0).deleteKey == nil)
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: true)
+        let field = NSTextField(frame: .init(x: 0, y: 0, width: 100, height: 20)), slider = NSSlider(frame: .init(x: 0, y: 30, width: 100, height: 20))
+        for v in [field, slider] { window.contentView?.addSubview(v) }
+        #expect(window.makeFirstResponder(slider) && window.focusIsInAField)
+        #expect(window.makeFirstResponder(nil) && !window.focusIsInAField)
     }
 
     /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.

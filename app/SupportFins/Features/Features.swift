@@ -18,5 +18,7 @@ enum Features {
         PlatesFeature.self,
         ExportFeature.self,
         ReadoutFeature.self,
+        ReportFeature.self,
+        SessionFeature.self,
     ]
 }

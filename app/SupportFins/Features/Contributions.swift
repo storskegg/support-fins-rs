@@ -12,14 +12,18 @@ struct WindowOverlay: Identifiable {
     var alignment: Alignment
     /// Draw under the title bar and the toolbar, like the viewport (only the frame-time readout needs it).
     var ignoresSafeArea: Bool
+    /// The layer places its content at viewport points (a projected point, the pointer), so it stays left to right
+    /// in a right-to-left language: SwiftUI mirrors `.position` and `.offset` there, the viewport does not mirror.
+    var inViewportSpace: Bool
     var content: () -> AnyView
 
     init<V: View>(_ id: String, order: Int, alignment: Alignment = .topLeading, ignoresSafeArea: Bool = false,
-                  @ViewBuilder content: @escaping () -> V) {
+                  inViewportSpace: Bool = false, @ViewBuilder content: @escaping () -> V) {
         self.id = id
         self.order = order
         self.alignment = alignment
         self.ignoresSafeArea = ignoresSafeArea
+        self.inViewportSpace = inViewportSpace
         self.content = { AnyView(content()) }
     }
 }
@@ -163,6 +167,7 @@ struct MenuSection {
 struct MenuButton {
     var title: String
     var shortcut: KeyEquivalent?
+    var modifiers: EventModifiers = .command
     var help: String?
     var enabled: Bool
     var action: @MainActor () -> Void
@@ -184,9 +189,10 @@ indirect enum MenuEntry {
     case note(String)
     case submenu(String, [MenuEntry])
 
-    static func item(_ title: String, shortcut: KeyEquivalent? = nil, help: String? = nil, enabled: Bool = true,
+    static func item(_ title: String, shortcut: KeyEquivalent? = nil, modifiers: EventModifiers = .command,
+                     help: String? = nil, enabled: Bool = true,
                      action: @escaping @MainActor () -> Void) -> MenuEntry {
-        .button(MenuButton(title: title, shortcut: shortcut, help: help, enabled: enabled, action: action))
+        .button(MenuButton(title: title, shortcut: shortcut, modifiers: modifiers, help: help, enabled: enabled, action: action))
     }
 
     static func check(_ title: String, help: String? = nil, enabled: Bool = true, isOn: Binding<Bool>) -> MenuEntry {
@@ -196,7 +202,7 @@ indirect enum MenuEntry {
     /// The entry as one line of a snapshot: its title, "-" for a divider, "> " for a submenu's items.
     var snapshot: [String] {
         switch self {
-        case .button(let b): [b.title + (b.shortcut.map { " [\($0.character)]" } ?? "")]
+        case .button(let b): [b.title + (b.shortcut.map { " [\(b.modifiers.symbols)\($0.character)]" } ?? "")]
         case .toggle(let t): [t.title]
         case .divider: ["-"]
         case .note(let text): ["(\(text))"]
@@ -229,7 +235,7 @@ private struct MenuEntryView: View {
         switch entry {
         case .button(let b):
             Button(b.title, action: b.action)
-                .keyboardShortcut(b.shortcut.map { KeyboardShortcut($0) })
+                .keyboardShortcut(b.shortcut.map { KeyboardShortcut($0, modifiers: b.modifiers) })
                 .help(b.help ?? "")
                 .disabled(!b.enabled)
         case .toggle(let t):
@@ -243,5 +249,13 @@ private struct MenuEntryView: View {
         case .submenu(let title, let entries):
             Menu(title) { MenuEntriesView(entries: entries) }
         }
+    }
+}
+
+extension EventModifiers {
+    /// Mac order (control, option, shift, command); empty for the plain command key, which a snapshot leaves unsaid.
+    var symbols: String {
+        guard self != .command else { return "" }
+        return [(Self.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")].filter { contains($0.0) }.map(\.1).joined()
     }
 }

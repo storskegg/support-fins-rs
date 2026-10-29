@@ -16,14 +16,17 @@ struct LayFaceButton: View {
 /// part), this is what says the next click lays a face.
 struct LayFaceHint: View {
     let model: LayFaceModel
+    /// The clash banner is up: it sits between the plate tabs and this hint.
+    var clashBannerUp = false
 
     var body: some View {
         if model.armed {
             Text(LocalizedStringKey(model.title))
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .glassEffect(.regular, in: .capsule)
-                // under the plate tabs and the clash banner, which share the top of the view (`Plates/`)
-                .padding(.top, 96)
+                // under the plate tabs (8 + 36 pt) and, when it is up, the clash banner (52 + 32 pt): the hint follows
+                // the last of them instead of leaving a gap where there is no banner (`Plates/`)
+                .padding(.top, clashBannerUp ? 96 : 52)
                 .allowsHitTesting(false)
                 .accessibilityIdentifier("lay-face-hint")
         }

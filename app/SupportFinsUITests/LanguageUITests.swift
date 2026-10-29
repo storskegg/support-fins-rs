@@ -4,8 +4,13 @@ import XCTest
 /// window shows the web's translations. The launch, the window and the helpers are `PartWindowUITestCase`'s.
 final class LanguageUITests: PartWindowUITestCase {
     /// Relaunch the app in a language: set before `openFixturePart()` launches it.
+    ///
+    /// `-AppleTextDirection YES` lets the language set the layout direction, as on a Mac whose language is Arabic.
+    /// It does not force right to left (English and German stay left to right with it); without it a Mac with
+    /// `AppleTextDirection = 0` in its global preferences (`/Library/Preferences/.GlobalPreferences`, as on the
+    /// test Mac) keeps every app left to right whatever its language, and the Arabic window was not mirrored.
     private func launch(in language: String, locale: String) throws {
-        app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", locale]
+        app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", locale, "-AppleTextDirection", "YES"]
         try openFixturePart()
     }
 
@@ -16,6 +21,8 @@ final class LanguageUITests: PartWindowUITestCase {
         XCTAssertEqual(element("fins-toggle").label, "Finnen hinzufügen")
         XCTAssertEqual(element("toolbar-scale-badge").label, "Skalieren")
         XCTAssertEqual(element("toolbar-rotate").label, "Drehen")
+        // left to right: the build volume, the toolbar's first item, is left of Add fins
+        XCTAssertLessThan(element("volume").frame.midX, element("fins-toggle").frame.midX)
     }
 
     func testArabicShowsTheWebsTranslationsAndMirrorsTheLayout() throws {
@@ -25,7 +32,10 @@ final class LanguageUITests: PartWindowUITestCase {
         XCTAssertEqual(element("toolbar-scale-badge").label, "تحجيم")
         XCTAssertEqual(element("toolbar-rotate").label, "تدوير")
         // right to left: the build volume, the toolbar's first item, sits to the right of Add fins (it is to its left in
-        // English); SwiftUI mirrors the window itself, the app forces no direction
+        // German); SwiftUI mirrors the window itself, the app forces no direction. The 3D view and the view cube stay
+        // left to right (`ContentView`, `ViewCubeView`)
         XCTAssertGreaterThan(element("volume").frame.midX, element("fins-toggle").frame.midX)
+        // the inspector moves to the window's left: its left edge is left of the viewport's centre
+        XCTAssertLessThan(element("stat-name").frame.minX, element("viewport").frame.midX)
     }
 }

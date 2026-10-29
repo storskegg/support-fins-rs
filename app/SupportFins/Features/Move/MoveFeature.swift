@@ -74,17 +74,3 @@ final class MoveFeature: Feature {
         ])]
     }
 }
-
-/// A window-wide key handler (a local `NSEvent` monitor): the web's capturing `keydown` on the page. It lives as long
-/// as the feature and is removed with it.
-private final class KeyMonitor: @unchecked Sendable {
-    private let token: Any?
-
-    @MainActor init(handler: @escaping @MainActor (NSEvent) -> Bool) {
-        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            MainActor.assumeIsolated { handler(event) } ? nil : event
-        }
-    }
-
-    deinit { if let token { NSEvent.removeMonitor(token) } }
-}

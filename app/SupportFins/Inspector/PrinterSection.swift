@@ -31,6 +31,9 @@ struct PrinterSection: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { open.toggle() }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(open ? "Done" : "Edit")
             .tipCard(pic: "printer", JS.t("Your printer: nozzle, layer height, support gap, interface material. Click to change."))
         }
     }

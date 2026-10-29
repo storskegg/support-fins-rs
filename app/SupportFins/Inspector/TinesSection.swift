@@ -20,6 +20,8 @@ struct TinesSection: View {
                         Text(settings.pins ? "fewer" : "light").font(.caption).foregroundStyle(.secondary)
                         Slider(value: $settings.tineDensity, in: 0...100, step: 5, onEditingChanged: session.settingsEditing)
                             .accessibilityIdentifier("tine-density")
+                            .accessibilityLabel(settings.pins ? "Pins per wall" : "Tine grip")
+                            .accessibilityValue(JS.t("{n} percent", ["n": String(Int(settings.tineDensity))]))
                         Text(settings.pins ? "more" : "firm").font(.caption).foregroundStyle(.secondary)
                     }
                 }
