@@ -36,7 +36,7 @@ final class RotateFeature: Feature {
     func partWillShow() { layFace.cancel() }
 
     var overlays: [WindowOverlay] {
-        [WindowOverlay("lay-face-hint", order: 50, alignment: .top) { LayFaceHint(model: self.layFace) }]
+        [WindowOverlay("lay-face-hint", order: 50, alignment: .top) { LayFaceHint(model: self.layFace, clashBannerUp: self.host.features[PlatesFeature.self]?.board.clashing == true) }]
     }
 
     var modifiers: [WindowModifier] {
