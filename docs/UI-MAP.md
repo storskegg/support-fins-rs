@@ -70,7 +70,7 @@ stored inside the exported 3MF, `ui/session.js`) come back with M7 (done: a 3MF 
 | `export-fins` | button | Fins only (STL) |  |  | Just the fins and pad, in the part's print position, so they line up if imported beside it. | index.html:121; ui/export.js:203 | Export > Fins only (STL) | M4b |
 | `export-all` | button | All plates (3MF) |  |  | Every plate's part and supports, one 3MF each, in one .zip file. | index.html:123; ui/export.js:263 | Export > All plates (3MF), one .zip | M6 |
 | `more-btn` | button | ☰ |  |  | Build volume, overhang, calibration, plugins, language and links. | index.html:130; ui/topbar.js:17 | DROPPED (phone layout) | - |
-| `calibrate` | button | Calibrate ▾ |  |  | Test prints that tune the settings to your printer and filament. | index.html:136; ui/calibrate.js:63 | Help > Calibration prints submenu (opens a sheet with the list) | M7 |
+| `calibrate` | button | Calibrate ▾ |  |  | Test prints that tune the settings to your printer and filament. | index.html:136; ui/calibrate.js:63 | Help > Calibration Prints… (opens a sheet with the list; `Features/Calibration`, M7 done) | M7 |
 | `plugins` | button | Plugins ▾ |  |  |  | index.html:150; ui/plugins.js:136 | DROPPED (in-page plugin loader / downloads) | - |
 | `plugins-computer` | select | Your computer | (see choices, * = default) | (filled by JS) |  | index.html:154; ui/plugins.js:138 | DROPPED | - |
 | `lang-btn` | button | Language ▾ |  |  |  | index.html:163; app.js:278 | DROPPED as a control: the app follows the system language (Settings > Language); strings via a String Catalog | M7 |

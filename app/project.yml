@@ -28,7 +28,12 @@ targets:
     type: application
     platform: macOS
     sources:
-      - SupportFins
+      - path: SupportFins
+        excludes:
+          - Resources/Calibration
+      # the test prints and their estimates (web/calibration/), kept as a folder: file names stay as the page serves them
+      - path: SupportFins/Resources/Calibration
+        type: folder
     dependencies:
       - package: Viewer
         product: Viewer
