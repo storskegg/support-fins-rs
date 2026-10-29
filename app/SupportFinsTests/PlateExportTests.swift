@@ -146,7 +146,8 @@ struct PlateExportTests {
     }
 
     @Test func onePlateWithModelsIsTheThreeMFAlone() async throws {
-        let (_, board) = try await two()
+        let (model, board) = try await two()
+        defer { withExtendedLifetime(model) {} }         // the board works through its window
         board.addPlate()
         let out = try dir().appending(path: "x.3mf")
         let panel = Panel(url: out)
