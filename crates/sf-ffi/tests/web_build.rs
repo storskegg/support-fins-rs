@@ -2,6 +2,7 @@
 //! runs `buildFins` as web/finworker.js runs it, with the `finOpts()`-shaped request and tunables the page
 //! sends, and records the counts, a hash of the triangles and the per-fin records. The FFI build must give
 //! the same numbers, records and triangles, exactly.
+// these tests are about the page-vs-CLI difference and the refusals, so they spell the request out (`"{}"` is the empty request); see common/mod.rs.
 use std::path::PathBuf;
 
 use sf_ffi::{BuildResult, build_part, load_parts};

@@ -11,7 +11,7 @@ struct SuggestModelTests {
         let pose = FakePose()
         let model = SuggestModel(part: try TestParts.cube(), pose: pose.access)
         #expect(model.state == .idle && model.rows.isEmpty && model.buttonTitle == "Suggest orientation")
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(model.buttonTitle == "Ranking…" && model.isRanking)
         #expect(await eventually { !model.isRanking })
         guard case .ready = model.state else { Issue.record("ranking did not finish: \(model.state)"); return }
@@ -20,7 +20,7 @@ struct SuggestModelTests {
 
     @Test func theButtonShowsTheRankingsProgressAsAPercentage() async throws {
         let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         let g = try #require(model.wanted)
         // nothing reported yet: the bare label
         #expect(model.buttonTitle == "Ranking…")
@@ -45,7 +45,7 @@ struct SuggestModelTests {
     @Test func theAppRunsTheWideSearch() async throws {
         #expect(SuggestModel.searchDensity == 10, "ten times the web's candidate poses")
         let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(await eventually { !model.isRanking })
         guard case .ready = model.state else { Issue.record("the wide ranking did not finish: \(model.state)"); return }
         #expect(!model.rows.isEmpty)
@@ -53,7 +53,7 @@ struct SuggestModelTests {
 
     @Test func aPartThatNeedsNoFinsGetsTheGreenRowAndTheWinAsTheNote() async throws {
         let model = SuggestModel(part: try TestParts.cube(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(await eventually { !model.isRanking })
         let best = try #require(model.rows.first)
         // the page's words: "Best", then "{height} mm · no fins"
@@ -65,7 +65,7 @@ struct SuggestModelTests {
 
     @Test func aRowsLineIsTheEnginesHeightAndFinCount() async throws {
         let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(await eventually { !model.isRanking })
         #expect(!model.rows.isEmpty)
         for r in model.rows {
@@ -79,7 +79,7 @@ struct SuggestModelTests {
     @Test func aClickOnARowTurnsThePartOnceAndAManualTurnDropsTheHighlight() async throws {
         let pose = FakePose()
         let model = SuggestModel(part: try TestParts.tShape(), pose: pose.access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(await eventually { !model.isRanking })
         let row = try #require(model.rows.last)
         model.pick(model.rows.count - 1)
@@ -97,7 +97,7 @@ struct SuggestModelTests {
 
     @Test func aRankingThatIsResetIsNeverShown() async throws {
         let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         model.reset()
         #expect(model.state == .idle)
         try await Task.sleep(for: .seconds(1))
@@ -113,7 +113,7 @@ struct SuggestModelTests {
         settings.mode = mode
         settings.sway = sway
         let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: settings.optionsJSON(), tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: settings.optionsJSON(), tunablesJSON: settings.tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(await eventually { !model.isRanking })
         guard case .ready = model.state else { Issue.record("ranking failed: \(model.state)"); return }
         #expect(!model.rows.isEmpty)
@@ -121,7 +121,7 @@ struct SuggestModelTests {
 
     @Test func badOptionsAreShownAsTheEnginesMessage() async throws {
         let model = SuggestModel(part: try TestParts.cube(), pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: #"{"mode":"bogus"}"#, tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: #"{"mode":"bogus"}"#, tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(await eventually { !model.isRanking })
         guard case .failed(let message) = model.state else { Issue.record("expected a failure: \(model.state)"); return }
         #expect(!message.isEmpty && model.note == message)
@@ -129,7 +129,7 @@ struct SuggestModelTests {
 
     @Test func withoutAPartThereIsNothingToRank() {
         let model = SuggestModel(part: nil, pose: FakePose().access)
-        model.rank(thresholdDegrees: 45, optionsJSON: "{}", tunablesJSON: "{}", currentBore: 0, density: 1.24)
+        model.rank(thresholdDegrees: 45, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON(), currentBore: 0, density: 1.24)
         #expect(model.state == .idle)
     }
 
@@ -154,7 +154,7 @@ struct SuggestModelTests {
         let plain = try await ranked()
         var changed = window.session.settings
         changed.nozzle = 0.8
-        changed.wallLines = 3
+        changed.wallLines = 4
         changed.gap = 0.4
         changed.bedPad = .custom
         changed.padThickness = 1

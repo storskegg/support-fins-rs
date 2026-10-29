@@ -1,5 +1,6 @@
 //! The readout data of `summary_json()`, `after_removal_json()` and the part-level numbers, each checked
 //! against the engine value the page's `ui/readout.js` / `ui/part.js` read.
+// every build here is compared with the engine on the same inputs, so the request is spelled out (`"{}"` is the empty request); see common/mod.rs.
 use std::sync::Arc;
 
 use sf_cli::entry::{PageRequest, engine_request, options_from_dialog};

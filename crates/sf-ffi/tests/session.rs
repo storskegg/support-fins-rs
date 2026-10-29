@@ -6,6 +6,7 @@
 //! - the files `export` writes from the same models are the page's bytes, session included;
 //! - the files the native side writes are read by the page's reader (Deno, `parity/cli/session_check.js`) to the
 //!   state they were written from.
+// `"{}"` is the plate export's empty options (the failure case), not an app request; see common/mod.rs.
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;

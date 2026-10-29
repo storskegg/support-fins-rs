@@ -183,7 +183,10 @@ impl DrawKit {
             None
         } else {
             match parse(&tunables_json) {
-                Some(j @ Json::Obj(_)) => Some(sf_io::fins_opts::tunables_from_json(&j)),
+                Some(j @ Json::Obj(_)) => {
+                    crate::builder::check_tunable_ranges(&j)?;
+                    Some(sf_io::fins_opts::tunables_from_json(&j))
+                }
                 _ => return Err(engine("tunables must be a JSON object")),
             }
         };

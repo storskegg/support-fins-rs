@@ -35,6 +35,13 @@ you start a ticket, and again whenever a review sends you back.
    **After adding or moving Swift files, regenerate the project (`just app-project`) before
    testing; `just gate` does it.** The Xcode project is generated and gitignored, and a stale one
    silently skips new test files (201 tests run instead of 211). `just gate` prints the test count.
+   **Tests use the app's real JSON, not `"{}"`.** `parity/fixtures/app-settings/*.json` hold what `FinSettings`
+   produces (`optionsJSON`, `tunablesJSON`, `drawSettingsJSON`, the session form) for the defaults and a few variants.
+   `FinSettingsFixtureTests` (Swift) fails when `FinSettings` stops producing them byte for byte (the failure names the
+   folder with the new text to copy over); `crates/sf-ffi/tests/app_settings.rs` runs every file through every
+   JSON-taking FFI entry. A test about app behaviour takes its request from `crates/sf-ffi/tests/common` or
+   `FinSettings()`; `"{}"` stays only for empty-input and engine-default comparisons, with a comment saying why.
+   The FFI also refuses tunables outside the ranges the inspector clamps to (`check_tunable_ranges`, docs/FFI.md).
 
 
    **UI tests (`app-uitest`) are the orchestrator's only.** They take over the user's mouse and
