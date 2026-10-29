@@ -741,7 +741,7 @@ pub fn export_plates(
     for p in &plates {
         files.push(sf_io::zip::ZipFile {
             name: p.name.clone(),
-            data: sf_io::zip::ZipData::Bytes(plate_3mf_bytes(&p.models, bed.clone())?),
+            data: sf_io::zip::ZipData::Bytes(plate_3mf_bytes(&p.models, bed)?),
         });
     }
     write_file(&path, sf_io::zip::zip_store(&files))
