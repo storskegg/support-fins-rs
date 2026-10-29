@@ -96,6 +96,13 @@ final class ExportModel {
     @ObservationIgnored private let removedKeys: @MainActor () -> Set<FinKey>
     /// The format ⌘E writes again.
     var lastFormat = ExportFormat.stl
+    /// The hand-placed supports of Draw (Features/Draw): written between the fins and the pad, and not offered while
+    /// they are being re-stood.
+    struct Drawn {
+        var sweep: DrawnSweep?
+        var pending: Bool
+    }
+    @ObservationIgnored var drawn: @MainActor () -> Drawn = { Drawn(sweep: nil, pending: false) }
 
     init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, source: @escaping @MainActor () -> Source?,
          removed: @escaping @MainActor () -> Set<FinKey> = { [] },
@@ -117,8 +124,8 @@ final class ExportModel {
                                 note: "No fins yet: STL and 3MF write the part alone. Click Add fins first.")
         }
         // fins on: they are the build, which must have landed
-        guard let result = build.latest, !build.building else { return Availability(enabled: [], note: nil) }
-        let hasFins = result.fins().count() + result.pad().count() > 0
+        guard let result = build.latest, !build.building, !drawn().pending else { return Availability(enabled: [], note: nil) }
+        let hasFins = result.fins().count() + result.pad().count() + (drawn().sweep?.triangles().count() ?? 0) > 0
         return Availability(
             enabled: hasFins ? Set(ExportFormat.allCases) : [.stl, .threeMF],
             note: hasFins ? nil : "No supports on this plate: STL and 3MF write the part alone.")
@@ -176,7 +183,8 @@ final class ExportModel {
         let builds: [BuildResult] = finsOn() ? build.latest.map { [$0] } ?? [] : []
         if finsOn() && builds.isEmpty { return nil }
         do {
-            try export(path: url.path(percentEncoded: false), parts: [s.part], builds: builds, optionsJson: options)
+            try exportWithDrawn(path: url.path(percentEncoded: false), parts: [s.part], builds: builds,
+                                drawn: finsOn() ? drawn().sweep : nil, optionsJson: options)
             lastWritten = url
             return url
         } catch let e as FfiError {

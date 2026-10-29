@@ -166,7 +166,7 @@ struct FinSettings: Codable, Equatable, Sendable {
     /// `swayOpts` (`web/ui/finbuild.js:115-160`) ask for. Every key is written, so the request does not depend
     /// on the engine's defaults.
     ///
-    /// - Draw (M6) places walls by hand, so it sends no `mode` and no sway braces.
+    /// - Draw places walls by hand, so it sends `mode` draw (the seating verdict and the bed pad only) and no sway braces.
     /// - Full coverage sends `coverage` 0.5 whatever the slider says (`FIN.coverDefault`): the slider is Auto's.
     /// - Sway braces send only `sway.on` when off; the other sway keys only when on.
     /// - Custom pad numbers have no key: `padStyle` is left out; they travel in `tunablesJSON()` (`padCustom`).
@@ -178,7 +178,7 @@ struct FinSettings: Codable, Equatable, Sendable {
         func put(_ key: String, _ value: Bool) { o.append((key, value ? "true" : "false")) }
         func put(_ key: String, _ value: String) { o.append((key, "\"\(value)\"")) }
 
-        if mode != .draw { put("mode", mode.rawValue) }
+        put("mode", mode.rawValue)
         put("threshold", threshold)
         put("nozzle", nozzle)
         put("tines", tines)

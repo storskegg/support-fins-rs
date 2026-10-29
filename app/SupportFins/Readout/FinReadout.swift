@@ -166,6 +166,8 @@ struct ReadoutContext: Decodable, Equatable, Sendable {
     var crestPresent = false
     /// `fillReach(built.bare.coverage)` in mm, which the engine owns (`fins/fill.js`, `FILL.denseReach`)
     var fillReach: Double?
+    /// The hand-placed supports (`ui/walls.js` state): Draw's readout, and the hand-added lines of Auto and Full.
+    var draw: DrawReadoutInput?
 
     init() {}
 }
@@ -190,6 +192,7 @@ struct FinReadout: Equatable, Sendable {
 
     /// The English text for a Full / Auto build (`updateFinReadout`).
     static func make(_ built: ReadoutBuilt?, _ ctx: ReadoutContext) -> FinReadout {
+        if ctx.mode == "draw" { return makeDraw(built, ctx) }
         var r = FinReadout()
         guard let b = built else {
             r.fins = "—"
@@ -209,28 +212,33 @@ struct FinReadout: Equatable, Sendable {
         }
         if b.propCount != 0 { seg.append(JS.tn("{n} prop", "{n} props", b.propCount)) }
         let autoTxt = seg.joined(separator: " + ")
+        // Hand-added walls (Suggest + Draw mix) count toward the tally too.
+        let shownDraw = ctx.draw.flatMap { $0.shown ? $0 : nil }
+        let drawnOk = shownDraw?.okCount ?? 0
         let removedTxt = ctx.removed != 0 ? " (\(JS.t("{n} removed", ["n": String(ctx.removed)])))" : ""
         let ribTxt = b.tallRibs != 0 ? " · " + JS.tn("{n} wall rib", "{n} wall ribs", b.tallRibs) : ""
+        let drawnTxt = drawnOk != 0 ? (autoTxt.isEmpty ? "" : " + ") + JS.t("{n} drawn", ["n": String(drawnOk)]) : ""
         var swayTxt = ""
         if let sw = b.sway, sw.count != 0 {
-            swayTxt = (!autoTxt.isEmpty ? " + " : "") + JS.tn("{n} sway brace", "{n} sway braces", sw.count)
+            swayTxt = (!autoTxt.isEmpty || !drawnTxt.isEmpty ? " + " : "") + JS.tn("{n} sway brace", "{n} sway braces", sw.count)
             if sw.tines != 0 { swayTxt += " · " + JS.t("{n} brace tines", ["n": String(sw.tines)]) }
             if sw.cross != 0 { swayTxt += " · " + JS.tn("{n} brace rib", "{n} brace ribs", sw.cross) }
         }
-        let noneNeeded = n == 0 && ctx.removed == 0 && (b.sway?.count ?? 0) == 0 && onlySmallHoles(b, ctx)
-        let text = autoTxt + ribTxt + swayTxt + removedTxt
+        let noneNeeded = n == 0 && ctx.removed == 0 && (b.sway?.count ?? 0) == 0
+            && !(shownDraw.map { !$0.walls.isEmpty } ?? false) && onlySmallHoles(b, ctx)
+        let text = autoTxt + ribTxt + drawnTxt + swayTxt + removedTxt
         r.fins = !text.isEmpty ? text : (noneNeeded
             ? JS.tn("none needed: small hole left for bridging", "none needed: small holes left for bridging", b.smallHoleRegions)
             : "none possible")
-        r.finsWarn = n == 0 && (b.sway?.count ?? 0) == 0 && !noneNeeded
+        r.finsWarn = n == 0 && drawnOk == 0 && (b.sway?.count ?? 0) == 0 && !noneNeeded
 
         // `lead` = short + must-see, stays in the panel; `help` = how-it-works and how-to-fix, behind the (i).
         var lead: [String] = []
         var help: [String] = []
-        if n == 0 {
+        if n == 0 && drawnOk == 0 {
             // Nothing placed -- the box names the outcome; the why goes in the (i).
             help.append(explainNoFins(b, ctx))
-        } else {
+        } else if n != 0 {
             let brace = b.braceCount, prop = b.propCount
             if brace != 0 {
                 help.append(b.tines != 0
@@ -243,6 +251,21 @@ struct FinReadout: Equatable, Sendable {
                 help.append(JS.tn("The {n} prop sit under overhangs too shallow to grip, so those get no tines.",
                                   "The {n} props sit under overhangs too shallow to grip, so those get no tines.", prop))
             }
+        }
+        if drawnOk != 0 {
+            lead.append(JS.tn("plus {n} wall you added by hand", "plus {n} walls you added by hand", drawnOk))
+        }
+        // Hand-placement feedback has to surface here too (Suggest + Draw mix), or a rejected wall fails silently -- the
+        // same silence-as-success trap as M5. This one is an interactive failure, so it stays visible, not behind the (i).
+        if let d = shownDraw {
+            let bad = d.walls.count - drawnOk
+            if bad != 0 {
+                let one = d.walls.first { !$0.ok }
+                let reason = (one?.reason).flatMap { $0.isEmpty ? nil : " (\($0))" } ?? ""
+                lead.append(JS.tn("{n} drawn wall couldn’t attach here{reason}", "{n} drawn walls couldn’t attach here{reason}", bad, ["reason": reason]))
+            }
+            if !d.msg.isEmpty { lead.append(d.msg) }
+            if let note = d.selectedNote { lead.append(note) }
         }
         // Worth saying even when something WAS placed: a point-balanced part is standing on the added pad and
         // nothing else, so the pad is load-bearing, not cosmetic.

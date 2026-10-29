@@ -98,7 +98,18 @@ pub fn footprint_of_part(
 /// ids) and its pad, in print space; each vertex is rounded to `f32` first, as the page's `Float32Array` is.
 #[uniffi::export]
 pub fn footprint_of_build(build: Arc<BuildResult>, removed: Vec<u64>) -> Option<Arc<Footprint>> {
-    let added = build.kept_added(&removed, &[]);
+    footprint_of_build_with_drawn(build, None, removed)
+}
+
+/// [`footprint_of_build`] with the hand-placed supports of Draw between the fins and the pad (`activeAdded()` counts
+/// them): `drawn` is the sweep of the current pose.
+#[uniffi::export]
+pub fn footprint_of_build_with_drawn(
+    build: Arc<BuildResult>,
+    drawn: Option<Arc<crate::draw::DrawnSweep>>,
+    removed: Vec<u64>,
+) -> Option<Arc<Footprint>> {
+    let added = build.kept_added(&removed, drawn.as_ref().map_or(&[][..], |d| d.tris()));
     let flat: Vec<f64> = added
         .iter()
         .flat_map(|p| [p[0], p[1], p[2]])

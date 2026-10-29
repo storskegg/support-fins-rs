@@ -139,11 +139,20 @@ struct FeatureSetTests {
         #expect(titles.filter { $0 == "View" }.count <= 1)
     }
 
+    /// No menu of the real menu bar holds two items of one title: a feature's item named like one macOS already puts
+    /// there (Edit > Delete) would be a second one beside it.
+    @MainActor @Test func noMenuNamesAnItemTwice() throws {
+        for menu in try #require(NSApp?.mainMenu).items {
+            let titles = (menu.submenu?.items ?? []).filter { !$0.isSeparatorItem && !$0.title.isEmpty && !$0.isHidden }.map(\.title)
+            #expect(Set(titles).count == titles.count, "\(menu.title): \(titles)")
+        }
+    }
+
     // MARK: the real features
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
         let model = ViewerModel()
-        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "clash-banner", "plate-toast"]
+        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "clash-banner", "plate-toast", "brace-tip"]
         #if DEBUG
         expected.insert("frame-time", at: 0)
         #endif
@@ -153,11 +162,11 @@ struct FeatureSetTests {
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
         #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
-        #expect(model.features.inspectorSections(.basics).map(\.id) == ["remove-fins"])
+        #expect(model.features.inspectorSections(.basics).map(\.id) == ["augment", "remove-fins", "draw-controls"])
     }
 
     @Test func theEscCascadePutsAnArmedPointerModeBeforeEndingRemoveFins() {
-        #expect(ViewerModel().features.escapeHandlers.map(\.id) == ["lay-face", "move", "remove-fins"])
+        #expect(ViewerModel().features.escapeHandlers.map(\.id) == ["lay-face", "draw", "move", "remove-fins"])
     }
 
     @Test func theRealFeaturesRegisterTheirSlotsOnlyWhenTheyCanOpen() {

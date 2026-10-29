@@ -39,6 +39,8 @@ struct FootprintKey: Equatable {
     /// The build whose fins and pad are counted (nil: none, fins off), and the fin ids left out.
     var build: ObjectIdentifier?
     var removed: [UInt64]
+    /// The hand-placed supports' sweep that is counted too (Features/Draw), nil: none.
+    var drawn: ObjectIdentifier? = nil
 }
 
 /// A model that is not the one being edited (`stash` of a slot, `ui/models.js park`): its mesh, its pose and removed

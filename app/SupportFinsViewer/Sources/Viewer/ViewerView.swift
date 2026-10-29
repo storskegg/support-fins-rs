@@ -37,6 +37,7 @@ public final class ViewerMTKView: MTKView {
 
     /// A press that landed on a rotate ring turns the part; the drag belongs to the ring until the button is up.
     private var ringGrabbed = false
+    private var ringPressAt: NSPoint?
     /// A press that landed on the section plane's handle or sheet: the drag is the section's until the button is up.
     private var sectionGrabbed = false
     /// A press that landed on a model with Move on: the drag is Move's until the button is up.
@@ -57,6 +58,7 @@ public final class ViewerMTKView: MTKView {
             moveGrabbed = !e.modifierFlags.contains(.control) && controller?.move.begin(x: p.x, y: p.y, width: p.w, height: p.h) == true
             if moveGrabbed { pressAt = e.locationInWindow; return }
             ringGrabbed = controller?.beginRingDrag(x: p.x, y: p.y, width: p.w, height: p.h) ?? false
+            ringPressAt = ringGrabbed ? e.locationInWindow : nil
             pressAt = ringGrabbed ? nil : e.locationInWindow
         }
     }
@@ -73,9 +75,17 @@ public final class ViewerMTKView: MTKView {
                 controller?.move.ended()
                 moveGrabbed = false
             } else if ringGrabbed {
-                controller?.endRingDrag()
+                let turned = controller?.endRingDrag() ?? true
                 ringGrabbed = false
                 pressAt = nil
+                // a ring pressed and released without a turn is still a click in the sway-brace mode (the ring
+                // snaps 5 degrees within the 4 px a click allows): it stands the brace under the pointer
+                if !turned, controller?.handPicking == .braces, let start = ringPressAt,
+                   hypot(e.locationInWindow.x - start.x, e.locationInWindow.y - start.y) <= Self.clickSlop {
+                    let p = pixel(e)
+                    controller?.click(x: p.x, y: p.y, width: p.w, height: p.h)
+                }
+                ringPressAt = nil
                 return
             }
             defer { pressAt = nil }
@@ -92,8 +102,22 @@ public final class ViewerMTKView: MTKView {
     }
 
     public override func keyDown(with e: NSEvent) {
-        let handled = MainActor.assumeIsolated { () -> Bool in e.keyCode == 53 && controller?.cancelArmed() == true }
+        let handled = MainActor.assumeIsolated { () -> Bool in
+            switch e.keyCode {
+            case 53: return controller?.cancelArmed(escape: true) == true
+            case 51: return controller?.onHandKey?(.backspace) == true      // Backspace
+            case 117: return controller?.onHandKey?(.delete) == true        // forward Delete
+            default: return false
+            }
+        }
         if !handled { super.keyDown(with: e) }
+    }
+
+    /// Edit > Delete: the system's item sends `delete:` to the first responder (a text field takes its own). The view
+    /// answers it as Backspace (`app.js:63-74`): take back the last point of the wall being drawn, or remove the
+    /// selected support. A second Delete of the app's own would sit beside the system's.
+    @objc public func delete(_ sender: Any?) {
+        MainActor.assumeIsolated { _ = controller?.onHandKey?(.backspace) }
     }
 
     public override func resetCursorRects() {
@@ -111,6 +135,8 @@ public final class ViewerMTKView: MTKView {
         }
         if hand != 0 { addCursorRect(bounds, cursor: hand == 2 ? .closedHand : .openHand); return }
         if pointing { addCursorRect(bounds, cursor: .pointingHand) }
+        // aiming a hand-placed support: the crosshair (`renderer.domElement.style.cursor = 'crosshair'`)
+        if MainActor.assumeIsolated({ controller?.handCursor == true }) { addCursorRect(bounds, cursor: .crosshair) }
     }
 
     public override func mouseMoved(with e: NSEvent) {
@@ -120,7 +146,7 @@ public final class ViewerMTKView: MTKView {
         }
     }
     public override func mouseExited(with e: NSEvent) {
-        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover(); controller?.section.pointerLeft() }
+        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover(); controller?.section.pointerLeft(); controller?.handPointerLeft() }
     }
 
     public override func mouseDragged(with e: NSEvent) {
@@ -143,6 +169,8 @@ public final class ViewerMTKView: MTKView {
                 return
             }
             controller?.clearHover()
+            // an orbit has the pointer: a sway brace's preview goes (`dropBracePreview`)
+            if controller?.handPicking == .braces { controller?.handPointerLeft() }
             navigate(.left, e)
         }
     }
@@ -213,10 +241,24 @@ public struct ViewerViewport: NSViewRepresentable {
         view.autoResizeDrawable = true
         let bg = Palette.background
         view.clearColor = MTLClearColor(red: Double(bg.x), green: Double(bg.y), blue: Double(bg.z), alpha: 1)
+        // an element of its own for accessibility (a bare NSView is ignored), so a UI test can find it and click
+        // points of its frame: SwiftUI's identifier on a representable does not reliably reach the AppKit view
+        view.setAccessibilityElement(true)
+        view.setAccessibilityRole(.group)
+        view.setAccessibilityLabel("3D view")
+        view.setAccessibilityIdentifier("viewport")
         return view
     }
 
     public func updateNSView(_ view: ViewerMTKView, context: Context) {
         controller.renderer.pixelScale = Float(view.window?.backingScaleFactor ?? 2)
+    }
+}
+
+extension ViewerMTKView: NSMenuItemValidation {
+    /// Edit > Delete is enabled while it would do something.
+    public func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard item.action == #selector(delete(_:)) else { return true }
+        return MainActor.assumeIsolated { controller?.canHandDelete?() ?? false }
     }
 }

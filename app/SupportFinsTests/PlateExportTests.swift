@@ -207,4 +207,37 @@ struct PlateExportTests {
         board.removeModel()
         #expect(registry.badges[.arrange]?.isShown() == false)
     }
+
+    /// A model's hand-placed walls are written with its fins and pad in a plate's 3MF, the live model's and a parked
+    /// one's alike (`plateGeometry` takes `activeAdded()`'s walls; a parked model's are stood for its pose, `ui/parkedbuild.js`).
+    @Test func aPlatesThreeMFCarriesAParkedModelsDrawnWall() async throws {
+        let (model, board) = try await helper.window(name: "first")
+        model.session.perform("Add Fins") { model.session.finsOn = true }
+        let build = try #require(model.wiring?.build)
+        #expect(await eventually { build.latest != nil && !build.building })
+        let draw = try #require(model.features[DrawFeature.self]).model
+        // a wall across the slab's underside (the part stands where the file has it: its own frame is print space)
+        model.session.perform("Draw Wall") { model.session.drawnWalls = [DrawnWall.wall(from: [-20, -20, 20], to: [20, -20, 20])] }
+        draw.sync()
+        #expect(await eventually { draw.sweepCurrent })
+        let live = try #require(board.plateWrite(0)).models
+        #expect(live.count == 1 && live[0].drawn != nil, "the live model's wall")
+        // parked: the second model is live, the first keeps its wall
+        try await helper.add(model, "second", slab: 20)
+        #expect(model.session.drawnWalls.isEmpty, "the new model has none")
+        #expect(await eventually { model.wiring?.build?.latest != nil && model.wiring?.build?.building == false })
+        let w = try #require(board.plateWrite(0))
+        try #require(w.models.count == 2)
+        let parked = try #require(w.models[0].drawn, "the parked model's wall is written")
+        #expect(parked.triangles().count() > 0)
+        #expect(w.models[1].drawn == nil)
+        // the file holds it: the same plate without the wall is smaller
+        let out = try dir()
+        let with = try #require(board.writePlate(w, to: out.appending(path: "with.3mf")), "\(board.exportError ?? "")")
+        var bare = w
+        bare.models[0].drawn = nil
+        let without = try #require(board.writePlate(bare, to: out.appending(path: "without.3mf")))
+        let a = try Data(contentsOf: with).count, b = try Data(contentsOf: without).count
+        #expect(a > b, "with the wall \(a) bytes, without \(b)")
+    }
 }

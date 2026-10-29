@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Placement: Auto / Full coverage / Draw, with the per-mode note (`index.html:329-355`,
-/// `web/ui/settings.js:79-115`). Draw is drawn by hand: shown, disabled until M6.
+/// `web/ui/settings.js:79-115`). Draw is the by-hand mode (Features/Draw).
 struct PlacementSection: View {
     @Binding var settings: FinSettings
 
@@ -15,8 +15,8 @@ struct PlacementSection: View {
                     Button(title) { settings.mode = mode }
                         .buttonStyle(.bordered)
                         .tint(settings.mode == mode ? .accentColor : nil)
-                        .disabled(mode == .draw)
-                        .help(mode == .draw ? "Draw arrives with the pointer tools (M6)." : "Who places the support.")
+                        .help("Who places the support.")
+                        .accessibilityIdentifier("fin-mode-\(mode.rawValue)")
                         .accessibilityAddTraits(settings.mode == mode ? .isSelected : [])
                 }
             }

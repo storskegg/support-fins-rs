@@ -55,7 +55,9 @@ struct FinSettingsTests {
         for c in cases {
             let settings = try JSONDecoder().decode(FinSettings.self, from: c.form)
             let got = try dictionary(settings.optionsJSON())
-            #expect(Set(got.keys) == Set(c.dialog.keys), "\(c.id): keys")
+            // Draw's request-level `mode` rides beside the dialog keys (the page's `finOpts` sends it; `options.json` has none)
+            let wanted = settings.mode == .draw ? Set(c.dialog.keys).union(["mode"]) : Set(c.dialog.keys)
+            #expect(Set(got.keys) == wanted, "\(c.id): keys")
             for (key, want) in c.dialog {
                 let have = try #require(got[key], "\(c.id): \(key) missing")
                 #expect(Self.same(have, want), "\(c.id): \(key) = \(have), the web sends \(want)")
@@ -105,12 +107,12 @@ struct FinSettingsTests {
         #expect(t.count == 13)
     }
 
-    @Test func drawSendsNoModeAndNoSwayBraces() throws {
+    @Test func drawSendsModeDrawAndNoSwayBraces() throws {
         var s = FinSettings()
         s.mode = .draw
         s.sway = true
         let json = try dictionary(s.optionsJSON())
-        #expect(json["mode"] == nil && json["sway.gripFrom"] == nil)
+        #expect(Self.same(json["mode"]!, "draw") && json["sway.gripFrom"] == nil)
         #expect(Self.same(json["sway.on"]!, false))
     }
 }

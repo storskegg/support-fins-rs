@@ -27,11 +27,13 @@ extension PlateBoard {
                 // another plate's fins stay as they were left, under its own settings
                 let finsOn = pi == active ? session.finsOn : (pl.settings?.finsOn ?? false)
                 let layer = finsOn ? s.supportLayer(device: device) : nil
+                let plateSettings = pi == active ? session.settings : (pl.settings?.settings ?? session.settings)
+                let drawn = host.features[DrawFeature.self]?.parkedDrawn(s, settings: plateSettings, finsOn: finsOn) { [weak self] in self?.sync() }
                 parked.append(ParkedDrawable(
                     mesh: s.part, flags: flags, rotation: s.pose.float3x3, offset: s.offset,
                     origin: SIMD2(Float(m.xy.x), Float(m.xy.y)) + bed,
                     supports: layer, hiddenFins: layer == nil ? [] : s.build.hiddenRanges(removed: s.removedFins),
-                    stale: pi == active && isStale(s)))
+                    drawn: drawn?.mesh, stale: pi == active && isStale(s)))
                 parkedSlots.append(m)
                 parkedPlates.append(pi)
             }
@@ -54,18 +56,22 @@ extension PlateBoard {
     /// parked one from the fins it shows (`slotGrid`, `ui/arrange.js`).
     func footprint(of m: ModelSlot) -> Footprint? {
         let key: FootprintKey, part: Part, wanted: BuildResult?
+        var drawn: DrawnSweep?
         if m === plate.liveSlot, hasLive, let first = session.parts.first {
             let build = host.wiring?.build
             let latest = session.finsOn ? build?.latest : nil
             let ids = latest == nil ? [] : (build?.matchedRemovals(of: session.removedFins).keys.sorted().map { UInt64($0) } ?? [])
+            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.model.exportDrawn.sweep
             key = FootprintKey(pose: session.pose.columnMajor, offset: host.controller?.renderer.offset ?? .zero,
-                               build: latest.map(ObjectIdentifier.init), removed: ids)
+                               build: latest.map(ObjectIdentifier.init), removed: ids, drawn: drawn.map(ObjectIdentifier.init))
             part = first.part
             wanted = latest
         } else if let s = m.stash {
             let latest = session.finsOn ? s.build.latest : nil
             let ids = latest == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
-            key = FootprintKey(pose: s.pose.columnMajor, offset: s.offset, build: latest.map(ObjectIdentifier.init), removed: ids)
+            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.parkedDrawn(s, settings: session.settings, finsOn: session.finsOn) { [weak self] in self?.sync() }?.sweep
+            key = FootprintKey(pose: s.pose.columnMajor, offset: s.offset, build: latest.map(ObjectIdentifier.init), removed: ids,
+                               drawn: drawn.map(ObjectIdentifier.init))
             part = s.part.part
             wanted = latest
         } else {
@@ -74,7 +80,7 @@ extension PlateBoard {
         if let c = m.footprintCache, c.key == key { return c.grid }
         let o = key.offset
         let cells = try? footprintOfPart(part: part, rot: key.pose, offset: [Double(o.x), Double(o.y), Double(o.z)])
-        let added = wanted.flatMap { footprintOfBuild(build: $0, removed: key.removed) }
+        let added = wanted.flatMap { footprintOfBuildWithDrawn(build: $0, drawn: drawn, removed: key.removed) }
         let grid = footprintUnion(a: cells, b: added)
         m.footprintCache = (key, grid)
         return grid

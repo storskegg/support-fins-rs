@@ -19,13 +19,15 @@ public struct ParkedDrawable {
     /// fins' vertex ranges.
     public var supports: SupportLayer?
     public var hiddenFins: [Range<Int>]
+    /// Its hand-placed walls and braces (print space, about its own spot), drawn in the same ghost colour.
+    public var drawn: OverlayMesh?
     /// Built under settings the plate has since changed: greyed until rebuilt (`ghostLook`).
     public var stale: Bool
 
     public init(mesh: any MeshSource, flags: MTLBuffer, rotation: simd_float3x3, offset: SIMD3<Float>, origin: SIMD2<Float>,
-                supports: SupportLayer? = nil, hiddenFins: [Range<Int>] = [], stale: Bool = false) {
+                supports: SupportLayer? = nil, hiddenFins: [Range<Int>] = [], drawn: OverlayMesh? = nil, stale: Bool = false) {
         (self.mesh, self.flags, self.rotation, self.offset, self.origin) = (mesh, flags, rotation, offset, origin)
-        (self.supports, self.hiddenFins, self.stale) = (supports, hiddenFins, stale)
+        (self.supports, self.hiddenFins, self.drawn, self.stale) = (supports, hiddenFins, drawn, stale)
     }
 
     var matrix: simd_float4x4 {
@@ -128,6 +130,22 @@ extension ViewerRenderer {
             for seg in SupportSegments.fins(total: s.finVertices, hidden: p.hiddenFins, crest: []) { draw(s.fins, seg.range) }
             draw(s.pad, 0..<s.padVertices)
         }
+        // and their hand-placed walls
+        for p in list {
+            guard let d = p.drawn else { continue }
+            var u = Uniforms(viewProj: viewProj * simd_float4x4(translation: SIMD3(p.origin, 0)), model: matrix_identity_float4x4,
+                             eye: SIMD4(camera.eye, 1), params: SIMD4(Self.noFace, 6, 0, 0))
+            enc.setRenderPipelineState(p.stale ? staleSupportPipeline : supportPipeline)
+            enc.setDepthStencilState(depthState)
+            enc.setCullMode(.none)
+            var opacity = Self.staleOpacity
+            if p.stale { enc.setFragmentBytes(&opacity, length: MemoryLayout<Float>.size, index: 0) }
+            var c = SIMD4(Self.ghostFin, 1)
+            enc.setVertexBuffer(d.buffer, offset: 0, index: 0)
+            enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+            enc.setVertexBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
+            enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: d.vertices)
+        }
     }
 
     /// The red clash cells, drawn through everything (`clashMat`: depth test off).
@@ -224,6 +242,10 @@ extension ViewerRenderer {
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: s.padVertices)
             }
         }
+        // the live model's hand-placed walls are the model's too (`modelAt` raycasts `drawnMesh`, `ui/move.js:76`)
+        if let w = drawScene?.walls, w.vertices > 0 {
+            draw(w.buffer, stride: 6, vertices: w.vertices, model: matrix_identity_float4x4, viewProj: vp, id: 0)
+        }
         for (i, p) in plateScene.parked.enumerated() {
             if p.mesh.faceCount > 0 {
                 draw(p.mesh.vertexBuffer, stride: p.mesh.vertexStride / 4, vertices: p.mesh.faceCount * 3, model: p.matrix, viewProj: vp, id: UInt32(i + 1))
@@ -243,6 +265,13 @@ extension ViewerRenderer {
                     enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
                     enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: s.padVertices)
                 }
+            }
+            if let d = p.drawn {
+                let moved = vp * simd_float4x4(translation: SIMD3(p.origin, 0))
+                var u = Uniforms(viewProj: moved, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1), params: SIMD4(Self.noFace, 6, 0, UInt32(i + 1)))
+                enc.setVertexBuffer(d.buffer, offset: 0, index: 0)
+                enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+                enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: d.vertices)
             }
         }
         enc.endEncoding()
