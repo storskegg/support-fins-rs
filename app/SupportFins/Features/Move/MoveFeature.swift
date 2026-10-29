@@ -1,0 +1,90 @@
+import AppKit
+import SwiftUI
+import Viewer
+
+extension ToolbarSlot {
+    static let move = ToolbarSlot(id: "move", title: "Move", systemImage: "rectangle.and.hand.point.up.left",
+                                  help: "Move models on the plate: drag one to place it (M). Esc to stop.", order: 0)
+}
+
+/// Move (`ui/move.js`): the toolbar's Move toggle, Model > Move, the M key and Esc. The tool's pointer is the
+/// viewer's (`MoveTool`); what a drag does to the plate is `MoveModel`.
+@MainActor
+final class MoveFeature: Feature {
+    unowned let host: ViewerModel
+    let model: MoveModel
+    @ObservationIgnored private var keys: KeyMonitor?
+
+    init(host: ViewerModel) {
+        self.host = host
+        model = MoveModel(host: host)
+        if host.controller != nil {
+            keys = KeyMonitor { [weak self] in self?.key($0) ?? false }
+        }
+    }
+
+    var toolbarSlots: [ToolbarSlot] { [.move] }
+
+    func registerTools(in toolbar: ToolbarRegistry) {
+        guard host.controller != nil else { return }
+        toolbar.registerToggle(.move, isOn: { [model] in model.isOn }, setOn: { [model] in model.setOn($0) })
+    }
+
+    /// A model removed, or another loaded: the tool stays on only with a model to move (`partchange`).
+    func partDidShow(_ parts: [LoadedPart]) { if model.isOn && !(host.features[PlatesFeature.self]?.board.hasLive ?? false) { model.setOn(false) } }
+
+    var modifiers: [WindowModifier] {
+        [
+            // the last model taken off: nothing to move
+            .onChange("move-needs-a-model", of: { self.host.hasPart }) { _, has in if !has { self.model.setOn(false) } },
+        ]
+    }
+
+    var escapeHandlers: [EscapeHandler] {
+        [EscapeHandler(id: "move", priority: EscapeHandler.windowMode + 10) {
+            guard self.model.isOn else { return false }
+            self.model.setOn(false)
+            return true
+        }]
+    }
+
+    /// M toggles the tool, Esc leaves it, wherever the focus is but in a text field (`keydown`, `ui/move.js:182-196`);
+    /// Esc first closes an open popover (its own handler).
+    private func key(_ event: NSEvent) -> Bool {
+        guard let controller = host.controller, controller.isInKeyWindow, host.hasPart,
+              event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
+        if let r = event.window?.firstResponder, r is NSText || r is NSTextField { return false }
+        if event.keyCode == 53 {                                   // Esc
+            guard model.isOn, host.toolbar.open == nil else { return false }
+            model.setOn(false)
+            return true
+        }
+        guard event.charactersIgnoringModifiers?.lowercased() == "m", !event.isARepeat else { return false }
+        model.toggle()
+        return true
+    }
+
+    static func menus(_ f: MoveFeature?) -> [MenuSection] {
+        let model = f?.model
+        return [MenuSection(menu: .model, order: 2, entries: [
+            .divider,
+            .check("Move", help: "Move models on the plate: drag one to place it (M). Esc to stop.",
+                   enabled: f?.host.hasPart == true,
+                   isOn: Binding(get: { model?.isOn ?? false }, set: { model?.setOn($0) })),
+        ])]
+    }
+}
+
+/// A window-wide key handler (a local `NSEvent` monitor): the web's capturing `keydown` on the page. It lives as long
+/// as the feature and is removed with it.
+private final class KeyMonitor: @unchecked Sendable {
+    private let token: Any?
+
+    @MainActor init(handler: @escaping @MainActor (NSEvent) -> Bool) {
+        token = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated { handler(event) } ? nil : event
+        }
+    }
+
+    deinit { if let token { NSEvent.removeMonitor(token) } }
+}

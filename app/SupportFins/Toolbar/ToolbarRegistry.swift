@@ -20,6 +20,9 @@ extension ToolbarSlot: @unchecked Sendable {}   // immutable text and numbers
 struct ToolbarBadge {
     var isLit: () -> Bool
     var popover: () -> AnyView
+    /// A toggle badge (Move, `addBadge` with `setOn` and no popover, `ui/toolbar.js:134-136`): a tool with nothing to
+    /// fold out, so a click just turns it on or off and any open popover stays as it is.
+    var toggle: (isOn: () -> Bool, setOn: (Bool) -> Void)?
 
     init<Content: View>(isLit: @escaping () -> Bool = { false }, @ViewBuilder popover: @escaping () -> Content) {
         self.isLit = isLit
@@ -49,12 +52,22 @@ final class ToolbarRegistry {
         badges[slot] = ToolbarBadge(isLit: isLit, popover: popover)
     }
 
+    /// Register a toggle badge: lit while the tool is on; it has no popover.
+    func registerToggle(_ slot: ToolbarSlot, isOn: @escaping () -> Bool, setOn: @escaping (Bool) -> Void) {
+        var badge = ToolbarBadge(isLit: isOn) { EmptyView() }
+        badge.toggle = (isOn, setOn)
+        badges[slot] = badge
+    }
+
     func unregister(_ slot: ToolbarSlot) {
         badges[slot] = nil
         if open == slot { open = nil }
     }
 
-    func toggle(_ slot: ToolbarSlot) { open = open == slot ? nil : slot }
+    func toggle(_ slot: ToolbarSlot) {
+        if let t = badges[slot]?.toggle { t.setOn(!t.isOn()); return }
+        open = open == slot ? nil : slot
+    }
     func fold() { open = nil }
 
     private var flashGeneration = 0
