@@ -45,9 +45,10 @@ final class TipCardUITests: PartWindowUITestCase {
         app.typeKey(.tab, modifierFlags: .shift)   // out of the field
         app.typeKey(.tab, modifierFlags: [])       // and back in, by the keyboard
         XCTAssertTrue(card.waitForExistence(timeout: 5), "the card shows on keyboard focus")
-        // a SwiftUI Text's string is the static text's value on macOS (its label is empty), so match it whole, as the
-        // hover test does (`staticTexts[_]` matches the value too)
-        XCTAssertTrue(card.staticTexts[gapTooltip].exists, "it is the Support gap's tooltip")
+        // a SwiftUI Text's string is the static text's value on macOS (its label is empty), and a subscript query takes at
+        // most 128 characters: match the value, whole, through a predicate
+        XCTAssertTrue(card.staticTexts.matching(NSPredicate(format: "value == %@", gapTooltip)).firstMatch.exists,
+                      "it is the Support gap's tooltip")
     }
 }
 
