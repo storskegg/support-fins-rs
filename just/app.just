@@ -51,8 +51,14 @@ app-uibuild: app-core app-project
 # The window driven end to end (XCUITest): open a part, Add fins, change a setting, export. Needs the Accessibility
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 #
+# Every worktree shares the derived data path (below), so after a run from another worktree the precompiled modules built from its
+# headers (sf_ffiFFI.h) fail the next run ("has been modified since the module file ... was built"). So, under the
+# lock, each run first drops the module caches built from project headers (Swift and clang explicit modules, the
+# implicit module cache) and rebuilds them from its own worktree. The SDK's modules (SDKExplicitPrecompiledModules)
+# and the content-addressed CompilationCache stay.
+#
 # The derived data path is fixed (see the top of the justfile), so the UI test runner's code signature stays the same
 # from run to run and macOS does not ask for the Accessibility permission again. This takes over the mouse and
 # keyboard: only the orchestrator runs it, never an agent and never `just gate`.
 app-uitest: app-core app-project
-    tools/lock/lock.py app-uitest -- xcodebuild test -jobs {{xcode_jobs}} -derivedDataPath "{{uitest_derived_data}}" -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+    tools/lock/lock.py app-uitest -- bash -ec 'dd="{{uitest_derived_data}}"; rm -rf "$dd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules" "$dd/Build/Intermediates.noindex/ExplicitPrecompiledModules" "$dd/ModuleCache.noindex"; xcodebuild test -jobs {{xcode_jobs}} -derivedDataPath "$dd" -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination "platform=macOS"'
