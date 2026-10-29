@@ -19,6 +19,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         var model: simd_float4x4
         var eye: SIMD4<Float>
         var params: SIMD4<UInt32>
+        /// The section plane (`SectionTool`): kept where `dot(xyz, p) + w >= 0`; zero = no cut.
+        var clip = SIMD4<Float>.zero
     }
 
     public let device: MTLDevice
@@ -40,6 +42,10 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     let overlayDepthState: MTLDepthStencilState
     /// No depth test and no depth write: the HUD (load arrow, layer frames) is always visible.
     let hudDepthState: MTLDepthStencilState
+    /// The section view's ghost pipelines (`Section/SectionRenderer.swift`).
+    let sectionPipelines: SectionPipelines
+    /// The section view: the plane, its handle and the pointer's dealings with it.
+    public let section = SectionTool()
 
     public var camera = OrbitCamera.home() { didSet { changeCount += 1; onCameraChange?() } }
     /// Called after every change of the camera (the view cube turns with it).
@@ -59,7 +65,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     var viewport = SIMD2<Float>(1, 1)
     /// The parts on show: a file can hold several objects, all drawn in the file's frame.
     public private(set) var meshes: [any MeshSource] = []
-    private var flagBuffers: [MTLBuffer] = []
+    var flagBuffers: [MTLBuffer] = []
     /// Keeps the parts' (large, `bytesNoCopy`) buffers resident on the GPU between frames.
     private var residency: MTLResidencySet?
     /// First global face index of each part, plus the total as the last element.
@@ -174,6 +180,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
             overlayPipeline = try device.makeRenderPipelineState(descriptor: overlay)
             overlay.vertexFunction = lib.makeFunction(name: "hud_vertex")
             hudPipeline = try device.makeRenderPipelineState(descriptor: overlay)
+            sectionPipelines = try SectionPipelines(device: device, library: lib)
         } catch {
             return nil
         }
@@ -200,6 +207,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         readback = device.makeBuffer(length: 4, options: .storageModeShared)!
         plate = PlateGeometry(volume: .standard)
         super.init()
+        section.renderer = self
+        section.onRedraw = { [weak self] in MainActor.assumeIsolated { self?.changeCount &+= 1 } }
         move.renderer = self
         uploadPlate()
     }
@@ -303,6 +312,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     public func setPose(rotation: simd_float3x3, offset: SIMD3<Float>) {
         self.rotation = rotation
         self.offset = offset
+        section.follow()
         changeCount += 1
     }
 
@@ -336,10 +346,11 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
                                 SIMD4(rotation.columns.2, 0), SIMD4(offset, 1)))
     }
 
-    private func uniforms() -> Uniforms {
+    func uniforms() -> Uniforms {
         Uniforms(viewProj: camera.viewProjection, model: modelMatrix, eye: SIMD4(camera.eye, 1),
                  params: SIMD4(hoverFace.map { UInt32($0) } ?? Self.noFace,
-                               UInt32((meshes.first?.vertexStride ?? 24) / 4), highlightSmall ? 1 : 0, 0))
+                               UInt32((meshes.first?.vertexStride ?? 24) / 4), highlightSmall ? 1 : 0, 0),
+                 clip: clipVector)
     }
 
     // MARK: encoding
@@ -402,6 +413,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         if let g = gizmo, g.visible { drawGizmo(g, uniforms: &u, with: enc) }
         encodeHUD(into: enc)
         encodeIslandMarkers(into: enc)
+        encodeSection(into: enc)
     }
 
     private func drawGizmo(_ g: GizmoDisplay, uniforms u: inout Uniforms, with enc: MTLRenderCommandEncoder) {
@@ -442,7 +454,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     /// Supports are print-space: no model matrix. Both sides are drawn, as the web does.
     private func encodeSupports(_ s: SupportLayer, into enc: MTLRenderCommandEncoder) {
         var u = Uniforms(viewProj: camera.viewProjection, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1),
-                         params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0))
+                         params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0), clip: clipVector)
         enc.setRenderPipelineState(dimSupports ? staleSupportPipeline : supportPipeline)
         enc.setDepthStencilState(depthState)
         enc.setFrontFacing(.counterClockwise)
@@ -624,7 +636,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         pass.depthAttachment.clearDepth = 1
         // the part is in the pass as an occluder (a fin behind the part cannot be clicked), with no id of its own
         var u = Uniforms(viewProj: camera.viewProjection, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1),
-                         params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0))
+                         params: SIMD4(Self.noFace, UInt32(s.stride), 0, 0), clip: clipVector)
         let enc = cb.makeRenderCommandEncoder(descriptor: pass)!
         enc.setRenderPipelineState(idPipeline)
         enc.setDepthStencilState(depthState)

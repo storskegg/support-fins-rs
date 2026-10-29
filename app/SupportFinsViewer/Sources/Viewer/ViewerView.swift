@@ -37,6 +37,8 @@ public final class ViewerMTKView: MTKView {
 
     /// A press that landed on a rotate ring turns the part; the drag belongs to the ring until the button is up.
     private var ringGrabbed = false
+    /// A press that landed on the section plane's handle or sheet: the drag is the section's until the button is up.
+    private var sectionGrabbed = false
     /// A press that landed on a model with Move on: the drag is Move's until the button is up.
     private var moveGrabbed = false
 
@@ -46,6 +48,10 @@ public final class ViewerMTKView: MTKView {
             // Ctrl+click is the Mac's right click: it cancels an armed mode
             if e.modifierFlags.contains(.control), controller?.cancelArmed() == true { pressAt = nil; return }
             let p = pixel(e)
+            // the section's handle first (Move leaves a press to it: `planeBusy`, `ui/move.js:115-118`), then Move,
+            // then the part's rings; Ctrl+click is a cancel, not a grab
+            sectionGrabbed = !e.modifierFlags.contains(.control) && controller?.section.begin(x: p.x, y: p.y, width: p.w, height: p.h) == true
+            if sectionGrabbed { pressAt = nil; return }
             // Move: a press on a model drags it, anywhere else orbits. The press stays a click candidate: a model
             // pressed and released in place is still clicked (a parked one is edited)
             moveGrabbed = !e.modifierFlags.contains(.control) && controller?.move.begin(x: p.x, y: p.y, width: p.w, height: p.h) == true
@@ -57,6 +63,12 @@ public final class ViewerMTKView: MTKView {
 
     public override func mouseUp(with e: NSEvent) {
         MainActor.assumeIsolated {
+            if sectionGrabbed {
+                controller?.section.ended()
+                sectionGrabbed = false
+                pressAt = nil
+                return
+            }
             if moveGrabbed {
                 controller?.move.ended()
                 moveGrabbed = false
@@ -86,6 +98,12 @@ public final class ViewerMTKView: MTKView {
 
     public override func resetCursorRects() {
         let pointing = MainActor.assumeIsolated { controller.map { $0.hoveringSupport || $0.hoveringFaceToLay } == true }
+        // the section sheet lights with a hand while a press would grab it
+        let sheet = MainActor.assumeIsolated { () -> Int in
+            guard let s = controller?.section else { return 0 }
+            return s.sheetDragging ? 2 : s.hot ? 1 : 0
+        }
+        if sheet != 0 { addCursorRect(bounds, cursor: sheet == 2 ? .closedHand : .openHand); return }
         // Move: the grab hand over a model, the closed one while it is dragged (`ui/move.js:108-111, 130-134`)
         let hand = MainActor.assumeIsolated { () -> Int in
             guard let m = controller?.move, m.isOn else { return 0 }
@@ -102,11 +120,17 @@ public final class ViewerMTKView: MTKView {
         }
     }
     public override func mouseExited(with e: NSEvent) {
-        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover() }
+        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover(); controller?.section.pointerLeft() }
     }
 
     public override func mouseDragged(with e: NSEvent) {
         MainActor.assumeIsolated {
+            if sectionGrabbed {
+                // Shift releases the 5 degree snap of the tilt rings (`web/ui/section.js`)
+                let p = pixel(e)
+                controller?.section.dragged(x: p.x, y: p.y, width: p.w, height: p.h, snap: !e.modifierFlags.contains(.shift))
+                return
+            }
             if moveGrabbed {
                 let p = pixel(e)
                 controller?.move.dragged(x: p.x, y: p.y, width: p.w, height: p.h)
@@ -141,6 +165,12 @@ public final class ViewerMTKView: MTKView {
     public override func scrollWheel(with e: NSEvent) {
         MainActor.assumeIsolated {
             guard let c = controller else { return }
+            // Shift + scroll pushes the cut 1 mm a notch (the web's `deltaY || deltaX`), ahead of the navigation
+            if c.section.isOn, e.modifierFlags.contains(.shift) {
+                let d = e.scrollingDeltaY != 0 ? -e.scrollingDeltaY : -e.scrollingDeltaX
+                if e.momentumPhase.isEmpty { c.section.scrollPush(Double(d)) }
+                return
+            }
             if e.hasPreciseScrollingDeltas {
                 // a trackpad: the scroll is the finger's drag
                 let chord = !e.modifierFlags.isDisjoint(with: [.shift, .option])
