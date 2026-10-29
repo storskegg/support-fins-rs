@@ -77,7 +77,7 @@ struct BuildModelTests {
     @Test func aRealBuildIsDecodedIntoSummaryAndRecords() async throws {
         let model = try tShapeModel()
         #expect(model.latest == nil && !model.building)
-        let g = model.build(rotation: identity, optionsJSON: "{}")
+        let g = model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         #expect(g == 1 && model.building && model.generation == 1)
         await model.settled()
         #expect(!model.building && model.error == nil)
@@ -106,7 +106,7 @@ struct BuildModelTests {
 
     @Test func aNewerRequestSupersedesAnOlderOne() async throws {
         let model = try tShapeModel()
-        let g1 = model.build(rotation: rotation(30, 0, 0), optionsJSON: "{}")
+        let g1 = model.build(rotation: rotation(30, 0, 0), optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         let g2 = model.build(rotation: rotation(30, 0, 0), optionsJSON: #"{"mode":"full"}"#)
         #expect(g2 == g1 + 1)
         await model.settled()
@@ -117,14 +117,14 @@ struct BuildModelTests {
 
     @Test func cancelDropsTheBuildAndClearForgetsTheFins() async throws {
         let model = try tShapeModel()
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         model.cancel()
         #expect(!model.building)
         await model.settled() // returns at once
         try await Task.sleep(for: .milliseconds(500))
         #expect(model.latest == nil, "a cancelled build must not land")
 
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
         #expect(model.latest != nil)
         model.clear()
@@ -133,7 +133,7 @@ struct BuildModelTests {
 
     @Test func aFailedBuildKeepsTheFinsOnScreenAndReportsTheEngineMessage() async throws {
         let model = try tShapeModel()
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
         let before = try #require(model.summary)
         model.build(rotation: identity, optionsJSON: #"{"mode":"bogus"}"#)
@@ -141,21 +141,21 @@ struct BuildModelTests {
         #expect(model.error?.isEmpty == false && !model.building)
         #expect(model.summary == before, "the last good build stays until a fresh one lands")
         // the next good build clears the error
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
         #expect(model.error == nil)
     }
 
     @Test func finKeysSurviveARebuildAndAnOptionsChange() async throws {
         let model = try tShapeModel()
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
         let first = model.keys.compactMap(\.sig)
         #expect(first.count == model.records?.fins.count)
         #expect(Set(first).count == first.count, "keys are unique within a build")
 
         // the same request again: the same keys
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
         #expect(model.keys.compactMap(\.sig) == first)
 
@@ -173,7 +173,7 @@ struct BuildModelTests {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let model = try tShapeModel()
         #expect(model.supportLayer(device: device) == nil && model.seatingOffset == nil)
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
 
         let layer = try #require(model.supportLayer(device: device))
@@ -203,7 +203,7 @@ struct BuildModelTests {
         let model = try tShapeModel()
         model.show(on: renderer)
         #expect(renderer.supports == nil)
-        model.build(rotation: identity, optionsJSON: "{}")
+        model.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await model.settled()
         let key = try #require(model.keys.first?.sig)
         model.show(on: renderer, removed: [key])

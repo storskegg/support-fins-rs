@@ -1,4 +1,8 @@
 //! Builder / BuildResult / export (docs/FFI.md, M4b).
+//!
+//! The Builder tests send the app's real request (`common`, from the S-07 fixture); the tests that compare with the
+//! engine's own defaults, or test empty input, keep `"{}"`.
+mod common;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
@@ -60,8 +64,8 @@ fn a_build_is_delivered_on_the_worker_thread_with_its_generation() {
     let (l, rx) = listener();
     let g = b.build(
         rotation_matrix([35.0, 0.0, 0.0]).to_vec(),
-        "{}".into(),
-        "{}".into(),
+        common::options(),
+        common::tunables(),
         l,
     );
     assert_eq!(g, 1);
@@ -82,8 +86,8 @@ fn a_stale_generation_is_dropped_never_delivered() {
     let rot = rotation_matrix([30.0, 0.0, 0.0]).to_vec();
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = b.build(rot.clone(), "{}".into(), "{}".into(), l1);
-    let g2 = b.build(rot, "{\"mode\":\"full\"}".into(), "{}".into(), l2);
+    let g1 = b.build(rot.clone(), common::options(), common::tunables(), l1);
+    let g2 = b.build(rot, "{\"mode\":\"full\"}".into(), common::tunables(), l2);
     assert_eq!((g1, g2), (1, 2));
     let Event::Done(g, _) = wait(&rx2) else {
         panic!("failed")
@@ -98,6 +102,7 @@ fn a_stale_generation_is_dropped_never_delivered() {
 
 #[test]
 fn bad_options_and_poses_are_reported_as_engine_errors_with_their_generation() {
+    // `"{}"` tunables below: these are failure cases of the options and the pose, not app requests
     let b = Builder::new(load("cube"));
     for (rot, opts) in [
         (ID.to_vec(), "{\"mode\":\"bogus\"}"),
@@ -120,6 +125,7 @@ fn bad_options_and_poses_are_reported_as_engine_errors_with_their_generation() {
 
 #[test]
 fn a_build_equals_the_cli_engine_on_the_same_pose() {
+    // `"{}"` on purpose: no options and no tunables is the CLI's build, which this compares with the engine's defaults
     for (name, deg) in [("cube", 40.0), ("sphere", 0.0), ("lbracket", 35.0)] {
         let part = load(name);
         let m = rotation_matrix([deg, 0.0, 0.0]);
@@ -160,7 +166,7 @@ fn patch_stats_omit_zero_counters_and_fill_walls_have_no_region() {
         &part,
         &rotation_matrix([30.0, 0.0, 0.0]),
         "{\"mode\":\"full\"}",
-        "{}",
+        &common::tunables(),
     )
     .unwrap();
     let s = json(&r.summary_json());
@@ -213,14 +219,15 @@ fn a_raised_cancel_gives_cancelled_on_both_build_paths() {
     let flag = Arc::new(std::sync::atomic::AtomicBool::new(true));
     let cancel = sf_engine::cancel::Cancel::new(flag);
     // the CLI's path, and the page's (a tunable or a page-level key)
-    for (opts, tunables) in [("{}", "{}"), ("{}", "{\"wallLines\":4}")] {
+    let (app_options, app_tunables) = (common::options(), common::tunables());
+    for (opts, tunables) in [("{}", "{}"), (&app_options[..], &app_tunables[..])] {
         let r = build_part_cancellable(&part, &rot, opts, tunables, &cancel);
         assert!(matches!(r, Err(FfiError::Cancelled)), "{tunables}");
     }
     // unraised, it is build_part
     let calm = sf_engine::cancel::Cancel::default();
-    let a = build_part_cancellable(&part, &rot, "{}", "{}", &calm).unwrap();
-    let b = build_part(&part, &rot, "{}", "{}").unwrap();
+    let a = build_part_cancellable(&part, &rot, &app_options, &app_tunables, &calm).unwrap();
+    let b = build_part(&part, &rot, &app_options, &app_tunables).unwrap();
     assert_eq!(a.fins().count(), b.fins().count());
     assert_eq!(a.summary_json(), b.summary_json());
 }
@@ -231,10 +238,10 @@ fn a_newer_build_cancels_the_one_in_flight_and_cancel_drops_everything() {
     let rot = rotation_matrix([45.0, 0.0, 0.0]).to_vec();
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    b.build(rot.clone(), "{}".into(), "{}".into(), l1);
+    b.build(rot.clone(), common::options(), common::tunables(), l1);
     // let the first one start, then supersede it
     std::thread::sleep(Duration::from_millis(3));
-    let g2 = b.build(rot.clone(), "{}".into(), "{}".into(), l2);
+    let g2 = b.build(rot.clone(), common::options(), common::tunables(), l2);
     let Event::Done(g, _) = wait(&rx2) else {
         panic!("failed")
     };
@@ -246,14 +253,14 @@ fn a_newer_build_cancels_the_one_in_flight_and_cancel_drops_everything() {
     // cancel(): the build in flight is dropped, a later build is unaffected
     let (l3, rx3) = listener();
     let (l4, rx4) = listener();
-    b.build(rot.clone(), "{}".into(), "{}".into(), l3);
+    b.build(rot.clone(), common::options(), common::tunables(), l3);
     std::thread::sleep(Duration::from_millis(3));
     b.cancel();
     assert!(matches!(
         rx3.recv_timeout(Duration::from_millis(500)),
         Err(mpsc::RecvTimeoutError::Disconnected)
     ));
-    let g4 = b.build(rot, "{}".into(), "{}".into(), l4);
+    let g4 = b.build(rot, common::options(), common::tunables(), l4);
     let Event::Done(g, r) = wait(&rx4) else {
         panic!("failed")
     };
