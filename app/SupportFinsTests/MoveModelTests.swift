@@ -175,4 +175,32 @@ struct MoveModelTests {
         #expect(lay.armed)
         #expect(!move.isOn)
     }
+
+    @Test func aModelDroppedOverAnotherPlateGoesToItWithAToastUndoAndMoveStaysOn() async throws {
+        let host = ViewerModel()
+        try #require(host.controller != nil, "no Metal device")
+        await host.load(url: try stl("move-p"))
+        let board = try #require(host.features[PlatesFeature.self]?.board)
+        let move = try #require(host.features[MoveFeature.self]?.model)
+        let tool = try #require(host.controller?.move)
+        board.addPlate()
+        board.switchPlate(0)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(board.plates.count == 2 && board.active == 0)
+        move.setOn(true)
+        let slot = board.plate.liveSlot
+        let from = slot.xy
+        // mid-drag over the other plate's bed: it lights; dropped there, the model is on that plate
+        #expect(tool.onBegin?(.live, .zero) == true)
+        tool.onDrag?(SIMD2(board.pitch, 0))
+        #expect(host.controller?.renderer.plateScene.target == 1)
+        tool.onEnd?()
+        #expect(host.controller?.renderer.plateScene.target == nil)
+        #expect(board.active == 1 && board.plate.models.contains { $0 === slot })
+        #expect(board.toast?.hasPrefix("Moved ") == true && board.toast?.contains("plate 2") == true, "\(board.toast ?? "")")
+        #expect(move.isOn, "the tool stays on through the switch")
+        board.undoMove()
+        #expect(board.active == 0 && board.plates[0].models.contains { $0 === slot })
+        #expect(slot.xy == from)
+    }
 }

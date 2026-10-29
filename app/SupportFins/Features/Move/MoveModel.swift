@@ -23,8 +23,12 @@ final class MoveModel {
         var from: SIMD2<Double>
         var grab: SIMD2<Double>
         var moved = false
+        /// The other plate it is over (`plateUnder`), and its spot there.
+        var over: (plate: Int, xy: SIMD2<Double>)?
     }
     private var drag: Drag?
+    /// The tool is being switched off: a drag ends where it stands and moves nothing to another plate.
+    private var leaving = false
 
     init(host: ViewerModel) {
         self.host = host
@@ -48,7 +52,9 @@ final class MoveModel {
         let now = on && (board?.hasLive ?? false)
         if now == tool.isOn { return }
         if now { host.controller?.cancelArmed() }
+        leaving = !now
         tool.setOn(now)
+        leaving = false
     }
 
     // MARK: a drag
@@ -77,8 +83,27 @@ final class MoveModel {
         let xy = step(d.slot, to: to, on: board)
         if xy == d.slot.xy { return }
         d.moved = true
+        d.over = over(xy, on: board)
         drag = d
         put(d.slot, at: xy, on: board)
+        lightTarget(d.over?.plate, on: board)
+    }
+
+    /// The other plate a model at `xy` (the edited plate's coordinates) would be dropped on: its middle over that
+    /// plate's bed (`over`, `plateUnder`, `ui/move.js:170-174`, `ui/platerow.js`).
+    private func over(_ xy: SIMD2<Double>, on board: PlateBoard) -> (plate: Int, xy: SIMD2<Double>)? {
+        guard let v = host.controller?.volume else { return nil }
+        let r = plateUnder(x: xy.x, y: xy.y, active: UInt64(board.active), count: UInt64(board.plates.count), pitch: board.pitch,
+                           bx: Double(v.x), by: Double(v.y))
+        return r.count == 3 ? (Int(r[0]), SIMD2(r[1], r[2])) : nil
+    }
+
+    /// That plate's bed lit while the model is over it (`markTarget`, `ui/plateview.js`).
+    private func lightTarget(_ plate: Int?, on board: PlateBoard) {
+        guard let renderer = host.controller?.renderer, renderer.plateScene.target != plate else { return }
+        var scene = renderer.plateScene
+        scene.target = plate
+        renderer.setPlateScene(scene)
     }
 
     /// `dragStep` with `clashAt` as the probe: the others stand where they stand.
@@ -103,11 +128,19 @@ final class MoveModel {
         board.sync()
     }
 
+    /// The drag ends. Dropped over another plate, the model goes to it, with an Undo in the toast (`moveToPlate`; the
+    /// switch empties the page a moment, which would turn Move off: it stays on); else it stays, one undo step.
     private func end() {
         host.session.dragLocked = false
-        guard let d = drag else { return }
+        guard let d = drag, let board else { drag = nil; return }
         drag = nil
-        if d.moved { host.session.pushMoves([SlotMove(who: d.slot.id, xy: d.from)], name: "Move Model") }
+        if let renderer = host.controller?.renderer, renderer.plateScene.target != nil { lightTarget(nil, on: board) }
+        guard d.moved else { return }
+        if let to = d.over, !leaving, board.moveToPlate(d.slot, to: to.plate, at: to.xy, back: d.from) {
+            setOn(true)
+            return
+        }
+        host.session.pushMoves([SlotMove(who: d.slot.id, xy: d.from)], name: "Move Model")
     }
 
     /// An undo or redo of a move: the slots back at their spots, edited or parked (`placeSlots`).
