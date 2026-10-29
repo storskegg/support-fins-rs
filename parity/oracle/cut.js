@@ -41,10 +41,15 @@ const cyl = (cx, cy, r, z0, z1, n = 32) => {
 };
 const neg = (positions, name = 'n') => ({ kind: 'negative', name, positions });
 
-const cases = [];
+const cases = [], provenance = [];
 const add = async (id, positions, colors, extras) => {
   const out = await cutNegatives({ positions, colors, extras });
   cases.push({ id, args: [positions, colors, extras], out });
+  // cutNegatives(obj, { provenance: true }): the geometry must not change (the replay checks it
+  // against `out` above), and sourceFaces says where each triangle came from
+  const traced = await cutNegatives({ positions, colors, extras }, { provenance: true });
+  const { sourceFaces, cut, uncut, why } = traced;
+  provenance.push({ id, args: [positions, colors, extras], out: { sourceFaces, cut, uncut, why, samePositions: traced.positions.length === out.positions.length && traced.positions.every((v, i) => Object.is(v, out.positions[i])) } });
 };
 
 // the slicers' own files
@@ -88,3 +93,5 @@ for await (const e of Deno.readDir(MODELS)) {
   await add(`model:${e.name}:notch`, pos, null, [neg(block(c[0], hi[0] + 1, lo[1] - 1, c[1], c[2], hi[2] + 1)), neg(cyl(lo[0], c[1], r, lo[2] - 1, hi[2] + 1), 'second')]);
 }
 writeCases('cut', 'cutNegatives', cases);
+// out: { sourceFaces (Int32Array), cut, uncut, why, samePositions }
+writeCases('cut', 'cutNegativesProvenance', provenance);

@@ -16,10 +16,9 @@ struct EmptyWindowView: View {
                     step(3, "Export.", "Fins come baked in — no slicer supports needed.")
                 }
                 .frame(maxWidth: 460, alignment: .leading)
-                Text("Opening the 3MF, Bambu Studio and PrusaSlicer may note it has “no config” and load the geometry only — that’s expected. The file is pure geometry with no slicer profile baked in, so it opens the same in every slicer; your part comes in correctly oriented and sized. Just slice with supports off.")
-                    .font(.callout).foregroundStyle(.secondary).frame(maxWidth: 460, alignment: .leading)
                 Text("Nothing is uploaded. The file is read inside this tab and never leaves your machine.")
                     .font(.callout).foregroundStyle(.secondary).frame(maxWidth: 460, alignment: .leading)
+                WhatsNewCard()
             }
             Button("Import a model", action: onImport)
                 .buttonStyle(.borderedProminent).controlSize(.large)
