@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Support_Fins
+import Viewer
 
 /// The app's strings in the six languages (`Resources/Localizable.xcstrings`, generated from the web's tables by
 /// `tools/i18n`): the web's own translations come out of `JS.t` / `JS.tn`, plurals follow each language's rules, and a
@@ -99,5 +100,24 @@ struct LocalizationTests {
     @Test("the tips are the web's, translated")
     func tips() throws {
         #expect(JS.t(Tip.finMode, in: try lang("de")) != Tip.finMode)
+    }
+}
+
+@Suite("Localization: the view cube")
+struct ViewCubeLocalizationTests {
+    @Test("the cube's face names come from the catalog (`ui/viewcube.js:59`)")
+    func faces() throws {
+        for code in ["de", "ar"] {
+            let l = try #require(L10n.Language(code))
+            for face in ViewCube.Face.allCases {
+                let shown = face.localizedLabel(bundle: l.bundle, locale: l.locale)
+                #expect(shown == JS.t(face.label, in: l), "\(code) \(face.label)")
+            }
+        }
+        let de = try #require(L10n.Language("de"))
+        #expect(ViewCube.Face.front.localizedLabel(bundle: de.bundle, locale: de.locale) == "Vorne")
+        let ar = try #require(L10n.Language("ar"))
+        #expect(ViewCube.Face.front.localizedLabel(bundle: ar.bundle, locale: ar.locale) != "Front")
+        #expect(ViewCube.Face.front.localizedLabel(bundle: try #require(L10n.Language("en")).bundle) == "Front")
     }
 }

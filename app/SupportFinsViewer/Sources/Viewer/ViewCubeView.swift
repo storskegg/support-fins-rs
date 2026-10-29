@@ -45,7 +45,7 @@ struct ViewCubeStage: View {
             // the labels are resolved once as symbols; resolving the text again for every camera change
             // was the largest cost of an orbit on the main thread
             ForEach(ViewCube.Face.allCases, id: \.self) { face in
-                Text(face.label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(white: 0.92)).tag(face)
+                Text(verbatim: face.localizedLabel()).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(white: 0.92)).tag(face)
             }
         }
         .frame(width: CGFloat(ViewCube.stage), height: CGFloat(ViewCube.stage))
