@@ -1,4 +1,12 @@
 {
+  "Could not read {name}:": {
+    "why": "the status line when a file fails to open (the web's alert, `ui/io.js:407`, is English only)",
+    "de": "{name} konnte nicht gelesen werden:",
+    "zh": "无法读取 {name}：",
+    "pt": "Não foi possível ler {name}:",
+    "ar": "تعذّرت قراءة {name}:",
+    "nl": "Kan {name} niet lezen:"
+  },
   "3D view": {
     "why": "VoiceOver label of the 3D view (the web draws a canvas without one)",
     "de": "3D-Ansicht",

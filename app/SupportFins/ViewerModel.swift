@@ -75,7 +75,7 @@ final class ViewerModel {
             self.picker = picker
         } catch {
             addingModel = false
-            status = error.localizedDescription
+            status = ReadFailure.text(of: error, reading: url?.lastPathComponent)
         }
     }
 
@@ -92,7 +92,7 @@ final class ViewerModel {
             show([LoadedPart(name: core.info.name, mesh: core)], url: url)
         } catch {
             addingModel = false
-            status = error.localizedDescription
+            status = ReadFailure.text(of: error, reading: url?.lastPathComponent)
         }
     }
 

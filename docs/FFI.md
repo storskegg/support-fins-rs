@@ -25,7 +25,10 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
   build is byte-identical to one that was never cancellable.
 - **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled}`) carrying the JS-identical
-  message where one exists.
+  message where one exists. On the Swift side `FfiError.localizedDescription` is that message, not UniFFI's
+  `String(reflecting:)` type dump: `just swift-bindings` rewrites the generated `errorDescription` to call the
+  hand-written `ffiErrorDescription` (`FfiError+Description.swift`) and fails if UniFFI's line changes. A failed file open
+  shows `ReadFailure.text`: the web's `Could not read <name>:\n<message>` (`ui/io.js:407`).
 
 ## Surface (M4a; extended in M4b)
 
