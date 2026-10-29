@@ -25,6 +25,7 @@ enum Shaders {
     constant float3 BED = float3(0.247, 0.498, 0.816);
     constant float3 HOVER = float3(0.302, 0.639, 1.0);
     constant float3 BACK = float3(0.09, 0.10, 0.13);
+    constant float3 GHOST = float3(0.604, 0.631, 0.678);
 
     struct MeshOut {
         float4 position [[position]];
@@ -44,9 +45,11 @@ enum Shaders {
         // web/ui/part.js paintOverhangs: kept = red, else over (a sliver) = amber, else bed contact = blue
         float3 c = PLAIN;
         if (f & FLAG_KEPT) c = OVERHANG;
-        else if ((f & FLAG_OVER) && u.params.z != 0) c = SMALL;
+        else if ((f & FLAG_OVER) && (u.params.z & 1u) != 0) c = SMALL;
         else if (f & FLAG_BED) c = BED;
         if (face + u.params.w == u.params.x) c = mix(c, HOVER, 0.65);
+        // a parked model (z bit 1) keeps its overhang colours a shade darker (`ghostPart`, ui/plateview.js)
+        if ((u.params.z & 2u) != 0) c *= GHOST;
         MeshOut out;
         out.position = u.viewProj * (u.model * float4(p, 1));
         out.normal = (u.model * float4(n, 0)).xyz;
@@ -123,6 +126,18 @@ enum Shaders {
         IdOut out;
         out.position = u.viewProj * (u.model * float4(p, 1));
         out.face = vid / 3 + u.params.w;
+        return out;
+    }
+
+    // One id for the whole draw (params.w): which model of the plate a pick lands on.
+    vertex IdOut id_flat_vertex(uint vid [[vertex_id]],
+                                const device float* verts [[buffer(0)]],
+                                constant Uniforms& u [[buffer(2)]]) {
+        uint o = vid * u.params.y;
+        float3 p = float3(verts[o], verts[o + 1], verts[o + 2]);
+        IdOut out;
+        out.position = u.viewProj * (u.model * float4(p, 1));
+        out.face = u.params.w;
         return out;
     }
 

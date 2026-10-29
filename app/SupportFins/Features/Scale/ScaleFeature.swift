@@ -30,6 +30,14 @@ final class ScaleFeature: Feature {
         registerTools(in: host.toolbar)
     }
 
+    /// A model on a plate keeps its scale and its 100 % part while parked (`ui/models.js`).
+    private struct Kept { var scale: Double; var base: Part? }
+    func modelState() -> Any? { let k = model.park(); return Kept(scale: k.scale, base: k.base) }
+    func restoreModelState(_ state: Any) {
+        guard let k = state as? Kept else { return }
+        model.restore(scale: k.scale, base: k.base)
+    }
+
     func registerTools(in toolbar: ToolbarRegistry) {
         guard host.controller != nil, model.hasPart else { toolbar.unregister(.scale); return }
         toolbar.register(.scale, isLit: { [model] in model.isScaled }, detail: { [model] in model.badgeSuffix }) {

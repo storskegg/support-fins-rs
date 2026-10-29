@@ -43,6 +43,8 @@ struct ReadoutSections: View {
     var build: (any ReadoutBuildSource)?
     /// Lines other features add to the status card.
     var extraLines: [StatusLine] = []
+    /// Rows other features add at the end of the stats card (`InspectorSlot.stats`).
+    var statsRows: [InspectorSection] = []
 
     @State private var analysis: Analysis?
     @State private var afterRemoval: AfterRemoval?
@@ -92,7 +94,7 @@ struct ReadoutSections: View {
             volume: (Double(controller.volume.x), Double(controller.volume.y), Double(controller.volume.z))))
         let fins = FinReadout.make(built, context(settings, built, regions))
         Group {
-            StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins)
+            StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins, rows: statsRows)
             StatusCard(part: part, fins: fins, importNote: session.parts.first?.info.importNote ?? "",
                        islandCard: islandCard(built, count: analysis?.islands ?? 0), extra: extraLines)
         }

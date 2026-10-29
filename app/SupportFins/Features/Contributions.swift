@@ -61,6 +61,9 @@ struct WindowToolbarItem: Identifiable {
 enum InspectorSlot: Int, CaseIterable {
     /// Above everything: the stats and status cards.
     case top
+    /// Inside the stats card (Part), after Analysis: the web's `part-btns` (Add model, Remove model). The readout
+    /// draws these, not the inspector.
+    case stats
     /// In the settings block, after Cutouts and before More settings (Remove fins).
     case basics
     /// After the settings block.
@@ -125,6 +128,8 @@ struct MenuID: Hashable, Identifiable {
     static let view = MenuID(title: "View", order: 0)
     static let model = MenuID(title: "Model", order: 10)
     static let fileExport = MenuID(title: "File", order: 100, isFileGroup: true)
+    /// Items after Undo and Redo in the Edit menu (Remove Model from Plate).
+    static let edit = MenuID(title: "Edit", order: 110, isFileGroup: true)
 }
 
 /// A run of one menu's entries from one feature. Sections of a menu come in `order`, so a feature's items sit

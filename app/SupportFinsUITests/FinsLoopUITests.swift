@@ -46,9 +46,19 @@ final class FinsLoopUITests: XCTestCase {
         let slider = element("tine-density")
         XCTAssertTrue(slider.waitForExistence(timeout: 5))
         let before = String(describing: slider.value)   // a number or a string, depending on the control
-        // the build's Status block pushes the slider below the inspector's fold: scroll it into view before clicking.
+        // the stats card and the build's Status block push the slider below the inspector's fold: scroll the
+        // inspector itself (not a row of it, which scrolls out of view) until the slider stands clear of its bottom
+        // edge, where a debug build's Benchmark orbit bar covers the rows while they still count as hittable.
         // adjust(toNormalizedSliderPosition:) leaves a SwiftUI slider on macOS where it was; a click on the track moves it
-        for _ in 0..<15 where !slider.isHittable { fins.scroll(byDeltaX: 0, deltaY: -80) }
+        let inspector = app.scrollViews.containing(.any, identifier: "tine-density").firstMatch
+        XCTAssertTrue(inspector.exists, "the inspector's scroll view")
+        func clear() -> Bool { slider.isHittable && slider.frame.maxY < inspector.frame.maxY - 60 }
+        var last = slider.frame
+        for _ in 0..<30 where !clear() {
+            inspector.scroll(byDeltaX: 0, deltaY: -80)
+            if slider.frame == last { break }        // the end of the inspector
+            last = slider.frame
+        }
         XCTAssertTrue(slider.isHittable, "the slider scrolled into view")
         slider.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).click()
         XCTAssertNotEqual(String(describing: slider.value), before, "the slider moved")

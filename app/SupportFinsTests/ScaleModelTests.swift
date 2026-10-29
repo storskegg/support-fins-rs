@@ -101,4 +101,27 @@ struct ScaleModelTests {
         item.action()
         #expect(host.toolbar.open == .scale)
     }
+
+    /// Several models on a plate (`ui/models.js park/unpark`): each keeps its own scale and its 100 % part while it
+    /// is parked, so coming back it still says 150 % and Reset still goes back to the part as loaded.
+    @Test func aParkedModelKeepsItsScaleAndItsBase() async throws {
+        let (host, f) = try await window()
+        defer { withExtendedLifetime(host) {} }
+        let board = try #require(host.features[PlatesFeature.self]?.board)
+        let before = size(host)
+        f.model.commit(text: "150")
+        try await eventually("the reload") { f.model.scale == 1.5 }
+        let other = URL(fileURLWithPath: try TestParts.write(TestParts.box(-4, 4, -4, 4, 0, 8), name: "scale-b-\(UUID().uuidString).stl"))
+        await host.load(url: other, adding: true)
+        try #require(board.plate.models.count == 2 && board.plate.live == 1)
+        #expect(f.model.scale == 1 && f.model.badgeSuffix == "", "the new model is at 100 %")
+        board.select(0)
+        #expect(board.plate.live == 0)
+        #expect(f.model.scale == 1.5 && f.model.badgeSuffix == " 150%")
+        for k in 0..<3 { #expect(abs(size(host)[k] - 1.5 * before[k]) < 1e-3) }
+        f.model.reset()
+        try await eventually("reset") { f.model.scale == 1 }
+        for k in 0..<3 { #expect(abs(size(host)[k] - before[k]) < 1e-3) }
+        #expect(board.plate.models.count == 2, "a rescale keeps the plate's other model")
+    }
 }

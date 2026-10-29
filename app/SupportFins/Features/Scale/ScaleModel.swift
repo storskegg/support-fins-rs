@@ -33,6 +33,20 @@ final class ScaleModel {
         base = part
     }
 
+    /// The scale and the part at 100 % of a model put away on a plate (`scaleState`, `ui/models.js park`). Parking
+    /// also drops a rescale still in flight: it was for this model, not the next.
+    func park() -> (scale: Double, base: Part?) {
+        generation += 1
+        return (scale, base)
+    }
+
+    /// A parked model is back on show (`setScaleState`, `ui/models.js unpark`): its scale and its base, no reload.
+    func restore(scale s: Double, base b: Part?) {
+        generation += 1
+        scale = s
+        base = b
+    }
+
     /// The field's Enter or blur (`scale-pct` `change`): junk or empty shows the scale that holds, else rescale.
     /// Returns the text the field should show.
     @discardableResult

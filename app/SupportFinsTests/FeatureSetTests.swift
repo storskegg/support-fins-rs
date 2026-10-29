@@ -123,7 +123,7 @@ struct FeatureSetTests {
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
         let model = ViewerModel()
-        var expected = ["empty-state", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar"]
+        var expected = ["empty-state", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-toast"]
         #if DEBUG
         expected.insert("frame-time", at: 0)
         #endif
@@ -131,6 +131,8 @@ struct FeatureSetTests {
         #expect(model.toolbar.slots.map(\.id) == ["rotate", "scale-badge", "suggest", "strength", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
+        // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
+        #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["remove-fins"])
     }
 
@@ -144,7 +146,7 @@ struct FeatureSetTests {
         #expect(model.toolbar.badges[.suggest] == nil && model.toolbar.badges[.strength] == nil)   // no part yet
     }
 
-    /// The menu bar, as it has always been: View, Model, then File's Export. Keep in step with docs/UI-MAP.md.
+    /// The menu bar, as it has always been: View, Model, then File's Export and Add Model, and Edit's Remove Model. Keep in step with docs/UI-MAP.md.
     @Test func theMenuBarKeepsItsItemsAndTheirOrder() {
         var view = ["View", "  Show Rotate Rings", "  Rebuild While Dragging", "  Frame Part [0]", "  Home", "  Show Print Layers"]
         #if DEBUG
@@ -153,12 +155,13 @@ struct FeatureSetTests {
         view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]"]
         let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
                      "  Lay a Face Flat", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
-        let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]"]
+        let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
+        let edit = ["Edit", "  Remove Model from Plate"]
         // no window focused
-        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file)
+        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
         let window = ViewerModel()
-        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file)
+        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file + edit)
     }
 
     /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.

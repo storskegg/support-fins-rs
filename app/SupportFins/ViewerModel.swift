@@ -38,28 +38,34 @@ final class ViewerModel {
     /// The file being read, for the "reading STEP…" overlay (`parseStep`, `ui/io.js:313`).
     private(set) var loadingURL: URL?
     /// The name of the file on show, which can differ from the document's when a file is opened in place.
-    private(set) var openedName: String?
+    var openedName: String?
     var hasPart: Bool { (controller?.partCount ?? 0) > 0 }
 
     /// No part, nothing loading and no picker open: the intro (or the compact button) fills the window.
     var showsEmptyState: Bool { controller != nil && !hasPart && !isLoading && picker == nil }
 
-    func load(url: URL?) async {
+    /// The part being loaded goes beside the plate's models instead of in place of the one on show (Add Model to
+    /// Plate, `ui/io.js` `loadFile(file, true)`): the `Plates` feature parks the model on show when the part arrives.
+    /// Cleared once the part is shown, or the load ends without one.
+    private(set) var addingModel = false
+
+    func load(url: URL?, adding: Bool = false) async {
         guard let controller else { return }
         hasOpened = true
         isLoading = true
+        addingModel = adding && hasPart
         loadingURL = url
         defer { isLoading = false; loadingURL = nil }
         do {
             let parts = try await loader.load(url: url, device: controller.renderer.device)
-            guard !parts.isEmpty else { status = "The file has no mesh."; return }
+            guard !parts.isEmpty else { addingModel = false; status = "The file has no mesh."; return }
             // a plate of several goes to the picker; cancelling it keeps whatever is on show (`io.js:200-205`)
             guard parts.count > 1 else { show(parts, url: url); return }
             let picker = ObjectPickerModel(objects: parts.map {
                 let d = $0.mesh.bounds.max - $0.mesh.bounds.min
                 return (name: $0.name, triangles: $0.mesh.faceCount, size: [Double(d.x), Double(d.y), Double(d.z)])
             })
-            picker.onCancel = { [weak self] in self?.picker = nil }
+            picker.onCancel = { [weak self] in self?.picker = nil; self?.addingModel = false }
             picker.onLoad = { [weak self] chosen in
                 guard let self else { return }
                 self.picker = nil
@@ -68,6 +74,7 @@ final class ViewerModel {
             }
             self.picker = picker
         } catch {
+            addingModel = false
             status = error.localizedDescription
         }
     }
@@ -79,11 +86,12 @@ final class ViewerModel {
         defer { isLoading = false }
         do {
             let cores = chosen.compactMap { ($0.mesh as? CorePart)?.part }
-            guard cores.count == chosen.count else { status = "These objects cannot be merged."; return }
+            guard cores.count == chosen.count else { addingModel = false; status = "These objects cannot be merged."; return }
             let merged = try await Task.detached(priority: .userInitiated) { try mergeParts(parts: cores, objectCount: UInt64(total)) }.value
-            guard let core = CorePart(part: merged, device: controller.renderer.device) else { status = "The merged mesh could not be shared with the GPU."; return }
+            guard let core = CorePart(part: merged, device: controller.renderer.device) else { addingModel = false; status = "The merged mesh could not be shared with the GPU."; return }
             show([LoadedPart(name: core.info.name, mesh: core)], url: url)
         } catch {
+            addingModel = false
             status = error.localizedDescription
         }
     }
@@ -106,5 +114,6 @@ final class ViewerModel {
         if !keepingPose { openedName = url?.lastPathComponent ?? first.name }
         status = nil
         features.partDidShow(parts)
+        addingModel = false
     }
 }
