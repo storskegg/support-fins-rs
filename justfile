@@ -3,7 +3,7 @@
 # app (Swift bindings, Xcode project, app tests), bench (the bench-* timings) and tools (dashboard, tidy).
 # NEW RECIPES GO IN THEIR AREA'S FILE, not here. `just --list` shows all of them.
 #
-# app-test, app-uitest and every bench-* take the machine-wide lock (tools/lock): one at a time on this Mac,
+# app-test, app-uibuild, app-uitest and every bench-* take the machine-wide lock (tools/lock): one at a time on this Mac,
 # whichever worktree they run from. Benchmarks also record the machine load before and during the run.
 #
 # Per-job build caps. Up to 4 agents build at once on a 12-core Mac; each at 4 jobs is ~16

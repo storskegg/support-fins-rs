@@ -117,3 +117,21 @@ Functions that push onto, compact or truncate a caller's `out` array (`sweep`, `
 `out[from..]` as it stands after the call, which covers in-place compaction and a rejected wall's
 truncation. The replay seeds a Rust `out` of the same length, calls the function, and compares the same
 slice. `capture.js`'s `opts.pushes` does this for captured calls.
+
+## STEP import (`step`)
+
+`parity/oracle/step.js` runs the web's own kernel (the vendored OpenCascade 7.6.1 WASM, occt-import-js 0.0.23) with
+`STEP_PARAMS` on `tests/fixtures/*.step` and on 13 files that `parity/step-fixtures/gen.cpp` writes (spheres, cones, tori,
+fillets, lofts, a revolved spline, a boolean pocket, loose shells and faces, a file in inches, a named nested assembly with
+shared and moved instances, three free roots), plus five broken files. Three recorded functions: `isStep` (bytes, bool),
+`readStepFile` (bytes; `success`, the assembly `root` tree and every mesh's `position` Float32Array and `index` Uint32Array,
+as `web/stepworker.js` stores them) and `readStep` (bytes; `stepObjects` of that: name, soup, tris, meshes, bbox, or the
+thrown message). `crates/sf-step/tests/parity_step.rs` replays them through the native kernel with **`Tol::Exact`**:
+23 meshes, 85,430 vertices, 161,800 triangles, 0 differences (`cargo run -p sf-step --example parity_numbers`).
+
+That exactness needs the same maths library, not only the same OpenCascade commit. Emscripten links musl's libm, and its
+`sin`, `cos`, `atan2`, `pow` ... differ from Apple's in the last bit for a few percent of arguments (4.3% of a sphere's vertex
+doubles, up to 1.8e-15). Rounded to f32 the vertices look identical, but the mesher decides on cocircular points by those
+bits, and with Apple's libm 10 of the 23 meshes came out with other diagonals and another triangle order (the same vertices
+and counts). `tools/occt/` therefore builds OpenCascade and the shim with every maths call renamed to musl's
+(`wasm_math.h`, `libwasmmath.a` from Emscripten 3.1.69's sources), no fused multiply-add and no libm builtin rewriting.

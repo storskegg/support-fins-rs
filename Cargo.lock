@@ -734,6 +734,7 @@ dependencies = [
  "sf-cut",
  "sf-engine",
  "sf-io",
+ "sf-step",
  "sf-testkit",
 ]
 
@@ -769,6 +770,7 @@ dependencies = [
  "sf-cut",
  "sf-engine",
  "sf-io",
+ "sf-step",
  "sf-testkit",
  "uniffi",
 ]
@@ -782,6 +784,16 @@ dependencies = [
  "miniz_oxide",
  "parity",
  "rayon",
+ "sf-engine",
+ "sf-testkit",
+]
+
+[[package]]
+name = "sf-step"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "parity",
  "sf-engine",
  "sf-testkit",
 ]

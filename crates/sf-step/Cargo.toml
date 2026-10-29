@@ -1,0 +1,23 @@
+[package]
+name = "sf-step"
+description = "STEP import through native OpenCascade 7.6.1 (port of web/step.js; the kernel is occt-import-js 0.0.23's, built natively)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[dependencies]
+sf-engine.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[dev-dependencies]
+parity = { path = "../../parity" }
+sf-testkit.workspace = true
+
+
+[lints]
+workspace = true
