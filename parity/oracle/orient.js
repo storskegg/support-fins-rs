@@ -5,7 +5,10 @@
 //                        out: {rot, cross, quality, text, height, over, bedArea} | null
 //   suggestOrientations  args: [$topo, {top, threshold}, {$config: <every config object>}]
 //                        out: {candidates: [{rot, overArea, bedArea, height, size, regions, walls, coverage, volume, seating,
-//                        holes, bore, score}], confidence}
+//                        holes, bore, score}], confidence}. `cheapAbove` in the options (the >1M-face rule, forced on a small part)
+//                        makes walls/coverage/volume/bore null and seating "unknown".
+//   suggestProgress      args: as suggestOrientations           out: {progress: [every onProgress(f) call, in order]}
+//                        (the Rust ranking runs on several threads, so the replay compares them sorted)
 // Replayed by crates/sf-testkit/tests/parity_orient.rs.
 import { writeCases } from "./lib/encode.js";
 import { modelList, topoRef, topoOf } from "./lib/direct.js";
@@ -28,7 +31,7 @@ const snap = () => ({
   ROWS: m.rows.ROWS, NOZZLE: { nozzle: m.nozzle.nozzle, wallLines: m.nozzle.wallLines },
 });
 
-const cases = { layerVerdict: [], loadAlignment: [], suggestStrengthPose: [], suggestOrientations: [] };
+const cases = { layerVerdict: [], loadAlignment: [], suggestStrengthPose: [], suggestOrientations: [], suggestProgress: [] };
 
 const sizes = [];
 for (const x of [0, 0.1, 5, 40, 100]) for (const y of [0, 5, 50, 100]) for (const z of [0, 0.5, 5, 50, 52.5, 70, 94.9, 95, 100]) sizes.push({ x, y, z });
@@ -55,6 +58,26 @@ for (const [name] of modelList()) {
     const topo = topoOf(name);
     const out = suggestOrientations(topo, o);
     cases.suggestOrientations.push({ id: `${name}|top${o.top}|t${o.threshold}`, args: [topoRef(name), o, new Ref({ $config: encode(snap()) })], out });
+  }
+}
+
+// The rank-without-fin-builds rule (RANK_CHEAP_FACES): forced with cheapAbove on every model, at the exact
+// threshold (topo.nFaces > cheapAbove: equal builds, one less does not), and the progress calls of both rankings.
+for (const [name] of modelList()) {
+  const topo = topoOf(name);
+  const optSets = [{ top: 3, threshold: 45, cheapAbove: 0 }];
+  if (/^(cube|wedge|lbracket|torus|arch|ramp)$/.test(name)) {
+    optSets.push({ top: 1, threshold: 45, cheapAbove: 0 }, { top: 5, threshold: 30, cheapAbove: 0 }, { top: 0, threshold: 45, cheapAbove: 0 },
+      { top: 3, threshold: 45, cheapAbove: topo.nFaces }, { top: 3, threshold: 45, cheapAbove: topo.nFaces - 1 });
+  }
+  for (const o of optSets) {
+    const id = `${name}|top${o.top}|t${o.threshold}|cheap${o.cheapAbove === 0 ? "0" : o.cheapAbove === topo.nFaces ? "=n" : "n-1"}`;
+    cases.suggestOrientations.push({ id, args: [topoRef(name), o, new Ref({ $config: encode(snap()) })], out: suggestOrientations(topo, o) });
+  }
+  for (const o of [{ top: 3, threshold: 45 }, { top: 3, threshold: 45, cheapAbove: 0 }]) {
+    const progress = [];
+    suggestOrientations(topo, { ...o, onProgress: (f) => progress.push(f) });
+    cases.suggestProgress.push({ id: `${name}|${o.cheapAbove === 0 ? "cheap" : "full"}`, args: [topoRef(name), o, new Ref({ $config: encode(snap()) })], out: { progress } });
   }
 }
 

@@ -58,10 +58,10 @@ fn suggest_orientations_equals_the_engine_ranking() {
             assert_eq!(
                 (r.fins, r.rough_holes, r.regions, r.bore),
                 (
-                    c.walls as u64,
+                    c.walls.map(|n| n as u64),
                     c.holes as u64,
                     c.regions as u64,
-                    c.bore as u64
+                    c.bore.map(|n| n as u64)
                 )
             );
             assert_eq!(r.volume, c.volume);
@@ -74,7 +74,7 @@ fn suggest_orientations_equals_the_engine_ranking() {
                 }
             );
             // the line the page writes: height, fins, rough holes
-            let fins = match c.walls {
+            let fins = match c.walls.unwrap() {
                 0 => "no fins".to_string(),
                 1 => "1 fin".to_string(),
                 n => format!("{n} fins"),
@@ -168,8 +168,44 @@ fn a_pose_that_points_the_bores_up_earns_the_bores_clean_badge_only_when_the_cur
                 .unwrap()
                 .starts_with("This way up the bores point up")
         );
-        assert_eq!(r.bore, 0);
+        assert_eq!(r.bore, Some(0));
     }
+}
+
+/// The app sends Suggest the build's whole `opts_json` (`FinSettings.optionsJSON()`), page extras
+/// included: `tallRibs`, `curvedWalls`, Draw's `mode`, and with braces `sway.uncappedDepth` /
+/// `sway.crossRise`. The ranking takes them as the build does (they don't touch its clearances), never
+/// as "unknown dialog option tallRibs" (#206: the popover showed that error and no rows).
+#[test]
+fn the_apps_build_options_rank_like_the_dialogs_own() {
+    let part = load("lbracket");
+    // FinSettings() as the app sends it: Auto, the defaults, braces off
+    let dialog = r#""mode":"auto","threshold":45,"nozzle":0.4,"tines":true,"tineDensity":0,"tineDir":"horizontal","pinDepth":0.1,"layerHeight":0.2,"gap":0.2,"padStyle":"auto","cutout":"none","coverage":0.5,"plateOnly":false,"separateWalls":"off","longWalls":true"#;
+    let app = format!(r#"{{{dialog},"tallRibs":true,"curvedWalls":false,"sway.on":false}}"#);
+    let want = part
+        .suggest_orientations(45.0, format!(r#"{{{dialog},"sway.on":false}}"#), ctx())
+        .unwrap();
+    assert!(!want.rows.is_empty());
+    assert_eq!(
+        part.suggest_orientations(45.0, app.clone(), ctx()).unwrap(),
+        want
+    );
+    assert_eq!(
+        part.suggest_orientations_wide(45.0, app, ctx(), 1.0)
+            .unwrap(),
+        want
+    );
+    // braces on: the request extras ride beside the sway keys
+    let sway = r#"{"mode":"auto","tallRibs":false,"curvedWalls":true,"sway.on":true,"sway.gripFrom":0,"sway.tineSpacing":6,"sway.reach":0.15,"sway.uncappedDepth":false,"sway.crossRise":0.5}"#;
+    assert!(part.suggest_orientations(45.0, sway.into(), ctx()).is_ok());
+    // Draw: options.json has no such mode; the page's finOpts sends it
+    let draw = r#"{"mode":"draw","tallRibs":true,"curvedWalls":false,"sway.on":false}"#;
+    assert!(part.suggest_orientations(45.0, draw.into(), ctx()).is_ok());
+    // a bad extra is still the build's error
+    assert!(
+        part.suggest_orientations(45.0, r#"{"tallRibs":1}"#.into(), ctx())
+            .is_err()
+    );
 }
 
 #[test]
@@ -269,6 +305,7 @@ fn suggest_strength_pose_equals_the_engine_and_says_when_it_is_already_strongest
 // ---- Suggester: the same generation-drop pattern as Builder -----------------------------------------
 
 enum Event {
+    Progress(u64, f64),
     Suggested(u64, SuggestResult),
     Strength(u64, StrengthAdvice),
     Failed(u64, FfiError),
@@ -278,11 +315,34 @@ impl SuggestListener for Listener {
     fn suggested(&self, g: u64, r: SuggestResult) {
         let _ = self.0.lock().unwrap().send(Event::Suggested(g, r));
     }
+    fn progress(&self, g: u64, f: f64) {
+        let _ = self.0.lock().unwrap().send(Event::Progress(g, f));
+    }
     fn strength(&self, g: u64, a: StrengthAdvice) {
         let _ = self.0.lock().unwrap().send(Event::Strength(g, a));
     }
     fn failed(&self, g: u64, e: FfiError) {
         let _ = self.0.lock().unwrap().send(Event::Failed(g, e));
+    }
+}
+/// The next event that is not a progress report (those come first, for as long as a ranking runs).
+fn next_event(rx: &mpsc::Receiver<Event>, timeout: Duration) -> Event {
+    loop {
+        match rx.recv_timeout(timeout).unwrap() {
+            Event::Progress(..) => {}
+            e => return e,
+        }
+    }
+}
+/// Nothing but progress reports ever reach a listener whose ranking was replaced (`Ok` while the
+/// older one still ran as the latest, `Disconnected` once the worker dropped it): never its answer.
+fn assert_never_answered(rx: &mpsc::Receiver<Event>) {
+    loop {
+        match rx.recv_timeout(Duration::from_millis(300)) {
+            Ok(Event::Progress(..)) => {}
+            Ok(_) => panic!("a replaced ranking was delivered"),
+            Err(_) => return,
+        }
     }
 }
 fn listener() -> (Box<Listener>, mpsc::Receiver<Event>) {
@@ -299,7 +359,7 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
     let g1 = s.suggest(45.0, "{}".into(), ctx(), l1);
     let g2 = s.suggest(45.0, "{}".into(), ctx(), l2);
     assert_eq!((g1, g2), (1, 2));
-    let Event::Suggested(g, r) = rx2.recv_timeout(Duration::from_secs(60)).unwrap() else {
+    let Event::Suggested(g, r) = next_event(&rx2, Duration::from_secs(60)) else {
         panic!("not a suggestion")
     };
     assert_eq!(g, 2);
@@ -307,10 +367,47 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
         r,
         part.suggest_orientations(45.0, "{}".into(), ctx()).unwrap()
     );
-    assert!(matches!(
-        rx1.recv_timeout(Duration::from_millis(300)),
-        Err(mpsc::RecvTimeoutError::Disconnected)
-    ));
+    assert_never_answered(&rx1);
+}
+
+// suggest_worker.test.js:47 -- the page shows the worker's progress on the Suggest button, so it must
+// report after every pose, climbing to 1 before the ranking arrives (and never go backwards, though
+// the engine scores on several threads).
+#[test]
+fn a_ranking_reports_progress_after_every_pose_climbing_to_1() {
+    for density in [None, Some(10.0)] {
+        let part = load("torus");
+        let s = Suggester::new(part.clone());
+        let (l, rx) = listener();
+        let g = match density {
+            None => s.suggest(45.0, "{}".into(), ctx(), l),
+            Some(d) => s.suggest_wide(45.0, "{}".into(), ctx(), d, l),
+        };
+        let mut seen = vec![];
+        loop {
+            match rx.recv_timeout(Duration::from_secs(120)).unwrap() {
+                Event::Progress(pg, f) => {
+                    assert_eq!(pg, g, "progress without its generation");
+                    seen.push(f);
+                }
+                Event::Suggested(sg, r) => {
+                    assert_eq!(sg, g);
+                    assert!(!r.rows.is_empty(), "no ranking");
+                    break;
+                }
+                _ => panic!("unexpected event"),
+            }
+        }
+        assert!(seen.len() >= 6, "only {} progress messages", seen.len());
+        assert!(
+            seen.windows(2).all(|w| w[1] > w[0]),
+            "progress went backwards: {seen:?}"
+        );
+        assert!(
+            (seen.last().unwrap() - 1.0).abs() < 1e-9,
+            "ended at {seen:?}"
+        );
+    }
 }
 
 #[test]
@@ -355,14 +452,11 @@ fn a_stale_wide_search_stops_early_and_the_newer_one_is_delivered() {
     let g1 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l1);
     let g2 = s.suggest_wide(45.0, "{}".into(), ctx(), 10.0, l2);
     assert_eq!((g1, g2), (1, 2));
-    let Event::Suggested(g, _) = rx2.recv_timeout(Duration::from_secs(120)).unwrap() else {
+    let Event::Suggested(g, _) = next_event(&rx2, Duration::from_secs(120)) else {
         panic!("not a suggestion")
     };
     assert_eq!(g, 2);
-    assert!(matches!(
-        rx1.recv_timeout(Duration::from_millis(300)),
-        Err(mpsc::RecvTimeoutError::Disconnected)
-    ));
+    assert_never_answered(&rx1);
 }
 
 #[test]

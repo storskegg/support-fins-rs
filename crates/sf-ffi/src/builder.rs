@@ -249,7 +249,7 @@ fn json_bool(v: &Json, key: &str) -> Result<bool, FfiError> {
 }
 
 /// Split `opts_json` into the dialog's `options.json` keys and the page's request-level extras.
-fn split_options(
+pub(crate) fn split_options(
     opts_json: &str,
     page: &mut PageRequest,
 ) -> Result<(Vec<(String, Json)>, bool), FfiError> {

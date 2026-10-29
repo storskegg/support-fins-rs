@@ -58,7 +58,7 @@ Web-only rows:
 | `neck.test.js` | 5 | cutout, inside, nozzle, overhangs, prop/squat, stl | M2 | green |
 | `nozzle.test.js` | 12 | fins, fins/wedges, inside, nozzle, overhangs, prop, stl, sway | M3 | green (js_nozzle.rs) |
 | `obj.test.js` | 6 | inside, obj, overhangs, stl | M1 | green |
-| `orient.test.js` | 13 | inside, orient, overhangs, stl | M3 | green |
+| `orient.test.js` | 14 | inside, orient, overhangs, stl | M3 | green (js_orient.rs; the 1M-face test also has two Rust-only companions: the confidence cap and the strict `>` threshold; parity corpus orient/ replays the cheap ranking and its progress calls) |
 | `pad.test.js` | 14 | fins, fins/pad, inside, overhangs, prop, stl | M3 | green (js_pad.rs: the `buildPad` ones; js_pad_fins.rs: the rest) |
 | `part_foot.test.js` | 13 | cutout, draw, inside, overhangs, stl | M3 | green |
 | `patches.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_patches.rs) |
@@ -82,7 +82,7 @@ Web-only rows:
 | `stability.test.js` | 3 | draw, fins, inside, overhangs, stl | M3 | green |
 | `step.test.js` | 6 | fins, inside, overhangs, prop, step, stl | M6 | not ported |
 | `stl.test.js` | 6 | inside, overhangs, stl | M1 | green |
-| `suggest_worker.test.js` | 2 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | green (sf-engine/tests/js_suggest_worker.rs; the worker is a direct `suggest_orientations` call on a `Config` the tunables were applied to) |
+| `suggest_worker.test.js` | 3 | fins, inside, orient, overhangs, prop, stl, suggestworker | M3 | green (sf-engine/tests/js_suggest_worker.rs; the worker is a direct `suggest_orientations` call on a `Config` the tunables were applied to; the progress test is `a_ranking_reports_progress_after_every_pose_climbing_to_1` in sf-ffi/tests/suggest.rs, through the `Suggester` listener) |
 | `supports.test.js` | 4 | fins, inside, overhangs, prop, stl | M3 | green (js_supports.rs) |
 | `surface_lowest.test.js` | 2 | inside, overhangs, prop/surface, stl | M1 | green |
 | `sway.test.js` | 19 | fins, inside, overhangs, prop, stl, sway | M3 | green (js_sway.rs) |

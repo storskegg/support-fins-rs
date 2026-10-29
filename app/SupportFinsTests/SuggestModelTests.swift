@@ -17,6 +17,30 @@ struct SuggestModelTests {
         #expect(model.buttonTitle == "Suggest orientation")
     }
 
+    @Test func theButtonShowsTheRankingsProgressAsAPercentage() async throws {
+        let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
+        model.rank(thresholdDegrees: 45, optionsJSON: "{}", currentBore: 0, density: 1.24)
+        let g = try #require(model.wanted)
+        // nothing reported yet: the bare label
+        #expect(model.buttonTitle == "Ranking…")
+        model.deliver(.progress(g, 0.4))
+        #expect(model.buttonTitle == "Ranking… 40%")
+        // the engine's threads can land out of order: it only rises
+        model.deliver(.progress(g, 0.3))
+        #expect(model.buttonTitle == "Ranking… 40%")
+        // Math.round: a half rounds up
+        model.deliver(.progress(g, 0.625))
+        #expect(model.buttonTitle == "Ranking… 63%")
+        // a superseded ranking's progress is dropped
+        model.deliver(.progress(g + 1, 0.99))
+        #expect(model.buttonTitle == "Ranking… 63%")
+        // a new ranking starts again from the bare label
+        model.reset()
+        #expect(model.buttonTitle == "Suggest orientation" && model.progress == nil)
+        model.deliver(.progress(g, 0.9))
+        #expect(model.buttonTitle == "Suggest orientation", "progress with no ranking in flight is ignored")
+    }
+
     @Test func theAppRunsTheWideSearch() async throws {
         #expect(SuggestModel.searchDensity == 10, "ten times the web's candidate poses")
         let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
@@ -44,7 +68,8 @@ struct SuggestModelTests {
         #expect(await eventually { !model.isRanking })
         #expect(!model.rows.isEmpty)
         for r in model.rows {
-            let fins = r.fins == 0 ? "no fins" : r.fins == 1 ? "1 fin" : "\(r.fins) fins"
+            let n = try #require(r.fins)
+            let fins = n == 0 ? "no fins" : n == 1 ? "1 fin" : "\(n) fins"
             #expect(r.line.hasPrefix("\(Int(r.height.rounded())) mm · \(fins)"), "\(r.line)")
         }
         if model.rows[0].tier == .ordinary { #expect(model.note == "Click a pose to turn the part." && !model.noteIsGood) }
@@ -76,6 +101,21 @@ struct SuggestModelTests {
         #expect(model.state == .idle)
         try await Task.sleep(for: .seconds(1))
         #expect(model.state == .idle && model.rows.isEmpty, "the answer to a dropped ranking never lands")
+    }
+
+    /// The toolbar button sends the build's options (`FinSettings().optionsJSON()`), page extras and all
+    /// (`tallRibs`, `curvedWalls`, Draw's mode, the sway extras): the ranking must take them, not fail with
+    /// "unknown dialog option tallRibs" and show no rows (#206).
+    @Test(arguments: [FinSettings.Mode.auto, .full, .draw], [false, true])
+    func theAppsOwnOptionsRank(mode: FinSettings.Mode, sway: Bool) async throws {
+        var settings = FinSettings()
+        settings.mode = mode
+        settings.sway = sway
+        let model = SuggestModel(part: try TestParts.tShape(), pose: FakePose().access)
+        model.rank(thresholdDegrees: 45, optionsJSON: settings.optionsJSON(), currentBore: 0, density: 1.24)
+        #expect(await eventually { !model.isRanking })
+        guard case .ready = model.state else { Issue.record("ranking failed: \(model.state)"); return }
+        #expect(!model.rows.isEmpty)
     }
 
     @Test func badOptionsAreShownAsTheEnginesMessage() async throws {

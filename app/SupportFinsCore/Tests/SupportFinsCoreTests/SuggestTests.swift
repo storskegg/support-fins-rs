@@ -16,6 +16,7 @@ private func modelPath(_ name: String) throws -> String {
 private final class Collector: SuggestListener, @unchecked Sendable {
     enum Event: Sendable {
         case suggested(UInt64, SuggestResult)
+        case progress(UInt64, Double)
         case strength(UInt64, StrengthAdvice)
         case failed(UInt64, FfiError)
     }
@@ -23,6 +24,7 @@ private final class Collector: SuggestListener, @unchecked Sendable {
     private let continuation: AsyncStream<Event>.Continuation
     init() { (stream, continuation) = AsyncStream.makeStream() }
     func suggested(generation: UInt64, result: SuggestResult) { continuation.yield(.suggested(generation, result)) }
+    func progress(generation: UInt64, fraction: Double) { continuation.yield(.progress(generation, fraction)) }
     func strength(generation: UInt64, advice: StrengthAdvice) { continuation.yield(.strength(generation, advice)) }
     func failed(generation: UInt64, err: FfiError) { continuation.yield(.failed(generation, err)) }
     func finish() { continuation.finish() }
@@ -36,6 +38,7 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     let collector = Collector()
     let generation = suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: collector)
     for await event in collector.stream {
+        if case .progress = event { continue }  // the button's percentage; the ranking comes last
         guard case .suggested(let g, let result) = event else { Issue.record("not a suggestion"); return }
         #expect(g == generation)
         let best = try #require(result.rows.first)
@@ -49,6 +52,34 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     }
 }
 
+/// `onProgress` of `suggestOrientations` (suggest_worker.test.js:47): after every pose, climbing to 1 before the
+/// ranking arrives, for the web's search and the wide one.
+@Test func aRankingReportsProgressAfterEveryPoseClimbingToOne() async throws {
+    let part = try #require(try loadParts(path: try modelPath("torus")).first)
+    for density in [nil, 10.0] as [Double?] {
+        let suggester = Suggester(part: part)
+        let collector = Collector()
+        let generation = density.map {
+            suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", context: context, density: $0, listener: collector)
+        } ?? suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: collector)
+        var seen: [Double] = []
+        for await event in collector.stream {
+            switch event {
+            case .progress(let g, let f):
+                #expect(g == generation, "progress without its generation")
+                seen.append(f)
+            case .suggested(let g, let result):
+                #expect(g == generation && !result.rows.isEmpty)
+                collector.finish()
+            default: Issue.record("unexpected event")
+            }
+        }
+        #expect(seen.count >= 6, "only \(seen.count) progress messages")
+        #expect(zip(seen, seen.dropFirst()).allSatisfy { $0 < $1 }, "progress went backwards: \(seen)")
+        #expect(abs((seen.last ?? 0) - 1) < 1e-9)
+    }
+}
+
 @Test func aSupersededRankingIsNeverDelivered() async throws {
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let suggester = Suggester(part: part)
@@ -56,6 +87,7 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     _ = suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: first)
     let g2 = suggester.suggest(thresholdDeg: 45, optsJson: "{}", context: context, listener: second)
     for await event in second.stream {
+        if case .progress = event { continue }  // the button's percentage; the ranking comes last
         guard case .suggested(let g, _) = event else { Issue.record("not a suggestion"); return }
         #expect(g == g2)
         break
@@ -76,6 +108,7 @@ private let context = SuggestContext(currentBore: 0, density: 1.24)
     let collector = Collector()
     let generation = suggester.suggestWide(thresholdDeg: 45, optsJson: "{}", context: context, density: 10, listener: collector)
     for await event in collector.stream {
+        if case .progress = event { continue }  // the button's percentage; the ranking comes last
         guard case .suggested(let g, let result) = event else { Issue.record("not a suggestion"); return }
         #expect(g == generation)
         #expect(result.rows.count == 3 && result.rows[0].rank == "Best")
