@@ -35,7 +35,8 @@ final class SearchFeature: Feature {
     }
 
     var inspectorSections: [InspectorSection] {
-        [InspectorSection("search-note", slot: .top, order: -10) { SearchEmptyNote(search: self.model) }]
+        [InspectorSection("search-field", slot: .top, order: -20) { SearchField(search: self.model) },
+         InspectorSection("search-note", slot: .top, order: -10) { SearchEmptyNote(search: self.model) }]
     }
 
     static func menus(_ f: SearchFeature?) -> [MenuSection] {
@@ -47,20 +48,41 @@ final class SearchFeature: Feature {
     }
 }
 
-/// The window with the search field (`#opts-search`) in its toolbar, the model in the environment for the rows, and the
-/// search re-run whenever what shows or hides a row changes (the page's `MutationObserver`).
+/// The window with the model in the environment for the rows, and the search re-run whenever what shows or hides a row
+/// changes (the page's `MutationObserver`).
 private struct SearchHost: View {
     let feature: SearchFeature
     let content: AnyView
+
+    var body: some View {
+        content
+            .environment(feature.model)
+            .onChange(of: feature.context()) { feature.model.refresh() }
+    }
+}
+
+/// The box at the top of the options panel (`#opts-search`): Esc in it clears it; Edit > Search Settings focuses it.
+struct SearchField: View {
+    @Bindable var search: SettingsSearch
     @FocusState private var focused: Bool
 
     var body: some View {
-        @Bindable var model = feature.model
-        content
-            .searchable(text: $model.query, placement: .toolbar, prompt: "Search settings")
-            .searchFocused($focused)
-            .environment(feature.model)
-            .onChange(of: feature.model.focusRequests) { focused = true }
-            .onChange(of: feature.context()) { feature.model.refresh() }
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Search settings", text: $search.query)
+                .textFieldStyle(.plain)
+                .focused($focused)
+                .autocorrectionDisabled()
+                .onKeyPress(.escape) { search.clear() ? .handled : .ignored }
+                .accessibilityIdentifier("opts-search")
+            if !search.query.isEmpty {
+                Button { search.query = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel("Clear")
+            }
+        }
+        .padding(6)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+        .onChange(of: search.focusRequests) { focused = true }
     }
 }

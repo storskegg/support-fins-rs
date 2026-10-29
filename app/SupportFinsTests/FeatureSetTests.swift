@@ -159,7 +159,7 @@ struct FeatureSetTests {
         #expect(model.features.overlays.map(\.id) == expected)
         #expect(model.toolbar.slots.map(\.id) == ["move", "arrange", "rotate", "scale-badge", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
-        #expect(model.features.inspectorSections(.top).map(\.id) == ["search-note", "readout", "report"])
+        #expect(model.features.inspectorSections(.top).map(\.id) == ["search-field", "search-note", "readout", "report"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
         #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["augment", "remove-fins", "draw-controls"])
