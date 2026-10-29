@@ -95,6 +95,10 @@ extension ViewerRenderer {
         guard let s = drawState.scene else { return }
         var u = Uniforms(viewProj: camera.viewProjection, model: matrix_identity_float4x4, eye: SIMD4(camera.eye, 1),
                          params: SIMD4(Self.noFace, 6, 0, 0))
+        // the walls, their highlight and the ghosts are cut by the section like the fins (`clippingPlanes: clip`); the
+        // dots and the band are a HUD over everything
+        var uw = u
+        uw.clip = clipVector
         enc.setFrontFacing(.counterClockwise)
         enc.setCullMode(.none)
         func lit(_ mesh: OverlayMesh, color: SIMD3<Float>, opacity: Float?) {
@@ -102,7 +106,7 @@ extension ViewerRenderer {
             if var o = opacity { enc.setFragmentBytes(&o, length: MemoryLayout<Float>.size, index: 0) }
             var c = SIMD4(color, 1)
             enc.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
-            enc.setVertexBytes(&u, length: MemoryLayout<Uniforms>.size, index: 2)
+            enc.setVertexBytes(&uw, length: MemoryLayout<Uniforms>.size, index: 2)
             enc.setVertexBytes(&c, length: MemoryLayout<SIMD4<Float>>.size, index: 3)
             enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: mesh.vertices)
         }

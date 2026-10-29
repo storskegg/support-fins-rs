@@ -67,6 +67,27 @@ struct HandPickingTests {
         #expect(clicks == 1, "no hand mode: no click")
     }
 
+    /// The id pass the hand modes read is cut by the section (`keptHit`): a cut that takes the cube's top away gives a
+    /// face of the kept half, never the top, so Draw's surface point (the ray on that face) is on the kept side too.
+    @Test func theSectionsCutAwayHalfIsNotPicked() async throws {
+        let c = try rig()
+        c.handPicking = .walls
+        var got: ViewerController.HandPointer?
+        c.onHandClick = { got = $0 }
+        c.click(x: 128, y: 128, width: 256, height: 256)
+        try await eventually("a click") { got != nil }
+        #expect([2, 3].contains(got?.face?.face ?? -1), "the top, uncut")
+        // keep what is below z = 30 (the cube stands 0..40)
+        let world = SectionPlane(position: [0, 0, 30], orientation: simd_quatf(angle: .pi, axis: [1, 0, 0])).matrix
+        c.section.restore(c.renderer.modelMatrix.inverse * world)
+        #expect(c.section.isOn && c.section.plane.distance(to: [0, 0, 20]) > 0 && c.section.plane.distance(to: [0, 0, 40]) < 0)
+        got = nil
+        c.click(x: 128, y: 128, width: 256, height: 256)
+        try await eventually("a click") { got != nil }
+        #expect(![2, 3].contains(got?.face?.face ?? -1), "the cut top is passed over: \(String(describing: got?.face))")
+        c.section.setOn(false)
+    }
+
     @Test func theRingsStepAsideForDrawAndStayForBraces() throws {
         let c = try rig()
         c.showRings = true

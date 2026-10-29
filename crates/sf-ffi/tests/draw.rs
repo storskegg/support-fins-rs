@@ -392,19 +392,51 @@ fn a_click_on_a_drawn_wall_picks_it_unless_the_part_is_in_front() {
     let from: Vec<f64> = (0..3).map(|i| mid[i] + 5.0 * n[i]).collect();
     let dir: Vec<f64> = n.iter().map(|x| -x).collect();
     assert_eq!(
-        sweep.pick(from.clone(), dir.clone(), None).unwrap(),
+        sweep.pick(from.clone(), dir.clone(), None, None).unwrap(),
         Some(0)
     );
     assert_eq!(
-        sweep.pick(from.clone(), dir.clone(), Some(100.0)).unwrap(),
+        sweep
+            .pick(from.clone(), dir.clone(), Some(100.0), None)
+            .unwrap(),
         Some(0)
     );
     // the same ray with the part reported in front of it picks nothing
-    assert_eq!(sweep.pick(from, dir, Some(0.001)).unwrap(), None);
+    assert_eq!(
+        sweep
+            .pick(from.clone(), dir.clone(), Some(0.001), None)
+            .unwrap(),
+        None
+    );
+    // a section keeping the side the ray comes from keeps the wall; one keeping only what lies far past it cuts the
+    // wall away (`keptHit`): `n . p + w >= 0` is kept, the plane through `q` with normal `n`
+    let plane = |n: [f64; 3], ahead: f64| {
+        let q: Vec<f64> = (0..3).map(|i| mid[i] + dir[i] * ahead).collect();
+        vec![n[0], n[1], n[2], -(n[0] * q[0] + n[1] * q[1] + n[2] * q[2])]
+    };
+    let back = [-dir[0], -dir[1], -dir[2]];
+    let along = [dir[0], dir[1], dir[2]];
+    assert_eq!(
+        sweep
+            .pick(from.clone(), dir.clone(), None, Some(plane(back, 0.5)))
+            .unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        sweep
+            .pick(from.clone(), dir.clone(), None, Some(plane(along, 1000.0)))
+            .unwrap(),
+        None
+    );
+    assert!(
+        sweep
+            .pick(from.clone(), dir.clone(), None, Some(vec![0.0, 0.0]))
+            .is_err()
+    );
     // a ray that misses everything
     assert_eq!(
         sweep
-            .pick(vec![500.0, 500.0, 500.0], vec![0.0, 0.0, -1.0], None)
+            .pick(vec![500.0, 500.0, 500.0], vec![0.0, 0.0, -1.0], None, None)
             .unwrap(),
         None
     );

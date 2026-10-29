@@ -452,15 +452,22 @@ impl DrawnSweep {
     }
 
     /// The index of the wall under a pointer ray, if nearer than the part (`part_distance`, the part's
-    /// own hit along the same ray) (`pickSupport`).
+    /// own hit along the same ray) (`pickSupport`). `keep` (`[nx, ny, nz, w]`, the section's plane) passes over
+    /// hits on its cut-away side, `n . p + w < 0` (`keptHit`); `None` with no section.
     pub fn pick(
         &self,
         origin: Vec<f64>,
         dir: Vec<f64>,
         part_distance: Option<f64>,
+        keep: Option<Vec<f64>>,
     ) -> Result<Option<u64>, FfiError> {
         let (o, d) = (v3(&origin, "origin")?, v3(&dir, "dir")?);
-        Ok(pick_support(&self.sweep, o, d, part_distance).map(|i| i as u64))
+        let keep = match keep {
+            Some(k) if k.len() == 4 => Some([k[0], k[1], k[2], k[3]]),
+            Some(_) => return Err(engine("keep must be four numbers".to_string())),
+            None => None,
+        };
+        Ok(pick_support(&self.sweep, o, d, part_distance, keep).map(|i| i as u64))
     }
 
     /// What the built supports add to the plate, for the fit check and the grams receipt (`activeAdded`):

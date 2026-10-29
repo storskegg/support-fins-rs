@@ -659,12 +659,22 @@ final class DrawModel {
         refresh()
     }
 
-    /// The hand-placed support under the pointer, if it is nearer than the part (`pickSupport`): its index.
+    /// The hand-placed support under the pointer, if it is nearer than the part (`pickSupport`): its index. With a
+    /// section on, both hits skip the cut-away half (`keptHit`): the part's is the id pass's, which the cut clips; the
+    /// walls' passes over hits behind the plane.
     private func pickSupport(_ p: ViewerController.HandPointer, _ hit: Surface?) -> Int? {
+        let keep = sectionKeep
         guard let sweep, drawShown, sweptIDs == session.drawnWalls.map(\.id),
               let i = try? sweep.pick(origin: [p.origin.x, p.origin.y, p.origin.z], dir: [p.direction.x, p.direction.y, p.direction.z],
-                                      partDistance: hit?.distance) else { return nil }
+                                      partDistance: hit?.distance, keep: keep) else { return nil }
         return Int(i)
+    }
+
+    /// The section's plane (`[nx, ny, nz, w]`, kept where `n . p + w >= 0`, print space), nil with no section.
+    var sectionKeep: [Double]? {
+        guard let section = controller?.section, section.isOn else { return nil }
+        let c = section.plane.clip
+        return [Double(c.x), Double(c.y), Double(c.z), Double(c.w)]
     }
 
     /// Commit the wall from `start` to `b` (through `m` for a curve), if it can build (`placeWall`).

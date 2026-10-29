@@ -569,11 +569,23 @@ pub fn pick_support(
     origin: V3,
     dir: V3,
     part_distance: Option<f64>,
+    keep: Option<[f64; 4]>,
 ) -> Option<usize> {
+    // `keptHit` (web/ui/section.js): with a section on, a hit on the cut-away side (`n . p + w < 0`) is passed over
+    let kept = |d: f64| {
+        keep.is_none_or(|[nx, ny, nz, w]| {
+            nx * (origin[0] + dir[0] * d)
+                + ny * (origin[1] + dir[1] * d)
+                + nz * (origin[2] + dir[2] * d)
+                + w
+                >= 0.0
+        })
+    };
     let mut best: Option<(f64, usize)> = None;
     for (i, t) in sweep.tris.as_chunks::<3>().0.iter().enumerate() {
         let p = |k: usize| [t[k][0], t[k][1], t[k][2]];
         if let Some(d) = ray_triangle(origin, dir, p(0), p(1), p(2))
+            && kept(d)
             && best.is_none_or(|(bd, _)| d < bd)
         {
             best = Some((d, i));

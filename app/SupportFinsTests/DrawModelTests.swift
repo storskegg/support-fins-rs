@@ -165,6 +165,33 @@ struct DrawModelTests {
         #expect(window.session.drawnWalls.count == 1)
     }
 
+    /// With a section on, a click skips the cut-away half (`keptHit`, `web/ui/section.js`): a wall behind the plane is
+    /// not picked, the same wall on the kept side is.
+    @Test func aWallTheSectionCutsAwayIsNotPicked() async throws {
+        let (window, draw, kit) = try await drawWindow()
+        let c = try #require(window.controller)
+        draw.pointerClicked(try below(kit, faces: 24, x: -12, y: 12))
+        draw.pointerClicked(try below(kit, faces: 24, x: 12, y: 12))
+        let wall = try #require(window.session.drawnWalls.first)
+        try await eventually("the sweep") { draw.outcomes[wall.id] != nil && draw.sweepCurrent }
+        // a cut through y = 0 keeping -y: the wall (y = 12) is on the cut-away side
+        func cut(keeping normal: SIMD3<Float>) {
+            let turn = simd_quatf(from: SIMD3<Float>(0, 0, 1), to: normal)
+            let world = SectionPlane(position: .zero, orientation: turn).matrix
+            c.section.restore(c.renderer.modelMatrix.inverse * world)
+        }
+        cut(keeping: SIMD3(0, -1, 0))
+        #expect(c.section.isOn && draw.sectionKeep != nil)
+        draw.pointerClicked(side(x: 10, z: 8))
+        #expect(draw.selectedID == nil, "cut away: not picked")
+        // keeping +y: the wall is in view and a click there picks it
+        cut(keeping: SIMD3(0, 1, 0))
+        draw.pointerClicked(side(x: 10, z: 8))
+        #expect(draw.selectedID == wall.id)
+        c.section.setOn(false)
+        #expect(draw.sectionKeep == nil)
+    }
+
     @Test func clearAllIsOneUndoStepAndDoesNothingWithoutWalls() async throws {
         let (window, draw, kit) = try await drawWindow()
         draw.clearAll()                                     // nothing to clear: no undo step

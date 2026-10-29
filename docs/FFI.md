@@ -272,8 +272,9 @@ fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError>
 - **`sweep`** (`sweepDrawn`) re-stands every wall for the pose: `auto_build` is Auto's build when its supports are on screen (`auto` is a C keyword, which the generated header cannot use as a parameter name) (hand braces and
   tall-wall ribs stand clear of them) and `removed` its removed fin ids (`records_json` ids). `DrawnSweep`: `triangles()` (interleaved
   position + normal, `f32`, print space, in the walls' order), `walls_json()` (one entry per wall, in order: `{ ok, triStart, triEnd, kind,
-  reason | length, height, tines, ribs | cross, stilt }`; `triStart` / `triEnd` are triangle indices), `pick(origin, dir, part_distance)`
-  (`pickSupport`: the wall under the ray if nearer than the part's own hit), `wall_triangles(i)` (the selection's highlight).
+  reason | length, height, tines, ribs | cross, stilt }`; `triStart` / `triEnd` are triangle indices), `pick(origin, dir, part_distance, keep)`
+  (`pickSupport`: the wall under the ray if nearer than the part's own hit; `keep`, the section's plane `[nx, ny, nz, w]`, passes over hits
+  where `n . p + w < 0`, as `keptHit` does), `wall_triangles(i)` (the selection's highlight).
 - **`ghost`** is the live preview of the wall in progress (`updatePreview`'s `drawnWall`: `braceTall`, `through`, no tines), **`check_wall`**
   `placeWall`'s test (`drawnWall` with `through` only). `DrawnGhost`: `ok()`, `reason()` (the web's text, e.g. "curve too tight - 3.0mm
   radius, needs 5mm"), `triangles()`.
