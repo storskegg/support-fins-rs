@@ -31,7 +31,7 @@ struct InspectorView: View {
                         Text("Lattice").tag(FinSettings.Cutout.lattice)
                         Text("Honeycomb").tag(FinSettings.Cutout.honeycomb)
                     }
-                    .help(Tip.cutout)
+                    .tipCard(pic: "cutout", Tip.cutout)
                 }
                 ForEach(basics) { $0.content() }
                 MoreSettingsSection(settings: $settings, open: $sections.more)

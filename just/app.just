@@ -76,3 +76,7 @@ i18n-catalog:
 # catalog. Reads the strings the compiler extracted from the build of `app-uibuild` (`.dd-ui`), so it builds first.
 i18n-check: app-uibuild
     deno run -A --config tools/i18n/deno.json tools/i18n/parity.ts --stringsdata "{{justfile_directory()}}/.dd-ui/Build/Intermediates.noindex/SupportFins.build"
+
+# The tip cards' pictures (web/ui/tippics.js) as drawing data for the app (Features/Tips); `--check` is in `just gate`.
+tippics-gen *args:
+    deno run -A --config tools/tippics/deno.json tools/tippics/gen.ts {{args}}

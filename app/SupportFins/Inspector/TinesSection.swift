@@ -31,7 +31,7 @@ struct TinesSection: View {
                             Text(settings.pins ? "more" : "firm").font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    .help(settings.pins ? Self.pinSpacingTip : Tip.tineDensity)
+                    .tipCard(pic: settings.pins ? "pin-spacing" : "tine-density", settings.pins ? Self.pinSpacingTip : Tip.tineDensity)
                 }
             }
             if v.tineDirection {
@@ -40,12 +40,12 @@ struct TinesSection: View {
                         Text("Horizontal (FDM)").tag(FinSettings.TineDirection.horizontal)
                         Text("Vertical (resin)").tag(FinSettings.TineDirection.vertical)
                     }
-                    .help(Tip.tineDir)
+                    .tipCard(pic: "tine-dir", Tip.tineDir)
                 }
             }
             if v.pinDepth {
                 FindRow("pindepth-fld") {
-                    NumberField(title: "Pin depth", value: $settings.pinDepth, limits: FinSettings.pinDepthLimits, help: Tip.pinDepth)
+                    NumberField(title: "Pin depth", value: $settings.pinDepth, limits: FinSettings.pinDepthLimits, help: Tip.pinDepth, pic: "pin-depth")
                 }
             }
             if v.resinNote {
@@ -53,7 +53,7 @@ struct TinesSection: View {
             }
         } label: {
             HStack {
-                FindRow("tines", hides: false) { Toggle(isOn: $settings.tines) { ChangedLabel("Tines", detail: "grip the part", changed: false) }.help(Tip.tines) }
+                FindRow("tines", hides: false) { Toggle(isOn: $settings.tines) { ChangedLabel("Tines", detail: "grip the part", changed: false) }.tipCard(pic: "tines", Tip.tines) }
                 Spacer()
                 if !open { Text(settings.tinesSummary).font(.caption).foregroundStyle(.secondary) }
             }

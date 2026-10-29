@@ -10,7 +10,7 @@ struct AugmentToggle: View {
                 FindRow("augment-toggle") {
                     Toggle(model.augmentTitle, isOn: Binding(get: { model.session.addByHand }, set: { _ in model.toggleAugment() }))
                         .toggleStyle(.button)
-                        .help(DrawTip.augment)
+                        .tipCard(pic: "add-walls", DrawTip.augment)
                         .accessibilityIdentifier("augment-toggle")
                 }
             }
@@ -54,14 +54,14 @@ struct DrawControls: View {
                 if model.started {
                     FindRow("draw-back") {
                         Button("Back one point") { _ = model.undoPoint() }
-                            .help(DrawTip.back)
+                            .tipCard(DrawTip.back)
                             .accessibilityIdentifier("draw-back")
                     }
                 }
                 if model.selectedID != nil {
                     FindRow("draw-remove") {
                         Button("Remove selected") { model.removeSelected() }
-                            .help(DrawTip.removeSelected)
+                            .tipCard(pic: "draw-remove", DrawTip.removeSelected)
                             .accessibilityIdentifier("draw-remove")
                     }
                 }

@@ -9,6 +9,10 @@ struct NumberField: View {
     var unit: LocalizedStringKey?
     var changed = false
     var help = ""
+    /// the key of the setting's tip-card picture (`data-tip-pic`)
+    var pic: String?
+    /// the field's accessibility identifier (UI tests)
+    var fieldID: String?
 
     var body: some View {
         LabeledContent {
@@ -17,13 +21,14 @@ struct NumberField: View {
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 64)
+                    .accessibilityIdentifier(fieldID ?? "")
                 if let unit { Text(unit).foregroundStyle(.secondary) }
                 Stepper(title, value: clamped, in: limits.range, step: limits.step).labelsHidden()
             }
         } label: {
             ChangedLabel(title, changed: changed)
         }
-        .help(help)
+        .tipCard(pic: pic, help)
     }
 
     private var clamped: Binding<Double> {
@@ -59,8 +64,9 @@ struct ChangedToggle: View {
     @Binding var isOn: Bool
     var changed = false
     var help = ""
+    var pic: String?
 
     var body: some View {
-        Toggle(isOn: $isOn) { ChangedLabel(title, detail: detail, changed: changed) }.help(help)
+        Toggle(isOn: $isOn) { ChangedLabel(title, detail: detail, changed: changed) }.tipCard(pic: pic, help)
     }
 }
