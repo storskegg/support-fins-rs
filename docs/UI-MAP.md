@@ -85,7 +85,7 @@ stored inside the exported 3MF, `ui/session.js`) come back with M7 (done: a 3MF 
 
 **Top bar items that are not controls**
 - Brand mark + "Support Fins" (`index.html:88`): the window title / app icon. Dropped as a control.
-- GitHub link (`index.html:174`) and Ko-fi link (`index.html:178`): Help menu items ("Support Fins on GitHub", "Support the project"). M7.
+- GitHub link (`index.html:174`) and Ko-fi link (`index.html:178`): Help menu items ("Support Fins on GitHub", "Support the project"). M7 done (`Features/Help`). The Help Book (`app/SupportFins/Help`, `just helpbook`) is built from the web's pages: the intro of `#drop`, the options panel's labels and tooltips, README sections and docs/CALIBRATION.md, NOZZLE.md.
 - "Full guide" link in the Calibrate panel (`ui/calibrate.js:14`, docs/CALIBRATION.md): Help menu. M7.
 
 **Printer volume presets** (`ui/volume.js:17-24`, default `250 x 220 x 270`, remembered as `sf.volume`):

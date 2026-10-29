@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The “no config” notice in your slicer</title>
+<meta name="AppleTitle" content="The “no config” notice in your slicer">
+<meta name="robots" content="anchors">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../shrd/help.css">
+</head>
+<body>
+<p class="nav"><a href="index.html">Support Fins Help</a></p><main>
+<h1>The “no config” notice in your slicer</h1>
+<p>Opening the 3MF, <strong>Bambu Studio</strong> ("invalid config, load geometry data only") and <strong>PrusaSlicer</strong> ("does not contain PrusaSlicer configuration. Only geometry was loaded.") show a notice and import just the mesh. This is <strong>expected and harmless</strong> — every slicer shows it for any geometry-only 3MF (Fusion 360, FreeCAD, even the 3MF Consortium's own reference files). The part imports correctly oriented and sized; the fins come in as intended. Just slice with supports off. (OrcaSlicer opens it without a notice.)</p>
+<p>The export ships <strong>pure geometry with no slicer profile embedded</strong> on purpose: baking in a profile would silence the notice but replace whoever-opens-it's printer/filament/ print settings with ours on load, and it would have to be re-authored per slicer <em>and</em> per slicer version — a worse trade than a one-time, benign notice on a file whose geometry is already right. See <code>web/threemf.js</code> for the writer.</p>
+
+</main>
+</body>
+</html>

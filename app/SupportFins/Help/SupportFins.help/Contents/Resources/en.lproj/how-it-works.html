@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How it works</title>
+<meta name="AppleTitle" content="How it works">
+<meta name="robots" content="anchors">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../shrd/help.css">
+</head>
+<body>
+<p class="nav"><a href="index.html">Support Fins Help</a></p><main>
+<h1>How it works</h1>
+<h2>Why</h2>
+<p>Printing a part flat is usually the weakest way to print it. Lying or diagonal layer orientation tests up to ~3× stronger than standing up. Most people print flat anyway, because the strong orientation needs supports, and slicer supports scar the surface, waste plastic, and take longer to pick off than the part took to design.</p>
+<p>Designed-in fins fix that, and they beat slicer supports in one way a slicer can't touch: the support lives in the STL. Upload it anywhere — any printer, any filament, any slicer — and it still comes out right. A slicer only ever outputs gcode for one machine.</p>
+<p>No slicer generates these. OrcaSlicer's whole style list is Grid / Snug / Organic / Tree Slim / Strong / Hybrid, and none of them modify the mesh or bond to the part on purpose. The technique isn't new (Slant3D has evangelized designed-in supports for years), but until now you had to CAD it by hand every time.</p>
+
+<h2>How it works</h2>
+<ol type="1">
+<li>Import an STL, 3MF, STEP or OBJ.</li>
+<li>Rotate it. You're in control — Support Fins suggests, it never decides for you.</li>
+<li>It shows you live: overhang count, how many can take a real fin, height, bed contact. Point at the load direction, answer one question — <em>does it pull apart, or does it lever?</em> — and it scores orientations for strength too.</li>
+<li>Export. Fins and a bed pad come baked into the STL (or 3MF).</li>
+</ol>
+<p><strong>Why you pick the rotation, not the software:</strong> "stronger" means nothing without a load direction, and the geometry doesn't contain one. Turn a solver fully loose and it'll hand you a part 155 mm tall balanced on a needle with two sail-sized fins — technically optimal, completely unprintable. (Ours did exactly that.) So the human makes the one call the software can't, and the software does the rest.</p>
+
+</main>
+</body>
+</html>

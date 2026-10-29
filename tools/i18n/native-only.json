@@ -446,5 +446,21 @@
     "pt": "Guia completo de calibração",
     "ar": "دليل المعايرة الكامل",
     "nl": "Volledige kalibratiegids"
+  },
+  "Support the project": {
+    "why": "Help menu item for the Ko-fi link (the web's Ko-fi button)",
+    "de": "Das Projekt unterstützen",
+    "zh": "支持本项目",
+    "pt": "Apoiar o projeto",
+    "ar": "ادعم المشروع",
+    "nl": "Steun het project"
+  },
+  "Report a problem": {
+    "why": "Help menu item that opens the GitHub bug report form",
+    "de": "Ein Problem melden",
+    "zh": "报告问题",
+    "pt": "Relatar um problema",
+    "ar": "الإبلاغ عن مشكلة",
+    "nl": "Een probleem melden"
   }
 }
