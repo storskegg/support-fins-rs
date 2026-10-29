@@ -186,11 +186,12 @@ struct FeatureSetTests {
                      "  Lay a Face Flat", "  -", "  Move", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
         let edit = ["Edit", "  Remove Model from Plate"]
+        let help = ["Help", "  -", "  Support Fins on GitHub", "  Support the project", "  Report a problem"]
         // no window focused
-        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit)
+        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit + help)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
         let window = ViewerModel()
-        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file + edit)
+        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file + edit + help)
     }
 
     /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.

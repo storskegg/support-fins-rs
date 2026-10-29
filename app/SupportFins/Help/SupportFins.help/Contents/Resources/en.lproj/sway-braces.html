@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sway braces for tall parts</title>
+<meta name="AppleTitle" content="Sway braces for tall parts">
+<meta name="robots" content="anchors">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../shrd/help.css">
+</head>
+<body>
+<p class="nav"><a href="index.html">Support Fins Help</a></p><main>
+<h1>Sway braces for tall parts</h1>
+<p><strong>Full brace depth</strong> is an optional checkbox under Sway. It starts off, keeping the usual 60 mm depth limit. On, <strong>Brace depth</strong> uses its selected 5–50% of the actual brace height beyond that limit: a 999 mm brace at 15% reaches about 150 mm. The wider foot needs more plate space and material; model/support collisions can still shorten or refuse a brace. Check the build-volume preview and sliced first layers. Thickness, contact tines and grip rules are unchanged; deeper metre-high braces have not been physically print-tested. Undo/redo and 3MF sessions retain the checkbox. Direct callers opt in with <code>sway: { on: true, uncappedDepth: true }</code>.</p>
+<p>Tall, slender parts have a problem the fins were never built for: nothing overhangs, but as the part grows, the nozzle's drag and each layer shrinking as it cools push the top around. The part drifts, sags or wobbles, and every movement shows up as a layer line. Sway braces stop that by tying the part's upright sides to a stiff support all the way up.</p>
+<p><strong>What a sway brace is:</strong> a vertical rib standing <strong>edge-on</strong> to an upright side (its stiff direction). It's deep at the bed and tapers to a 4 mm flat top, gets thicker as it gets taller, and sits on a thin foot on the plate. One-layer horizontal tines, spaced <strong>evenly up the full height</strong>, tie it to the part. Like every support here, it stands off by the breakaway gap and snaps off; only the tines touch the part.</p>
+<p><strong>Using it:</strong> tick <strong>Sway braces (tall parts)</strong> in the options panel. It's off by default.</p>
+<ul>
+<li><strong>Auto</strong> braces the tallest sides for you: up to four faces facing different ways, so both axes are held, with each rib placed where its face reaches highest.</li>
+<li><strong>Draw</strong>: one click on an upright side stands a brace there. Click a support you placed to select it (amber), then press <strong>Delete</strong> or <strong>Remove selected</strong>; Undo brings it back.</li>
+<li>Three settings appear while it's on: <strong>Brace grip from</strong> (height the tines start; 0 = the whole height), <strong>Brace tine spacing</strong> (default 6 mm) and <strong>Brace depth</strong> (% of height at the bed; default 15%).</li>
+<li>Braces keep at least 1 mm of air between them. One that would run into another, for example straight across a narrow channel, is refused with a reason rather than fused into a bar that won't break away.</li>
+</ul>
+<p><strong>Why this shape, not the old Brace fin:</strong> the Brace fin lies flat against the face, so it bends the easy way exactly when the part leans into it, and its tines bunch at the base and spread out going up, leaving the top of a tall part, where the sway is, nearly untied. Every number and the reasoning behind it is in <code>docs/FIN-SPEC.md</code> ("Sway braces"); the code is <code>web/sway.js</code>, and <code>tests/sway.test.js</code> pins its behaviour.</p>
+<p><strong>Status: printed.</strong> Developed on a 249 mm fence-post cap, where Auto places 4 braces (about 20 g of support) and hand-placed braces follow its gable up to 225 mm. Two test prints (2026-09-22) both came out clean, so the defaults below — depth, thickness and tine spacing — are the printed ones, not estimates.</p>
+
+</main>
+</body>
+</html>

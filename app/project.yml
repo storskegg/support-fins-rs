@@ -27,7 +27,12 @@ targets:
     type: application
     platform: macOS
     sources:
-      - SupportFins
+      - path: SupportFins
+        excludes:
+          - Help
+      # the Help Book (built from the web's pages by tools/helpbook), kept whole: the Help Viewer reads the folder as is
+      - path: SupportFins/Help/SupportFins.help
+        type: folder
     dependencies:
       - package: Viewer
         product: Viewer
@@ -46,6 +51,8 @@ targets:
     info:
       path: SupportFins/Info.plist
       properties:
+        CFBundleHelpBookFolder: SupportFins.help
+        CFBundleHelpBookName: com.storskegg.SupportFins.help
         CFBundleDocumentTypes:
           - CFBundleTypeName: STL model
             CFBundleTypeRole: Viewer
