@@ -171,6 +171,7 @@ enum Shaders {
         IdOut out;
         out.position = u.viewProj * (u.model * float4(p, 1));
         out.face = u.params.w;
+        out.clip_d[0] = 1;       // Move's pick is not cut: `modelAt` (ui/move.js:71-82) raycasts past the clip
         return out;
     }
 

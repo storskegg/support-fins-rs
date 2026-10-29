@@ -154,3 +154,90 @@ pub fn plate_under(
         .map(|(plate, xy)| vec![plate as f64, xy[0], xy[1]])
         .unwrap_or_default()
 }
+
+/// Move's step (`dragStep`, `ui/footprint.js:248-265`; the probe is `clashAt`, `ui/arrange.js:101-110`): where a
+/// model whose own footprint is `grid` goes when it stands at `at` and the pointer asks for `to`, given the
+/// `others` (each already placed where it stands). The clash at a spot is the cells the model would share with the
+/// others there. Never into a worse clash than where it is: the whole step when that holds, else as far along it
+/// as holds in half-millimetre steps, then the rest along x alone or y alone, so it slides along the other's edge.
+/// Two numbers: the spot (`at` itself when it stays).
+#[uniffi::export]
+pub fn footprint_drag_step(
+    at: Vec<f64>,
+    to: Vec<f64>,
+    grid: Arc<Footprint>,
+    others: Vec<Arc<Footprint>>,
+) -> Vec<f64> {
+    let me = &grid.grid;
+    let clash = |p: [f64; 2]| {
+        let here = fp::placed(me, p);
+        others
+            .iter()
+            .map(|o| fp::shared(Some(&here), Some(&o.grid)).len())
+            .sum::<usize>() as f64
+    };
+    fp::drag_step([at[0], at[1]], [to[0], to[1]], clash).to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A `w` x `h` mm box footprint with its corner cell at the origin.
+    fn rect(w: f64, h: f64) -> Arc<Footprint> {
+        let tris = [
+            0.0, 0.0, 0.0, w, 0.0, 0.0, w, h, 0.0, 0.0, 0.0, 0.0, w, h, 0.0, 0.0, h, 0.0,
+        ];
+        Footprint::new(fp::rasterize(&tris, None).unwrap())
+    }
+
+    // Move's step through the FFI is the engine's, with the clash of `clashAt` for the probe.
+    #[test]
+    fn drag_step_stops_at_the_others_edge_and_slides_along_it() {
+        let me = rect(10.0, 10.0);
+        let other = rect(10.0, 10.0).placed(30.0, 0.0);
+        // free: the whole step
+        assert_eq!(
+            footprint_drag_step(
+                vec![0.0, 0.0],
+                vec![5.0, 7.0],
+                me.clone(),
+                vec![other.clone()]
+            ),
+            vec![5.0, 7.0]
+        );
+        // into the other: it stops where they would touch, never sharing a cell
+        let stop = footprint_drag_step(
+            vec![0.0, 0.0],
+            vec![30.0, 0.0],
+            me.clone(),
+            vec![other.clone()],
+        );
+        assert!(stop[0] > 5.0 && stop[0] < 30.0, "{stop:?}");
+        assert!(me.placed(stop[0], stop[1]).shared(other.clone()).is_empty());
+        // a diagonal drag into its side keeps the free axis: it slides along the edge
+        let slide = footprint_drag_step(
+            vec![0.0, 0.0],
+            vec![30.0, 25.0],
+            me.clone(),
+            vec![other.clone()],
+        );
+        assert!(
+            me.placed(slide[0], slide[1])
+                .shared(other.clone())
+                .is_empty()
+        );
+        assert!(slide[1] > 5.0, "{slide:?}");
+        // the same as the engine's own, with the probe written out
+        let probe = |p: [f64; 2]| {
+            fp::shared(Some(&fp::placed(&me.grid, p)), Some(&other.grid)).len() as f64
+        };
+        let want = fp::drag_step([0.0, 0.0], [30.0, 25.0], probe);
+        assert_eq!(slide, want.to_vec());
+        // no others: always the whole step
+        assert_eq!(
+            footprint_drag_step(vec![1.0, 2.0], vec![99.0, -9.0], me, vec![]),
+            vec![99.0, -9.0]
+        );
+    }
+}

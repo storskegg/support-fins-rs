@@ -39,6 +39,8 @@ public final class ViewerMTKView: MTKView {
     private var ringGrabbed = false
     /// A press that landed on the section plane's handle or sheet: the drag is the section's until the button is up.
     private var sectionGrabbed = false
+    /// A press that landed on a model with Move on: the drag is Move's until the button is up.
+    private var moveGrabbed = false
 
     public override func mouseDown(with e: NSEvent) {
         MainActor.assumeIsolated {
@@ -46,9 +48,14 @@ public final class ViewerMTKView: MTKView {
             // Ctrl+click is the Mac's right click: it cancels an armed mode
             if e.modifierFlags.contains(.control), controller?.cancelArmed() == true { pressAt = nil; return }
             let p = pixel(e)
-            // the section handle comes before the part's rings; Ctrl+click is a cancel, not a grab
+            // the section's handle first (Move leaves a press to it: `planeBusy`, `ui/move.js:115-118`), then Move,
+            // then the part's rings; Ctrl+click is a cancel, not a grab
             sectionGrabbed = !e.modifierFlags.contains(.control) && controller?.section.begin(x: p.x, y: p.y, width: p.w, height: p.h) == true
             if sectionGrabbed { pressAt = nil; return }
+            // Move: a press on a model drags it, anywhere else orbits. The press stays a click candidate: a model
+            // pressed and released in place is still clicked (a parked one is edited)
+            moveGrabbed = !e.modifierFlags.contains(.control) && controller?.move.begin(x: p.x, y: p.y, width: p.w, height: p.h) == true
+            if moveGrabbed { pressAt = e.locationInWindow; return }
             ringGrabbed = controller?.beginRingDrag(x: p.x, y: p.y, width: p.w, height: p.h) ?? false
             pressAt = ringGrabbed ? nil : e.locationInWindow
         }
@@ -62,7 +69,10 @@ public final class ViewerMTKView: MTKView {
                 pressAt = nil
                 return
             }
-            if ringGrabbed {
+            if moveGrabbed {
+                controller?.move.ended()
+                moveGrabbed = false
+            } else if ringGrabbed {
                 controller?.endRingDrag()
                 ringGrabbed = false
                 pressAt = nil
@@ -93,8 +103,14 @@ public final class ViewerMTKView: MTKView {
             guard let s = controller?.section else { return 0 }
             return s.sheetDragging ? 2 : s.hot ? 1 : 0
         }
-        if sheet != 0 { addCursorRect(bounds, cursor: sheet == 2 ? .closedHand : .openHand) }
-        else if pointing { addCursorRect(bounds, cursor: .pointingHand) }
+        if sheet != 0 { addCursorRect(bounds, cursor: sheet == 2 ? .closedHand : .openHand); return }
+        // Move: the grab hand over a model, the closed one while it is dragged (`ui/move.js:108-111, 130-134`)
+        let hand = MainActor.assumeIsolated { () -> Int in
+            guard let m = controller?.move, m.isOn else { return 0 }
+            return m.dragging ? 2 : m.hover != nil ? 1 : 0
+        }
+        if hand != 0 { addCursorRect(bounds, cursor: hand == 2 ? .closedHand : .openHand); return }
+        if pointing { addCursorRect(bounds, cursor: .pointingHand) }
     }
 
     public override func mouseMoved(with e: NSEvent) {
@@ -113,6 +129,11 @@ public final class ViewerMTKView: MTKView {
                 // Shift releases the 5 degree snap of the tilt rings (`web/ui/section.js`)
                 let p = pixel(e)
                 controller?.section.dragged(x: p.x, y: p.y, width: p.w, height: p.h, snap: !e.modifierFlags.contains(.shift))
+                return
+            }
+            if moveGrabbed {
+                let p = pixel(e)
+                controller?.move.dragged(x: p.x, y: p.y, width: p.w, height: p.h)
                 return
             }
             if ringGrabbed {
@@ -180,6 +201,7 @@ public struct ViewerViewport: NSViewRepresentable {
     public func makeNSView(context: Context) -> ViewerMTKView {
         let view = ViewerMTKView(frame: .zero, device: controller.renderer.device)
         view.controller = controller
+        controller.viewport = view
         controller.onCursorChange = { [weak view] in if let view { view.window?.invalidateCursorRects(for: view) } }
         view.delegate = controller.renderer
         view.colorPixelFormat = ViewerRenderer.colorFormat

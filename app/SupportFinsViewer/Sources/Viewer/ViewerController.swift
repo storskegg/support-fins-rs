@@ -42,6 +42,7 @@ public final class ViewerController {
     public var supportPicking = false {
         didSet {
             guard supportPicking != oldValue else { return }
+            if supportPicking { move.setOn(false) }        // one pointer mode at a time
             pendingPick = nil
             hoverFace = nil
             renderer.setHover(nil)
@@ -59,6 +60,7 @@ public final class ViewerController {
     public var facePicking = false {
         didSet {
             guard facePicking != oldValue else { return }
+            if facePicking { move.setOn(false) }
             clearHover()
             ringHover = nil
             updateGizmo()
@@ -111,10 +113,19 @@ public final class ViewerController {
         // the section plane's handle takes the part's rings' place while it is up (`planeHandleShown`)
         r.section.onChange = { [weak self] in MainActor.assumeIsolated { self?.updateGizmo(); self?.clearHover() } }
         r.section.onCursorChange = { [weak self] in MainActor.assumeIsolated { self?.onCursorChange?() } }
+        // Move takes the press on a model, and the rotate rings would take it first: they step aside (`setMove`)
+        r.move.onChange = { [weak self] in MainActor.assumeIsolated { self?.updateGizmo(); self?.clearHover() } }
+        r.move.onCursorChange = { [weak self] in MainActor.assumeIsolated { self?.onCursorChange?() } }
     }
 
     /// The section view (`web/ui/section.js`).
     public var section: SectionTool { renderer.section }
+
+    /// The Move tool (`web/ui/move.js`).
+    public var move: MoveTool { renderer.move }
+    /// The view this controller draws into, for a key handler that must know whether its window is the key one.
+    @ObservationIgnored public weak var viewport: NSView?
+    public var isInKeyWindow: Bool { viewport?.window?.isKeyWindow == true }
 
     // MARK: the part
 
@@ -307,13 +318,13 @@ public final class ViewerController {
     }
 
     func updateGizmo() {
-        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
+        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.move.isOn, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
         renderer.setGizmo(GizmoDisplay(center: drag?.center ?? gizmoCenter, hover: ringHover, active: ringDragging, fade: ringFade))
     }
 
     /// The ring under a pixel, if the rings are on.
     public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoHandle? {
-        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
+        guard showRings, !supportPicking, !facePicking, !renderer.section.isOn, !renderer.move.isOn, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
         return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
                                                     width: Float(width), height: Float(height))
     }
@@ -399,6 +410,18 @@ public final class ViewerController {
         Task { @MainActor in
             while let p = pendingPick {
                 pendingPick = nil
+                if move.isOn {
+                    // Move: the model under the pointer, for the grab cursor and the press (`modelAt`)
+                    let pick = await renderer.pickModel(x: p.x, y: p.y, width: p.w, height: p.h)
+                    if move.isOn, !move.dragging { move.setHover(pick) }
+                    // the section's sheet is not grabbed over the visible part either (`sheetPoint` skips the cut
+                    // half, which Move's pick does not)
+                    if section.isOn {
+                        let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
+                        section.overPart = face != nil
+                    }
+                    continue
+                }
                 if supportPicking {
                     let tri = await renderer.pickSupport(x: p.x, y: p.y, width: p.w, height: p.h)
                     guard supportPicking else { continue }
@@ -430,6 +453,7 @@ public final class ViewerController {
     public func clearHover() {
         pendingPick = nil
         section.overPart = false
+        if !move.dragging { move.setHover(nil) }
         let wasLit = hoveringFaceToLay
         hoverFace = nil
         renderer.setHover(nil)

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// A badge slot of the floating view toolbar (`ui/toolbar.js`, UI-MAP section 5). A feature declares its slots with
@@ -24,6 +25,9 @@ struct ToolbarBadge {
     /// click turns it on and opens its popover; opening another popover leaves it on (its badge stays lit); a click on
     /// the lit badge brings its popover back, and with the popover open turns it off. A panel badge has none.
     var tool: (isOn: () -> Bool, setOn: (Bool) -> Void)?
+    /// A toggle badge (Move, `addBadge` with `setOn` and no popover, `ui/toolbar.js:134-136`): a tool with nothing to
+    /// fold out, so a click just turns it on or off and any open popover stays as it is.
+    var toggle: (isOn: () -> Bool, setOn: (Bool) -> Void)?
     /// Text after the badge's title (Scale: the percent while it is not 100, `#scale-now`).
     var detail: () -> String = { "" }
 
@@ -65,12 +69,20 @@ final class ToolbarRegistry {
         badges[slot] = badge
     }
 
+    /// Register a toggle badge: lit while the tool is on; it has no popover.
+    func registerToggle(_ slot: ToolbarSlot, isOn: @escaping () -> Bool, setOn: @escaping (Bool) -> Void) {
+        var badge = ToolbarBadge(isLit: isOn) { EmptyView() }
+        badge.toggle = (isOn, setOn)
+        badges[slot] = badge
+    }
+
     func unregister(_ slot: ToolbarSlot) {
         badges[slot] = nil
         if open == slot { open = nil }
     }
 
     func toggle(_ slot: ToolbarSlot) {
+        if let t = badges[slot]?.toggle { t.setOn(!t.isOn()); return }
         guard let tool = badges[slot]?.tool else { open = open == slot ? nil : slot; return }
         if !tool.isOn() {
             tool.setOn(true)
@@ -83,6 +95,27 @@ final class ToolbarRegistry {
         }
     }
     func fold() { open = nil }
+
+    /// The Esc that last folded a popover (its event's timestamp). The web's Esc listeners all see the same key:
+    /// Move's runs first (capture) and leaves the key to an open popover (`ui/move.js:190-193`), the toolbar's folds it
+    /// (`ui/toolbar.js:106-114`). Here the toolbar's monitor may run before Move's, so Move asks whether this very Esc
+    /// has just folded a popover, rather than whether one is open now.
+    @ObservationIgnored private var escapeFoldTime: TimeInterval?
+
+    /// Esc folds the open popover (`EscapeFolds`); remembered for `escapeFoldedPopover(_:)`.
+    func fold(byEscape e: NSEvent) {
+        guard open != nil else { return }
+        escapeFoldTime = e.timestamp
+        fold()
+    }
+
+    /// Whether `e` is the Esc that folded a popover, or a popover is open for it to fold: a handler that must leave
+    /// such an Esc to the popover returns false for it.
+    func escapeIsThePopovers(_ e: NSEvent?) -> Bool {
+        if open != nil { return true }
+        guard let e, e.type == .keyDown, e.keyCode == 53, let t = escapeFoldTime else { return false }
+        return e.timestamp == t
+    }
 
     private var flashGeneration = 0
 
