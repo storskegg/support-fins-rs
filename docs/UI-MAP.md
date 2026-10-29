@@ -323,7 +323,7 @@ Right-click cancels only on a click (a right **drag** is an orbit/pan); on a Mac
 | ⌘Z / Ctrl+Z | undo; ignored while typing in a text/number field, works from a slider, checkbox or menu (`app.js:56-79`) | Edit > Undo ⌘Z | M4b |
 | ⇧⌘Z / Ctrl+Shift+Z / Ctrl+Y | redo (`app.js:76-78`) | Edit > Redo ⇧⌘Z | M4b |
 | Backspace | take back the last point of the wall being drawn (`app.js:65-68`); or remove the selected drawn wall (`:69-73`) | Edit > Delete / Backspace in Draw | M6 |
-| Delete | remove the selected drawn wall (`app.js:69-73`) | Edit > Delete (⌫) | M6 |
+| Delete | remove the selected drawn wall (`app.js:69-73`) | Edit > Delete (the system's own item, answered by the viewer while it has the keys) / ⌫ / ⌦ | M6 |
 | Esc | cancel Remove, Lay, or the wall in progress, or deselect (`app.js:194-205`); fold the open popover (`ui/toolbar.js:106`); close menus (`ui/export.js:280`, `ui/calibrate.js:155`, `ui/plugins.js:273`); clear the search box (`ui/search.js:115`); stop Move (`ui/move.js:190`); cancel the object picker (`ui/io.js:195`); hide a tip card (`ui/tips.js:168`) | Esc, same cascade | M4b |
 | Enter | Load in the object picker (`ui/io.js:196`) | default button of the sheet | M4b |
 | M | toggle Move (`ui/move.js:194`, not while ⌘/Ctrl/⌥ held, not on repeat) | Model > Move (M) | M6 |

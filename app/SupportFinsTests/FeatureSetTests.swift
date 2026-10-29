@@ -139,6 +139,15 @@ struct FeatureSetTests {
         #expect(titles.filter { $0 == "View" }.count <= 1)
     }
 
+    /// No menu of the real menu bar holds two items of one title: a feature's item named like one macOS already puts
+    /// there (Edit > Delete) would be a second one beside it.
+    @MainActor @Test func noMenuNamesAnItemTwice() throws {
+        for menu in try #require(NSApp?.mainMenu).items {
+            let titles = (menu.submenu?.items ?? []).filter { !$0.isSeparatorItem && !$0.title.isEmpty && !$0.isHidden }.map(\.title)
+            #expect(Set(titles).count == titles.count, "\(menu.title): \(titles)")
+        }
+    }
+
     // MARK: the real features
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
@@ -176,7 +185,7 @@ struct FeatureSetTests {
         let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
                      "  Lay a Face Flat", "  -", "  Move", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
-        let edit = ["Edit", "  Remove Model from Plate", "  Delete [\(KeyEquivalent.delete.character)]"]
+        let edit = ["Edit", "  Remove Model from Plate"]
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)

@@ -6,7 +6,8 @@ import XCTest
 ///
 /// Elements are found by the accessibility identifiers the app sets: `fins-toggle`, `fin-mode-draw`, `draw-hint`,
 /// `draw-back`, `draw-clear`, `stat-fins`, `viewport`. The clicks are computed from the viewer's frame: the part is
-/// framed and centred in it, so points in its middle third lie on the slab's underside, off the line of the stem.
+/// framed and centred in it, so seen from below (0.38, 0.32) and (0.62, 0.32) lie on the slab's underside, clear of the
+/// stem, for any likely window shape (HandPickingTests `theDrawUITestsClicksLandOnTheSlabsUnderside` checks it headless).
 final class DrawUITests: PartWindowUITestCase {
     func testDrawAWallAndTakeItBack() throws {
         try openFixturePart()
@@ -23,8 +24,11 @@ final class DrawUITests: PartWindowUITestCase {
         waitFor("nothing drawn yet", timeout: 30) { self.text(fins) == "none yet" }
 
         // look at the part from below, then click two points across the slab's red underside
-        menuBarItem("View").click()
-        app.menuBars.menuItems["Bottom"].click()
+        // View > Bottom, looked up in the View menu only: `app.menuBars.menuItems["Bottom"]` also finds Window > Move &
+        // Resize > Bottom (macOS's own), so it matched more than one item
+        let view = menuBarItem("View")
+        view.click()
+        view.menuItems["Bottom"].click()
         Thread.sleep(forTimeInterval: 1.5)         // the camera glides 450 ms
         let viewport = element("viewport")
         XCTAssertTrue(viewport.waitForExistence(timeout: 10), "the viewer")
@@ -33,6 +37,7 @@ final class DrawUITests: PartWindowUITestCase {
         a.click()
         let back = element("draw-back")
         XCTAssertTrue(back.waitForExistence(timeout: 10), "Back one point is offered while a wall is half drawn")
+        scrollIntoView(back)        // the Draw controls sit below Placement, under the long hint
         back.click()
         waitFor("Back one point is gone with the point", timeout: 10) { !back.exists }
         a.click()
@@ -42,7 +47,9 @@ final class DrawUITests: PartWindowUITestCase {
         XCTAssertFalse(back.exists, "the wall is placed: no point to take back")
 
         // Clear all
-        element("draw-clear").click()
+        let clear = element("draw-clear")
+        scrollIntoView(clear)
+        clear.click()
         waitFor("cleared", timeout: 30) { self.text(fins) == "none yet" }
     }
 }

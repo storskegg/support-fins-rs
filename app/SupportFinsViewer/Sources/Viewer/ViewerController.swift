@@ -108,6 +108,8 @@ public final class ViewerController {
     /// Backspace and forward Delete, while the view has the keys.
     public enum HandKey: Sendable { case backspace, delete }
     @ObservationIgnored public var onHandKey: (@MainActor (HandKey) -> Bool)?
+    /// Edit > Delete (the system's item, `delete:`) would do something: a wall half drawn or a support selected.
+    @ObservationIgnored public var canHandDelete: (@MainActor () -> Bool)?
     @ObservationIgnored public var onHandMove: (@MainActor (HandPointer?) -> Void)?
     @ObservationIgnored public var onHandClick: (@MainActor (HandPointer) -> Void)?
     /// `escape`: the key (which also deselects), not a right click. True when the event was the mode's.
@@ -494,12 +496,17 @@ public final class ViewerController {
     /// A click at a pixel of the drawable (origin top left): in lay-a-face mode the part and face under it; in remove mode the fin-buffer triangle
     /// under it (nil: empty space). Does nothing when the mode is off.
     public func click(x: Int, y: Int, width: Int, height: Int) {
-        if handPicking != .off && !supportPicking {
+        // Move owns the pointer: nothing is picked while it is on (`app.js` pointerup: `moveActive()`)
+        if handPicking != .off && !supportPicking && !move.isOn {
             Task { @MainActor in
                 let face = await renderer.pickFace(x: x, y: y, width: width, height: height)
                 guard handPicking != .off else { return }
                 onHandClick?(handPointer(x: x, y: y, width: width, height: height, face: face))
             }
+            // the plates read every click as well (`ui/plates.js` listens beside `app.js`'s dispatch): a click on a
+            // parked model or another plate's bed still goes there in Draw and the sway-brace mode (the live part's
+            // is theirs)
+            onTap?(x, y, width, height)
             return
         }
         if facePicking {

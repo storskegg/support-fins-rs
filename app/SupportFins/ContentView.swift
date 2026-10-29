@@ -29,8 +29,7 @@ struct ContentView: View {
             Color.clear
             if let controller = model.controller {
                 ViewerViewport(controller: controller)
-                    .ignoresSafeArea()
-                    .accessibilityIdentifier("viewport")
+                    .ignoresSafeArea()      // its accessibility identifier, `viewport`, is the view's own (ViewerViewport)
             }
         }
         .overlay { OverlayStack(overlays: overlays) }

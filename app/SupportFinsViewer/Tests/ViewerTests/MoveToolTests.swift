@@ -51,4 +51,35 @@ struct MoveToolTests {
         // the part still wins where it is nearest
         #expect(abs((r.hitHeight(of: .live, ray: down(at: 0, 0)) ?? -1) - 40) < 1e-3)
     }
+
+    /// A hand-placed wall is the model's too (`modelAt` raycasts `drawnMesh`, `ui/move.js:76`): the live model's and a
+    /// parked one's are grabbed at their own height, and a click on the live one's picks the live model.
+    @Test func aDrawnWallIsGrabbedAtItsOwnHeight() async throws {
+        let r = try rig()
+        func mesh(_ tris: [[Float]]) throws -> OverlayMesh {
+            var flat: [Float] = []
+            for t in tris { for k in 0..<3 { flat += [t[k * 3], t[k * 3 + 1], t[k * 3 + 2], 0, 0, 1] } }
+            let b = try #require(r.device.makeBuffer(bytes: flat, length: flat.count * 4, options: .storageModeShared))
+            return OverlayMesh(buffer: b, vertices: flat.count / 6)
+        }
+        // a flat sheet 12 mm up, beside the cube
+        let wall = try mesh([[40, -10, 12, 60, -10, 12, 60, 10, 12], [40, -10, 12, 60, 10, 12, 40, 10, 12]])
+        var scene = DrawScene()
+        scene.walls = wall
+        r.setDrawScene(scene)
+        let onWall = r.hitHeight(of: .live, ray: down(at: 50, 0))
+        #expect(abs((onWall ?? -1) - 12) < 1e-3, "\(String(describing: onWall))")
+        // the id pass: looking down at the wall, the live model
+        r.camera = OrbitCamera(target: [50, 0, 0], distance: 200, azimuth: 0, elevation: OrbitCamera.maxElevation, aspect: 1)
+        #expect(await r.pickModel(x: 128, y: 128, width: 256, height: 256) == .live)
+        // a parked model's wall, about its own spot 300 mm along X
+        let cube = GeneratedMesh.cube(edge: 40, device: r.device)
+        let flags = try #require(r.device.makeBuffer(length: 64, options: .storageModeShared))
+        r.setPlateScene(PlateScene(beds: [.zero], edited: 0, parked: [
+            ParkedDrawable(mesh: cube, flags: flags, rotation: matrix_identity_float3x3,
+                           offset: seatingOffset(bounds: cube.bounds, rotation: matrix_identity_float3x3), origin: SIMD2(300, 0), drawn: wall),
+        ]))
+        let parked = r.hitHeight(of: .parked(0), ray: down(at: 350, 0))
+        #expect(abs((parked ?? -1) - 12) < 1e-3, "\(String(describing: parked))")
+    }
 }

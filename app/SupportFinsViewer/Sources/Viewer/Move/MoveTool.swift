@@ -97,7 +97,7 @@ public final class MoveTool {
 extension ViewerRenderer {
     func changeCountBump() { changeCount &+= 1 }
 
-    /// The height at which `ray` meets what `pick` is made of -- its part, its fins and its pad, whichever is nearest
+    /// The height at which `ray` meets what `pick` is made of -- its part, its fins and its pad and its drawn walls, whichever is nearest
     /// (`modelAt` raycasts `[part, finMesh, padMesh, drawnMesh]`, `ui/move.js:73-76`): the plane the model is dragged
     /// on, so the point grabbed stays under the pointer. One pass over the triangles at the press.
     func hitHeight(of pick: ModelPick, ray: (origin: SIMD3<Float>, direction: SIMD3<Float>)) -> Float? {
@@ -109,11 +109,13 @@ extension ViewerRenderer {
         case .live:
             if let m = meshes.first { consider(m.vertexBuffer, stride: m.vertexStride / 4, vertices: 0..<(m.faceCount * 3), matrix: modelMatrix) }
             if let s = supports { supportHits(s, hidden: hiddenFinRanges, matrix: matrix_identity_float4x4, consider) }
+            if let w = drawScene?.walls { consider(w.buffer, stride: 6, vertices: 0..<w.vertices, matrix: matrix_identity_float4x4) }
         case .parked(let i):
             guard plateScene.parked.indices.contains(i) else { return nil }
             let p = plateScene.parked[i]
             consider(p.mesh.vertexBuffer, stride: p.mesh.vertexStride / 4, vertices: 0..<(p.mesh.faceCount * 3), matrix: p.matrix)
             if let s = p.supports { supportHits(s, hidden: p.hiddenFins, matrix: simd_float4x4(translation: SIMD3(p.origin, 0)), consider) }
+            if let d = p.drawn { consider(d.buffer, stride: 6, vertices: 0..<d.vertices, matrix: simd_float4x4(translation: SIMD3(p.origin, 0))) }
         }
         return best.isFinite ? ray.origin.z + best * ray.direction.z : nil
     }

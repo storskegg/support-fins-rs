@@ -84,6 +84,7 @@ final class DrawModel {
             c.onHandClick = { [weak self] p in self?.pointerClicked(p) }
             c.onHandCancel = { [weak self] escape in self?.cancel(escape: escape) ?? false }
             c.onHandKey = { [weak self] key in self?.key(key) ?? false }
+            c.canHandDelete = { [weak self] in self?.canDelete ?? false }
         }
     }
 
@@ -194,6 +195,9 @@ final class DrawModel {
         controller?.handPicking = mode
         if mode == .off { motion.drop() }
         host.wiring?.exporter?.drawn = { [weak self] in self?.exportDrawn ?? ExportModel.Drawn(sweep: nil, pending: false) }
+        if let board = host.features[PlatesFeature.self]?.board, let draw = host.features[DrawFeature.self] {
+            board.drawn = { [weak draw, unowned board] m in draw?.exportDrawn(m, board: board) }
+        }
         ensureKit()
         resweep()
         refresh()
@@ -749,7 +753,7 @@ final class DrawModel {
         return true
     }
 
-    /// Edit > Delete.
+    /// Edit > Delete, the system's item (the viewer answers its `delete:` while it has the keys): as Backspace.
     func deleteMenu() { _ = key(.backspace) }
 
     /// Esc, a right click or Ctrl+click in the viewport (`cancelArmed`); Esc also deselects (`app.js:194-205`).

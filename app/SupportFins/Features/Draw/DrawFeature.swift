@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// Draw (`web/ui/walls.js`, `web/ui/braceghost.js`): hand-placed breakaway walls and sway braces. The Draw
@@ -36,17 +35,4 @@ final class DrawFeature: Feature {
 
     func partWillShow() { model.partChanged() }
     func partDidShow(_ parts: [LoadedPart]) { model.sync() }
-
-    /// Edit > Delete (⌫): take back the last point of the wall being drawn, or remove the selected support
-    /// (`app.js:63-74`). Disabled when it would do nothing.
-    static func menus(_ f: DrawFeature?) -> [MenuSection] {
-        [MenuSection(menu: .edit, order: 20, entries: [
-            .item("Delete", shortcut: .delete, help: "Take back the last point of the wall you're drawing, or remove the selected support.",
-                  enabled: f?.model.canDelete ?? false) {
-                // a text field has the keys: ⌫ is its own
-                if let text = NSApp.keyWindow?.firstResponder as? NSTextView { text.deleteBackward(nil); return }
-                f?.model.deleteMenu()
-            },
-        ])]
-    }
 }

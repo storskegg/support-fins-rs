@@ -101,6 +101,13 @@ public final class ViewerMTKView: MTKView {
         if !handled { super.keyDown(with: e) }
     }
 
+    /// Edit > Delete: the system's item sends `delete:` to the first responder (a text field takes its own). The view
+    /// answers it as Backspace (`app.js:63-74`): take back the last point of the wall being drawn, or remove the
+    /// selected support. A second Delete of the app's own would sit beside the system's.
+    @objc public func delete(_ sender: Any?) {
+        MainActor.assumeIsolated { _ = controller?.onHandKey?(.backspace) }
+    }
+
     public override func resetCursorRects() {
         let pointing = MainActor.assumeIsolated { controller.map { $0.hoveringSupport || $0.hoveringFaceToLay } == true }
         // Move: the grab hand over a model, the closed one while it is dragged (`ui/move.js:108-111, 130-134`)
@@ -204,10 +211,24 @@ public struct ViewerViewport: NSViewRepresentable {
         view.autoResizeDrawable = true
         let bg = Palette.background
         view.clearColor = MTLClearColor(red: Double(bg.x), green: Double(bg.y), blue: Double(bg.z), alpha: 1)
+        // an element of its own for accessibility (a bare NSView is ignored), so a UI test can find it and click
+        // points of its frame: SwiftUI's identifier on a representable does not reliably reach the AppKit view
+        view.setAccessibilityElement(true)
+        view.setAccessibilityRole(.group)
+        view.setAccessibilityLabel("3D view")
+        view.setAccessibilityIdentifier("viewport")
         return view
     }
 
     public func updateNSView(_ view: ViewerMTKView, context: Context) {
         controller.renderer.pixelScale = Float(view.window?.backingScaleFactor ?? 2)
+    }
+}
+
+extension ViewerMTKView: NSMenuItemValidation {
+    /// Edit > Delete is enabled while it would do something.
+    public func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard item.action == #selector(delete(_:)) else { return true }
+        return MainActor.assumeIsolated { controller?.canHandDelete?() ?? false }
     }
 }

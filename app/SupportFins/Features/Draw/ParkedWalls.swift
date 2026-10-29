@@ -34,10 +34,8 @@ final class ParkedWalls {
     /// model is drawn pale meanwhile). Starts the work when the request changed; `landed` runs when it is ready.
     func standing(for s: ParkedModel, settings: FinSettings, device: MTLDevice?, landed: @escaping @MainActor () -> Void)
         -> (sweep: DrawnSweep?, mesh: OverlayMesh?) {
-        let auto = settings.mode != .draw ? s.build.latest : nil
-        let removed = auto == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
-        let key = Key(pose: s.pose.columnMajor, threshold: settings.threshold, settings: settings.drawSettingsJSON(),
-                      tunables: settings.tunablesJSON(), walls: walls, build: auto.map(ObjectIdentifier.init), removed: removed)
+        let (key, auto) = request(for: s, settings: settings)
+        let removed = key.removed
         if done?.key != key, asked != key {
             asked = key
             task?.cancel()
@@ -60,6 +58,24 @@ final class ParkedWalls {
         }
         return (done?.sweep, done?.mesh)
     }
+
+    /// What `s` under `settings` asks to be stood, and Auto's build it stands clear of (none in Draw).
+    private func request(for s: ParkedModel, settings: FinSettings) -> (Key, BuildResult?) {
+        let auto = settings.mode != .draw ? s.build.latest : nil
+        let removed = auto == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
+        return (Key(pose: s.pose.columnMajor, threshold: settings.threshold, settings: settings.drawSettingsJSON(),
+                    tunables: settings.tunablesJSON(), walls: walls, build: auto.map(ObjectIdentifier.init), removed: removed), auto)
+    }
+
+    /// The walls stood for `s` under `settings` now, for an export (`plateGeometry` stands them as it writes): the
+    /// background sweep when it is of this request, else stood here.
+    func sweepNow(for s: ParkedModel, settings: FinSettings) -> DrawnSweep? {
+        let (key, auto) = request(for: s, settings: settings)
+        if let done, done.key == key { return done.sweep }
+        guard let kit = try? DrawKit(part: s.part.part, rot: key.pose, thresholdDeg: key.threshold, settingsJson: key.settings,
+                                     tunablesJson: key.tunables) else { return nil }
+        return try? kit.sweep(wallsJson: walls.json, autoBuild: auto, removed: key.removed)
+    }
 }
 
 extension DrawFeature {
@@ -69,6 +85,16 @@ extension DrawFeature {
         -> (sweep: DrawnSweep?, mesh: OverlayMesh?)? {
         guard finsOn, let p = s.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls, !p.walls.isEmpty else { return nil }
         return p.standing(for: s, settings: settings, device: host.controller?.renderer.device, landed: landed)
+    }
+
+    /// The walls a plate export writes for model `m` (`PlateBoard.drawn`, `plateGeometry`), in print space about its own
+    /// spot: the live model's sweep, or a parked one's stood for its pose under its plate's settings. Nil without walls.
+    func exportDrawn(_ m: ModelSlot, board: PlateBoard) -> DrawnSweep? {
+        if m === board.plate.liveSlot { return model.sweepNow() }
+        guard let s = m.stash, let p = s.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls, !p.walls.isEmpty,
+              let i = board.plates.firstIndex(where: { $0.models.contains { $0 === m } }) else { return nil }
+        let ps = board.plateSettings(i)
+        return ps.finsOn ? p.sweepNow(for: s, settings: ps.settings) : nil
     }
 
     /// `takeState`: the walls and the add-by-hand state go with the model when it is parked.

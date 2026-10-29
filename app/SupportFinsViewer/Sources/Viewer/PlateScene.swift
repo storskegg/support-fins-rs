@@ -242,6 +242,10 @@ extension ViewerRenderer {
                 enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: s.padVertices)
             }
         }
+        // the live model's hand-placed walls are the model's too (`modelAt` raycasts `drawnMesh`, `ui/move.js:76`)
+        if let w = drawScene?.walls, w.vertices > 0 {
+            draw(w.buffer, stride: 6, vertices: w.vertices, model: matrix_identity_float4x4, viewProj: vp, id: 0)
+        }
         for (i, p) in plateScene.parked.enumerated() {
             if p.mesh.faceCount > 0 {
                 draw(p.mesh.vertexBuffer, stride: p.mesh.vertexStride / 4, vertices: p.mesh.faceCount * 3, model: p.matrix, viewProj: vp, id: UInt32(i + 1))
