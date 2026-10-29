@@ -28,7 +28,11 @@ final class PlatesFeature: Feature {
     // MARK: window
 
     var overlays: [WindowOverlay] {
-        [WindowOverlay("plate-toast", order: 70, alignment: .bottom) { PlateToast(board: self.board) }]
+        [
+            WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true) { PlateLabels(board: self.board) },
+            WindowOverlay("plate-tabs", order: 65, alignment: .top) { PlateTabs(board: self.board) },
+            WindowOverlay("plate-toast", order: 70, alignment: .bottom) { PlateToast(board: self.board) },
+        ]
     }
 
     var inspectorSections: [InspectorSection] {
@@ -71,6 +75,19 @@ final class PlatesFeature: Feature {
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
         addModels(panel.urls)
+    }
+
+    /// Several files at once go one to a plate, starting on this one if it is empty; in turn, a 3MF's object picker
+    /// waiting for its answer (`loadFiles`, `ui/io.js`).
+    func loadFiles(_ urls: [URL]) {
+        Task {
+            for url in urls where OpenRules.accepts(url) {
+                board.freePlate()
+                await host.load(url: url)
+                while host.picker != nil { try? await Task.sleep(for: .milliseconds(100)) }
+            }
+            board.dropEmptyPlate()
+        }
     }
 
     func addModels(_ urls: [URL]) {
@@ -137,19 +154,6 @@ struct PlateToast: View {
             .padding(.bottom, 70)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("toast")
-        }
-    }
-}
-
-extension PlateBoard {
-    /// A click on the view with no pointer mode armed: a parked model of the plate is edited (`pointerup` in
-    /// `ui/plates.js`).
-    func tapped(x: Int, y: Int, width: Int, height: Int) {
-        guard !busy, modelCount > 1, let renderer = host.controller?.renderer else { return }
-        Task { [weak self] in
-            guard let pick = await renderer.pickModel(x: x, y: y, width: width, height: height), case .parked(let i) = pick,
-                  let self, parkedSlots.indices.contains(i), let k = plate.models.firstIndex(where: { $0 === parkedSlots[i] }) else { return }
-            select(k)
         }
     }
 }
