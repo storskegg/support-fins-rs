@@ -95,6 +95,15 @@ final class StrengthModel {
         loadChanged(loadLocal)
     }
 
+    /// The load of a model brought back to the plate (`replaceLoadDir`, `ui/models.js` unpark): the direction in the
+    /// part's own frame, and the arrow with it.
+    func restore(load local: SIMD3<Double>?) {
+        loadLocal = local
+        strongestNote = nil
+        refresh()
+        loadChanged(local)
+    }
+
     func clear() {
         wanted = nil
         thinking = false

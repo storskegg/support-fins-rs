@@ -23,6 +23,8 @@ struct BuildRequest: Equatable, Sendable {
 protocol BuildDriving: AnyObject {
     var building: Bool { get }
     var generation: UInt64 { get }
+    /// The request the fins on show were built for, when the driver knows it (`BuildModel`); nil otherwise.
+    var latestRequest: BuildRequest? { get }
     @discardableResult func build(rotation: [Double], optionsJSON: String, tunablesJSON: String) -> UInt64
     func cancel()
     func clear()
@@ -30,6 +32,10 @@ protocol BuildDriving: AnyObject {
 }
 
 extension BuildModel: BuildDriving {}
+
+extension BuildDriving {
+    var latestRequest: BuildRequest? { nil }
+}
 
 /// When a build runs, as the web schedules it (`web/ui/finbuild.js refreshFins`, `web/ui/settings.js`):
 ///
@@ -98,10 +104,26 @@ final class BuildController {
     }
 
     /// Turns the fins on or off. On builds at once; off drops any build in flight and clears the fins.
-    func setEnabled(_ on: Bool) {
+    /// `reusing`: a model brought back to the plate (`Plates/`) keeps the fins it was built with when they are
+    /// the ones the request would build, so there is no rebuild (and no blink) on a switch.
+    func setEnabled(_ on: Bool, reusing: Bool = false) {
         guard on != enabled else { return }
         enabled = on
+        if reusing, on, !driver.building, let req = request(), driver.latestRequest == req {
+            lastRequest = req
+            return
+        }
         refresh()
+    }
+
+    /// Stops following the session without touching the driver or the fins it holds: the model this scheduler
+    /// served was parked (`Plates/`), and its build stays as it stands. No debounced refresh, live build or
+    /// spinner outlives the call.
+    func stop() {
+        pending?.cancel(); pending = nil
+        stopLive()
+        stopSpinner()
+        enabled = false
     }
 
     /// A settings change: refresh 180 ms after the last one (`debouncedRefresh`).

@@ -150,8 +150,8 @@ Formula sources are the engine's: the analysis numbers come from `analyze` (`FFI
 | Control (`id`) | Type | Label | Default | Range / choices | Tooltip (verbatim) | Source | Native element | M |
 |---|---|---|---|---|---|---|---|---|
 | `s-fin-info` | button | i |  |  | How these supports work, and what this pose leaves uncovered | index.html:213; ui/readout.js:194 | Info button next to the Fins row: popover with the detail text | M4b |
-| `add-part` | button | Add model |  |  | Put another model on this plate, beside this one. Click a model to edit it. | index.html:220; ui/io.js:468 | File > Add Model to Plate… | M6 |
-| `remove-part` | button | Remove model |  |  | Take this model off the plate, to import another without reloading the page. | index.html:222; ui/plates.js:278 | Edit > Remove Model from Plate | M6 |
+| `add-part` | button | Add model |  |  | Put another model on this plate, beside this one. Click a model to edit it. | index.html:220; ui/io.js:468 | File > Add Model to Plate…; an Add model button at the end of the inspector's Part section (the stats card), after Analysis | M6 |
+| `remove-part` | button | Remove model |  |  | Take this model off the plate, to import another without reloading the page. | index.html:222; ui/plates.js:278 | Edit > Remove Model from Plate; a Remove model button beside Add model | M6 |
 | `file-add` | file |  |  |  |  | index.html:225; ui/io.js:462 | (the picker behind Add model) | M6 |
 | `chip-stats` | button | Part ▾ |  |  |  | index.html:234; ui/phone.js:10 | DROPPED (phone layout) | - |
 | `chip-opts` | button | Fin settings ▾ |  |  |  | index.html:236; ui/phone.js:10 | DROPPED (phone layout) | - |

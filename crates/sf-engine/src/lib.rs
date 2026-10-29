@@ -9,6 +9,7 @@ pub mod draw;
 pub mod drawarc;
 pub mod drawn;
 pub mod fins;
+pub mod footprint;
 pub mod fxhash;
 pub mod gridsize;
 pub mod inside;

@@ -141,6 +141,33 @@ impl BuildResult {
         ]))
     }
 
+    /// What the page exports of this build (`activeAdded`): the fins less the `removed` ones (record ids), the `drawn`
+    /// walls, then the pad, in print space.
+    pub(crate) fn kept_added(
+        &self,
+        removed: &[u64],
+        drawn: &[sf_engine::types::V4],
+    ) -> Vec<sf_engine::types::V4> {
+        let mut added: Vec<sf_engine::types::V4> = if removed.is_empty() {
+            self.built.triangles.clone()
+        } else {
+            // the kept fins' own triangles, in record order (ui/remove.js `filteredTriangles`)
+            self.built
+                .fins
+                .iter()
+                .filter(|f| !removed.contains(&(f.id as u64)))
+                .flat_map(|f| {
+                    f.tri_ranges
+                        .iter()
+                        .flat_map(|&[lo, hi]| self.built.triangles[lo..hi].iter().copied())
+                })
+                .collect()
+        };
+        added.extend_from_slice(drawn);
+        added.extend_from_slice(&self.built.pad_triangles);
+        added
+    }
+
     /// The fin soup then the pad as `computeFins` returns them (`f32`, xyz per vertex): what an export writes.
     pub fn triangles(&self) -> &[f32] {
         &self.triangles
@@ -662,24 +689,7 @@ fn export_impl(
     // the pose, the seating and the supports (print space already)
     let (rot, offset, added): (Option<[f64; 9]>, Xyz, Vec<sf_engine::types::V4>) = if o.fins {
         let b = &builds[0];
-        let mut added: Vec<sf_engine::types::V4> = if o.removed.is_empty() {
-            b.built.triangles.clone()
-        } else {
-            // the kept fins' own triangles, in record order (ui/remove.js `filteredTriangles`)
-            b.built
-                .fins
-                .iter()
-                .filter(|f| !o.removed.contains(&(f.id as u64)))
-                .flat_map(|f| {
-                    f.tri_ranges
-                        .iter()
-                        .flat_map(|&[lo, hi]| b.built.triangles[lo..hi].iter().copied())
-                })
-                .collect()
-        };
-        added.extend_from_slice(drawn);
-        added.extend_from_slice(&b.built.pad_triangles);
-        (b.rot, b.offset, added)
+        (b.rot, b.offset, b.kept_added(&o.removed, drawn))
     } else {
         let rot = (o.pose != IDENTITY3).then_some(o.pose);
         let a = analyze(topo, o.threshold, &o.pose);

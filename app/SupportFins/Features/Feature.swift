@@ -31,6 +31,11 @@ protocol Feature: AnyObject {
     /// A part is about to replace the one on show, and after `session` and the viewer have taken it.
     func partWillShow()
     func partDidShow(_ parts: [LoadedPart])
+    /// Several models on a plate (`Plates/`): the model on show is parked, and this is the feature's state for it (the
+    /// Strength load, the Suggest list) kept with the model; `restoreModelState` gets it back once the model is shown
+    /// again (after `partDidShow`). Nil: nothing to keep.
+    func modelState() -> Any?
+    func restoreModelState(_ state: Any)
 }
 
 extension Feature {
@@ -45,6 +50,8 @@ extension Feature {
     func registerTools(in toolbar: ToolbarRegistry) {}
     func partWillShow() {}
     func partDidShow(_ parts: [LoadedPart]) {}
+    func modelState() -> Any? { nil }
+    func restoreModelState(_ state: Any) {}
 }
 
 extension [LoadedPart] {
