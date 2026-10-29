@@ -348,6 +348,25 @@ the build volume the spots are on. `export_plates` writes each `PlateFile` as a 
 `crates/sf-ffi/tests/export.rs` compares them. `footprint_arrange` is `arrange`'s placement (`sf_engine::footprint::arrange`: `pack`'s
 spots, a model with no room in a row past the bed's right edge).
 
+## M7 additions: report links (`ui/report.js`, `web/report.js`)
+
+```rust
+#[uniffi::export] fn build_report(result: &BuildResult, scale: f64, opts_json: String, tunables_json: String) -> Result<Arc<BuildReport>, FfiError>;
+impl BuildReport {
+  fn settings_json(&self) -> String;                                    // JSON.stringify(rep, null, 2): what Copy settings copies
+  fn url(&self, site: String, when: String, drawn: u32, removed: u32) -> String;   // reportUrl: the prefilled GitHub issue link
+}
+```
+
+`result` is the build on screen; `scale` the part's scale (1 = as loaded); `opts_json` / `tunables_json` the two texts
+`Builder.build` took for it. The report's `opts` is the page's `finOpts()` request rebuilt from them
+(`sf_io::report::web_fin_opts`: `bedPad` is `padStyle !== 'off'`, `sway` gets `swayOpts()`'s keys with `crossAbove`
+the tall-wall height or `null`, `tunables` as sent). The part's size is the box of its Float32 positions and `faces`
+its triangle count; the threshold and the pose are the build's. `site` and `when` fill the "Site" line (the page
+sends `location.host`; the app sends `Support Fins for Mac <engine_version>`), `drawn` is the walls drawn by hand
+that built and `removed` the fins removed by hand. `crates/sf-ffi/tests/report.rs` compares both outputs with
+`parity/oracle/ffireport.js`, which runs the page's `finOpts` request, `buildFins`, `reportSettings`,
+`reportCoverage` and `reportUrl`, byte for byte.
 ## M7 additions: sessions (the 3MF carries the supports drawn by hand and the settings)
 
 A 3MF the web exports holds a session beside the model (`Metadata/support_fins.json`, `web/ui/session.js`, #214): the drawn

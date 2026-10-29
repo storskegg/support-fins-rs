@@ -159,7 +159,7 @@ struct FeatureSetTests {
         #expect(model.features.overlays.map(\.id) == expected)
         #expect(model.toolbar.slots.map(\.id) == ["move", "arrange", "rotate", "scale-badge", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
-        #expect(model.features.inspectorSections(.top).map(\.id) == ["search-note", "readout"])
+        #expect(model.features.inspectorSections(.top).map(\.id) == ["search-note", "readout", "report"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
         #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["augment", "remove-fins", "draw-controls"])
@@ -185,7 +185,7 @@ struct FeatureSetTests {
         let model = ["Model", "  Rotate 90° About X [r]", "  Rotate 90° About Y [⌥⌘r]", "  Rotate 90° About Z [⌃⌘r]", "  Reset Rotation", "  -",
                      "  Lay a Face Flat", "  -", "  Move", "  Arrange", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
-        let edit = ["Edit", "  Remove Model from Plate", "  -", "  Search Settings [⌥⌘f]"]
+        let edit = ["Edit", "  Remove Model from Plate", "  -", "  Copy Build Settings", "  -", "  Search Settings [⌥⌘f]"]
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)

@@ -19,6 +19,7 @@ enum Features {
         ExportFeature.self,
         ReadoutFeature.self,
         SearchFeature.self,
+        ReportFeature.self,
         SessionFeature.self,
     ]
 }

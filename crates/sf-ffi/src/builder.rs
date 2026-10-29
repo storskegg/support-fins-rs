@@ -96,6 +96,12 @@ impl BuildResult {
         &self.built
     }
 
+    /// What a report needs of the build (`report.rs`): the part's topology, the overhang threshold and the
+    /// pose it was built in (`None` for the identity).
+    pub(crate) fn report_inputs(&self) -> (&Arc<sf_engine::overhangs::Topology>, f64, [f64; 9]) {
+        (&self.topo, self.threshold, self.rot.unwrap_or(IDENTITY3))
+    }
+
     /// See [`after_removal_json`](Self::after_removal_json).
     pub fn after_removal(&self, removed: &[u64]) -> Result<Json, FfiError> {
         use sf_engine::fins::coverage::automatic_targets;
