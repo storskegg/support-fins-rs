@@ -140,6 +140,8 @@ struct MenuID: Hashable, Identifiable {
         case afterUndoRedo
         /// View, before the toolbar items.
         case beforeToolbar
+        /// Help, after the system's own "Support Fins Help".
+        case afterHelp
     }
 
     /// A menu of the app's own, added to the bar (`CommandMenu`).
@@ -154,6 +156,8 @@ struct MenuID: Hashable, Identifiable {
     static let fileExport = MenuID(title: "File", order: 100, group: .afterNewItem)
     /// Items after Undo and Redo in the Edit menu (Remove Model from Plate).
     static let edit = MenuID(title: "Edit", order: 110, group: .afterUndoRedo)
+    /// Items after "Support Fins Help" in the Help menu (Calibration Prints, the links).
+    static let help = MenuID(title: "Help", order: 200, group: .afterHelp)
 }
 
 /// A run of one menu's entries from one feature. Sections of a menu come in `order`, so a feature's items sit

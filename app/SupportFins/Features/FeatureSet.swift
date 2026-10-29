@@ -109,6 +109,7 @@ struct FeatureCommands: Commands {
         CommandGroup(after: .newItem) { menu(.fileExport) }
         CommandGroup(after: .undoRedo) { menu(.edit) }
         CommandGroup(before: .toolbar) { menu(.view) }
+        CommandGroup(after: .help) { menu(.help) }
         if menus.count > 0 { CommandMenu(menus[0].title) { menu(menus[0]) } }
         if menus.count > 1 { CommandMenu(menus[1].title) { menu(menus[1]) } }
         if menus.count > 2 { CommandMenu(menus[2].title) { menu(menus[2]) } }

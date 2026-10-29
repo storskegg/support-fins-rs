@@ -430,5 +430,21 @@
   "Search Settings": {
     "why": "Edit menu item that focuses the settings search box (title case)",
     "like": "Search settings"
+  },
+  "Calibration Prints…": {
+    "why": "Help menu item that opens the calibration sheet (the web's Calibrate ▾ menu)",
+    "de": "Kalibrierdrucke…",
+    "zh": "校准打印…",
+    "pt": "Impressões de calibração…",
+    "ar": "طبعات المعايرة…",
+    "nl": "Kalibratieprints…"
+  },
+  "Full Calibration Guide": {
+    "why": "Help menu item that opens docs/CALIBRATION.md (the web's Full guide link)",
+    "de": "Vollständige Kalibrierungsanleitung",
+    "zh": "完整校准指南",
+    "pt": "Guia completo de calibração",
+    "ar": "دليل المعايرة الكامل",
+    "nl": "Volledige kalibratiegids"
   }
 }

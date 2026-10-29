@@ -1,0 +1,172 @@
+{
+ "upstream": "299ef491128126cb47672080ffce00137490d814",
+ "coupons": [
+  {
+   "name": "Angle",
+   "file": "angle-coupon.stl",
+   "sets": "Sets the Overhang slider (top bar) · print this first",
+   "note": "No supports in this one: print it as it is.",
+   "how": "Seven ramps, 10° to 40°, measured up from the plate, so lower is harder. The shallowest ramp that came out clean (no droop, no curls) is your Overhang setting. The slider stops at 30°: if a lower ramp came out clean, set 30."
+  },
+  {
+   "name": "Gap",
+   "file": "gap-coupon.3mf",
+   "sets": "Sets Printer ▸ Edit ▸ Support gap",
+   "note": "Print at 0.2 mm layers with a 0.2 mm first layer and adaptive layer height off, or the gaps stop being whole layers.",
+   "how": "Ledges held 0.2, 0.4 and 0.6 mm below (1, 2 and 3 empty layers). Snap each wall off. Welded or tearing the ledge = too small; saggy or stringy underside = too big. Use the smallest gap that snaps off clean. The field stops at 0.4: if only 0.6 came clean, set 0.4 and tell us."
+  },
+  {
+   "name": "Grip",
+   "file": "grip-coupon.3mf",
+   "sets": "Sets Tines ▸ Tine grip",
+   "how": "Four ramps built at OFF, LIGHT (the default), MID and FIRM. Check every wall is still standing, then snap them off. A wall leaned or came loose: go one step right. Marks where the tines were: go one step left. Use the lightest setting whose walls all held."
+  },
+  {
+   "name": "Pad",
+   "file": "pad-coupon.3mf",
+   "sets": "Sets More settings ▸ Bed pad ▸ Custom ▸ Pad gap",
+   "how": "Six cubes on an edge, each held down only by a pad 0 to 0.3 mm off it. A cube came loose = gap too big; a pad won't peel or tears the edge = too small. Use the biggest gap whose cube stayed put, with Pad thickness 0.2, Pad grip 0 and Pad spread 4."
+  },
+  {
+   "name": "Cutouts",
+   "file": "cutout-coupon.3mf",
+   "sets": "Sets Cutouts (below Tines)",
+   "how": "Five tall ledges, each held by walls cut with one style: NONE, DIAMOND, TRIANGLE, ARCH, LATTICE. Check every wall stood and every ledge printed flat, then snap the walls off. A wall that leaned, sagged at a hole or broke apart: that style is too open. Use the most open style whose walls all held; Arch and Lattice save about a third of the support plastic."
+  },
+  {
+   "name": "Bore",
+   "file": "bore-coupon.3mf",
+   "sets": "No setting yet: tells us how small a hole to support",
+   "how": "A block with two sets of sideways holes, 3 to 12 mm across. In set A one wall runs along each hole, the way the site does it; in set X three walls run across it. Pull every wall out of an open end (an X wall slides out along the hole) and tell us which came out clean, which broke or stuck, and whether A or X left the smoother ceiling."
+  },
+  {
+   "name": "Sampler",
+   "file": "sampler-coupon.3mf",
+   "sets": "Sets nothing: print it last, to see what your parts will get",
+   "note": "Part and supports are two objects: don't Arrange or move one without the other.",
+   "how": "One part with every hard shape: ramps, a ball, a thin ledge, a flat table, a mushroom, a cave, sideways holes and an arch, supported in Full coverage. Snap every wall off and tell us which stuck or tore the part, and which undersides sagged. A few droopy layers on the ball and a rougher table near the spine are what we get too."
+  }
+ ],
+ "fmtTime": [
+  [
+   0,
+   "0 min"
+  ],
+  [
+   1,
+   "1 min"
+  ],
+  [
+   19,
+   "19 min"
+  ],
+  [
+   59,
+   "59 min"
+  ],
+  [
+   60,
+   "1 h"
+  ],
+  [
+   61,
+   "1 h 1 min"
+  ],
+  [
+   62,
+   "1 h 2 min"
+  ],
+  [
+   96,
+   "1 h 36 min"
+  ],
+  [
+   119,
+   "1 h 59 min"
+  ],
+  [
+   120,
+   "2 h"
+  ],
+  [
+   121,
+   "2 h 1 min"
+  ],
+  [
+   600,
+   "10 h"
+  ],
+  [
+   1439,
+   "23 h 59 min"
+  ]
+ ],
+ "rows": [
+  {
+   "name": "Angle",
+   "title": "Angle · 19 min · 7 g",
+   "download": {
+    "text": "Download",
+    "title": "angle-coupon.stl",
+    "file": "angle-coupon.stl"
+   }
+  },
+  {
+   "name": "Gap",
+   "title": "Gap · 20 min · 8 g",
+   "download": {
+    "text": "Download",
+    "title": "gap-coupon.3mf",
+    "file": "gap-coupon.3mf"
+   }
+  },
+  {
+   "name": "Grip",
+   "title": "Grip · 1 h 3 min · 24 g",
+   "download": {
+    "text": "Download",
+    "title": "grip-coupon.3mf",
+    "file": "grip-coupon.3mf"
+   }
+  },
+  {
+   "name": "Pad",
+   "title": "Pad · 34 min · 12 g",
+   "download": {
+    "text": "Download",
+    "title": "pad-coupon.3mf",
+    "file": "pad-coupon.3mf"
+   }
+  },
+  {
+   "name": "Cutouts",
+   "title": "Cutouts · 1 h 1 min · 24 g",
+   "download": {
+    "text": "Download",
+    "title": "cutout-coupon.3mf",
+    "file": "cutout-coupon.3mf"
+   }
+  },
+  {
+   "name": "Bore",
+   "title": "Bore · 39 min · 18 g",
+   "download": {
+    "text": "Download",
+    "title": "bore-coupon.3mf",
+    "file": "bore-coupon.3mf"
+   }
+  },
+  {
+   "name": "Sampler",
+   "title": "Sampler · 1 h 36 min · 44 g",
+   "download": {
+    "text": "Download",
+    "title": "sampler-coupon.3mf",
+    "file": "sampler-coupon.3mf"
+   }
+  }
+ ],
+ "profile": "Times and filament from PrusaSlicer, Core One, PLA, 0.2 mm layers; yours will differ.",
+ "intro": "Print each with your usual profile and slicer supports off; the supports are in the file. Each sets one setting.",
+ "guide": "https://github.com/gittrahan/support-fins/blob/main/docs/CALIBRATION.md"
+}
