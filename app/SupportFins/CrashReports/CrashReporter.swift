@@ -34,7 +34,11 @@ final class CrashReporter {
     init(folder: CrashFolder = CrashFolder(url: CrashFolder.standard)) { self.folder = folder }
 
     /// The banner: the last run ended badly, or a report is new, and the user has not dismissed it.
-    var showsBanner: Bool { !dismissed && (closedUnexpectedly || !unseen.isEmpty) }
+    /// A caught Rust panic (`crash-rust-*`) is a report but not a close: the app went on, so it never raises the banner.
+    var showsBanner: Bool { !dismissed && (closedUnexpectedly || !unseenCloses.isEmpty) }
+
+    /// The unseen reports of a run that ended: the launch's own and MetricKit's crashes and hangs.
+    private var unseenCloses: [CrashFolder.Report] { unseen.filter { !$0.stem.hasPrefix("crash-rust-") } }
 
     // MARK: launch and termination
 
@@ -205,7 +209,7 @@ final class CrashReporter {
 
     /// The report files the banner talks about: the unseen reports (the newest one when all are seen).
     var bannerFiles: [URL] {
-        let list = unseen.isEmpty ? Array(folder.reports().prefix(1)) : unseen
+        let list = unseenCloses.isEmpty ? Array(folder.reports().prefix(1)) : unseenCloses
         return list.flatMap(\.files)
     }
 

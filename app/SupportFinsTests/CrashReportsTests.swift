@@ -98,6 +98,25 @@ struct CrashReportsTests {
         #expect(mj["diagnostic"] != nil && mj["breadcrumbs"] is [String])
     }
 
+    @Test func aCaughtPanicReportAloneNeverRaisesTheBanner() throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        try plant(folder, "rust-2026-10-29T10-00-00-0", age: 5)       // the panic hook's report; the app went on
+        let clean = CrashReporter(folder: folder)
+        clean.start(register: false)
+        #expect(!clean.showsBanner && clean.unseen.count == 1, "the report is there, the banner is not")
+        #expect(folder.reports().count == 1, "it stays for Help > Show crash reports")
+        clean.refresh()
+        #expect(!clean.showsBanner)
+        clean.stop()
+
+        // a MetricKit crash or hang diagnostic does
+        let next = CrashReporter(folder: folder)
+        next.start(register: false)
+        next.record(metrics: [.init(kind: "crash", json: Data("{}".utf8))])
+        #expect(next.showsBanner)
+    }
+
     @Test func theBreadcrumbRingKeepsTheLast50() {
         let b = Breadcrumbs()
         for i in 0..<120 { b.add("action \(i)") }

@@ -25,7 +25,10 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
   build is byte-identical to one that was never cancellable.
 - **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled}`) carrying the JS-identical
-  message where one exists.
+  message where one exists. On the Swift side `FfiError.localizedDescription` is that message, not UniFFI's
+  `String(reflecting:)` type dump: `just swift-bindings` rewrites the generated `errorDescription` to call the
+  hand-written `ffiErrorDescription` (`FfiError+Description.swift`) and fails if UniFFI's line changes. A failed file open
+  shows `ReadFailure.text`: the web's `Could not read <name>:\n<message>` (`ui/io.js:407`).
 
 ## Surface (M4a; extended in M4b)
 
@@ -449,3 +452,12 @@ Nothing is sent over the network; reports are files in a folder Swift names (`~/
   and saves it to the folder; both end up in the reports.
 - **`crash_zip(names, datas)`** is `sf_io::zip::zip_store` for Save crash report... .
 - Test: `crates/sf-ffi/tests/crash.rs` forces a panic inside `catch_unwind` and reads the report back.
+- **When the banner shows.** Only for a leftover running marker (the last run did not end normally) and for MetricKit crash or hang
+  diagnostics. A `crash-rust-*` report alone (a panic that was caught and became an error) never raises it: the app went on. Those
+  reports stay in the folder and are reachable through Help > Show crash reports.
+- **Release symbols.** Checked on a Release build (`nm`, `atos`): `sf_ffi` functions (Rust v0-mangled, local symbols) are in the binary
+  and `atos` resolves them, and the build also writes `Support Fins.app.dSYM`. The Rust release profile is cargo's default (no debug
+  info, no strip), so a Rust frame has a function name but no file:line (the panic's own file:line is separate, from `Location`).
+  A plain `xcodebuild build` does not strip (`DEPLOYMENT_POSTPROCESSING = NO`), but an Archive does with `STRIP_STYLE = all`, which
+  removes every local symbol, i.e. all Rust frames. `app/project.yml` therefore sets `STRIP_STYLE: debugging` (only debug symbols go).
+  To symbolicate a MetricKit address later: `atos -o "Support Fins.app.dSYM/Contents/Resources/DWARF/Support Fins" -arch arm64 -l <load address> <address>`.
