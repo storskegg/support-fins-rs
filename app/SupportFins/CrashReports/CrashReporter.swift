@@ -42,6 +42,15 @@ final class CrashReporter {
 
     // MARK: launch and termination
 
+    /// False in a unit-test host (it would write markers into the user's folder). A DEBUG build launched with its own
+    /// `-SFCrashDir` (the UI tests) starts, whatever the environment says.
+    static func shouldStart(environment: [String: String], defaults: UserDefaults = .standard) -> Bool {
+        #if DEBUG
+        if defaults.string(forKey: "SFCrashDir") != nil { return true }
+        #endif
+        return environment["XCTestConfigurationFilePath"] == nil
+    }
+
     /// Call once at launch. `register` is false in tests that only exercise the logic.
     func start(register: Bool = true) {
         guard !started else { return }

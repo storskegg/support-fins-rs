@@ -4,12 +4,12 @@ import SwiftUI
 /// reports"). The banner is non-modal: a strip over the top of the viewport.
 @MainActor
 final class CrashReportsFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
 
     init(host: ViewerModel) { self.host = host }
 
     var overlays: [WindowOverlay] {
-        [WindowOverlay("crash-banner", order: 80, alignment: .top) { CrashBanner(reporter: CrashReporter.shared, model: { self.host.openedURL }) }]
+        [WindowOverlay("crash-banner", order: 80, alignment: .top) { CrashBanner(reporter: CrashReporter.shared, model: { self.host?.openedURL }) }]
     }
 
     static func menus(_ f: CrashReportsFeature?) -> [MenuSection] {

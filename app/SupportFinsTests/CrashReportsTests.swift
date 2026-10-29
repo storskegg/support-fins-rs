@@ -117,6 +117,33 @@ struct CrashReportsTests {
         #expect(next.showsBanner)
     }
 
+    #if DEBUG
+    /// The launch arguments `-SFCrashDir <dir> -SFPlantCrash YES` (UserDefaults' argument domain): the marker is planted in
+    /// that folder before `start` looks for a leftover one, so the banner shows; and a test host that carries the XCTest
+    /// environment still starts when it names its own folder.
+    @Test func plantingTheMarkerBeforeStartShowsTheBanner() throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        let d = UserDefaults.standard
+        d.set(folder.url.path, forKey: "SFCrashDir")
+        d.set(true, forKey: "SFPlantCrash")
+        defer { d.removeObject(forKey: "SFCrashDir"); d.removeObject(forKey: "SFPlantCrash") }
+        let env = ["XCTestConfigurationFilePath": "/x"]
+        #expect(CrashReporter.shouldStart(environment: env), "a named crash folder starts the reporter in a test environment")
+        let r = CrashReporter(folder: CrashFolder(url: FileManager.default.temporaryDirectory.appending(path: "unused-\(UUID().uuidString)")))
+        r.start(register: false)
+        #expect(r.showsBanner && r.closedUnexpectedly)
+        #expect(r.folder.url.standardizedFileURL == folder.url.standardizedFileURL)
+        #expect(folder.reports().contains { $0.stem.hasPrefix("crash-session-") })
+        #expect(folder.markerExists, "this run's own marker is set after the leftover one was read")
+    }
+    #endif
+
+    @Test func aUnitTestHostWithoutAFolderDoesNotStart() {
+        #expect(!CrashReporter.shouldStart(environment: ["XCTestConfigurationFilePath": "/x"], defaults: UserDefaults(suiteName: "sf-none-\(UUID().uuidString)")!))
+        #expect(CrashReporter.shouldStart(environment: [:]))
+    }
+
     @Test func theBreadcrumbRingKeepsTheLast50() {
         let b = Breadcrumbs()
         for i in 0..<120 { b.add("action \(i)") }

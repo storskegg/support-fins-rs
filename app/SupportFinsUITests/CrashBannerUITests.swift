@@ -7,8 +7,15 @@ final class CrashBannerUITests: PartWindowUITestCase {
         app.launchArguments += ["-SFPlantCrash", "YES"]
         try openFixturePart()
         let message = element("crash-banner-message")
-        XCTAssertTrue(message.waitForExistence(timeout: 10), "the banner shows after a run that did not end normally")
-        XCTAssertEqual(message.label, "Support Fins closed unexpectedly last time.")
+        let shown = message.waitForExistence(timeout: 10)
+        if !shown {
+            let a = XCTAttachment(string: app.debugDescription)
+            a.name = "app.debugDescription"
+            a.lifetime = .keepAlways
+            add(a)
+        }
+        XCTAssertTrue(shown, "the banner shows after a run that did not end normally")
+        XCTAssertEqual(text(message), "Support Fins closed unexpectedly last time.")
         XCTAssertTrue(element("crash-banner-show").exists)
         XCTAssertTrue(element("crash-banner-save").exists)
 
