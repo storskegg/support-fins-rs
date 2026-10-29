@@ -10,10 +10,10 @@ struct RemoveFinsControls: View {
             HStack {
                 Toggle(model.toggleLabel, isOn: Binding(get: { model.armed }, set: { _ in model.toggle() }))
                     .toggleStyle(.button)
-                    .help("Click a fin to remove just that one. Esc or right-click cancels.")
+                    .tipCard(pic: "remove-fins", JS.t("Click a fin to remove just that one. Esc or right-click cancels."))
                 if model.canRestore {
                     Button("Restore all") { model.restoreAll() }
-                        .help("Bring back every fin removed in this orientation.")
+                        .tipCard(pic: "restore-fins", JS.t("Bring back every fin removed in this orientation."))
                 }
             }
         }

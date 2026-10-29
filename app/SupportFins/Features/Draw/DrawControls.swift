@@ -9,7 +9,7 @@ struct AugmentToggle: View {
             HStack {
                 Toggle(model.augmentTitle, isOn: Binding(get: { model.session.addByHand }, set: { _ in model.toggleAugment() }))
                     .toggleStyle(.button)
-                    .help(DrawTip.augment)
+                    .tipCard(pic: "add-walls", DrawTip.augment)
                     .accessibilityIdentifier("augment-toggle")
             }
         }
@@ -43,12 +43,12 @@ struct DrawControls: View {
                 HStack {
                     if model.started {
                         Button("Back one point") { _ = model.undoPoint() }
-                            .help(DrawTip.back)
+                            .tipCard(DrawTip.back)
                             .accessibilityIdentifier("draw-back")
                     }
                     if model.selectedID != nil {
                         Button("Remove selected") { model.removeSelected() }
-                            .help(DrawTip.removeSelected)
+                            .tipCard(pic: "draw-remove", DrawTip.removeSelected)
                             .accessibilityIdentifier("draw-remove")
                     }
                     Button("Clear all") { model.clearAll() }

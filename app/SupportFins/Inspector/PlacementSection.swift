@@ -15,7 +15,7 @@ struct PlacementSection: View {
                     Button(title) { settings.mode = mode }
                         .buttonStyle(.bordered)
                         .tint(settings.mode == mode ? .accentColor : nil)
-                        .help("Who places the support.")
+                        .tipCard(JS.t("Who places the support."))
                         .accessibilityIdentifier("fin-mode-\(mode.rawValue)")
                         .accessibilityAddTraits(settings.mode == mode ? .isSelected : [])
                 }

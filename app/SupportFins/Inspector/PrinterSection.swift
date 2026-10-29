@@ -11,17 +11,17 @@ struct PrinterSection: View {
             Picker("Nozzle", selection: Binding(get: { settings.nozzle }, set: { settings.setNozzle($0) })) {
                 ForEach(FinSettings.nozzleChoices, id: \.self) { Text("\(FinSettings.nozzleText($0)) mm").tag($0) }
             }
-            .help(Tip.nozzle)
+            .tipCard(pic: "nozzle", Tip.nozzle)
             if settings.visibility.layerHeight {
-                NumberField(title: "Layer height", value: $settings.layerHeight, limits: FinSettings.layerHeightLimits, unit: "mm", help: Tip.layerHeight)
+                NumberField(title: "Layer height", value: $settings.layerHeight, limits: FinSettings.layerHeightLimits, unit: "mm", help: Tip.layerHeight, pic: "layer-height")
             }
-            NumberField(title: "Support gap", value: $settings.gap, limits: FinSettings.gapLimits, unit: "mm", help: Tip.gap)
+            NumberField(title: "Support gap", value: $settings.gap, limits: FinSettings.gapLimits, unit: "mm", help: Tip.gap, pic: "gap")
             Picker("Interface material", selection: $settings.interfaceMaterial) {
                 Text("Off").tag(FinSettings.InterfaceMaterial.off)
                 Text("Flat contacts").tag(FinSettings.InterfaceMaterial.flat)
                 Text("Everywhere").tag(FinSettings.InterfaceMaterial.all)
             }
-            .help(Tip.iface)
+            .tipCard(pic: "iface", Tip.iface)
         } label: {
             HStack {
                 Image(systemName: "printer")
@@ -31,7 +31,7 @@ struct PrinterSection: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { open.toggle() }
-            .help("Your printer: nozzle, layer height, support gap, interface material. Click to change.")
+            .tipCard(pic: "printer", JS.t("Your printer: nozzle, layer height, support gap, interface material. Click to change."))
         }
     }
 }
