@@ -37,6 +37,7 @@ public final class ViewerMTKView: MTKView {
 
     /// A press that landed on a rotate ring turns the part; the drag belongs to the ring until the button is up.
     private var ringGrabbed = false
+    private var ringPressAt: NSPoint?
 
     public override func mouseDown(with e: NSEvent) {
         MainActor.assumeIsolated {
@@ -45,6 +46,7 @@ public final class ViewerMTKView: MTKView {
             if e.modifierFlags.contains(.control), controller?.cancelArmed() == true { pressAt = nil; return }
             let p = pixel(e)
             ringGrabbed = controller?.beginRingDrag(x: p.x, y: p.y, width: p.w, height: p.h) ?? false
+            ringPressAt = ringGrabbed ? e.locationInWindow : nil
             pressAt = ringGrabbed ? nil : e.locationInWindow
         }
     }
@@ -52,9 +54,17 @@ public final class ViewerMTKView: MTKView {
     public override func mouseUp(with e: NSEvent) {
         MainActor.assumeIsolated {
             if ringGrabbed {
-                controller?.endRingDrag()
+                let turned = controller?.endRingDrag() ?? true
                 ringGrabbed = false
                 pressAt = nil
+                // a ring pressed and released without a turn is still a click in the sway-brace mode (the ring
+                // snaps 5 degrees within the 4 px a click allows): it stands the brace under the pointer
+                if !turned, controller?.handPicking == .braces, let start = ringPressAt,
+                   hypot(e.locationInWindow.x - start.x, e.locationInWindow.y - start.y) <= Self.clickSlop {
+                    let p = pixel(e)
+                    controller?.click(x: p.x, y: p.y, width: p.w, height: p.h)
+                }
+                ringPressAt = nil
                 return
             }
             defer { pressAt = nil }
@@ -71,13 +81,22 @@ public final class ViewerMTKView: MTKView {
     }
 
     public override func keyDown(with e: NSEvent) {
-        let handled = MainActor.assumeIsolated { () -> Bool in e.keyCode == 53 && controller?.cancelArmed() == true }
+        let handled = MainActor.assumeIsolated { () -> Bool in
+            switch e.keyCode {
+            case 53: return controller?.cancelArmed(escape: true) == true
+            case 51: return controller?.onHandKey?(.backspace) == true      // Backspace
+            case 117: return controller?.onHandKey?(.delete) == true        // forward Delete
+            default: return false
+            }
+        }
         if !handled { super.keyDown(with: e) }
     }
 
     public override func resetCursorRects() {
         let pointing = MainActor.assumeIsolated { controller.map { $0.hoveringSupport || $0.hoveringFaceToLay } == true }
         if pointing { addCursorRect(bounds, cursor: .pointingHand) }
+        // aiming a hand-placed support: the crosshair (`renderer.domElement.style.cursor = 'crosshair'`)
+        if MainActor.assumeIsolated({ controller?.handCursor == true }) { addCursorRect(bounds, cursor: .crosshair) }
     }
 
     public override func mouseMoved(with e: NSEvent) {
@@ -87,7 +106,7 @@ public final class ViewerMTKView: MTKView {
         }
     }
     public override func mouseExited(with e: NSEvent) {
-        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover() }
+        MainActor.assumeIsolated { controller?.clearHover(); controller?.clearRingHover(); controller?.handPointerLeft() }
     }
 
     public override func mouseDragged(with e: NSEvent) {
@@ -99,6 +118,8 @@ public final class ViewerMTKView: MTKView {
                 return
             }
             controller?.clearHover()
+            // an orbit has the pointer: a sway brace's preview goes (`dropBracePreview`)
+            if controller?.handPicking == .braces { controller?.handPointerLeft() }
             navigate(.left, e)
         }
     }

@@ -58,13 +58,25 @@ export function tn(singular, plural1, n, params = {}) {
 `);
 ui("remove.js", `export const removedIds = new Set();`);
 ui("walls.js", `
-export const drawnWalls = [];
-export const drawMsg = '';
-export const selectedWall = null;
-export const selectedNote = () => '';
-export const drawShown = () => false;
+export let drawnWalls = [];
+export let drawMsg = '';
+export let selectedWall = null;
+let note = '';
+let shown = false, shape = 'line';
+export const selectedNote = () => note;
+export const drawShown = () => shown;
 export const drawMaterial = {};
-export const drawShapeNow = () => 'line';
+export const drawShapeNow = () => shape;
+// the page state a case sets: { walls: [{kind, ok, tines, braces, cross, stilt, reason}], msg, selectedNote, shape, shown }
+export function __set(d) {
+  drawnWalls = (d?.walls ?? []).map((w) => ({ kind: w.kind === 'sway' ? 'sway' : undefined, ok: w.ok,
+    info: { tines: w.tines, braces: w.braces, cross: w.cross, stilt: w.stilt, reason: w.reason } }));
+  drawMsg = d?.msg ?? '';
+  note = d?.selectedNote ?? '';
+  selectedWall = d?.selectedNote != null ? {} : null;
+  shown = !!d?.shown;
+  shape = d?.shape ?? 'line';
+}
 `);
 ui("settings.js", `
 export let finMode = 'auto';
@@ -98,6 +110,7 @@ const root = `file://${dir}/web/`;
 const readout = await import(`${root}ui/readout.js`);
 const domMod = await import(`${root}ui/dom.js`);
 const settings = await import(`${root}ui/settings.js`);
+const wallsMod = await import(`${root}ui/walls.js`);
 const part = await import(`${root}ui/part.js`);
 const finbuild = await import(`${root}ui/finbuild.js`);
 const removeMod = await import(`${root}ui/remove.js`);
@@ -120,6 +133,7 @@ function run(built, ctx) {
   settings.__set(ctx.mode);
   part.__set(ctx.regions);
   finbuild.__set(ctx.added ?? []);
+  wallsMod.__set(ctx.draw);
   removeMod.removedIds.clear();
   for (let i = 0; i < ctx.removed; i++) removeMod.removedIds.add(i);
   PROP.tineDir = ctx.tineDir;
@@ -235,6 +249,53 @@ add("curved-fill-one", { curvedFill: { walls: 1, unservedArea: 3.2, capped: fals
 add("curved-capped", { curvedFill: { walls: 4, unservedArea: 41.6, capped: true } });
 add("curved-no-walls-bare", { curvedFill: { walls: 0, unservedArea: 7, capped: false } });
 add("full-and-curved-fill", { ...fullBase, fill: { walls: 1, bareBefore: 40, unservedArea: 6, capped: false }, curvedFill: { walls: 1, unservedArea: 9, capped: false } });
+// Draw mode (updateDrawReadout): the hand-drawn walls, and what the pad and seating say beside them
+const drawBase = { mode: "draw", fins: [], braceCount: 0, propCount: 0, tines: 0, patchCount: 0, rejected: { blocked: 0, tooFewTines: 0, sites: 0, tried: 0 } };
+const w = (o = {}) => ({ kind: "wall", ok: true, tines: 0, braces: 0, cross: 0, stilt: 0, ...o });
+const br = (o = {}) => ({ kind: "sway", ok: true, tines: 0, braces: 0, cross: 0, stilt: 0, ...o });
+const dr = (walls, o = {}) => ({ draw: { walls, msg: "", shape: "line", shown: true, ...o } });
+add("draw-empty-line", drawBase, dr([]));
+add("draw-empty-curve", drawBase, dr([], { shape: "curve" }));
+add("draw-one-wall", drawBase, dr([w({ tines: 9 })]));
+add("draw-one-wall-no-tines", drawBase, dr([w()]));
+add("draw-one-tine", drawBase, dr([w({ tines: 1 })]));
+add("draw-pins", drawBase, { ...dr([w({ tines: 6 }), w({ tines: 4 })]), tineDir: "vertical" });
+add("draw-walls-ribs", drawBase, dr([w({ tines: 5, braces: 2 }), w({ tines: 3, braces: 1 })]));
+add("draw-one-wall-one-rib", drawBase, dr([w({ tines: 5, braces: 1 })]));
+add("draw-braces-cross", drawBase, dr([br({ tines: 12, cross: 2 }), br({ tines: 8, cross: 1 })]));
+add("draw-one-brace", drawBase, dr([br({ tines: 7 })]));
+add("draw-brace-stilt", drawBase, dr([br({ tines: 7, stilt: 31.6 })]));
+add("draw-braces-stilt", drawBase, dr([br({ tines: 7, stilt: 25 }), br({ tines: 9, stilt: 41.4 }), br({ tines: 3, stilt: 5 })]));
+add("draw-mixed", drawBase, dr([w({ tines: 4, braces: 1 }), br({ tines: 9, cross: 1 }), w({ tines: 4 })]));
+add("draw-bad-one", drawBase, dr([w({ tines: 4 }), w({ ok: false, reason: "wall too short — 0.5mm, needs 2mm" })]));
+add("draw-bad-no-reason", drawBase, dr([w({ ok: false })]));
+add("draw-bad-many", drawBase, dr([w({ ok: false, reason: "nothing to hold up there — the line sits at the plate" }), br({ ok: false, reason: "that’s too low for a brace — move up the side" })]));
+add("draw-msg-only", drawBase, dr([], { msg: "couldn’t place that wall: wall too short — 1.0mm, needs 2mm" }));
+add("draw-msg-with-wall", drawBase, dr([w({ tines: 4 })], { msg: "can’t place this curve: curve too tight — 3.0mm radius, needs 5mm" }));
+add("draw-selected", drawBase, dr([w({ tines: 4 })], { selectedNote: "selected: wall 24mm long, 4 tines. Press Delete or Remove selected to take it out (Esc to keep it)" }));
+add("draw-point-with-pad", { ...drawBase, seating: { kind: "point", span: 0.1, bedArea: 0 }, pad: { style: "sure", autoSure: false, smallFoot: false, outline: 3 } }, dr([w({ tines: 4 })]));
+add("draw-point-without-pad", { ...drawBase, seating: { kind: "point", span: 0.1, bedArea: 0 }, pad: null }, dr([]));
+add("draw-pad-small-foot", { ...drawBase, pad: { style: "light", autoSure: false, smallFoot: true, outline: 3 } }, { ...dr([w({ tines: 4 })]), padStyle: "light" });
+add("draw-pad-sure-auto", { ...drawBase, pad: { style: "sure", autoSure: true, smallFoot: true, outline: 7.4 } }, dr([w()]));
+add("draw-time", drawBase, { ...dr([w({ tines: 4 })]), ms: 41.6 });
+add("draw-no-ms", drawBase, { ...dr([w({ tines: 4 })]), ms: null });
+add("draw-iface-flat-none", drawBase, { ...dr([w({ tines: 4 })]), iface: "flat" });
+add("draw-no-added", drawBase, { ...dr([]), added: [] });
+add("draw-grams", drawBase, { ...dr([w({ tines: 4 })]), added: tetra(35) });
+// "+ Add walls by hand" in Auto and Full (updateFinReadout): the hand-added walls beside the auto ones
+add("aug-fins-and-drawn", {}, dr([w({ tines: 4 }), w({ tines: 2 })]));
+add("aug-one-drawn", {}, dr([w({ tines: 4 })]));
+add("aug-only-drawn", { fins: [], braceCount: 0, propCount: 0, tines: 0, patchCount: 0, rejected: { blocked: 0, tooFewTines: 0, sites: 0, tried: 0 } }, dr([w({ tines: 4 })]));
+add("aug-drawn-and-sway", { sway: { count: 2, tines: 14, skipped: 0, cross: 1 } }, dr([w({ tines: 4 })]));
+add("aug-bad", {}, dr([w({ tines: 4 }), w({ ok: false, reason: "wall too short — 0.5mm, needs 2mm" })]));
+add("aug-bad-many", {}, dr([w({ ok: false }), br({ ok: false, reason: "that face is too small or curved to stand a brace against" })]));
+add("aug-msg-and-selected", {}, dr([w({ tines: 4 })], { msg: "couldn’t place that brace: that’s too low for a brace — move up the side", selectedNote: "selected: sway brace 40mm tall. Press Delete or Remove selected to take it out (Esc to keep it)" }));
+add("aug-hidden", {}, dr([w({ tines: 4 })], { shown: false }));
+add("aug-none-possible-only-bad", { fins: [], braceCount: 0, propCount: 0, tines: 0, patchCount: 0, rejected: { blocked: 0, tooFewTines: 0, sites: 0, tried: 0 } }, dr([w({ ok: false, reason: "x" })]));
+add("aug-small-holes-with-drawn", { fins: [], braceCount: 0, propCount: 0, tines: 0, smallHoleRegions: 2 }, { ...dr([w({ tines: 4 })]), regions: 2 });
+add("aug-small-holes-with-bad-drawn", { fins: [], braceCount: 0, propCount: 0, tines: 0, smallHoleRegions: 2 }, { ...dr([w({ ok: false })]), regions: 2 });
+add("aug-full", { mode: "full", fill: { walls: 2, bareBefore: 90, unservedArea: 12.4, capped: false } }, dr([w({ tines: 4 })]));
+add("aug-point-seating", { seating: { kind: "point", span: 0.1, bedArea: 0 }, pad: { style: "sure", autoSure: false, smallFoot: false, outline: 3 } }, dr([w({ tines: 4 })]));
 // many things at once
 add("kitchen-sink", {
   propCount: 2, tallRibs: 2, floating: [{ faces: 1, lowest: [0, 0, 3], drop: 3 }], sagRisk: true, unserved: 0,

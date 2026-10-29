@@ -69,6 +69,47 @@ public final class ViewerController {
     @ObservationIgnored public var onFaceCancel: (@MainActor () -> Void)?
     /// The pointer is over a face that a click would lay flat.
     public var hoveringFaceToLay: Bool { facePicking && hoverFace != nil }
+    /// Hand-placed supports (`web/ui/walls.js` `drawActive` / `braceActive`): `walls` is Draw (and "+ Add walls
+    /// by hand"), where the pointer lays walls and the rotate rings step aside; `braces` is Auto / Full with Sway
+    /// braces on, where hovering an upright side previews a brace and the rings stay (faded by `ringFade`). The
+    /// view reports the pointer (`onHandMove`), a click that did not drag (`onHandClick`), and Esc, a right click
+    /// or Ctrl+click (`onHandCancel`), each with the face under it and the ray through it.
+    public enum HandPicking: Equatable, Sendable { case off, walls, braces }
+    public var handPicking = HandPicking.off {
+        didSet {
+            guard handPicking != oldValue else { return }
+            pendingPick = nil
+            hoverFace = nil
+            renderer.setHover(nil)
+            updateGizmo()
+            if handPicking == .off { handCursor = false }
+            onCursorChange?()
+        }
+    }
+    /// The crosshair is shown over the view: the pointer is on the part in a hand mode.
+    public var handCursor = false { didSet { if handCursor != oldValue { onCursorChange?() } } }
+
+    /// Where the pointer is for a hand mode: the face under it (nil: off the part), and the ray through it in print
+    /// space (a unit direction).
+    public struct HandPointer: Sendable {
+        public var face: (part: Int, face: Int)?
+        public var origin: SIMD3<Double>
+        public var direction: SIMD3<Double>
+        /// In points from the view's top left, and the view's size in points.
+        public var location: CGPoint
+        public var size: CGSize
+
+        public init(face: (part: Int, face: Int)?, origin: SIMD3<Double>, direction: SIMD3<Double>, location: CGPoint, size: CGSize) {
+            (self.face, self.origin, self.direction, self.location, self.size) = (face, origin, direction, location, size)
+        }
+    }
+    /// Backspace and forward Delete, while the view has the keys.
+    public enum HandKey: Sendable { case backspace, delete }
+    @ObservationIgnored public var onHandKey: (@MainActor (HandKey) -> Bool)?
+    @ObservationIgnored public var onHandMove: (@MainActor (HandPointer?) -> Void)?
+    @ObservationIgnored public var onHandClick: (@MainActor (HandPointer) -> Void)?
+    /// `escape`: the key (which also deselects), not a right click. True when the event was the mode's.
+    @ObservationIgnored public var onHandCancel: (@MainActor (_ escape: Bool) -> Bool)?
     @ObservationIgnored public var onSupportHover: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onSupportClick: (@MainActor (Int?) -> Void)?
     @ObservationIgnored public var onCancelArmed: (@MainActor () -> Void)?
@@ -276,13 +317,13 @@ public final class ViewerController {
     }
 
     func updateGizmo() {
-        guard showRings, !supportPicking, !facePicking, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
+        guard showRings, !supportPicking, !facePicking, handPicking != .walls, !renderer.meshes.isEmpty else { renderer.setGizmo(nil); return }
         renderer.setGizmo(GizmoDisplay(center: drag?.center ?? gizmoCenter, hover: ringHover, active: ringDragging, fade: ringFade))
     }
 
     /// The ring under a pixel, if the rings are on.
     public func ringAt(x: Int, y: Int, width: Int, height: Int) -> GizmoHandle? {
-        guard showRings, !supportPicking, !facePicking, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
+        guard showRings, !supportPicking, !facePicking, handPicking != .walls, !renderer.meshes.isEmpty, width > 0, height > 0, drag == nil else { return nil }
         return RotateGizmo(center: gizmoCenter).hit(atPixel: SIMD2(Float(x), Float(y)), camera: renderer.camera,
                                                     width: Float(width), height: Float(height))
     }
@@ -313,13 +354,16 @@ public final class ViewerController {
         onRing?(.turned(delta: delta, degrees: degrees, handle: d.state.handle))
     }
 
-    public func endRingDrag() {
-        guard drag != nil else { return }
+    /// Ends the drag; true when it turned the part (a press that did not is a click in the sway-brace mode).
+    @discardableResult
+    public func endRingDrag() -> Bool {
+        guard drag != nil else { return true }
         let turned = ringDegrees != 0
         drag = nil
         ringDragging = nil
         onRing?(.ended(turned: turned))
         refreshPose()      // re-seat on the plate now the pivot may move again
+        return turned
     }
 
     public func clearRingHover() { if ringHover != nil { ringHover = nil } }
@@ -328,7 +372,8 @@ public final class ViewerController {
     public func pointerMoved(x: Int, y: Int, width: Int, height: Int) {
         let ring = ringAt(x: x, y: y, width: width, height: height)
         if ring != ringHover { ringHover = ring }
-        if ring != nil { clearHover() } else { hover(x: x, y: y, width: width, height: height) }
+        // over the rings without a drag a sway brace is still previewed: a drag there turns the part, a click stands it
+        if ring != nil && handPicking != .braces { clearHover() } else { hover(x: x, y: y, width: width, height: height) }
     }
 
     // MARK: input (points; the view passes its height for the gesture maths)
@@ -373,6 +418,12 @@ public final class ViewerController {
                     onSupportHover?(tri)
                     continue
                 }
+                if handPicking != .off {
+                    let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
+                    guard handPicking != .off else { continue }
+                    onHandMove?(handPointer(x: p.x, y: p.y, width: p.w, height: p.h, face: face))
+                    continue
+                }
                 let face = await renderer.pickFace(x: p.x, y: p.y, width: p.w, height: p.h)
                 let before = hoveringFaceToLay
                 hoverFace = face
@@ -400,6 +451,14 @@ public final class ViewerController {
     /// A click at a pixel of the drawable (origin top left): in lay-a-face mode the part and face under it; in remove mode the fin-buffer triangle
     /// under it (nil: empty space). Does nothing when the mode is off.
     public func click(x: Int, y: Int, width: Int, height: Int) {
+        if handPicking != .off && !supportPicking {
+            Task { @MainActor in
+                let face = await renderer.pickFace(x: x, y: y, width: width, height: height)
+                guard handPicking != .off else { return }
+                onHandClick?(handPointer(x: x, y: y, width: width, height: height, face: face))
+            }
+            return
+        }
         if facePicking {
             Task { @MainActor in
                 guard let face = await renderer.pickFace(x: x, y: y, width: width, height: height), facePicking,
@@ -419,11 +478,29 @@ public final class ViewerController {
     /// Esc, a right click or Ctrl+click while a pointer mode is armed (`app.js cancelArmed`). True when it was
     /// armed, i.e. the event was the mode's.
     @discardableResult
-    public func cancelArmed() -> Bool {
+    public func cancelArmed(escape: Bool = false) -> Bool {
         if facePicking { onFaceCancel?(); return true }
+        if !supportPicking, handPicking != .off { return onHandCancel?(escape) ?? false }
         guard supportPicking else { return false }
         onCancelArmed?()
         return true
+    }
+
+    /// The pointer for a hand mode at a pixel of the drawable, with the face the id pass found there.
+    private func handPointer(x: Int, y: Int, width: Int, height: Int, face: Int?) -> HandPointer {
+        let r = ndcRay(x: x, y: y, width: width, height: height)
+        let s = CGFloat(max(renderer.pixelScale, 1))
+        return HandPointer(face: face.flatMap { renderer.locate($0) },
+                           origin: SIMD3<Double>(r.origin), direction: SIMD3<Double>(r.direction),
+                           location: CGPoint(x: CGFloat(x) / s, y: CGFloat(y) / s),
+                           size: CGSize(width: CGFloat(width) / s, height: CGFloat(height) / s))
+    }
+
+    /// The pointer left the part's view or an orbit took it: the hand mode's preview goes.
+    public func handPointerLeft() {
+        guard handPicking != .off else { return }
+        pendingPick = nil
+        onHandMove?(nil)
     }
 
     // MARK: benchmark

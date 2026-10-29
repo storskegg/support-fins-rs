@@ -115,16 +115,18 @@ struct EscapeHandler: Identifiable {
 // MARK: menus
 
 /// A menu of the menu bar. Features that name the same menu share it; menus come in `order`. `fileExport` is not a
-/// menu but the items after File > New.
+/// menu but the items after File > New; `edit` is the items after the standard Edit menu's pasteboard group.
 struct MenuID: Hashable, Identifiable {
     var title: String
     var order: Int
     var isFileGroup = false
+    var isEditGroup = false
     var id: String { title }
 
     static let view = MenuID(title: "View", order: 0)
     static let model = MenuID(title: "Model", order: 10)
     static let fileExport = MenuID(title: "File", order: 100, isFileGroup: true)
+    static let edit = MenuID(title: "Edit", order: 5, isEditGroup: true)
 }
 
 /// A run of one menu's entries from one feature. Sections of a menu come in `order`, so a feature's items sit

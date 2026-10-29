@@ -116,14 +116,14 @@ struct FeatureSetTests {
 
     /// `FeatureCommands` shows a fixed number of menus.
     @Test func theMenuBarHasRoomForEveryMenu() {
-        #expect(FeatureSet.menuIDs().filter { !$0.isFileGroup }.count <= FeatureCommands.menuSlots)
+        #expect(FeatureSet.menuIDs().filter { !$0.isFileGroup && !$0.isEditGroup }.count <= FeatureCommands.menuSlots)
     }
 
     // MARK: the real features
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
         let model = ViewerModel()
-        var expected = ["empty-state", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar"]
+        var expected = ["empty-state", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "brace-tip"]
         #if DEBUG
         expected.insert("frame-time", at: 0)
         #endif
@@ -131,11 +131,11 @@ struct FeatureSetTests {
         #expect(model.toolbar.slots.map(\.id) == ["rotate", "suggest", "strength", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
-        #expect(model.features.inspectorSections(.basics).map(\.id) == ["remove-fins"])
+        #expect(model.features.inspectorSections(.basics).map(\.id) == ["augment", "remove-fins", "draw-controls"])
     }
 
     @Test func theEscCascadePutsAnArmedPointerModeBeforeEndingRemoveFins() {
-        #expect(ViewerModel().features.escapeHandlers.map(\.id) == ["lay-face", "remove-fins"])
+        #expect(ViewerModel().features.escapeHandlers.map(\.id) == ["lay-face", "draw", "remove-fins"])
     }
 
     @Test func theRealFeaturesRegisterTheirSlotsOnlyWhenTheyCanOpen() {
@@ -151,14 +151,15 @@ struct FeatureSetTests {
         view.append("  Show Frame Time")
         #endif
         view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]"]
+        let edit = ["Edit", "  Delete [\(KeyEquivalent.delete.character)]"]
         let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
                      "  Lay a Face Flat", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]"]
         // no window focused
-        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file)
+        #expect(FeatureSet.menuSnapshot(in: nil) == view + edit + model + file)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
         let window = ViewerModel()
-        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file)
+        #expect(FeatureSet.menuSnapshot(in: window.features) == view + edit + model + file)
     }
 
     /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.

@@ -43,6 +43,9 @@ struct ReadoutSections: View {
     var build: (any ReadoutBuildSource)?
     /// Lines other features add to the status card.
     var extraLines: [StatusLine] = []
+    /// The hand-placed supports (Features/Draw): their state for the Fins row and their volume and extent for the
+    /// fit and the grams (`activeAdded`).
+    var draw: DrawReadoutState?
 
     @State private var analysis: Analysis?
     @State private var afterRemoval: AfterRemoval?
@@ -107,6 +110,16 @@ struct ReadoutSections: View {
     private func effectiveBuilt() -> ReadoutBuilt? {
         guard var b = build?.readoutSummaryJSON.flatMap({ try? ReadoutBuilt(summaryJSON: $0, finCount: build?.readoutFinCount ?? 0) })
         else { return nil }
+        // the hand-placed supports are added to the plate too: the fit check and the grams count them
+        if let added = draw?.added {
+            b.finVolumeMm3 += added.volumeMm3
+            if let lo = added.min, let hi = added.max {
+                let cur = b.addedBounds
+                b.addedBounds = ReadoutBuilt.Bounds(
+                    min: [Swift.min(cur?.min[0] ?? lo.x, lo.x), Swift.min(cur?.min[1] ?? lo.y, lo.y), Swift.min(cur?.min[2] ?? lo.z, lo.z)],
+                    max: [Swift.max(cur?.max[0] ?? hi.x, hi.x), Swift.max(cur?.max[1] ?? hi.y, hi.y), Swift.max(cur?.max[2] ?? hi.z, hi.z)])
+            }
+        }
         if let r = afterRemoval, !session.removedFins.isEmpty, r.removed > 0 {
             b.bare = r.bare
             b.addedBounds = r.addedBounds
@@ -152,6 +165,10 @@ struct ReadoutSections: View {
             c.wallsPresent = b.finCount > 0
         }
         c.crestPresent = build?.readoutHasCrest ?? false
+        if let d = draw {
+            c.draw = d.input
+            if d.added != nil { c.hasAdded = true; c.wallsPresent = true }
+        }
         c.fillReach = built?.fillReach
         return c
     }

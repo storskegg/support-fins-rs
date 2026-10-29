@@ -85,6 +85,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     var islandCones: (buffer: MTLBuffer, vertices: Int)?
     var islandLines: (buffer: MTLBuffer, vertices: Int)?
     var layerFrames: (buffer: MTLBuffer, vertices: Int)?
+    /// Draw's layers (see `DrawOverlay.swift`).
+    let drawState = DrawRenderState()
 
     private var plate: PlateGeometry
     private var plateBuffers: [MTLBuffer?] = [nil, nil, nil, nil]
@@ -365,6 +367,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         if let g = gizmo, g.visible { drawGizmo(g, uniforms: &u, with: enc) }
         encodeHUD(into: enc)
         encodeIslandMarkers(into: enc)
+        encodeDrawScene(into: enc)
     }
 
     private func drawGizmo(_ g: GizmoDisplay, uniforms u: inout Uniforms, with enc: MTLRenderCommandEncoder) {

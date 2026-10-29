@@ -10,6 +10,10 @@ struct SessionSnapshot: Equatable, Sendable {
     /// The "Add fins" toggle (`finsVisible`): the web's history snapshot holds it too (`ui/history.js`), so
     /// turning fins on and off is an undo step.
     var finsOn = false
+    /// The hand-placed walls and braces of Draw (`drawnWalls`) and "+ Add walls by hand" (`drawAugment`): the web's
+    /// history snapshot holds both (`ui/history.js` `snapshot`).
+    var drawnWalls: [DrawnWall] = []
+    var addByHand = false
 }
 
 /// The state of one window's part: its objects, the pose, the settings, the fins the user removed, and the
@@ -28,6 +32,10 @@ final class PartSession {
     var removedFins: Set<FinKey>
     /// Are the fins on (the toolbar's Add fins)?
     var finsOn = false
+    /// The hand-placed supports (Features/Draw), in the part's own frame.
+    var drawnWalls: [DrawnWall] = []
+    /// "+ Add walls by hand" is on (`drawAugment`).
+    var addByHand = false
     private(set) var history = History<SessionSnapshot>()
     /// A rotate ring is being dragged (set by `RingEdits`). Not part of the history: the drag is one step, taken
     /// when it ends. The window rebuilds the fins live while this is true (`BuildWiring`).
@@ -51,7 +59,9 @@ final class PartSession {
         self.removedFins = removedFins
     }
 
-    var snapshot: SessionSnapshot { SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins, finsOn: finsOn) }
+    var snapshot: SessionSnapshot {
+        SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins, finsOn: finsOn, drawnWalls: drawnWalls, addByHand: addByHand)
+    }
     var canUndo: Bool { history.canUndo }
     var canRedo: Bool { history.canRedo }
 
@@ -60,6 +70,8 @@ final class PartSession {
         self.parts = parts
         pose = .identity
         removedFins = []
+        drawnWalls = []
+        addByHand = false
         history.reset()
         if !keepingSettings { settings = FinSettings() }
         undoManager?.removeAllActions(withTarget: self)
@@ -103,7 +115,9 @@ final class PartSession {
     /// (`web/ui/history.js:93-98`), which a slider fires once, on release.
     func setSettings(_ new: FinSettings) {
         guard new != settings else { return }
-        if history.inGesture { settings = new } else { perform("Change Settings") { settings = new } }
+        // a mode switch starts with hand-placement off (`settings.js` `fin-mode` change: `drawAugment = false`)
+        let ends: () -> Void = { if new.mode != self.settings.mode { self.addByHand = false } }
+        if history.inGesture { ends(); settings = new } else { perform("Change Settings") { ends(); settings = new } }
     }
 
     /// A Slider's `onEditingChanged`: true when the thumb goes down, false when it is released.
@@ -141,6 +155,8 @@ final class PartSession {
         settings = s.settings
         removedFins = s.removedFins
         finsOn = s.finsOn
+        drawnWalls = s.drawnWalls
+        addByHand = s.addByHand
     }
 
     private func register(_ name: String?) {

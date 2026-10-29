@@ -16,8 +16,8 @@ What a feature may register (`Features/Contributions.swift`): `overlays` (alignm
 `registerTools(in:)` for the floating toolbar's badges (declare a `static let` `ToolbarSlot` of your own),
 `inspectorSections` (slot `.top`, `.basics` or `.bottom`), `statusLines` (the status card), `escapeHandlers`
 (priority: higher first; return true to take the key and stop the cascade), `partWillShow` / `partDidShow`, and
-`static func menus(_:)` (`MenuSection`s for `.view`, `.model`, `.fileExport`, or your own `MenuID`; items come
-in section `order`, so a feature's items sit where the menu has them).
+`static func menus(_:)` (`MenuSection`s for `.view`, `.model`, `.fileExport`, `.edit` (the items after the standard Edit
+menu's pasteboard group), or your own `MenuID`; items come in section `order`, so a feature's items sit where the menu has them).
 
 Ties in `order` keep the `Features.all` order. Menus come in `MenuID.order` (View 0, Model 10), so a menu of your own
 sits where its order puts it; `FeatureCommands` has room for `menuSlots` menus (a test fails when they run out).

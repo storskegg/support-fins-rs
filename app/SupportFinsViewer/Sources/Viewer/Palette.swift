@@ -2,7 +2,7 @@ import simd
 
 /// The web app's colours (`web/ui/part.js:52-57`, `web/ui/scene.js:43,118-136`, `web/style.css`), as sRGB.
 public enum Palette {
-    static func hex(_ v: UInt32) -> SIMD3<Float> {
+    public static func hex(_ v: UInt32) -> SIMD3<Float> {
         SIMD3(Float((v >> 16) & 0xff), Float((v >> 8) & 0xff), Float(v & 0xff)) / 255
     }
 
