@@ -32,6 +32,7 @@ BASE = [
     ("cli-parity", ["just", "cli-parity"]),
     ("i18n-catalog", ["just", "i18n-catalog"]),
     ("tippics", ["just", "tippics-gen", "--check"]),
+    ("whatsnew", ["just", "whatsnew-gen", "--check"]),
 ]
 # --no-deps: the gate runs app-core and app-project itself, so app-test must not run them again
 APP = [
