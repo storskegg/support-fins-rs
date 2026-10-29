@@ -9,7 +9,7 @@ import simd
 extension PlateBoard {
     /// Centre to centre between plates along X (`pitch`, `ui/plateview.js`).
     static func pitch(volumeX x: Double) -> Double { x + max(20, 0.12 * x) }
-    var pitch: Double { Self.pitch(volumeX: Double(host.controller?.volume.x ?? PrinterVolume.standard.x)) }
+    var pitch: Double { Self.pitch(volumeX: Double(host?.controller?.volume.x ?? PrinterVolume.standard.x)) }
 
     // MARK: what the tabs say
 
@@ -76,7 +76,7 @@ extension PlateBoard {
     }
 
     private func go(_ i: Int, quiet: Bool = false) {
-        guard i != active, plates.indices.contains(i), let controller = host.controller else { return }
+        guard i != active, plates.indices.contains(i), let controller = host?.controller else { return }
         let from = plate.liveSlot.xy, camera = controller.renderer.camera
         parkPlate(plate)
         arrive(i, from: from, camera: camera, quiet: quiet)
@@ -87,7 +87,7 @@ extension PlateBoard {
     func arrive(_ i: Int, from: SIMD2<Double>, camera: OrbitCamera, quiet: Bool) {
         let dx = Double(i - active) * pitch
         show(i)
-        guard !quiet, let controller = host.controller else { return }
+        guard !quiet, let controller = host?.controller else { return }
         // the row slid under the camera by the plates' spacing and the two live models' spots: start from the same view
         let to = plate.liveSlot.xy
         let shift = SIMD3<Float>(Float(dx + to.x - from.x), Float(to.y - from.y), 0)
@@ -115,7 +115,7 @@ extension PlateBoard {
 
     /// Pull the camera back to take in every plate of the row (`frameAll`, `ui/plateview.js`).
     func frameAll() {
-        guard let controller = host.controller else { return }
+        guard let controller = host?.controller else { return }
         let v = controller.volume, p = Float(pitch), n = Float(plates.count)
         let was = controller.renderer.camera
         controller.renderer.camera.frame(size: SIMD3((n - 1) * p / 2 + v.x / 2, v.y / 2, 0))
@@ -195,7 +195,7 @@ extension PlateBoard {
     @discardableResult
     func moveToPlate(_ m: ModelSlot, to j: Int, at xy: SIMD2<Double>, back: SIMD2<Double>?) -> Bool {
         guard let si = plates.firstIndex(where: { $0.models.contains { $0 === m } }), plates.indices.contains(j),
-              let controller = host.controller else { return false }
+              let controller = host?.controller else { return false }
         let src = plates[si], dst = plates[j]
         guard let k = src.models.firstIndex(where: { $0 === m }), !busy, src !== dst,
               si == active && k == src.live ? hasLive : m.stash != nil else { return false }
@@ -237,7 +237,7 @@ extension PlateBoard {
     /// What a click on the view lands on (`plateAt`): a parked model of the plate being edited, another plate's model,
     /// or the bare bed of a plate of the row.
     func tapped(x: Int, y: Int, width: Int, height: Int) {
-        guard !busy, tabsMatter, let renderer = host.controller?.renderer else { return }
+        guard !busy, tabsMatter, let renderer = host?.controller?.renderer else { return }
         Task { [weak self] in
             let pick = await renderer.pickModel(x: x, y: y, width: width, height: height)
             guard let self else { return }
@@ -262,7 +262,7 @@ extension PlateBoard {
     /// The plate of the row whose bed (and the strip under it, for its label) the scene point `at` is on, if not the
     /// one being edited (`plateAt`'s bed test).
     func plate(at: SIMD2<Float>) -> Int? {
-        guard let controller = host.controller else { return nil }
+        guard let controller = host?.controller else { return nil }
         let v = controller.volume, p = Float(pitch)
         let live = plate.liveSlot.xy
         let x0 = at.x + Float(live.x), y = at.y + Float(live.y)

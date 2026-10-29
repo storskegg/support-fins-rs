@@ -84,7 +84,7 @@ struct PlateLabels: View {
     let board: PlateBoard
 
     var body: some View {
-        if board.plates.count > 1, let c = board.host.controller {
+        if board.plates.count > 1, let c = board.host?.controller {
             GeometryReader { geo in
                 let _ = c.cameraRevision
                 let v = c.volume, w = min(90, Double(v.x) * 0.45), live = board.plate.liveSlot.xy

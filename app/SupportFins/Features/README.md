@@ -7,6 +7,10 @@ To add one:
 1. Make `YourFeature: Feature` (`Features/Feature.swift`) in your folder: a `@MainActor final class` with
    `init(host: ViewerModel)`. Keep your models in the feature, not in `ViewerModel`; read the shared ones
    (`host.session`, `host.controller`, `host.wiring`, `host.toolbar`) from `host`.
+   Hold the window as `weak let host: ViewerModel?` (never `unowned`, never strongly in a closure the window keeps, such
+   as a toolbar registration): a Task or timer of yours can outlive the window, and a nil `host` means it closed, so
+   do nothing. Re-read `host` after every `await`, and cancel your Tasks in `close()` (called from the window's deinit).
+   `WindowLifetimeTests` fails when a closed window is not freed.
 2. Add one line to `Features.all` (`Features/Features.swift`). Swift has no reliable automatic registration, so this is
    the single list.
 3. Implement only what you need; every property has an empty default.

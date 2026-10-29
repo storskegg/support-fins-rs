@@ -7,7 +7,7 @@ import SwiftUI
 /// controls; the viewer the walls, ghosts and dots; Edit > Delete (and Backspace / Delete) removes the selected support.
 @MainActor
 final class DrawFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let model: DrawModel
     private var keys: KeyMonitor?
 
@@ -23,10 +23,12 @@ final class DrawFeature: Feature {
     /// a slider or a pop-up (`app.js:56-74`: the page's `keydown` skips a text field, and an input or select but for
     /// undo). The viewer's own `keyDown` is then not reached; a key held down repeats, as the web's does.
     private func key(_ event: NSEvent) -> Bool {
-        guard let controller = host.controller, controller.isInKeyWindow, host.hasPart,
+        guard let host, let controller = host.controller, controller.isInKeyWindow, host.hasPart,
               let key = event.deleteKey, event.window?.focusIsInAField != true else { return false }
         return model.key(key)
     }
+
+    func close() { model.close() }
 
     var overlays: [WindowOverlay] {
         // over the viewport, which fills the window under the toolbar: the label's coordinates are the view's

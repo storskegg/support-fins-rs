@@ -25,7 +25,10 @@ final class PlateBoard {
     /// How long a removal's Undo stays on offer (`UNDO_MS`, `ui/plates.js`).
     static let undoSeconds = 10.0
 
-    @ObservationIgnored unowned let host: ViewerModel
+    /// The window. Weak: a parked rebuild or a timer can outlive it, and then finds it gone and stops.
+    @ObservationIgnored weak let host: ViewerModel?
+    /// The window's session, kept here so the board's state reads stay valid while a Task of its own winds down.
+    @ObservationIgnored let session: PartSession
     /// The plates and the one being edited; `PlateBoard+Plates` switches, adds and deletes them.
     var plates = [Plate()]
     var active = 0
@@ -83,6 +86,7 @@ final class PlateBoard {
 
     init(host: ViewerModel) {
         self.host = host
+        session = host.session
         host.session.isOnPlate = { [weak self] id in self?.plate.models.contains { $0.id == id } ?? true }
         host.session.focus = { [weak self] id in self?.focus(id) }
         host.session.slotSpot = { [weak self] id in self?.plate.models.first { $0.id == id }?.xy }
@@ -91,7 +95,6 @@ final class PlateBoard {
     }
 
     var plate: Plate { plates[active] }
-    var session: PartSession { host.session }
     /// A model is on show in the window.
     var hasLive: Bool { !session.parts.isEmpty }
     /// How many models the plate being edited holds (the live one counts when it is on show).
@@ -103,7 +106,7 @@ final class PlateBoard {
     /// history and settings stay with the session: only a plate switch takes them away.
     func parkModel(_ plate: Plate) {
         let m = plate.liveSlot
-        guard let part = session.parts.first, let controller = host.controller else { m.stash = nil; return }
+        guard let host, let part = session.parts.first, let controller = host.controller else { m.stash = nil; return }
         let settings = PlateSettings(settings: session.settings, finsOn: session.finsOn)
         let build = host.wiring?.detach() ?? BuildModel(part: part.part)
         let stash = ParkedModel(part: part, openedName: host.openedName, pose: session.pose, removedFins: session.removedFins,
@@ -122,7 +125,7 @@ final class PlateBoard {
     /// Bring the plate's live slot back (stashed, or empty); the window is empty (`unpark`, `ui/models.js`).
     func unparkModel(_ plate: Plate) {
         let m = plate.liveSlot
-        guard let s = m.stash, let controller = host.controller else {
+        guard let host, let s = m.stash, let controller = host.controller else {
             session.install(parts: [], pose: .identity, removedFins: [], owner: m.id)
             return
         }
@@ -145,7 +148,7 @@ final class PlateBoard {
     /// Swap the live model for slot `k` of the plate being edited. The world shifts by the difference of their
     /// spots: the camera goes with it, then pans to the model (`swap`, `ui/models.js`).
     func swap(to k: Int, quiet: Bool = false) {
-        guard let controller = host.controller, plate.models.indices.contains(k) else { return }
+        guard let controller = host?.controller, plate.models.indices.contains(k) else { return }
         let from = plate.liveSlot.xy, to = plate.models[k].xy
         let camera = controller.renderer.camera
         swapping = true
@@ -160,7 +163,7 @@ final class PlateBoard {
 
     /// The view as it was, the world moved by `d` under it, aimed at the model now on show; then eased to there.
     private func glide(from camera: OrbitCamera, shifted d: SIMD2<Double>) {
-        guard let controller = host.controller else { return }
+        guard let controller = host?.controller else { return }
         let shift = SIMD3<Float>(Float(d.x), Float(d.y), 0)
         var aimed = camera
         aimed.target = SIMD3(0, 0, camera.target.z)
@@ -209,7 +212,7 @@ final class PlateBoard {
     /// Where a new model of `part` goes (`spot`, `ui/models.js`): the free spot nearest the bed's centre, `gap` mm
     /// from the plate's parked models, or past their right edge when the bed has none.
     private func spot(for part: CorePart) -> SIMD2<Double> {
-        guard let controller = host.controller else { return .zero }
+        guard let controller = host?.controller else { return .zero }
         // as it will stand: seated for the identity pose, centred on its spot; its fins are still to come
         let o = seatingOffset(bounds: part.bounds, rotation: matrix_identity_float3x3)
         let grid = try? footprintOfPart(part: part.part, rot: PoseAccess.identity, offset: [Double(o.x), Double(o.y), Double(o.z)])
@@ -287,7 +290,7 @@ final class PlateBoard {
     /// something put there since covers that spot -- then at the free spot nearest the centre, as Add model would
     /// (`putBack`, `ui/models.js`).
     func putBack(_ plate: Plate, _ slots: [ModelSlot]) {
-        guard let v = host.controller?.volume else { plate.models += slots; return }
+        guard let v = host?.controller?.volume else { plate.models += slots; return }
         for m in slots {
             let grid = footprint(of: m)
             let near = grid?.placed(x: m.xy.x, y: m.xy.y).dilate(r: Self.gap)

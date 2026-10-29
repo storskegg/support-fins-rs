@@ -6,7 +6,7 @@ import SwiftUI
 final class FeatureSet {
     let types: [any Feature.Type]
     private(set) var instances: [any Feature] = []
-    /// The features hold their window (`unowned`), and the menu bar can outlive it (the focused value of a window
+    /// The features hold their window weakly, and the menu bar can outlive it (the focused value of a window
     /// that just closed), so a lookup answers nil once the window is gone: the menus then show with nothing to act on.
     private weak var host: ViewerModel?
 
@@ -46,6 +46,8 @@ final class FeatureSet {
     }
 
     func partWillShow() { instances.forEach { $0.partWillShow() } }
+    /// The window is going: every feature stops what it started.
+    func close() { instances.forEach { $0.close() } }
     func partDidShow(_ parts: [LoadedPart]) { instances.forEach { $0.partDidShow(parts) } }
 
     // MARK: menus

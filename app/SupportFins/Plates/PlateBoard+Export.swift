@@ -34,7 +34,7 @@ extension PlateBoard {
             let part: CorePart, build: BuildModel?, pose: Pose, removed: Set<FinKey>
             if i == active && k == p.live {
                 guard let live = session.parts.first else { continue }
-                (part, build, pose, removed) = (live, host.wiring?.build, session.pose, session.removedFins)
+                (part, build, pose, removed) = (live, host?.wiring?.build, session.pose, session.removedFins)
             } else if let s = m.stash {
                 (part, build, pose, removed) = (s.part, s.build, s.pose, s.removedFins)
             } else {
@@ -60,7 +60,8 @@ extension PlateBoard {
     /// parked builds (`parkedSettled`), another plate's built where its models are parked (`plateReady`).
     func settlePlate(_ i: Int) async -> Bool {
         if i == active {
-            await host.wiring?.build?.settled()
+            let build = host?.wiring?.build      // not the window: it may close meanwhile
+            await build?.settled()
             return await parkedSettled()
         }
         let ps = plateSettings(i)
@@ -78,12 +79,12 @@ extension PlateBoard {
 
     /// The build volume's x and y: the 3MF is written where the models stand on a centred bed.
     private var bedOptions: String {
-        let v = host.controller?.volume ?? .standard
+        let v = host?.controller?.volume ?? .standard
         return "{\"bed\":[\(v.x),\(v.y)]}"
     }
 
     /// Nothing to write until the model on show has its build (`export-3mf` is disabled while a rebuild is out).
-    var canExportPlate: Bool { hasLive && !busy && host.wiring?.build?.building != true }
+    var canExportPlate: Bool { hasLive && !busy && host?.wiring?.build?.building != true }
 
     /// Some parked model of the plate has fins (`parkedFins`): the "No supports on this plate" note is about all of it.
     var parkedFinsExist: Bool {
@@ -110,7 +111,7 @@ extension PlateBoard {
         exportError = nil
         do {
             try SupportFinsCore.exportPlate(path: url.path(percentEncoded: false), models: w.models, optionsJson: bedOptions)
-            host.wiring?.exporter?.lastFormat = .threeMF
+            host?.wiring?.exporter?.lastFormat = .threeMF
             return url
         } catch let e as FfiError {
             exportError = BuildModel.message(e)

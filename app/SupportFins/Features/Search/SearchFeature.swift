@@ -5,7 +5,7 @@ import SwiftUI
 /// (`FindRow`, `FindBlock`).
 @MainActor
 final class SearchFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let model = SettingsSearch()
 
     init(host: ViewerModel) {
@@ -15,6 +15,7 @@ final class SearchFeature: Feature {
 
     /// The state the rows depend on: the settings and what Draw and Remove fins offer.
     func context() -> SearchContext {
+        guard let host else { return SearchContext() }
         var c = SearchContext(settings: host.session.settings)
         if let draw = host.features[DrawFeature.self]?.model {
             c.augmentOffered = draw.augmentOffered
@@ -43,7 +44,7 @@ final class SearchFeature: Feature {
         [MenuSection(menu: .edit, order: 30, entries: [
             .divider,
             .item(JS.t("Search Settings"), shortcut: "f", modifiers: [.command, .option], help: JS.t("Search settings"),
-                  enabled: f?.host.hasPart == true) { f?.model.requestFocus() },
+                  enabled: f?.host?.hasPart == true) { f?.model.requestFocus() },
         ])]
     }
 }

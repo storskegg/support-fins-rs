@@ -42,7 +42,7 @@ final class BuildModel {
     /// Called when `latest` changes: a build landed, or `clear()` forgot it. The window puts the new fins on the
     /// viewer here.
     @ObservationIgnored var onUpdate: (@MainActor () -> Void)?
-    @ObservationIgnored private let builder: Builder
+    @ObservationIgnored let builder: Builder
     @ObservationIgnored private var listener: Listener!
     /// The generation whose delivery is still wanted; nil after `cancel()` / `clear()`.
     @ObservationIgnored private var wanted: UInt64?

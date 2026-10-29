@@ -6,7 +6,7 @@ import SwiftUI
 /// Like the page, it shows nothing while nothing is released: the item is not in the menu.
 @MainActor
 final class WhatsNewFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let model = WhatsNewModel()
 
     init(host: ViewerModel) { self.host = host }

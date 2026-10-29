@@ -4,24 +4,24 @@ import SwiftUI
 /// drop target.
 @MainActor
 final class OpenFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
 
     init(host: ViewerModel) { self.host = host }
 
     var overlays: [WindowOverlay] {
         [
             WindowOverlay("empty-state", order: 20) {
-                if self.host.showsEmptyState {
-                    EmptyWindowView(compact: self.host.hasOpened) { OpenFlow.importModel(into: self.host) }
+                if let host = self.host, host.showsEmptyState {
+                    EmptyWindowView(compact: host.hasOpened) { OpenFlow.importModel(into: host) }
                 }
             },
             WindowOverlay("status", order: 30) {
                 ZStack(alignment: .topLeading) {
                     // `parseStep`'s spinner (`ui/io.js:313-320`): the CAD kernel takes a moment on a big assembly
-                    if self.host.isLoading, let url = self.host.loadingURL, OpenRules.isStep(url) {
+                    if let host = self.host, host.isLoading, let url = host.loadingURL, OpenRules.isStep(url) {
                         ReadingStepSpinner()
                     }
-                    if let status = self.host.status {
+                    if let status = self.host?.status {
                         Text(status).padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
                     }
                 }
@@ -30,7 +30,7 @@ final class OpenFeature: Feature {
     }
 
     var modifiers: [WindowModifier] {
-        [WindowModifier("open-flow") { content in AnyView(content.openFlow(self.host)) }]
+        [WindowModifier("open-flow") { content in self.host.map { AnyView(content.openFlow($0)) } ?? AnyView(content) }]
     }
 }
 

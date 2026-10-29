@@ -176,17 +176,19 @@ final class RemovalModel {
     /// Wires the viewer's pointer to this model and pushes the masks. Call after a build lands and after each
     /// change of `removed`, `hoveredFin` or `armed`.
     func update(_ controller: ViewerController) {
-        controller.onSupportHover = { [weak self] t in
+        // the closures live on the controller: a strong `controller` in them would keep it (and its window's part)
+        // alive for ever (C-01)
+        controller.onSupportHover = { [weak self, weak controller] t in
             self?.hover(triangle: t)
-            self?.update(controller)
+            if let controller { self?.update(controller) }
         }
-        controller.onSupportClick = { [weak self] t in
+        controller.onSupportClick = { [weak self, weak controller] t in
             self?.click(triangle: t)
-            self?.update(controller)
+            if let controller { self?.update(controller) }
         }
-        controller.onCancelArmed = { [weak self] in
+        controller.onCancelArmed = { [weak self, weak controller] in
             self?.disarm()
-            self?.update(controller)
+            if let controller { self?.update(controller) }
         }
         controller.supportPicking = isActive
         controller.renderer.setFinMask(hidden: hiddenRanges, crest: build.crestRanges)
