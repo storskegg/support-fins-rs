@@ -1,0 +1,104 @@
+import XCTest
+
+/// STEP import through the real window (M6): a `.step` opened from the Open panel is read through OpenCascade, the
+/// window opens, and the Status block carries the page's import note ("STEP: tessellated at 0.01 mm."). Run by the
+/// orchestrator, like `FinsLoopUITests` (it drives the Open panel).
+///
+/// Elements are found by the accessibility identifiers the app sets: `fins-toggle`.
+final class StepImportUITests: XCTestCase {
+    private var app: XCUIApplication!
+    private var dir: URL!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        dir = FileManager.default.temporaryDirectory.appending(path: "sf-uitest-step-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        app = XCUIApplication()
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+    }
+
+    override func tearDownWithError() throws {
+        app.terminate()
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    func testOpenAStepFile() throws {
+        let part = dir.appending(path: "ball.step")
+        try Self.sphereStep.write(to: part, atomically: true, encoding: .utf8)
+        app.launch()
+
+        let toggle = app.descendants(matching: .any)["fins-toggle"].firstMatch
+        if !panelExists("open-panel", timeout: 5) && !toggle.exists { app.typeKey("o", modifierFlags: .command) }
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
+        // the panel offers .step files: ⇧⌘G, the path, Return (go to it), Return (Open)
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        app.typeText(part.path)
+        app.typeKey(.return, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+
+        XCTAssertTrue(toggle.waitForExistence(timeout: 30), "the STEP file's window opened")
+        let note = app.staticTexts["STEP: tessellated at 0.01 mm."]
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "the import note")
+    }
+
+    private func panelExists(_ id: String, timeout: TimeInterval) -> Bool {
+        let shown = NSPredicate { _, _ in
+            self.app.dialogs.firstMatch.exists || self.app.sheets.firstMatch.exists || self.app.windows[id].exists
+        }
+        return XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: shown, object: nil)], timeout: timeout) == .completed
+    }
+
+    /// A 12 mm ball: one spherical face (OpenCascade's own export, `parity/step-fixtures/sphere.step`).
+    private static let sphereStep = #"""
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Open CASCADE Model'),'2;1');
+FILE_NAME('Open CASCADE Shape Model','2026-10-28T18:29:00',('Author'),(
+    'Open CASCADE'),'Open CASCADE STEP processor 7.6','Open CASCADE 7.6'
+  ,'Unknown');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
+ENDSEC;
+DATA;
+#1 = APPLICATION_PROTOCOL_DEFINITION('international standard',
+  'automotive_design',2000,#2);
+#2 = APPLICATION_CONTEXT(
+  'core data for automotive mechanical design processes');
+#3 = SHAPE_DEFINITION_REPRESENTATION(#4,#10);
+#4 = PRODUCT_DEFINITION_SHAPE('','',#5);
+#5 = PRODUCT_DEFINITION('design','',#6,#9);
+#6 = PRODUCT_DEFINITION_FORMATION('','',#7);
+#7 = PRODUCT('Open CASCADE STEP translator 7.6 1',
+  'Open CASCADE STEP translator 7.6 1','',(#8));
+#8 = PRODUCT_CONTEXT('',#2,'mechanical');
+#9 = PRODUCT_DEFINITION_CONTEXT('part definition',#2,'design');
+#10 = ADVANCED_BREP_SHAPE_REPRESENTATION('',(#11,#15),#27);
+#11 = AXIS2_PLACEMENT_3D('',#12,#13,#14);
+#12 = CARTESIAN_POINT('',(0.,0.,0.));
+#13 = DIRECTION('',(0.,0.,1.));
+#14 = DIRECTION('',(1.,0.,-0.));
+#15 = MANIFOLD_SOLID_BREP('',#16);
+#16 = CLOSED_SHELL('',(#17));
+#17 = ADVANCED_FACE('',(#18),#22,.T.);
+#18 = FACE_BOUND('',#19,.T.);
+#19 = VERTEX_LOOP('',#20);
+#20 = VERTEX_POINT('',#21);
+#21 = CARTESIAN_POINT('',(7.347880794884E-16,-1.799711739194E-31,-12.));
+#22 = SPHERICAL_SURFACE('',#23,12.);
+#23 = AXIS2_PLACEMENT_3D('',#24,#25,#26);
+#24 = CARTESIAN_POINT('',(0.,0.,0.));
+#25 = DIRECTION('',(0.,0.,1.));
+#26 = DIRECTION('',(1.,0.,-0.));
+#27 = ( GEOMETRIC_REPRESENTATION_CONTEXT(3) 
+GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#31)) GLOBAL_UNIT_ASSIGNED_CONTEXT(
+(#28,#29,#30)) REPRESENTATION_CONTEXT('Context #1',
+  '3D Context with UNIT and UNCERTAINTY') );
+#28 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );
+#29 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );
+#30 = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );
+#31 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-07),#28,
+  'distance_accuracy_value','confusion accuracy');
+#32 = PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,(#7));
+ENDSEC;
+END-ISO-10303-21;
+"""#
+}
