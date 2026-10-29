@@ -1,0 +1,2830 @@
+{
+ "upstream": "299ef491128126cb47672080ffce00137490d814",
+ "formIds": [
+  "nozzle",
+  "thr",
+  "tines",
+  "tine-density",
+  "tine-dir",
+  "pin-depth",
+  "layer-height",
+  "gap",
+  "bed-pad",
+  "pad-h",
+  "pad-gap",
+  "pad-grip",
+  "pad-margin",
+  "sway",
+  "sway-from",
+  "sway-spacing",
+  "sway-depth",
+  "sway-cross-height",
+  "full-brace-depth",
+  "rounded-feet",
+  "wall-lines",
+  "cutout",
+  "iface",
+  "coverage",
+  "plate-only",
+  "long-walls",
+  "separate-walls",
+  "tall-ribs",
+  "tall-ribs-height",
+  "curved-walls",
+  "highlight-small",
+  "show-islands",
+  "show-layers",
+  "show-rings",
+  "nav-preset"
+ ],
+ "viewerIds": [
+  "highlight-small",
+  "show-islands",
+  "show-layers",
+  "show-rings",
+  "nav-preset",
+  "nozzle"
+ ],
+ "fields": [
+  {
+   "id": "nozzle",
+   "type": "select-one",
+   "options": [
+    "0.2",
+    "0.25",
+    "0.4",
+    "0.6",
+    "0.8",
+    "1.0",
+    "1.2",
+    "1.4",
+    "1.6",
+    "1.8",
+    "2.0"
+   ],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": "0.4",
+   "viewer": true
+  },
+  {
+   "id": "thr",
+   "type": "range",
+   "options": [],
+   "min": "30",
+   "max": "70",
+   "step": "1",
+   "default": "45",
+   "viewer": false
+  },
+  {
+   "id": "tines",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": true,
+   "viewer": false
+  },
+  {
+   "id": "tine-density",
+   "type": "range",
+   "options": [],
+   "min": "0",
+   "max": "100",
+   "step": "5",
+   "default": "0",
+   "viewer": false
+  },
+  {
+   "id": "tine-dir",
+   "type": "select-one",
+   "options": [
+    "horizontal",
+    "vertical"
+   ],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": "horizontal",
+   "viewer": false
+  },
+  {
+   "id": "pin-depth",
+   "type": "number",
+   "options": [],
+   "min": "0.05",
+   "max": "1",
+   "step": "0.05",
+   "default": "0.1",
+   "viewer": false
+  },
+  {
+   "id": "layer-height",
+   "type": "number",
+   "options": [],
+   "min": "0.08",
+   "max": "0.6",
+   "step": "0.04",
+   "default": "0.2",
+   "viewer": false
+  },
+  {
+   "id": "gap",
+   "type": "number",
+   "options": [],
+   "min": "0.1",
+   "max": "0.4",
+   "step": "0.05",
+   "default": "0.2",
+   "viewer": false
+  },
+  {
+   "id": "bed-pad",
+   "type": "select-one",
+   "options": [
+    "off",
+    "auto",
+    "light",
+    "sure",
+    "custom"
+   ],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": "auto",
+   "viewer": false
+  },
+  {
+   "id": "pad-h",
+   "type": "number",
+   "options": [],
+   "min": "0.1",
+   "max": "1.0",
+   "step": "0.05",
+   "default": "0.2",
+   "viewer": false
+  },
+  {
+   "id": "pad-gap",
+   "type": "number",
+   "options": [],
+   "min": "0",
+   "max": "0.5",
+   "step": "0.01",
+   "default": "0.12",
+   "viewer": false
+  },
+  {
+   "id": "pad-grip",
+   "type": "number",
+   "options": [],
+   "min": "-0.2",
+   "max": "0.3",
+   "step": "0.05",
+   "default": "0",
+   "viewer": false
+  },
+  {
+   "id": "pad-margin",
+   "type": "number",
+   "options": [],
+   "min": "1",
+   "max": "12",
+   "step": "0.5",
+   "default": "4",
+   "viewer": false
+  },
+  {
+   "id": "sway",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": false
+  },
+  {
+   "id": "sway-from",
+   "type": "number",
+   "options": [],
+   "min": "0",
+   "max": "2000",
+   "step": "5",
+   "default": "0",
+   "viewer": false
+  },
+  {
+   "id": "sway-spacing",
+   "type": "number",
+   "options": [],
+   "min": "2",
+   "max": "30",
+   "step": "1",
+   "default": "6",
+   "viewer": false
+  },
+  {
+   "id": "sway-depth",
+   "type": "number",
+   "options": [],
+   "min": "5",
+   "max": "50",
+   "step": "1",
+   "default": "15",
+   "viewer": false
+  },
+  {
+   "id": "sway-cross-height",
+   "type": "number",
+   "options": [],
+   "min": "10",
+   "max": "90",
+   "step": "1",
+   "default": "50",
+   "viewer": false
+  },
+  {
+   "id": "full-brace-depth",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": false
+  },
+  {
+   "id": "rounded-feet",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": false
+  },
+  {
+   "id": "wall-lines",
+   "type": "select-one",
+   "options": [
+    "2",
+    "4",
+    "6",
+    "8"
+   ],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": "2",
+   "viewer": false
+  },
+  {
+   "id": "cutout",
+   "type": "select-one",
+   "options": [
+    "none",
+    "diamond",
+    "triangle",
+    "arch",
+    "lattice",
+    "honeycomb"
+   ],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": "none",
+   "viewer": false
+  },
+  {
+   "id": "iface",
+   "type": "select-one",
+   "options": [
+    "off",
+    "flat",
+    "all"
+   ],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": "off",
+   "viewer": false
+  },
+  {
+   "id": "coverage",
+   "type": "range",
+   "options": [],
+   "min": "0",
+   "max": "100",
+   "step": "5",
+   "default": "50",
+   "viewer": false
+  },
+  {
+   "id": "plate-only",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": false
+  },
+  {
+   "id": "long-walls",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": true,
+   "viewer": false
+  },
+  {
+   "id": "separate-walls",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": false
+  },
+  {
+   "id": "tall-ribs",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": true,
+   "viewer": false
+  },
+  {
+   "id": "tall-ribs-height",
+   "type": "number",
+   "options": [],
+   "min": "5",
+   "max": "200",
+   "step": "0.1",
+   "default": "10",
+   "viewer": false
+  },
+  {
+   "id": "curved-walls",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": false
+  },
+  {
+   "id": "highlight-small",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": true,
+   "viewer": true
+  },
+  {
+   "id": "show-islands",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": true
+  },
+  {
+   "id": "show-layers",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": false,
+   "viewer": true
+  },
+  {
+   "id": "show-rings",
+   "type": "checkbox",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": true,
+   "viewer": true
+  },
+  {
+   "id": "nav-preset",
+   "type": "select-one",
+   "options": [],
+   "min": null,
+   "max": null,
+   "step": null,
+   "default": null,
+   "viewer": true
+  }
+ ],
+ "cases": [
+  {
+   "name": "one model, default settings",
+   "file": "one-model-default-settings.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     15
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "threshold": 45,
+    "fins": null,
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[50,50,30]},\"finMode\":\"auto\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[],\"removed\":[]}",
+    "bytes": 3263,
+    "hash": "c6119cbf392bd8b5"
+   }
+  },
+  {
+   "name": "one model, fins hidden",
+   "file": "one-model-fins-hidden.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     15
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": false,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "threshold": 45,
+    "fins": null,
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "auto",
+     "finsVisible": false,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[50,50,30]},\"finMode\":\"auto\",\"finsVisible\":false,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[],\"removed\":[]}",
+    "bytes": 3264,
+    "hash": "1b182836cc6b241b"
+   }
+  },
+  {
+   "name": "non-default pose, auto fins",
+   "file": "non-default-pose-auto-fins.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 2,
+    "n": 0,
+    "centre": [
+     128.00000381469727,
+     128,
+     26.626691818237305
+    ],
+    "note": "3MF: imported “lbracket” of 2 objects; restored the settings.",
+    "noteScaled": "3MF: imported “lbracket” of 2 objects.",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     0.9396926207859084,
+     0.34202014332566866,
+     -1.3877787807814457e-17,
+     -0.2801664995932355,
+     0.7697511313200572,
+     0.573576436351046,
+     0.19617469496901108,
+     -0.5389855446957563,
+     0.8191520442889918
+    ],
+    "threshold": 45,
+    "fins": {
+     "mode": "auto",
+     "iface": false
+    },
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[66.8782,59.4454,53.25338]},\"finMode\":\"auto\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[],\"removed\":[]}",
+    "bytes": 143075,
+    "hash": "6078d18367f3276a"
+   }
+  },
+  {
+   "name": "auto fins, two removed",
+   "file": "auto-fins-two-removed.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 2,
+    "n": 0,
+    "centre": [
+     128,
+     127.99999618530273,
+     26.626691818237305
+    ],
+    "note": "3MF: imported “lbracket” of 2 objects; restored the settings.",
+    "noteScaled": "3MF: imported “lbracket” of 2 objects.",
+    "state": {
+     "walls": [],
+     "removedSigs": [
+      "prop:18.8,-5.8,4.1:7.5:1.6",
+      "prop:8,-5.8,4.1:7.5:1.6"
+     ],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "readBeside": {
+    "session": "restored",
+    "objects": 2,
+    "n": 0,
+    "centre": [
+     128,
+     127.99999618530273,
+     26.626691818237305
+    ],
+    "note": "3MF: imported “lbracket” of 2 objects; the plate keeps its settings.",
+    "noteScaled": "3MF: imported “lbracket” of 2 objects.",
+    "state": {
+     "walls": [],
+     "removedSigs": [
+      "prop:18.8,-5.8,4.1:7.5:1.6",
+      "prop:8,-5.8,4.1:7.5:1.6"
+     ],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     0.8191520442889918,
+     0.573576436351046,
+     0,
+     -0.573576436351046,
+     0.8191520442889918
+    ],
+    "threshold": 45,
+    "fins": {
+     "mode": "auto",
+     "iface": false
+    },
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [],
+     "removed": [
+      "prop:18.8,-5.8,4.1:7.5:1.6",
+      "prop:8,-5.8,4.1:7.5:1.6"
+     ]
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[50,58.1649,53.25338]},\"finMode\":\"auto\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[],\"removed\":[\"prop:18.8,-5.8,4.1:7.5:1.6\",\"prop:8,-5.8,4.1:7.5:1.6\"]}",
+    "bytes": 139975,
+    "hash": "eda9c910a25136ca"
+   }
+  },
+  {
+   "name": "full coverage, one removed",
+   "file": "full-coverage-one-removed.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 2,
+    "n": 0,
+    "centre": [
+     128,
+     127.99999618530273,
+     26.626691818237305
+    ],
+    "note": "3MF: imported “lbracket” of 2 objects; restored the settings.",
+    "noteScaled": "3MF: imported “lbracket” of 2 objects.",
+    "state": {
+     "walls": [],
+     "removedSigs": [
+      "prop:18.8,-5.8,4.1:7.5:1.6"
+     ],
+     "finMode": "full",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     0.8191520442889918,
+     0.573576436351046,
+     0,
+     -0.573576436351046,
+     0.8191520442889918
+    ],
+    "threshold": 45,
+    "fins": {
+     "mode": "full",
+     "iface": false
+    },
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "full",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [],
+     "removed": [
+      "prop:18.8,-5.8,4.1:7.5:1.6"
+     ]
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[50,58.1649,53.25338]},\"finMode\":\"full\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[],\"removed\":[\"prop:18.8,-5.8,4.1:7.5:1.6\"]}",
+    "bytes": 139949,
+    "hash": "ce8f63529980a45b"
+   }
+  },
+  {
+   "name": "draw mode, walls and braces",
+   "file": "draw-mode-walls-and-braces.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 4,
+    "centre": [
+     128,
+     128,
+     15
+    ],
+    "note": "3MF: restored 4 hand-placed supports and the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "capped": false,
+       "a": [
+        -15.66667,
+        12,
+        -15
+       ],
+       "b": [
+        20.33333,
+        -2.66667,
+        -15
+       ]
+      },
+      {
+       "capped": false,
+       "a": [
+        -8.25,
+        4.5,
+        -3
+       ],
+       "b": [
+        6.125,
+        -2.75,
+        -3
+       ],
+       "m": [
+        0.5,
+        5.25,
+        -3
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 2,
+       "capped": true,
+       "a": [
+        15.66667,
+        12,
+        -15
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 5,
+       "capped": false,
+       "a": [
+        3.66667,
+        -17.33333,
+        -15
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "readBeside": {
+    "session": "restored",
+    "objects": 1,
+    "n": 4,
+    "centre": [
+     128,
+     128,
+     15
+    ],
+    "note": "3MF: restored 4 hand-placed supports; the plate keeps its settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "capped": false,
+       "a": [
+        -15.66667,
+        12,
+        -15
+       ],
+       "b": [
+        20.33333,
+        -2.66667,
+        -15
+       ]
+      },
+      {
+       "capped": false,
+       "a": [
+        -8.25,
+        4.5,
+        -3
+       ],
+       "b": [
+        6.125,
+        -2.75,
+        -3
+       ],
+       "m": [
+        0.5,
+        5.25,
+        -3
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 2,
+       "capped": true,
+       "a": [
+        15.66667,
+        12,
+        -15
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 5,
+       "capped": false,
+       "a": [
+        3.66667,
+        -17.33333,
+        -15
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "ushape",
+    "scale": null,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "threshold": 45,
+    "fins": null,
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [
+      {
+       "a": [
+        -15.666666666666666,
+        12,
+        -15
+       ],
+       "b": [
+        20.333333333333332,
+        -2.6666666666666665,
+        -15
+       ]
+      },
+      {
+       "a": [
+        -8.25,
+        4.5,
+        -3
+       ],
+       "b": [
+        6.125,
+        -2.75,
+        -3
+       ],
+       "m": [
+        0.5,
+        5.25,
+        -3
+       ]
+      },
+      {
+       "kind": "sway",
+       "capped": true,
+       "a": [
+        15.666666666666666,
+        12,
+        -15
+       ]
+      },
+      {
+       "kind": "sway",
+       "a": [
+        3.6666666666666665,
+        -17.333333333333332,
+        -15
+       ]
+      }
+     ],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[50,44,30]},\"finMode\":\"draw\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[{\"a\":[-15.66667,12,-15],\"b\":[20.33333,-2.66667,-15]},{\"a\":[-8.25,4.5,-3],\"b\":[6.125,-2.75,-3],\"m\":[0.5,5.25,-3]},{\"kind\":\"sway\",\"a\":[15.66667,12,-15],\"capped\":true},{\"kind\":\"sway\",\"a\":[3.66667,-17.33333,-15]}],\"removed\":[]}",
+    "bytes": 3860,
+    "hash": "cb3979042c0e75b7"
+   }
+  },
+  {
+   "name": "draw mode, posed",
+   "file": "draw-mode-posed.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 2,
+    "centre": [
+     128.00000381469727,
+     128,
+     26.626691818237305
+    ],
+    "note": "3MF: restored 2 hand-placed supports and the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "capped": false,
+       "a": [
+        1.39573,
+        6.70732,
+        4.30097
+       ],
+       "b": [
+        -3.43646,
+        3.90275,
+        1.7817
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 1,
+       "capped": true,
+       "a": [
+        -21.02243,
+        4.46432,
+        -14.39039
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     0.9396926207859084,
+     0.34202014332566866,
+     -1.3877787807814457e-17,
+     -0.2801664995932355,
+     0.7697511313200572,
+     0.573576436351046,
+     0.19617469496901108,
+     -0.5389855446957563,
+     0.8191520442889918
+    ],
+    "threshold": 45,
+    "fins": null,
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [
+      {
+       "a": [
+        1.5,
+        2.5,
+        3.5
+       ],
+       "b": [
+        -4,
+        0.25,
+        2
+       ]
+      },
+      {
+       "kind": "sway",
+       "capped": true,
+       "a": [
+        -20.333333333333332,
+        -3.6666666666666665,
+        -15
+       ]
+      }
+     ],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[66.8782,59.4454,53.25338]},\"finMode\":\"draw\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[{\"a\":[1.39573,6.70732,4.30097],\"b\":[-3.43646,3.90275,1.7817]},{\"kind\":\"sway\",\"a\":[-21.02243,4.46432,-14.39039],\"capped\":true}],\"removed\":[]}",
+    "bytes": 3633,
+    "hash": "908924c738c3793f"
+   }
+  },
+  {
+   "name": "scaled part",
+   "file": "scaled-part.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 1,
+    "centre": [
+     128,
+     128,
+     22.5
+    ],
+    "note": "3MF: restored 1 hand-placed support and the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "capped": false,
+       "a": [
+        3,
+        1,
+        -2
+       ],
+       "b": [
+        -3,
+        1,
+        -2
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": 1.5,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "threshold": 45,
+    "fins": null,
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [
+      {
+       "a": [
+        3,
+        1,
+        -2
+       ],
+       "b": [
+        -3,
+        1,
+        -2
+       ]
+      }
+     ],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[75,75,45]},\"finMode\":\"draw\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[{\"a\":[3,1,-2],\"b\":[-3,1,-2]}],\"removed\":[]}",
+    "bytes": 3339,
+    "hash": "79d42727980ff788"
+   }
+  },
+  {
+   "name": "interface and printer settings",
+   "file": "interface-and-printer-settings.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 2,
+    "n": 0,
+    "centre": [
+     127.99999618530273,
+     128,
+     24.16007423400879
+    ],
+    "note": "3MF: imported “lbracket” of 2 objects; restored the settings.",
+    "noteScaled": "3MF: imported “lbracket” of 2 objects.",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": true,
+      "wall-lines": "4",
+      "long-walls": false,
+      "tall-ribs": false,
+      "curved-walls": true,
+      "separate-walls": true,
+      "sway-cross-height": "60",
+      "tall-ribs-height": "12.5",
+      "thr": "50",
+      "tines": false,
+      "tine-density": "35",
+      "tine-dir": "vertical",
+      "pin-depth": "0.2",
+      "layer-height": "0.16",
+      "gap": "0.25",
+      "bed-pad": "custom",
+      "pad-h": "0.3",
+      "pad-gap": "0.15",
+      "pad-grip": "0.05",
+      "pad-margin": "6.5",
+      "sway": true,
+      "sway-from": "20",
+      "sway-spacing": "8",
+      "sway-depth": "20",
+      "full-brace-depth": true,
+      "cutout": "arch",
+      "iface": "flat",
+      "coverage": "75",
+      "plate-only": true
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "lbracket",
+    "scale": null,
+    "rot": [
+     0.9063077870366499,
+     0,
+     -0.42261826174069944,
+     0,
+     1,
+     0,
+     0.42261826174069944,
+     0,
+     0.9063077870366499
+    ],
+    "threshold": 45,
+    "fins": {
+     "mode": "auto",
+     "iface": "flat"
+    },
+    "placed": [
+     0,
+     0
+    ],
+    "state": {
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "thr": "50",
+      "tines": false,
+      "tine-density": "35",
+      "tine-dir": "vertical",
+      "pin-depth": "0.2",
+      "layer-height": "0.16",
+      "gap": "0.25",
+      "bed-pad": "custom",
+      "pad-h": "0.3",
+      "pad-gap": "0.15",
+      "pad-grip": "0.05",
+      "pad-margin": "6.5",
+      "sway": true,
+      "sway-from": "20",
+      "sway-spacing": "8",
+      "sway-depth": "20",
+      "sway-cross-height": "60",
+      "full-brace-depth": true,
+      "rounded-feet": true,
+      "wall-lines": "4",
+      "cutout": "arch",
+      "iface": "flat",
+      "coverage": "75",
+      "plate-only": true,
+      "long-walls": false,
+      "separate-walls": true,
+      "tall-ribs": false,
+      "tall-ribs-height": "12.5",
+      "curved-walls": true
+     },
+     "walls": [],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[57.99394,50,48.32015]},\"finMode\":\"auto\",\"finsVisible\":true,\"form\":{\"thr\":\"50\",\"tines\":false,\"tine-density\":\"35\",\"tine-dir\":\"vertical\",\"pin-depth\":\"0.2\",\"layer-height\":\"0.16\",\"gap\":\"0.25\",\"bed-pad\":\"custom\",\"pad-h\":\"0.3\",\"pad-gap\":\"0.15\",\"pad-grip\":\"0.05\",\"pad-margin\":\"6.5\",\"sway\":true,\"sway-from\":\"20\",\"sway-spacing\":\"8\",\"sway-depth\":\"20\",\"sway-cross-height\":\"60\",\"full-brace-depth\":true,\"rounded-feet\":true,\"wall-lines\":\"4\",\"cutout\":\"arch\",\"iface\":\"flat\",\"coverage\":\"75\",\"plate-only\":true,\"long-walls\":false,\"separate-walls\":true,\"tall-ribs\":false,\"tall-ribs-height\":\"12.5\",\"curved-walls\":true},\"walls\":[],\"removed\":[]}",
+    "bytes": 161245,
+    "hash": "8b22a7d7476d9db2"
+   }
+  },
+  {
+   "name": "placed away from the centre",
+   "file": "placed-away-from-the-centre.3mf",
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     165.5,
+     105.75,
+     20
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": true,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "full-brace-depth": false,
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   },
+   "write": {
+    "model": "cube",
+    "scale": null,
+    "rot": [
+     1,
+     0,
+     0,
+     0,
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "threshold": 45,
+    "fins": null,
+    "placed": [
+     37.5,
+     -22.25
+    ],
+    "state": {
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "thr": "45",
+      "tines": true,
+      "tine-density": "0",
+      "tine-dir": "horizontal",
+      "pin-depth": "0.1",
+      "layer-height": "0.2",
+      "gap": "0.2",
+      "bed-pad": "auto",
+      "pad-h": "0.2",
+      "pad-gap": "0.12",
+      "pad-grip": "0",
+      "pad-margin": "4",
+      "sway": false,
+      "sway-from": "0",
+      "sway-spacing": "6",
+      "sway-depth": "15",
+      "sway-cross-height": "50",
+      "full-brace-depth": false,
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "cutout": "none",
+      "iface": "off",
+      "coverage": "50",
+      "plate-only": false,
+      "long-walls": true,
+      "separate-walls": false,
+      "tall-ribs": true,
+      "tall-ribs-height": "10",
+      "curved-walls": false
+     },
+     "walls": [],
+     "removed": []
+    },
+    "session": "{\"v\":1,\"part\":{\"size\":[40,40,40]},\"finMode\":\"auto\",\"finsVisible\":true,\"form\":{\"thr\":\"45\",\"tines\":true,\"tine-density\":\"0\",\"tine-dir\":\"horizontal\",\"pin-depth\":\"0.1\",\"layer-height\":\"0.2\",\"gap\":\"0.2\",\"bed-pad\":\"auto\",\"pad-h\":\"0.2\",\"pad-gap\":\"0.12\",\"pad-grip\":\"0\",\"pad-margin\":\"4\",\"sway\":false,\"sway-from\":\"0\",\"sway-spacing\":\"6\",\"sway-depth\":\"15\",\"sway-cross-height\":\"50\",\"full-brace-depth\":false,\"rounded-feet\":false,\"wall-lines\":\"2\",\"cutout\":\"none\",\"iface\":\"off\",\"coverage\":\"50\",\"plate-only\":false,\"long-walls\":true,\"separate-walls\":false,\"tall-ribs\":true,\"tall-ribs-height\":\"10\",\"curved-walls\":false},\"walls\":[],\"removed\":[]}",
+    "bytes": 2900,
+    "hash": "5bc76b6216754b4d"
+   }
+  },
+  {
+   "name": "two models on a plate",
+   "file": "two-models-no-session.3mf",
+   "read": {
+    "session": "none",
+    "objects": 2
+   }
+  },
+  {
+   "name": "session without a form or a mode",
+   "file": "session-without-a-form-or-a-mode.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "a": [
+       1,
+       2,
+       3
+      ],
+      "b": [
+       4,
+       5,
+       6
+      ]
+     }
+    ]
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 1,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored 1 hand-placed support and the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "capped": false,
+       "a": [
+        1,
+        2,
+        3
+       ],
+       "b": [
+        4,
+        5,
+        6
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "session with an empty form",
+   "file": "session-with-an-empty-form.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "form": {},
+    "finMode": "full"
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "full",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": false,
+      "tall-ribs": false,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10"
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "form with values a field cannot take",
+   "file": "form-with-values-a-field-cannot-take.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "finsVisible": false,
+    "form": {
+     "thr": "abc",
+     "tines": "yes",
+     "tine-density": "37",
+     "tine-dir": "diagonal",
+     "wall-lines": "5",
+     "cutout": "arch",
+     "gap": " ",
+     "pad-h": "0.25",
+     "nozzle": "0.8",
+     "highlight-small": false,
+     "export": "x",
+     "bogus": true,
+     "layer-height": "0.12",
+     "tall-ribs": true,
+     "sway": 1
+    }
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": false,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": false,
+      "tall-ribs": true,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10",
+      "tine-density": "37",
+      "cutout": "arch",
+      "pad-h": "0.25",
+      "layer-height": "0.12"
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "form of an older file",
+   "file": "form-of-an-older-file.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "finMode": "draw",
+    "form": {
+     "gap": "0.3",
+     "tines": true,
+     "sway-cross-height": "100",
+     "tall-ribs-height": "400"
+    }
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "draw",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": false,
+      "tall-ribs": false,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "100",
+      "tall-ribs-height": "400",
+      "gap": "0.3",
+      "tines": true
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "form that is not an object",
+   "file": "form-that-is-not-an-object.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "form": "none"
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "form that is an array",
+   "file": "form-that-is-an-array.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "form": [
+     "a"
+    ]
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {
+      "rounded-feet": false,
+      "wall-lines": "2",
+      "long-walls": false,
+      "tall-ribs": false,
+      "curved-walls": false,
+      "separate-walls": false,
+      "sway-cross-height": "50",
+      "tall-ribs-height": "10"
+     },
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "part changed since it was exported",
+   "file": "part-changed-since-it-was-exported.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50.2,
+      50,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "a": [
+       1,
+       2,
+       3
+      ],
+      "b": [
+       4,
+       5,
+       6
+      ]
+     }
+    ]
+   },
+   "read": {
+    "session": "changed",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the part changed since it was exported.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "part within the size tolerance",
+   "file": "part-within-the-size-tolerance.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50.04,
+      49.95,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "a": [
+       1,
+       2,
+       3
+      ],
+      "b": [
+       4,
+       5,
+       6
+      ]
+     }
+    ]
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 1,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored 1 hand-placed support and the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "capped": false,
+       "a": [
+        1,
+        2,
+        3
+       ],
+       "b": [
+        4,
+        5,
+        6
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "session without a size",
+   "file": "session-without-a-size.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "walls": []
+   },
+   "read": {
+    "session": "changed",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the part changed since it was exported.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "unknown fin mode",
+   "file": "unknown-fin-mode.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "finMode": "combined"
+   },
+   "read": {
+    "session": "unreadable",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the saved session is damaged.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "fins visible that is not a boolean",
+   "file": "fins-visible-that-is-not-a-boolean.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "finsVisible": 1
+   },
+   "read": {
+    "session": "unreadable",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the saved session is damaged.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "removed that is not a list of text",
+   "file": "removed-that-is-not-a-list-of-text.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "removed": [
+     1,
+     2
+    ]
+   },
+   "read": {
+    "session": "unreadable",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the saved session is damaged.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "a wall with one point",
+   "file": "a-wall-with-one-point.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "a": [
+       1,
+       2,
+       3
+      ]
+     }
+    ]
+   },
+   "read": {
+    "session": "unreadable",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the saved session is damaged.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "a wall with a bad middle point",
+   "file": "a-wall-with-a-bad-middle-point.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "a": [
+       1,
+       2,
+       3
+      ],
+      "b": [
+       1,
+       2,
+       3
+      ],
+      "m": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "read": {
+    "session": "unreadable",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the saved session is damaged.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "a wall of an unknown kind",
+   "file": "a-wall-of-an-unknown-kind.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "kind": "post",
+      "a": [
+       1,
+       2,
+       3
+      ]
+     }
+    ]
+   },
+   "read": {
+    "session": "unreadable",
+    "objects": 1,
+    "n": null,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: saved supports not loaded: the saved session is damaged.",
+    "noteScaled": ""
+   }
+  },
+  {
+   "name": "walls null and removed listed",
+   "file": "walls-null-and-removed-listed.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    },
+    "walls": null,
+    "removed": [
+     "wedge:1.5,2,3:4:0.5",
+     "prop:0,0,0:1:0"
+    ]
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 0,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [],
+     "removedSigs": [
+      "wedge:1.5,2,3:4:0.5",
+      "prop:0,0,0:1:0"
+     ],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "a brace saved before the height cap",
+   "file": "a-brace-saved-before-the-height-cap.3mf",
+   "beside": false,
+   "session": {
+    "v": 1,
+    "part": {
+     "size": [
+      50,
+      44,
+      30
+     ]
+    },
+    "walls": [
+     {
+      "kind": "sway",
+      "a": [
+       -8.333333333333334,
+       -12.666666666666666,
+       -15
+      ]
+     },
+     {
+      "kind": "sway",
+      "a": [
+       -20.333333333333332,
+       -2.6666666666666665,
+       -15
+      ],
+      "capped": false
+     },
+     {
+      "kind": "sway",
+      "a": [
+       15.666666666666666,
+       12,
+       -15
+      ],
+      "capped": 1
+     }
+    ]
+   },
+   "read": {
+    "session": "restored",
+    "objects": 1,
+    "n": 3,
+    "centre": [
+     128,
+     128,
+     0
+    ],
+    "note": "3MF: restored 3 hand-placed supports and the settings.",
+    "noteScaled": "",
+    "state": {
+     "walls": [
+      {
+       "kind": "sway",
+       "face": 4,
+       "capped": false,
+       "a": [
+        -8.333333333333334,
+        -12.666666666666666,
+        -15
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 1,
+       "capped": false,
+       "a": [
+        -20.333333333333332,
+        -2.6666666666666665,
+        -15
+       ]
+      },
+      {
+       "kind": "sway",
+       "face": 2,
+       "capped": false,
+       "a": [
+        15.666666666666666,
+        12,
+        -15
+       ]
+      }
+     ],
+     "removedSigs": [],
+     "finMode": "auto",
+     "finsVisible": true,
+     "form": {},
+     "quat": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "load": null,
+     "drawAugment": false
+    }
+   }
+  },
+  {
+   "name": "session of another version",
+   "file": "session-of-another-version.3mf",
+   "beside": false,
+   "session": {
+    "v": 2,
+    "part": {
+     "size": [
+      50,
+      50,
+      30
+     ]
+    }
+   },
+   "read": {
+    "session": "none",
+    "objects": 1
+   }
+  }
+ ]
+}

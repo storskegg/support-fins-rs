@@ -113,6 +113,24 @@ public struct OrbitCamera: Equatable, Sendable {
         distance = min(max(distance / factor, Self.minDistance), Self.maxDistance)
     }
 
+    /// Zoom by `factor` keeping the point under the pointer (`ndc`, -1...1, y up) where it is: the point of the plane
+    /// through the target, facing the camera, that the pointer is over stays under it, so a pinch zooms toward the
+    /// cursor (native; the web's `zoomToCursor` is off).
+    public mutating func zoom(by factor: Float, towardNDC ndc: SIMD2<Float>) {
+        guard factor > 0, let before = focusPoint(ndc) else { return zoom(by: factor) }
+        zoom(by: factor)
+        if let after = focusPoint(ndc) { target += before - after }
+    }
+
+    /// Where the pointer's ray meets the plane through the target that faces the camera.
+    private func focusPoint(_ ndc: SIMD2<Float>) -> SIMD3<Float>? {
+        let r = ray(ndcX: ndc.x, ndcY: ndc.y)
+        let f = basis.forward
+        let denom = simd_dot(r.direction, f)
+        guard abs(denom) > 1e-6 else { return nil }
+        return r.origin + r.direction * (simd_dot(target - r.origin, f) / denom)
+    }
+
     /// A mouse-wheel tick: `getZoomScale` of OrbitControls, `0.95 ^ (|delta| * 0.01)` per unit.
     public mutating func zoom(wheelDelta delta: Float) {
         let scale = pow(0.95, abs(delta * 0.01))

@@ -34,6 +34,7 @@ struct StatsCard: View {
                     if let info = fins?.info, !info.isEmpty {
                         Button { showFinInfo.toggle() } label: { Image(systemName: "info.circle") }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("About these supports")
                             .help("How these supports work, and what this pose leaves uncovered")
                             .popover(isPresented: $showFinInfo) {
                                 Text(info).padding().frame(width: 280, alignment: .leading)
@@ -106,6 +107,7 @@ struct StatusCard: View {
             Section("Status") {
                 ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
                     Text(note.text).font(.callout).foregroundStyle(note.color)
+                        .accessibilityIdentifier(note.text == importNote ? "import-note" : "status-note")
                         .padding(.leading, note.bar == nil ? 0 : 9)
                         .overlay(alignment: .leading) {
                             if let bar = note.bar { RoundedRectangle(cornerRadius: 1.5).fill(bar).frame(width: 3) }
@@ -117,6 +119,7 @@ struct StatusCard: View {
                         Text("of support material added").foregroundStyle(.secondary)
                         Button { showReceiptInfo.toggle() } label: { Image(systemName: "info.circle") }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("About the support material")
                             .help(FinReadout.receiptTip)
                             .popover(isPresented: $showReceiptInfo) {
                                 Text(FinReadout.receiptTip).padding().frame(width: 280, alignment: .leading)
