@@ -89,6 +89,7 @@ Web-only rows:
 | `sway_clearance.test.js` | 2 | inside, overhangs, stl, sway | M3 | green |
 | `sway_cross_gauge.test.js` | 3 | fins, finworker, inside, nozzle, overhangs, prop, prop/brace, stl, sway, threemf | M3 | green (js_sway_depth.rs, js_sway_cross_gauge.rs; the worker/export cases in sf-io js_sway_export.rs) |
 | `sway_depth.test.js` | 7 | fins, finworker, inside, overhangs, prop, stl, sway, threemf | M3 | green (js_sway_depth.rs, js_sway_cross_gauge.rs; the worker/export cases in sf-io js_sway_export.rs) |
+| `swaycrop.test.js` | 6 | inside, overhangs, prop/brace, stl, sway, swaycrop | M3 | green (sf-engine/tests/js_swaycrop.rs: the 5-scene crop-vs-whole case in one Rust test, plus the end-to-end click; parity/oracle/swayhit.js also records `cropForRib`) |
 | `tails.test.js` | 7 | fins, inside, overhangs, prop, stl | M3 | green (js_tails.rs) |
 | `tall.test.js` | 4 | draw, fins, fins/tall, inside, overhangs, prop, stl | M3 | green |
 | `tap.test.js` | 4 | inside, overhangs, stl, ui/tap | — | dropped (web-only) |
@@ -99,6 +100,7 @@ Web-only rows:
 | `tines.test.js` | 9 | fins, inside, overhangs, prop, stl | M3 | green (js_tines.rs) |
 | `tines_realparts.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_tines_realparts.rs) |
 | `trace.test.js` | 1 | inside, overhangs, prop/config, prop/downhill, prop/trace, stl | M1 | green |
+| `triindex.test.js` | 8 | inside, overhangs, stl, swayhit, triindex | M3 | green (sf-engine/tests/js_triindex.rs: the 8 scenes in one Rust test; parity/oracle/swayhit.js records `lowestHit` on the stress models) |
 | `tunables.test.js` | 6 | fins, inside, overhangs, prop, stl | M3 | green (js_tunables.rs) |
 | `unserved.test.js` | 2 | fins, inside, overhangs, prop, stl | M3 | green (js_unserved.rs) |
 | `viewpresets.test.js` | 7 | inside, overhangs, stl, ui/viewpresets | M4 | not ported |
@@ -106,6 +108,7 @@ Web-only rows:
 | `weld.test.js` | 3 | inside, overhangs, stl | M1 | green |
 | `part_wall_ends.test.js` | 2 | prop/attached, draw | M3 (catch-up to 299ef49, 23039e2) | green (sf-engine/tests/js_part_wall_ends.rs; the drawn-wall case is the 23039e2 catch-up) |
 | `part_wall_ends_i18n.test.js` | 1 |  | M7 (catch-up to 23039e2) | green (app/SupportFinsTests/LocalizationTests.swift `sideWallRefusal`: the page's `web/i18n/*.js` is the app's String Catalog) |
+| `rest.test.js` | 2 | ui/rest | M6 | green (app/SupportFinsTests/RestTests.swift: `Rest`, the Draw brace hover's debounce) |
 | `report.test.js` | 4 | report, fins, overhangs, islands (+ index.html, ui/report, i18n) | M3 engine cases; UI and i18n cases M7 | 3 of 4 ported (sf-io/tests/js_report.rs); the locale case is the page's i18n (M7) |
 | `plugins/cli/tests/cli.test.js` | 17 | plugins/cli, plugins/shared/engine | M3 | 17 of 17 ported (sf-cli/tests/cli.rs); the negative-part cut (#104) is `sf-cut` |
 | `plugins/cli/tests/project.test.js` | 69 | plugins/cli/project* | M3 | 69 of 69 ported (sf-cli/tests/project.rs; the 69th, the empty nested cutter, is catch-up to 23039e2); the six "never falls back" cases are one test, and the killed-subprocess case polls the real binary for its first checkpoint instead of stopping it at a hook |

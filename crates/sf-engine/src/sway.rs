@@ -24,6 +24,8 @@ use crate::planes::{
 use crate::prop::brace::brace_cross_rib;
 use crate::prop::config::TineDir;
 use crate::solids::{Radius, loft_extrude, ribbon, rounded_polygon};
+use crate::swaycrop::crop_for_rib;
+use crate::swayhit::{clip, lowest_hit};
 use crate::tris::Tris;
 use crate::types::{Pt3, Rot3, V4, Xyz};
 
@@ -365,30 +367,6 @@ fn print_triangles(topo: &Topology, rot: &Rot3, offset: &Xyz) -> Vec<f64> {
     a
 }
 
-/// Port of `clip` (web/sway.js:148-160): Sutherland-Hodgman: keep the part of `poly` where
-/// `f(v) >= 0`.
-fn clip(poly: &[V3], f: &dyn Fn(&V3) -> f64) -> Vec<V3> {
-    let mut out = Vec::new();
-    for i in 0..poly.len() {
-        let a = poly[i];
-        let b = poly[(i + 1) % poly.len()];
-        let fa = f(&a);
-        let fb = f(&b);
-        if fa >= 0.0 {
-            out.push(a);
-        }
-        if (fa >= 0.0) != (fb >= 0.0) {
-            let t = fa / (fa - fb);
-            out.push([
-                a[0] + (b[0] - a[0]) * t,
-                a[1] + (b[1] - a[1]) * t,
-                a[2] + (b[2] - a[2]) * t,
-            ]);
-        }
-    }
-    out
-}
-
 /// Port of `pushSolid` (web/sway.js:163-172): push a closed solid, flipping the winding outward
 /// if its signed volume is negative.
 fn push_solid(local: &[V4], out: &mut Vec<V4>) {
@@ -433,9 +411,9 @@ fn prism(poly: &[[f64; 2]], lo: f64, hi: f64, p: impl Fn(f64, f64, f64) -> V3, o
 /// `buildSwayRib` adds): `s` is horizontal distance out of the face (along the face normal's
 /// horizontal part), `uu` is across the face (the patch's own u, so patchProbe reads it
 /// directly), z is z. A world point is s*nh + uu*u.
-struct Frame {
-    nh: (f64, f64),
-    u: (f64, f64),
+pub struct Frame {
+    pub nh: (f64, f64),
+    pub u: (f64, f64),
 }
 
 impl Frame {
@@ -455,61 +433,6 @@ impl Frame {
     fn s_of(&self, q: V3) -> f64 {
         q[0] * self.nh.0 + q[1] * self.nh.1
     }
-}
-
-/// Port of `lowestHit` (web/sway.js:207-232): the lowest z at which any part triangle crosses the
-/// volume the rib would occupy, or Infinity. Exact per triangle: clip to the rib's slab across the
-/// face, then against the rib's own (s, z) outline -- the same "does anything cross the volume"
-/// question the old fins.js leaning fin asked of its walls, for a tapered outline.
-fn lowest_hit(
-    tris: &[f64],
-    fr: &Frame,
-    u_lo: f64,
-    u_hi: f64,
-    outline: &[&dyn Fn(&V3) -> f64],
-) -> f64 {
-    let mut best = f64::INFINITY;
-    let mut i = 0;
-    while i < tris.len() {
-        let mut v = [[0.0; 3]; 3];
-        let (mut umin, mut umax) = (f64::INFINITY, f64::NEG_INFINITY);
-        for (k, vk) in v.iter_mut().enumerate() {
-            let x = tris[i + k * 3];
-            let y = tris[i + k * 3 + 1];
-            let z = tris[i + k * 3 + 2];
-            vk[0] = x * fr.nh.0 + y * fr.nh.1;
-            vk[1] = x * fr.u.0 + y * fr.u.1;
-            vk[2] = z;
-            if vk[1] < umin {
-                umin = vk[1];
-            }
-            if vk[1] > umax {
-                umax = vk[1];
-            }
-        }
-        i += 9;
-        if umax < u_lo || umin > u_hi {
-            continue;
-        }
-        let mut poly: Vec<V3> = v.to_vec();
-        poly = clip(&poly, &|q: &V3| q[1] - u_lo);
-        poly = clip(&poly, &|q: &V3| u_hi - q[1]);
-        for f in outline {
-            if poly.len() < 2 {
-                break;
-            }
-            poly = clip(&poly, *f);
-        }
-        if poly.len() < 2 {
-            continue;
-        }
-        for q in &poly {
-            if q[2] < best {
-                best = q[2];
-            }
-        }
-    }
-    best
 }
 
 /// The mutable shape state of `buildSwayRib` (`th`, `H`, `wIn`, `sIn0`, `sInSlope`, `D0`,
@@ -734,14 +657,29 @@ pub fn build_sway_rib(
             let o1 = move |q: &V3| (if last { h_top + 0.3 } else { hi }) - q[2];
             let o2 = move |q: &V3| q[0] - (a + slope * (q[2] - lo) - 0.05);
             let o3 = move |q: &V3| (stp.s_out(q[2]) + 0.1) - q[0];
+            // s bounds of this band's outline: its inner edge is a straight line, its outer edge
+            // piecewise linear between the band heights, so the ends and knots are enough.
+            let z_a = if first { -0.1 } else { lo };
+            let z_b = if last { h_top + 0.3 } else { hi };
+            let inner = |z: f64| a + slope * (z - lo) - 0.05;
+            let mut s_hi = jsnum::max(stp.s_out(z_a), stp.s_out(z_b));
+            for &z in &stp.heights {
+                if z > z_a && z < z_b {
+                    s_hi = jsnum::max(s_hi, stp.s_out(z));
+                }
+            }
             hit = jsnum::min(
                 hit,
                 lowest_hit(
-                    &part_tris.v,
+                    part_tris,
                     &fr,
                     uc - st.th / 2.0 - 0.3,
                     uc + st.th / 2.0 + 0.3,
                     &[&o0, &o1, &o2, &o3],
+                    jsnum::min(inner(z_a), inner(z_b)),
+                    s_hi + 0.1,
+                    z_a,
+                    z_b,
                 ),
             );
         }
@@ -768,11 +706,15 @@ pub fn build_sway_rib(
     let f2 = |q: &V3| q[0] - (s_in_bed - 0.05);
     let f3 = |q: &V3| (s_foot_out + 0.1) - q[0];
     let foot_hit = lowest_hit(
-        &part_tris.v,
+        part_tris,
         &fr,
         uc - foot_half_w - 0.2,
         uc + foot_half_w + 0.2,
         &[&f0, &f1, &f2, &f3],
+        s_in_bed - 0.05,
+        s_foot_out + 0.1,
+        -0.1,
+        sw.foot_h + 0.2,
     );
     if foot_hit != f64::INFINITY {
         return Err("the part’s base spreads out under this face, so there is no room on the plate for the brace’s foot".to_string());
@@ -999,13 +941,33 @@ pub fn build_sway_rib(
         // a rib leaning less than the edge would part from it toward the top.
         let cross_ok = jsnum::abs(slope) <= 1.0 + 1e-6;
         let clear_arm = |t: &[V4]| opts.cross_clear.is_none_or(|f| f(t));
+        // Only the part near the foot matters to the arms; the square covers the longest reach
+        // plus the clearances and the flange width (see swaycrop.rs).
+        let cropped;
+        let near: &Tris = if cross_ok {
+            cropped = crop_for_rib(
+                &part_tris.v,
+                [o[0], o[1]],
+                jsnum::max(cfg.brace.min_reach, st.d0)
+                    + 2.0 * cfg.prop.side_clear
+                    + cfg.prop.foot_min
+                    + th
+                    + 1.0,
+                lean,
+                0.0,
+                h + cfg.prop.side_clear,
+            );
+            &cropped
+        } else {
+            part_tris
+        };
         let sgns: &[f64] = if cross_ok { &[1.0, -1.0] } else { &[] };
         for &sgn in sgns {
             let d = [p.u.x * sgn, p.u.y * sgn];
             let start = out.len();
             let Some(c) = brace_cross_rib(
                 &mut out,
-                part_tris,
+                near,
                 [o[0], o[1]],
                 d,
                 0.0,

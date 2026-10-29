@@ -170,3 +170,12 @@ Peak of `bench_load 3mf` (`/usr/bin/time -l`): the whole private 3MF read, parse
 ### Known issues
 
 - Parallel lazy grid builds (#154) could deadlock under nested Rayon work (found in the quiet run; fixed in a follow-up PR).
+
+## Sway click on a million-face part (upstream catch-up U2)
+
+`just bench-sway` (`bench_sway`): `sway_at_face` on a synthetic 1.6M-triangle tower (30 x 20 x 80 mm, turned 30 degrees about Z, 0.1 mm facets, a ledge near the top so the rib's shrink loop runs), 24 clicks spread over the upright faces with cross ribs on. Ports of upstream's `triindex.js` (XY triangle grid, built once per part), `swayhit.js` (candidate triangles checked against the rib's (s, u, z) box before clipping) and `swaycrop.js` (cross ribs on a crop of the part, not a sheared copy). Machine load was 20-25 during both runs, so read the ratio, not the milliseconds.
+
+| | first click (builds the grid) | median of the other clicks | slowest | output hash |
+|---|---:|---:|---:|---|
+| before (main) | 264 ms | 752 ms | 2504 ms | a9885958e2606b45 |
+| after | 264-269 ms | 161-167 ms | 490-527 ms | a9885958e2606b45 |
