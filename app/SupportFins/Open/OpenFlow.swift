@@ -31,6 +31,12 @@ private struct OpenFlowModifier: ViewModifier {
             model.status = OpenRules.Unsupported().localizedDescription
             return false
         }
+        // several files at once go one to a plate of this window (`loadFiles`, `ui/io.js`)
+        let accepted = urls.filter(OpenRules.accepts)
+        if accepted.count > 1, let plates = model.features[PlatesFeature.self] {
+            plates.loadFiles(accepted)
+            return true
+        }
         if model.hasPart {
             Task { _ = try? await openDocument(at: url) }
         } else {

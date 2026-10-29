@@ -26,27 +26,44 @@ final class PlateBoard {
     static let undoSeconds = 10.0
 
     @ObservationIgnored unowned let host: ViewerModel
-    private(set) var plates = [Plate()]
-    private(set) var active = 0
+    /// The plates and the one being edited; `PlateBoard+Plates` switches, adds and deletes them.
+    var plates = [Plate()]
+    var active = 0
     /// Export is switching through the models: the board holds still (`busy`, `ui/plates.js`).
     private(set) var busy = false
     /// The text of the Undo toast while a removal can be undone.
-    private(set) var toast: String?
+    var toast: String?
 
     /// The slot of each parked model in the scene, in the scene's order (what a click on one means).
     @ObservationIgnored var parkedSlots: [ModelSlot] = []
-    @ObservationIgnored private var trash: Trash?
+    /// The plate of each of `parkedSlots` (the row shows every plate's models).
+    @ObservationIgnored var parkedPlates: [Int] = []
+    @ObservationIgnored var trash: Trash?
+    /// The last move to another plate, for the toast's Undo (`moved`, `ui/plates.js`).
+    @ObservationIgnored var moved: Moved?
     /// The board is bringing a model in itself (a swap, an Undo): the features' `partWillShow` is its own.
-    @ObservationIgnored private(set) var swapping = false
+    @ObservationIgnored var swapping = false
     @ObservationIgnored private var addedOver: Bool = false
     @ObservationIgnored var parkedTask: Task<Void, Never>?
     @ObservationIgnored var parkedTimer: Task<Void, Never>?
     @ObservationIgnored var parkedBuilding: ParkedModel?
 
     /// What a removal can bring back.
-    private struct Trash {
+    struct Trash {
         var slots: [ModelSlot]
-        var plate: Plate
+        /// The plate they left, or nil when it was deleted with them.
+        var plate: Plate?
+        var index: Int
+        /// A deleted plate's settings and history, for an Undo that has to make it again.
+        var own: (settings: PlateSettings?, history: History<SessionSnapshot>?)?
+        var timer: Task<Void, Never>
+    }
+
+    /// A model dragged to another plate: where it came from, for the toast's Undo.
+    struct Moved {
+        var slot: ModelSlot
+        var from: Plate
+        var xy: SIMD2<Double>
         var timer: Task<Void, Never>
     }
 
@@ -68,7 +85,7 @@ final class PlateBoard {
 
     /// Put the live model and its state away, leaving the window empty (`park`, `ui/models.js`). The plate's undo
     /// history and settings stay with the session: only a plate switch takes them away.
-    private func parkModel(_ plate: Plate) {
+    func parkModel(_ plate: Plate) {
         let m = plate.liveSlot
         guard let part = session.parts.first, let controller = host.controller else { m.stash = nil; return }
         let settings = PlateSettings(settings: session.settings, finsOn: session.finsOn)
@@ -87,7 +104,7 @@ final class PlateBoard {
     }
 
     /// Bring the plate's live slot back (stashed, or empty); the window is empty (`unpark`, `ui/models.js`).
-    private func unparkModel(_ plate: Plate) {
+    func unparkModel(_ plate: Plate) {
         let m = plate.liveSlot
         guard let s = m.stash, let controller = host.controller else {
             session.install(parts: [], pose: .identity, removedFins: [], owner: m.id)
@@ -191,8 +208,9 @@ final class PlateBoard {
     /// (`removeModel`, `ui/plates.js`).
     func removeModel() {
         guard !busy, hasLive else { return }
+        let plate = self.plate, index = active
         let m = takeLive()
-        trashed([m], text: removedText([m]))
+        trashed([m], plate: plate, index: index, text: removedText([m]))
     }
 
     /// Take the live model off the plate being edited: its slot, parked, for an Undo to put back. A plate of several
@@ -216,13 +234,14 @@ final class PlateBoard {
         return m
     }
 
-    private func removedText(_ slots: [ModelSlot]) -> String {
+    func removedText(_ slots: [ModelSlot]) -> String {
         slots.count == 1 ? "Removed \(slots[0].stash?.name ?? "model")" : "Removed \(slots.count) models"
     }
 
     // MARK: the toast's Undo
 
-    private func trashed(_ slots: [ModelSlot], text: String) {
+    func trashed(_ slots: [ModelSlot], plate: Plate? = nil, index: Int = 0, text: String,
+                 own: (settings: PlateSettings?, history: History<SessionSnapshot>?)? = nil) {
         guard !slots.isEmpty else { return }       // an empty plate: nothing to bring back (the last Undo stays)
         expire()
         let timer = Task { [weak self] in
@@ -230,46 +249,28 @@ final class PlateBoard {
             guard !Task.isCancelled else { return }
             self?.expire()
         }
-        trash = Trash(slots: slots, plate: plate, timer: timer)
+        trash = Trash(slots: slots, plate: plate, index: index, own: own, timer: timer)
         toast = text
     }
 
     /// The Undo goes, and with it what the toast kept: the models are freed.
     func expire() {
+        moved?.timer.cancel()
+        moved = nil
         trash?.timer.cancel()
         trash = nil
         toast = nil
     }
 
-    /// The toast's Undo: bring the last removal back, beside the plate's models (into its slot when the plate is
-    /// empty) (`undoDelete`).
+    /// The toast's Undo: a move back, or the last removal (`toast-undo`, `ui/plates.js`).
     func undoToast() {
-        guard let t = trash, !busy else { return }
-        t.timer.cancel()
-        trash = nil
-        toast = nil
-        guard let i = plates.firstIndex(where: { $0 === t.plate }) else { return }
-        swapping = true
-        if hasLive { parkModel(plate) }
-        swapping = false
-        let p = plates[i]
-        if p.models.count == 1 && p.models[0].stash == nil {
-            p.models = t.slots
-        } else {
-            putBack(p, t.slots)
-        }
-        p.live = p.models.firstIndex { $0 === t.slots[0] } ?? 0
-        swapping = true
-        unparkModel(p)
-        swapping = false
-        sync()
-        scheduleParked()
+        if moved != nil { undoMove() } else { undoDelete() }
     }
 
     /// Put the parked `slots` (a removal's Undo) back on `plate` beside its models: each where it stood, unless
     /// something put there since covers that spot -- then at the free spot nearest the centre, as Add model would
     /// (`putBack`, `ui/models.js`).
-    private func putBack(_ plate: Plate, _ slots: [ModelSlot]) {
+    func putBack(_ plate: Plate, _ slots: [ModelSlot]) {
         guard let v = host.controller?.volume else { plate.models += slots; return }
         for m in slots {
             let grid = footprint(of: m)
