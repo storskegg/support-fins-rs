@@ -49,7 +49,7 @@ struct ReadableErrorTests {
     @Test("the prefix is translated, the engine's message stays as the web leaves it", arguments: cases)
     func statusInGerman(c: Bad) async throws {
         let url = try Self.file(c.name, c.bytes)
-        let error = await #expect(throws: FfiError.self) { _ = try loadParts(path: url.path(percentEncoded: false)) }
+        let error = #expect(throws: FfiError.self) { _ = try loadParts(path: url.path(percentEncoded: false)) }
         let de = try #require(L10n.Language("de"))
         #expect(ReadFailure.text(of: try #require(error), reading: c.name, in: de) == "\(c.name) konnte nicht gelesen werden:\n\(c.message)")
     }
