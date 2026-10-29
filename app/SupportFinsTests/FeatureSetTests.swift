@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Testing
 @testable import Support_Fins
@@ -116,7 +117,26 @@ struct FeatureSetTests {
 
     /// `FeatureCommands` shows a fixed number of menus.
     @Test func theMenuBarHasRoomForEveryMenu() {
-        #expect(FeatureSet.menuIDs().filter { !$0.isFileGroup }.count <= FeatureCommands.menuSlots)
+        #expect(FeatureSet.menuIDs().filter(\.isOwnMenu).count <= FeatureCommands.menuSlots)
+    }
+
+    /// A feature menu named like one macOS already has fills that menu (`MenuID.group`): a `CommandMenu("View")` was a
+    /// second View menu beside the system's ("File Edit View View Model Window Help").
+    @Test func noFeatureMenuDuplicatesASystemMenu() {
+        let ids = FeatureSet.menuIDs()
+        for id in ids where MenuID.systemTitles.contains(id.title) {
+            #expect(!id.isOwnMenu, "\(id.title) would be a second \(id.title) menu")
+        }
+        let own = ids.filter(\.isOwnMenu).map(\.title)
+        #expect(Set(own).count == own.count)
+        #expect(MenuID.view.group == .beforeToolbar && MenuID.fileExport.group == .afterNewItem)
+    }
+
+    /// The real menu bar of the test host (the app): every title once.
+    @MainActor @Test func theMenuBarNamesEachMenuOnce() throws {
+        let titles = try #require(NSApp?.mainMenu).items.map(\.title)
+        #expect(Set(titles).count == titles.count, "\(titles)")
+        #expect(titles.filter { $0 == "View" }.count <= 1)
     }
 
     // MARK: the real features

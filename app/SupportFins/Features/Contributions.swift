@@ -114,17 +114,36 @@ struct EscapeHandler: Identifiable {
 
 // MARK: menus
 
-/// A menu of the menu bar. Features that name the same menu share it; menus come in `order`. `fileExport` is not a
-/// menu but the items after File > New.
+/// A menu of the menu bar. Features that name the same menu share it; menus come in `order`. A menu macOS already
+/// has (File, Edit, View, ...) is never added again: its items go into the system menu at `group` (`fileExport`: after
+/// File > New; `view`: the top of View, above Show Toolbar and Enter Full Screen). A `CommandMenu("View")` would be a
+/// second View menu next to the system's.
 struct MenuID: Hashable, Identifiable {
     var title: String
     var order: Int
-    var isFileGroup = false
+    /// Where in a system menu the items go; nil for a menu of the app's own (`CommandMenu`).
+    var group: SystemGroup?
     var id: String { title }
 
-    static let view = MenuID(title: "View", order: 0)
+    /// The places in the system's menus that `FeatureCommands` fills.
+    enum SystemGroup: Hashable, CaseIterable {
+        /// File, after New.
+        case afterNewItem
+        /// View, before the toolbar items.
+        case beforeToolbar
+    }
+
+    /// A menu of the app's own, added to the bar (`CommandMenu`).
+    var isOwnMenu: Bool { group == nil }
+    var isFileGroup: Bool { group == .afterNewItem }
+
+    /// The menus macOS (and SwiftUI's document app) already put in the bar: a feature menu with one of these titles
+    /// must fill a `group` of it, not add a menu of the same name.
+    static let systemTitles: Set<String> = ["File", "Edit", "Format", "View", "Window", "Help"]
+
+    static let view = MenuID(title: "View", order: 0, group: .beforeToolbar)
     static let model = MenuID(title: "Model", order: 10)
-    static let fileExport = MenuID(title: "File", order: 100, isFileGroup: true)
+    static let fileExport = MenuID(title: "File", order: 100, group: .afterNewItem)
 }
 
 /// A run of one menu's entries from one feature. Sections of a menu come in `order`, so a feature's items sit
