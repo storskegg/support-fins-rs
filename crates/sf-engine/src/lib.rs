@@ -7,6 +7,7 @@ pub mod csr;
 pub mod cutout;
 pub mod draw;
 pub mod drawarc;
+pub mod drawn;
 pub mod fins;
 pub mod fxhash;
 pub mod gridsize;
