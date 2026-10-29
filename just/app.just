@@ -16,6 +16,10 @@ swift-bindings:
     rm -rf "$gen" && mkdir -p "$gen/headers"
     cargo run --release -q -p sf-ffi --bin uniffi-bindgen -- generate --library "$lib" --language swift --out-dir "$gen"
     cp "$gen/sf_ffi.swift" "$pkg/Sources/SupportFinsCore/sf_ffi.swift"
+    # FfiError's errorDescription is UniFFI's String(reflecting: self), a Swift type dump; use the hand-written one
+    # (FfiError+Description.swift). Fail loudly if a UniFFI update changes the line.
+    grep -c 'String(reflecting: self)' "$pkg/Sources/SupportFinsCore/sf_ffi.swift" | grep -qx 1
+    sed -i '' 's/String(reflecting: self)/ffiErrorDescription(self)/' "$pkg/Sources/SupportFinsCore/sf_ffi.swift"
     cp "$gen/sf_ffiFFI.h" "$gen/headers/"
     cp "$gen/sf_ffiFFI.modulemap" "$gen/headers/module.modulemap"
     rm -rf "$pkg/sf_ffiFFI.xcframework"
@@ -84,3 +88,8 @@ tippics-gen *args:
 # What's new (web/changelog.json) as the app's changelog.json and its version (app/Version.xcconfig); `--check` is in `just gate`.
 whatsnew-gen *args:
     deno run -A --no-config tools/whatsnew/gen.js {{args}}
+
+# The app's Swift compiler warnings against tools/gate/swift-warnings.baseline: a new one fails (S-09). Builds the app from
+# clean in `.dd-warnings` (an incremental build only reports what it recompiles), under the machine lock. Part of `just gate`.
+swift-warnings: app-core app-project
+    tools/gate/swift_warnings.py

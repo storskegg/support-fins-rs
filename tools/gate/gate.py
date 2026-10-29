@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """`just gate`: every gate a PR needs, one summary table, non-zero exit if any failed.
 
-    just gate [--all] [--no-app] [--only NAME[,NAME...]]
+    just gate [--no-app] [--only NAME[,NAME...]]
 
-Always: fmt, clippy, test (cargo test --workspace), deno (the oracle library tests), cli-parity.
-When app/ or the bindings (crates/sf-ffi/) differ from origin/main (committed or not), also:
-app-core (regenerate the Swift bindings, swift test), app-project (XcodeGen), app-test (the viewer
-package's `swift test`, then the app's xcodebuild tests; takes the machine lock), app-uibuild (compile the UI
-tests without running them, so one that does not compile cannot reach review), i18n-check (every string the app shows is
-a web string or a listed native one, and every web translation is in the String Catalog: tools/i18n). app-core and app-project
-always run before app-test and app-uibuild (even with --only), because the generated Xcode project goes stale
-when Swift files are added; the table prints the test count so a silent skip shows.
-`--all` forces the app gates, `--no-app` skips them, `--only` runs just the named ones.
+Always: fmt, clippy, test (cargo test --workspace), deno (the oracle library tests), cli-parity, and the app gates:
+app-core (regenerate the Swift bindings, swift test), app-project (XcodeGen), app-test (the viewer package's `swift test`,
+then the app's xcodebuild tests; takes the machine lock), app-uibuild (compile the UI tests without running them, so one
+that does not compile cannot reach review), swift-warnings (the app's compiler warnings against
+tools/gate/swift-warnings.baseline: a new one fails), i18n-check (every string the app shows is a web string or a listed
+native one, and every web translation is in the String Catalog: tools/i18n). The app gates always run, whatever changed:
+the engine crates are the app's engine, and a change to sf-io, sf-cli or sf-engine can break the app with every engine
+test green (S-04). app-core and app-project always run before the gates that need them (even with --only), because the
+generated Xcode project goes stale when Swift files are added; the table prints the test count so a silent skip shows.
+`--no-app` is an explicit opt-out of the app gates, for a run that cannot build the app (it prints a loud warning; a PR
+needs the full gate). `--only` runs just the named gates.
 
 Every gate runs even when an earlier one fails, with its output live and also in
 target/gate/<name>.log. `app-uitest` is deliberately not here: it takes over the user's mouse and
@@ -40,26 +42,13 @@ APP = [
     ("app-project", ["just", "app-project"]),
     ("app-test", ["just", "--no-deps", "app-test"]),
     ("app-uibuild", ["just", "--no-deps", "app-uibuild"]),
+    # builds the app from clean in its own derived data and compares the compiler warnings with the baseline
+    ("swift-warnings", ["just", "--no-deps", "swift-warnings"]),
     # reads the strings app-uibuild's build extracted (.dd-ui): after it
     ("i18n-check", ["just", "--no-deps", "i18n-check"]),
 ]
 # the gates that need fresh bindings and a fresh Xcode project first
-NEEDS_PROJECT = ("app-test", "app-uibuild")
-APP_PATHS = ("app/", "crates/sf-ffi/")
-
-
-def app_changed():
-    """True if app/ or the bindings differ from origin/main, or origin/main cannot be read."""
-    def names(*args):
-        r = subprocess.run(["git", *args], capture_output=True, text=True)
-        return None if r.returncode else r.stdout.splitlines()
-
-    committed = names("diff", "--name-only", "origin/main...HEAD")
-    if committed is None:
-        print("gate: no origin/main to compare with; running the app gates", flush=True)
-        return True
-    dirty = [l[3:] for l in (names("status", "--porcelain", "--untracked-files=all") or [])]
-    return any(p.startswith(APP_PATHS) for p in committed + dirty)
+NEEDS_PROJECT = ("app-test", "app-uibuild", "swift-warnings")
 
 
 def test_count(name):
@@ -93,11 +82,11 @@ def main(argv):
         i = args.index("--only")
         only = set(args[i + 1].split(","))
     gates = list(BASE)
-    if "--all" in args or (only is None and "--no-app" not in args and app_changed()):
+    if "--no-app" in args:
+        banner = "gate: --no-app: THE APP GATES (app-core, app-project, app-test, app-uibuild, swift-warnings, i18n-check) ARE SKIPPED"
+        print("\n" + "!" * len(banner) + f"\n{banner}\n" + "gate: this is not a full gate; run plain `just gate` before reporting" + "\n" + "!" * len(banner) + "\n", flush=True)
+    else:
         gates += APP
-        print("gate: app gates included", flush=True)
-    elif "--no-app" not in args:
-        print("gate: app/ and the bindings are unchanged vs origin/main; app gates skipped", flush=True)
     if only is not None:
         gates = [g for g in BASE + APP if g[0] in only]
     if any(g[0] in NEEDS_PROJECT for g in gates):
@@ -129,6 +118,8 @@ def main(argv):
     total = sum(r[2] for r in results)
     failed = [r[0] for r in results if not r[1]]
     print(f"{'total'.ljust(w)}  {'FAIL' if failed else 'pass'}    {fmt_time(total)}")
+    if "--no-app" in args:
+        print("gate: --no-app: the app gates did NOT run; this is not a full gate")
     if failed:
         print(f"gate: FAILED: {', '.join(failed)}")
     return 1 if failed else 0
