@@ -229,7 +229,7 @@ struct FinReadout: Equatable, Sendable {
         let text = autoTxt + ribTxt + drawnTxt + swayTxt + removedTxt
         r.fins = !text.isEmpty ? text : (noneNeeded
             ? JS.tn("none needed: small hole left for bridging", "none needed: small holes left for bridging", b.smallHoleRegions)
-            : "none possible")
+            : JS.t("none possible"))
         r.finsWarn = n == 0 && drawnOk == 0 && (b.sway?.count ?? 0) == 0 && !noneNeeded
 
         // `lead` = short + must-see, stays in the panel; `help` = how-it-works and how-to-fix, behind the (i).
@@ -242,11 +242,11 @@ struct FinReadout: Equatable, Sendable {
             let brace = b.braceCount, prop = b.propCount
             if brace != 0 {
                 help.append(b.tines != 0
-                    ? (pins ? "The pins attach each wall to the part, as a resin print needs." : "The tines grab onto the part and bend away when you snap the supports off.")
-                    : "The fins stand a hair off the part (0.2mm) so they pop off. Turn Tines on if you want them to grip.")
+                    ? (pins ? JS.t("The pins attach each wall to the part, as a resin print needs.") : JS.t("The tines grab onto the part and bend away when you snap the supports off."))
+                    : JS.t("The fins stand a hair off the part (0.2mm) so they pop off. Turn Tines on if you want them to grip."))
             }
             if prop != 0 && brace == 0 {
-                help.append("These are plain props, not gripping fins. The overhangs here are too shallow or curved to stand a fin against, so there are no tines to add.")
+                help.append(JS.t("These are plain props, not gripping fins. The overhangs here are too shallow or curved to stand a fin against, so there are no tines to add."))
             } else if prop != 0 {
                 help.append(JS.tn("The {n} prop sit under overhangs too shallow to grip, so those get no tines.",
                                   "The {n} props sit under overhangs too shallow to grip, so those get no tines.", prop))
@@ -271,8 +271,8 @@ struct FinReadout: Equatable, Sendable {
         // nothing else, so the pad is load-bearing, not cosmetic.
         if n != 0 && b.seating?.kind == "point" {
             lead.append(b.pad != nil
-                ? "this part balances on one point, so the bed pad is holding it. Print with the pad on"
-                : "this part balances on one point with nothing under it. Turn the bed pad on, or rotate until it sits down")
+                ? JS.t("this part balances on one point, so the bed pad is holding it. Print with the pad on")
+                : JS.t("this part balances on one point with nothing under it. Turn the bed pad on, or rotate until it sits down"))
         }
         let note = padNote(b, ctx)
         if !note.isEmpty { lead.append(note) }
@@ -284,7 +284,7 @@ struct FinReadout: Equatable, Sendable {
                               count, ["drop": drop]))
         }
         if b.sagRisk {
-            lead.append("coverage is below the anti-sag guide, so a broad overhang may sag between supports — nudge the slider right if the surface bows")
+            lead.append(JS.t("coverage is below the anti-sag guide, so a broad overhang may sag between supports — nudge the slider right if the surface bows"))
         }
         // Full coverage: what it added, and -- must-see, in the panel -- the red it couldn't reach, never hidden.
         let fl = b.fill
@@ -300,7 +300,7 @@ struct FinReadout: Equatable, Sendable {
             if fl.walls != 0 {
                 help.append(JS.tn("Full coverage added {n} wall under overhangs Auto left bare.", "Full coverage added {n} walls under overhangs Auto left bare.", fl.walls))
             } else if fl.bareBefore < 1 && n != 0 {
-                help.append("Auto already reaches every overhang here, so Full coverage added nothing.")
+                help.append(JS.t("Auto already reaches every overhang here, so Full coverage added nothing."))
             }
             let bare = JS.round(fl.unservedArea)
             if fl.capped {
@@ -331,7 +331,7 @@ struct FinReadout: Equatable, Sendable {
         }
         // Curved walls in Full: the straight build held more, so it was kept
         if b.curvedDropped {
-            help.append("Curved walls: Full coverage does better here with straight walls, so it kept them. Switch to Auto for the curves.")
+            help.append(JS.t("Curved walls: Full coverage does better here with straight walls, so it kept them. Switch to Auto for the curves."))
         }
         if b.unserved != 0 && fl == nil {
             help.append(JS.tn("{n} overhang is too shallow for a fin this way up. Tilt the part steeper so a fin can follow it (try Suggest orientation), or add a wall by hand.",
@@ -351,9 +351,9 @@ struct FinReadout: Equatable, Sendable {
         // Sway braces were asked for, so say what they did -- and why, if nothing.
         if let sw = b.sway {
             if sw.count == 0 {
-                lead.append("no sway braces: \(sw.reason ?? "")")
+                lead.append("\(JS.t("no sway braces")): \(JS.t(sw.reason ?? ""))")
             } else {
-                help.append("The sway braces stand edge-on against the tall sides and are tied on by tines all the way up, so the top can’t drift or wobble as it prints.")
+                help.append(JS.t("The sway braces stand edge-on against the tall sides and are tied on by tines all the way up, so the top can’t drift or wobble as it prints."))
                 if sw.skipped != 0 {
                     help.append(JS.tn("{n} brace spot was blocked by the part itself. Switch to Draw and click an upright side to place one by hand.",
                                       "{n} brace spots were blocked by the part itself. Switch to Draw and click an upright side to place one by hand.", sw.skipped))
@@ -365,14 +365,14 @@ struct FinReadout: Equatable, Sendable {
         r.lead = lead.isEmpty ? "" : lead.joined(separator: ". ") + "."
         r.info = help.filter { !$0.isEmpty }.joined(separator: " ")
         // ms is absent when the readout reruns without rebuilding: leave the timing line alone
-        if let ms = ctx.ms { r.time = "\(ctx.analysisTiming) · fins \(JS.toFixed0(ms)) ms" }
+        if let ms = ctx.ms { r.time = "\(ctx.analysisTiming) · \(JS.t("fins")) \(JS.toFixed0(ms)) ms" }
         // The grams receipt: the mass of breakaway support the tool adds (`updateReceipt`, `readout.js:134-146`)
         if ctx.hasAdded { r.grams = "\(fmtGrams(ctx.volumeMm3 * Self.materialDensity / 1000)) g" }
         return r
     }
 
     /// The (i) on the grams receipt (`index.html:615`, docs/UI-MAP.md 4.3 `r-info`).
-    static let receiptTip = "Grams assume PLA and count only the fins + pad the tool adds, printed near-solid, cross-checked against the builder's fin volume. In test prints, breakaway fins used 20–45% less plastic and printed ~30% faster than slicer supports."
+    static var receiptTip: String { Tip.rInfo }
 
     /// `materialDensity`: PLA's, g/cm^3 (`web/materials.js`, `ui/settings.js:281`).
     static let materialDensity = 1.24
@@ -384,15 +384,15 @@ struct FinReadout: Equatable, Sendable {
 
     /// `padStatus` (`readout.js:282-288`).
     static func padStatus(_ b: ReadoutBuilt) -> String {
-        guard let p = b.pad else { return "not needed" }
-        return p.autoSure ? "Sure hold (small foot)" : "added"
+        guard let p = b.pad else { return JS.t("not needed") }
+        return p.autoSure ? JS.t("Sure hold (small foot)") : JS.t("added")
     }
 
     /// `padNote` (`readout.js:295-310`): the Light pad grips by first-layer squish along the part's outline, so a
     /// part on a small foot has almost nothing for it.
     static func padNote(_ b: ReadoutBuilt, _ ctx: ReadoutContext) -> String {
         guard let p = b.pad, p.smallFoot else { return "" }
-        let mm = p.outline < 1 ? "under 1 mm" : "\(JS.toFixed0(p.outline)) mm"
+        let mm = p.outline < 1 ? JS.t("under 1 mm") : "\(JS.toFixed0(p.outline)) mm"
         if p.autoSure {
             return JS.t("this part meets the plate on a small foot ({mm} of first-layer edge), too little for a Light pad to grip, so Auto made it Sure hold, touching the part to hold it", ["mm": mm])
         }
@@ -408,7 +408,7 @@ struct FinReadout: Equatable, Sendable {
     /// `ifaceNote` (`readout.js:178-183`): Flat contacts is on and there are walls, but no wall top got a crest.
     static func ifaceNote(_ ctx: ReadoutContext) -> String? {
         guard ctx.iface == "flat", ctx.wallsPresent, !ctx.crestPresent else { return nil }
-        return "Interface material: no flat contacts here, so every support prints in one material"
+        return JS.t("Interface material: no flat contacts here, so every support prints in one material")
     }
 
     /// `onlySmallHoles` (`readout.js:111-118`): an intentional empty result is different from a failed placement.
@@ -424,33 +424,33 @@ struct FinReadout: Equatable, Sendable {
     static func explainNoFins(_ b: ReadoutBuilt, _ ctx: ReadoutContext) -> String {
         // A part balanced on a point cannot be rescued by ANY support unless the bed pad is on to seat it.
         if b.seating?.kind == "point" && b.pad == nil {
-            return "this part touches the plate at a single point, so it has nothing to stand on. Turn the bed pad on to seat it, or rotate until it sits down on a face or an edge"
+            return JS.t("this part touches the plate at a single point, so it has nothing to stand on. Turn the bed pad on to seat it, or rotate until it sits down on a face or an edge")
         }
         // Plate only (#218) emptied it: in any mode, that is the reason to name
         if (b.skipped["onPart"] ?? 0) != 0 {
-            return "part of the model sits under these overhangs, and Plate only is on — untick it to stand supports on the part, or rotate"
+            return JS.t("part of the model sits under these overhangs, and Plate only is on — untick it to stand supports on the part, or rotate")
         }
         if onlySmallHoles(b, ctx) {
-            return "recognised small-hole ceilings are left unsupported to keep their openings clear; check bridging in the slicer"
+            return JS.t("recognised small-hole ceilings are left unsupported to keep their openings clear; check bridging in the slicer")
         }
         let st = b.patchStats
         if b.patchCount == 0 {
             // a cylinder or a mesh of small facets has no flat face wide enough
             return (st["tooNarrow"] ?? 0) > (st["notFlat"] ?? 0)
-                ? "nothing flat and wide enough to stand a fin against — curved or finely faceted surfaces have no flat face to grip"
-                : "no flat upright face on this part in this orientation"
+                ? JS.t("nothing flat and wide enough to stand a fin against — curved or finely faceted surfaces have no flat face to grip")
+                : JS.t("no flat upright face on this part in this orientation")
         }
         if b.rejected.sites == 0 {
             if let tooHigh = st["tooHigh"], tooHigh != 0 {
                 return JS.tn("{n} flat face found, but every one starts too far up the part — a fin would be mostly bare stilt. Rotate so a flat face runs down to the plate",
                              "{n} flat faces found, but every one starts too far up the part — a fin would be mostly bare stilt. Rotate so a flat face runs down to the plate", tooHigh)
             }
-            return "no usable face in this orientation — try rotating"
+            return JS.t("no usable face in this orientation — try rotating")
         }
         if b.rejected.blocked != 0 {
-            return "the part is in the way of every wall position on the faces it found — rotate, or switch to Draw and place one by hand"
+            return JS.t("the part is in the way of every wall position on the faces it found — rotate, or switch to Draw and place one by hand")
         }
-        return "the workable spots would put the fin inside the part — try rotating"
+        return JS.t("the workable spots would put the fin inside the part — try rotating")
     }
 }
 

@@ -15,9 +15,9 @@ final class CalibrationFeature: Feature {
 
     static func menus(_ f: CalibrationFeature?) -> [MenuSection] {
         [MenuSection(menu: .help, order: 10, entries: [
-            .item("Calibration Prints…", help: "Test prints that tune the settings to your printer and filament.",
+            .item(JS.t("Calibration Prints…"), help: JS.t("Test prints that tune the settings to your printer and filament."),
                   enabled: f != nil) { f?.model.show() },
-            .item("Full Calibration Guide", help: "How to read each test print: docs/CALIBRATION.md.") {
+            .item(JS.t("Full Calibration Guide")) {
                 NSWorkspace.shared.open(CalibrationCatalog.guide)
             },
         ])]

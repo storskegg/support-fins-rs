@@ -555,3 +555,68 @@ pub fn report_url(rep: &Json, cov: &Coverage, opts: &UrlOpts) -> String {
         q("Too long for the link: click \"Copy settings\" on the site and paste them here.")
     }
 }
+
+/// The page's build request (`finOpts()` with `swayOpts()`, web/ui/finbuild.js:115-170) as the
+/// object a report carries (`reportSettings`' `opts`, before its `islands` are dropped), from the
+/// two texts the native app builds with: `options` (the `opts_json` keys of docs/FFI.md) and
+/// `tunables` (`tunables_json`, which IS `finOpts().tunables`). Native only: the page reads its
+/// request off the DOM, the app sends these two. Key order is `finOpts`'s; `undefined` keys
+/// (`curvedWalls` off, no `sway`) are absent.
+///
+/// The map: `bedPad` is `padStyle !== 'off'` (Custom sends no `padStyle`), `separateWalls` is the
+/// options' `"on"` / `"off"` text, `sway` carries `swayOpts()`'s keys (`roundFeet`, `gap`,
+/// `iface` are the tunables', `crossAbove` is the tall-wall height when "Brace tall walls" is
+/// ticked, else Infinity, which JSON writes as `null`).
+pub fn web_fin_opts(options: &Json, tunables: &Json) -> Json {
+    let key = |k: &str| options.get(k);
+    let flag = |k: &str| matches!(key(k), Some(Json::Bool(true)));
+    let pass = |k: &str| key(k).cloned().unwrap_or(Json::Null);
+    let tun = |k: &str| tunables.get(k).cloned().unwrap_or(Json::Null);
+    let mut o: Vec<(&str, Json)> = vec![
+        ("mode", pass("mode")),
+        (
+            "bedPad",
+            Json::Bool(!matches!(key("padStyle"), Some(Json::Str(s)) if s == "off")),
+        ),
+        ("plateOnly", Json::Bool(flag("plateOnly"))),
+        ("longWalls", Json::Bool(flag("longWalls"))),
+        (
+            "separateWalls",
+            Json::Bool(matches!(key("separateWalls"), Some(Json::Str(s)) if s == "on")),
+        ),
+        ("tallRibs", Json::Bool(flag("tallRibs"))),
+    ];
+    if flag("curvedWalls") {
+        o.push(("curvedWalls", Json::Bool(true)));
+    }
+    o.push(("tines", Json::Bool(flag("tines"))));
+    o.push(("tineDensity", pass("tineDensity")));
+    o.push(("layerHeight", pass("layerHeight")));
+    o.push(("coverage", pass("coverage")));
+    if flag("sway.on") {
+        let cross_above = if flag("tallRibs") {
+            tun("tallRibsHeight")
+        } else {
+            Json::Num(f64::INFINITY)
+        };
+        o.push((
+            "sway",
+            obj(vec![
+                ("on", Json::Bool(true)),
+                ("roundFeet", tun("roundFeet")),
+                ("uncappedDepth", Json::Bool(flag("sway.uncappedDepth"))),
+                ("gripFrom", pass("sway.gripFrom")),
+                ("tineSpacing", pass("sway.tineSpacing")),
+                ("reach", pass("sway.reach")),
+                ("crossRise", pass("sway.crossRise")),
+                ("gap", tun("propGap")),
+                ("tines", Json::Bool(flag("tines"))),
+                ("iface", tun("iface")),
+                ("layerHeight", pass("layerHeight")),
+                ("crossAbove", cross_above),
+            ]),
+        ));
+    }
+    o.push(("tunables", tunables.clone()));
+    obj(o)
+}

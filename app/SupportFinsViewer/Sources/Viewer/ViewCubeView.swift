@@ -45,19 +45,22 @@ struct ViewCubeStage: View {
             // the labels are resolved once as symbols; resolving the text again for every camera change
             // was the largest cost of an orbit on the main thread
             ForEach(ViewCube.Face.allCases, id: \.self) { face in
-                Text(face.label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(white: 0.92)).tag(face)
+                Text(verbatim: face.localizedLabel()).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color(white: 0.92)).tag(face)
             }
         }
         .frame(width: CGFloat(ViewCube.stage), height: CGFloat(ViewCube.stage))
         .contentShape(.rect)
         .gesture(drag(basis))
+        // never mirrored in a right-to-left language: SwiftUI would mirror the pointer's x here, so a drag would
+        // orbit the other way and a click would pick the mirrored cell (the cube's place in the window does mirror)
+        .environment(\.layoutDirection, .leftToRight)
         // VoiceOver: one element, its faces as actions (a click on a face looks from there)
         .accessibilityElement()
         .accessibilityLabel("View cube")
         .accessibilityHint("Choose a face to look at the part from there")
         .accessibilityActions {
             ForEach(ViewCube.Face.allCases, id: \.self) { face in
-                Button(face.label) { controller.glide(toward: face.n) }
+                Button(face.localizedLabel()) { controller.glide(toward: face.n) }
             }
         }
         .onContinuousHover { phase in
@@ -152,6 +155,7 @@ struct ViewCubeAxes: View {
             }
         }
         .frame(width: 32, height: 32)
+        .environment(\.layoutDirection, .leftToRight)      // the camera's axes, never mirrored (like the cube)
         .accessibilityHidden(true)
     }
 

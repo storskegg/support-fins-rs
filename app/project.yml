@@ -7,6 +7,7 @@ options:
     macOS: "26.0"
   createIntermediateGroups: true
   xcodeVersion: "27.0"
+  developmentLanguage: en
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -47,6 +48,8 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
         INFOPLIST_KEY_NSHumanReadableCopyright: MIT
         ENABLE_HARDENED_RUNTIME: YES
+        # the compiler lists the strings the code localizes (.stringsdata): tools/i18n/parity.ts reads them
+        SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_ENTITLEMENTS: SupportFins/SupportFins.entitlements
     info:
       path: SupportFins/Info.plist
@@ -117,6 +120,9 @@ schemes:
       config: Debug
     test:
       config: Debug
+      # the tests read the English strings; the localization tests pick the language they look at themselves
+      language: en
+      region: US
       targets: [SupportFinsTests]
     profile:
       config: Release
@@ -128,4 +134,6 @@ schemes:
         SupportFins: all
     test:
       config: Debug
+      language: en
+      region: US
       targets: [SupportFinsUITests]

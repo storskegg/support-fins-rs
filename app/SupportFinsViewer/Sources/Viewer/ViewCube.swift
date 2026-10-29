@@ -15,6 +15,12 @@ public enum ViewCube {
 
         public var label: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
 
+        /// The face's name as the cube draws it: `t(VIEWS[key].label)` (`ui/viewcube.js:59`), the web's translation from
+        /// the app's String Catalog (`bundle` is the app's; a test passes one language's `.lproj`).
+        public func localizedLabel(bundle: Bundle = .main, locale: Locale = .current) -> String {
+            String(localized: String.LocalizationValue(label), bundle: bundle, locale: locale)
+        }
+
         /// `n` points out of the face, `u` is right and `v` down on it read from outside, so its label stands
         /// upright in that face's own view.
         public var n: SIMD3<Float> {

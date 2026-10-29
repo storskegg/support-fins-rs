@@ -16,6 +16,6 @@ struct LoadedPart {
 
 struct GeneratedLoader: PartLoading {
     func load(url: URL?, device: MTLDevice) async throws -> [LoadedPart] {
-        [LoadedPart(name: url?.lastPathComponent ?? "Cube", mesh: GeneratedMesh.cube(edge: 40, device: device))]
+        [LoadedPart(name: url?.lastPathComponent ?? JS.t("Cube"), mesh: GeneratedMesh.cube(edge: 40, device: device))]
     }
 }

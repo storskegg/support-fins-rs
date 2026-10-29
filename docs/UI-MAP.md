@@ -178,7 +178,7 @@ state is remembered (`sf.sections`, `ui/settings.js:363-380`) and whose collapse
 
 | Control (`id`) | Type | Label | Default | Range / choices | Tooltip (verbatim) | Source | Native element | M |
 |---|---|---|---|---|---|---|---|---|
-| `opts-search` | search |  |  |  | Search settings | index.html:261; ui/search.js:23 | `.searchable` on the inspector (⌥⌘F focuses); filters rows by label, then tooltip | M7 |
+| `opts-search` | search |  |  |  | Search settings | index.html:261; ui/search.js:23 | `.searchable` on the inspector (⌥⌘F focuses); filters rows by label, then tooltip (`Features/Search`, M7 done; replayed against `search.js`) | M7 |
 | `nozzle` | select | Nozzle mm 0.2 0.25 0.4 0.6 0.8 1.0 1.2 1.4 1.6 | (see choices, * = default) | 0.2=0.2, 0.25=0.25, 0.4=0.4*, 0.6=0.6, 0.8=0.8, 1.0=1.0, 1.2=1.2, 1.4=1.4, 1.6=1.6, 1.8=1.8, 2.0=2.0 | Your printer's nozzle diameter. The walls, contact tips and tines are sized in nozzle lines, so they widen for a bigger nozzle and the tines narrow for a smaller one. | index.html:287; ui/history.js:72 | Inspector > Printer: Picker (menu) | M4b |
 | `layer-height` | number | Layer height mm | 0.2 | 0.08..0.6 step 0.04 | Set this to the layer height you slice at. The grip tines are one layer tall so they snap off clean; if this doesn't match your slicer, the tines tear and leave marks. Default 0.2mm. | index.html:307; ui/export.js:42 | Inspector > Printer: number field with stepper | M4b |
 | `gap` | number | Support gap mm | 0.2 | 0.1..0.4 step 0.05 | Clearance between a support top and the part. Bigger = cleaner surface / easier removal; too big stops holding the overhang. Default 0.2mm. | index.html:311; ui/settings.js:404 | Inspector > Printer: number field with stepper | M4b |
@@ -234,7 +234,7 @@ Groups' hints and mode gates: Pad numbers are shown only for Custom (`ui/setting
 | Control (`id`) | Type | Label | Default | Range / choices | Tooltip (verbatim) | Source | Native element | M |
 |---|---|---|---|---|---|---|---|---|
 | `r-info` | button | i |  |  | Grams assume PLA and count only the fins + pad the tool adds, printed near-solid, cross-checked against the builder's fin volume. In test prints, breakaway fins used 20–45% less plastic and printed ~30% faster than slicer supports. | index.html:615; index.html only (title tooltip) | Info button on the grams receipt: popover | M4b |
-| `report-link` | button | Something didn’t get supported? |  |  | Opens a GitHub issue filled in with this build’s settings and numbers (not your model: attach it there if you can) | index.html:621; ui/report.js:34 | Link button: opens a prefilled GitHub issue | M7 |
+| `report-link` | button | Something didn’t get supported? |  |  | Opens a GitHub issue filled in with this build’s settings and numbers (not your model: attach it there if you can) | index.html:621; ui/report.js:34 | Link button: opens a prefilled GitHub issue (`Features/Report`, M7 done) | M7 |
 | `report-copy` | button | Copy settings |  |  | Copy this build’s settings as JSON: with the model, they rebuild exactly these supports | index.html:623; ui/report.js:44 | Button: copies the build settings JSON (Edit > Copy Build Settings) | M7 |
 
 ---

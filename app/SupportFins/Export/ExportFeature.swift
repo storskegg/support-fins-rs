@@ -23,8 +23,8 @@ final class ExportFeature: Feature {
         // models that collide print into each other: say so where the file is written (the plate's 3MF; an STL is the
         // model being edited alone), Arrange to hand
         if ready, board?.clashing == true {
-            entries += [.note("Models overlap: the 3MF prints them into each other."),
-                        .item("Arrange first") { Task { await board?.arrange() } }]
+            entries += [.note(JS.t("Models overlap: the 3MF prints them into each other.")),
+                        .item(JS.t("Arrange first")) { Task { await board?.arrange() } }]
         }
         entries += ExportFormat.allCases.map { format in
             if format == .threeMF, multi, let board {
@@ -35,7 +35,7 @@ final class ExportFeature: Feature {
             return .item(format.label, help: format.help, enabled: available?.enabled.contains(format) ?? false) { model?.run(format) }
         }
         if (board?.plates.count ?? 0) > 1, let board {
-            entries.append(.item("All plates (3MF)", help: "Every plate's part and supports, one 3MF each, in one .zip file.",
+            entries.append(.item(JS.t("All plates (3MF)"), help: JS.t("Every plate's part and supports, one 3MF each, in one .zip file."),
                                  enabled: !board.busy) { Task { await board.exportAll() } })
         }
         if let note = available?.note, !(multi && board?.parkedFinsExist == true) { entries += [.divider, .note(note)] }
@@ -57,8 +57,8 @@ final class ExportFeature: Feature {
         let board = f?.host.features[PlatesFeature.self]?.board
         let again = exporter?.lastFormat ?? .stl
         return [MenuSection(menu: .fileExport, order: 0, entries: [
-            .submenu("Export", itemEntries(exporter, board: board)),
-            .item("Export Again", shortcut: "e", enabled: exporter?.availability.enabled.contains(again) ?? false) {
+            .submenu(JS.t("Export"), itemEntries(exporter, board: board)),
+            .item(JS.t("Export Again"), shortcut: "e", enabled: exporter?.availability.enabled.contains(again) ?? false) {
                 run(again, model: exporter, board: board)
             },
         ])]

@@ -30,7 +30,7 @@ final class DrawFeature: Feature {
 
     var overlays: [WindowOverlay] {
         // over the viewport, which fills the window under the toolbar: the label's coordinates are the view's
-        [WindowOverlay("brace-tip", order: 80, alignment: .topLeading, ignoresSafeArea: true) { BraceTipView(motion: self.model.motion) }]
+        [WindowOverlay("brace-tip", order: 80, alignment: .topLeading, ignoresSafeArea: true, inViewportSpace: true) { BraceTipView(motion: self.model.motion) }]
     }
 
     var modifiers: [WindowModifier] {

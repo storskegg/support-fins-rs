@@ -11,18 +11,18 @@ enum ExportFormat: CaseIterable, Sendable {
 
     var label: String {
         switch self {
-        case .stl: "STL"
+        case .stl: JS.t("STL")
         case .threeMF: "3MF"
-        case .finsOnly: "Fins only (STL)"
+        case .finsOnly: JS.t("Fins only (STL)")
         }
     }
 
     /// The web's tooltips (`index.html:118-121`).
     var help: String {
         switch self {
-        case .stl: "Part and fins merged into one solid."
-        case .threeMF: "Part and supports as two separate objects, so the slicer keeps them apart and the tines only touch the part: they snap off cleaner. Opens in place in Bambu Studio, OrcaSlicer and PrusaSlicer; don't Arrange or move one without the other. 'No config, geometry only' is expected."
-        case .finsOnly: "Just the fins and pad, in the part's print position, so they line up if imported beside it."
+        case .stl: JS.t("Part and fins merged into one solid.")
+        case .threeMF: JS.t("Part and supports as two separate objects, so the slicer keeps them apart and the tines only touch the part: they snap off cleaner. Opens in place in Bambu Studio, OrcaSlicer and PrusaSlicer; don't Arrange or move one without the other. 'No config, geometry only' is expected.")
+        case .finsOnly: JS.t("Just the fins and pad, in the part's print position, so they line up if imported beside it.")
         }
     }
 
@@ -123,14 +123,14 @@ final class ExportModel {
         guard source() != nil else { return Availability(enabled: [], note: nil) }
         guard finsOn() else {
             return Availability(enabled: [.stl, .threeMF],
-                                note: "No fins yet: STL and 3MF write the part alone. Click Add fins first.")
+                                note: JS.t("No fins yet: STL and 3MF write the part alone. Click Add fins first."))
         }
         // fins on: they are the build, which must have landed
         guard let result = build.latest, !build.building, !drawn().pending else { return Availability(enabled: [], note: nil) }
         let hasFins = result.fins().count() + result.pad().count() + (drawn().sweep?.triangles().count() ?? 0) > 0
         return Availability(
             enabled: hasFins ? Set(ExportFormat.allCases) : [.stl, .threeMF],
-            note: hasFins ? nil : "No supports on this plate: STL and 3MF write the part alone.")
+            note: hasFins ? nil : JS.t("No supports on this plate: STL and 3MF write the part alone."))
     }
 
     /// The suggested file name: `part-fins-0.4nozzle-0.2layer.stl` (`export_file_name`, `ui/export.js` `plateName`).

@@ -62,3 +62,17 @@ app-uibuild: app-core app-project
 # keyboard: only the orchestrator runs it, never an agent and never `just gate`.
 app-uitest: app-core app-project
     tools/lock/lock.py app-uitest -- bash -ec 'dd="{{uitest_derived_data}}"; rm -rf "$dd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules" "$dd/Build/Intermediates.noindex/ExplicitPrecompiledModules" "$dd/ModuleCache.noindex"; xcodebuild test -jobs {{xcode_jobs}} -derivedDataPath "$dd" -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination "platform=macOS"'
+
+# Languages (docs/UI-MAP.md "Languages"; tools/i18n/README.md): the String Catalog is generated from the web's translation
+# tables, so re-run this at the upstream catch-up. `--check` fails when the file differs from what the tables generate.
+i18n-gen *args:
+    deno run -A --config tools/i18n/deno.json tools/i18n/gen.ts {{args}}
+
+# The catalog is what the web's tables generate (cheap, no build): part of every `just gate`.
+i18n-catalog:
+    deno run -A --config tools/i18n/deno.json tools/i18n/gen.ts --check
+
+# Every string the app shows is a web string (or listed in tools/i18n/native-only.json) and every web translation is in the
+# catalog. Reads the strings the compiler extracted from the build of `app-uibuild` (`.dd-ui`), so it builds first.
+i18n-check: app-uibuild
+    deno run -A --config tools/i18n/deno.json tools/i18n/parity.ts --stringsdata "{{justfile_directory()}}/.dd-ui/Build/Intermediates.noindex/SupportFins.build"

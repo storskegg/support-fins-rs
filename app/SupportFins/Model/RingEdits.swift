@@ -28,7 +28,7 @@ final class RingEdits {
             session.pose = Pose(rotation: delta * start.rotation)
         case .ended:
             // a drag that ended where it began leaves the pose as it was, so no step is recorded
-            session.commitGesture(name: "Rotate")
+            session.commitGesture(name: JS.t("Rotate"))
             session.ringDragging = false                  // after the final pose is in: one reaction sees both
             start = nil
         }

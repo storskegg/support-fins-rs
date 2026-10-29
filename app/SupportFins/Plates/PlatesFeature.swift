@@ -47,7 +47,7 @@ final class PlatesFeature: Feature {
 
     var overlays: [WindowOverlay] {
         [
-            WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true) { PlateLabels(board: self.board) },
+            WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true, inViewportSpace: true) { PlateLabels(board: self.board) },
             WindowOverlay("plate-tabs", order: 65, alignment: .top) { PlateTabs(board: self.board) },
             WindowOverlay("clash-banner", order: 66, alignment: .top) { ClashBanner(board: self.board) },
             WindowOverlay("plate-toast", order: 70, alignment: .bottom) { PlateToast(board: self.board) },
@@ -138,25 +138,25 @@ final class PlatesFeature: Feature {
         }
     }
 
-    static let arrangeHelp = "Pack this plate's models apart on the bed, biggest in the middle. Undo puts them back."
-    static let addHelp = "Put another model on this plate, beside this one. Click a model to edit it."
-    static let removeHelp = "Take this model off the plate, to import another without reloading the page."
+    static let arrangeHelp = JS.t("Pack this plate's models apart on the bed, biggest in the middle. Undo puts them back.")
+    static let addHelp = JS.t("Put another model on this plate, beside this one. Click a model to edit it.")
+    static let removeHelp = JS.t("Take this model off the plate, to import another without reloading the page.")
 
     static func menus(_ f: PlatesFeature?) -> [MenuSection] {
         [
             // after Move, before Scale (docs/UI-MAP.md 8.1); the toolbar's Arrange shows with several models, this is
             // greyed without them
             MenuSection(menu: .model, order: 3, entries: [
-                .item("Arrange", help: arrangeHelp,
+                .item(JS.t("Arrange"), help: arrangeHelp,
                       enabled: (f?.board.arrangeShown ?? false) && !(f?.board.arranging ?? true) && !(f?.board.busy ?? true)) {
                     if let board = f?.board { Task { await board.arrange() } }
                 },
             ]),
             MenuSection(menu: .fileExport, order: 10, entries: [
-                .item("Add Model to Plate…", help: addHelp, enabled: f != nil) { f?.addModels() },
+                .item(JS.t("Add Model to Plate…"), help: addHelp, enabled: f != nil) { f?.addModels() },
             ]),
             MenuSection(menu: .edit, order: 10, entries: [
-                .item("Remove Model from Plate", help: removeHelp, enabled: (f?.board.hasLive ?? false) && !(f?.board.busy ?? true)) {
+                .item(JS.t("Remove Model from Plate"), help: removeHelp, enabled: (f?.board.hasLive ?? false) && !(f?.board.busy ?? true)) {
                     f?.board.removeModel()
                 },
             ]),
