@@ -13,7 +13,8 @@ final class ReadoutFeature: Feature {
                 ReadoutSections(controller: controller, session: self.host.session, build: self.host.wiring?.build,
                                 extraLines: self.host.features.statusLines,
                                 draw: self.host.features[DrawFeature.self]?.model.readoutState,
-                                statsRows: self.host.features.inspectorSections(.stats))
+                                statsRows: self.host.features.inspectorSections(.stats),
+                                plateFit: { self.host.features[PlatesFeature.self]?.board.fit ?? PlateFit() })
             }
         }]
     }

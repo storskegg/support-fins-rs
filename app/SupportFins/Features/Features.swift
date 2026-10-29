@@ -6,6 +6,7 @@ enum Features {
     static let all: [any Feature.Type] = [
         OpenFeature.self,
         BuildSpinnerFeature.self,
+        MoveFeature.self,
         RotateFeature.self,
         ScaleFeature.self,
         SuggestFeature.self,

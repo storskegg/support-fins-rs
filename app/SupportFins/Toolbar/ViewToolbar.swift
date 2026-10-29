@@ -65,10 +65,24 @@ private struct SlotButton: View {
             }
         }
         .accessibilityIdentifier("toolbar-\(slot.id)")
+        .modifier(OnOffValue(state: badge?.toggle.map { $0.isOn() ? "on" : "off" }))
         .popover(isPresented: Binding(get: { registry.open == slot && badge != nil },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {
             badge?.popover().padding(12)
         }
+    }
+}
+
+/// A toggle badge says whether its tool is on to the accessibility tree (a UI test reads it as selected); other badges
+/// say nothing.
+private struct OnOffValue: ViewModifier {
+    let state: String?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let state {
+            // selected is what XCUITest reads reliably on a button (`isSelected`); the value says it in words
+            content.accessibilityValue(state).accessibilityAddTraits(state == "on" ? .isSelected : [])
+        } else { content }
     }
 }
