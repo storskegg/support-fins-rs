@@ -16,6 +16,10 @@ swift-bindings:
     rm -rf "$gen" && mkdir -p "$gen/headers"
     cargo run --release -q -p sf-ffi --bin uniffi-bindgen -- generate --library "$lib" --language swift --out-dir "$gen"
     cp "$gen/sf_ffi.swift" "$pkg/Sources/SupportFinsCore/sf_ffi.swift"
+    # FfiError's errorDescription is UniFFI's String(reflecting: self), a Swift type dump; use the hand-written one
+    # (FfiError+Description.swift). Fail loudly if a UniFFI update changes the line.
+    grep -c 'String(reflecting: self)' "$pkg/Sources/SupportFinsCore/sf_ffi.swift" | grep -qx 1
+    sed -i '' 's/String(reflecting: self)/ffiErrorDescription(self)/' "$pkg/Sources/SupportFinsCore/sf_ffi.swift"
     cp "$gen/sf_ffiFFI.h" "$gen/headers/"
     cp "$gen/sf_ffiFFI.modulemap" "$gen/headers/module.modulemap"
     rm -rf "$pkg/sf_ffiFFI.xcframework"
