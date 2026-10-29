@@ -7,6 +7,7 @@ pub mod obj;
 pub mod paintcode;
 pub mod report;
 pub mod scale;
+pub mod session;
 pub mod stl;
 mod text;
 pub mod threemf;

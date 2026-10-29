@@ -202,6 +202,7 @@ fn plate_models(spec: &Json) -> Vec<PlateModel> {
                     .collect(),
                 x: num(&placed[0]),
                 y: num(&placed[1]),
+                session: None,
             }
         })
         .collect()

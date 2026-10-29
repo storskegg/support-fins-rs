@@ -42,7 +42,7 @@ extension PlateBoard {
             let result = settings.finsOn ? build?.latest : nil
             let ids = result == nil ? [] : (build?.matchedRemovals(of: removed).keys.sorted().map { UInt64($0) } ?? [])
             models.append(PlateModel(part: part.part, build: result, drawn: result == nil ? nil : drawn(m), pose: pose.columnMajor,
-                                     threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y))
+                                     threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y, session: nil))
             if first == nil { first = part.info.name }
         }
         guard let first else { return nil }

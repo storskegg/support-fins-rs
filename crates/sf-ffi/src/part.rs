@@ -2,7 +2,7 @@
 
 use std::fmt;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use sf_engine::jsnum;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
@@ -178,11 +178,42 @@ pub struct Part {
     colors: Option<PartColors>,
     topo: Arc<Topology>,
     size: [f64; 3],
-    notes: Vec<String>,
-    import_note: String,
-    /// What the reader decided (`lastImportMeta`), kept so a merge can sum it.
-    meta: ImportMeta,
+    /// What the reader decided (`lastImportMeta`), kept so a merge can sum it, and the import note it makes;
+    /// a restored session or a rescale rewrites it.
+    note: Mutex<NoteState>,
     weld_ms: f64,
+}
+
+/// `lastImportMeta` with what `renderImportNote` needs of the file, the note it made, and the session a 3MF
+/// carried that is still to be restored (`pendingSession`, `web/ui/io.js:24`).
+pub(crate) struct NoteState {
+    pub(crate) meta: ImportMeta,
+    objects_len: usize,
+    chosen_len: usize,
+    notes: Vec<String>,
+    pub(crate) import_note: String,
+    pub(crate) pending: Option<sf_io::json::Json>,
+}
+
+impl NoteState {
+    fn new(name: &str, meta: ImportMeta, objects_len: usize, chosen_len: usize) -> NoteState {
+        let mut n = NoteState {
+            meta,
+            objects_len,
+            chosen_len,
+            notes: Vec::new(),
+            import_note: String::new(),
+            pending: None,
+        };
+        n.render(name);
+        n
+    }
+
+    /// `renderImportNote`: the notes and the line they make.
+    pub(crate) fn render(&mut self, name: &str) {
+        self.notes = self.meta.clauses(self.objects_len, self.chosen_len, name);
+        self.import_note = self.meta.line(&self.notes);
+    }
 }
 
 /// The box of a position soup: `[hi - lo; 3]`, zero for an empty one.
@@ -219,8 +250,7 @@ impl Part {
         chosen_len: usize,
     ) -> Part {
         let size = bbox_size(&positions);
-        let notes = meta.clauses(objects_len, chosen_len, &name);
-        let import_note = meta.line(&notes);
+        let note = NoteState::new(&name, meta, objects_len, chosen_len);
         let started = std::time::Instant::now();
         let topo = build_topology(positions);
         let weld_ms = started.elapsed().as_secs_f64() * 1e3;
@@ -231,16 +261,30 @@ impl Part {
             colors,
             topo: Arc::new(topo),
             size,
-            notes,
-            import_note,
-            meta,
+            note: Mutex::new(note),
             weld_ms,
         }
+    }
+
+    /// A 3MF's session, to be restored once the part is on show (`pendingSession`, `web/ui/io.js:287`).
+    fn with_session(self, session: sf_io::json::Json) -> Part {
+        self.note.lock().unwrap().pending = Some(session);
+        self
+    }
+
+    /// See `NoteState`.
+    pub(crate) fn note(&self) -> std::sync::MutexGuard<'_, NoteState> {
+        self.note.lock().unwrap()
     }
 
     /// The part's topology, for the build and the tests.
     pub fn topology(&self) -> &Arc<Topology> {
         &self.topo
+    }
+
+    /// The part's name, as the page shows it.
+    pub(crate) fn name(&self) -> &str {
+        &self.name
     }
 
     /// See the field.
@@ -324,6 +368,21 @@ impl Part {
         let started = std::time::Instant::now();
         let topo = build_topology(positions);
         let weld_ms = started.elapsed().as_secs_f64() * 1e3;
+        // `forgetSessionNote` (`web/ui/io.js:90-96`, called by `setScale`): the supports a saved session brought
+        // back are gone with the rescale, so the note no longer says they were restored
+        let mut note = {
+            let n = self.note();
+            NoteState {
+                meta: n.meta.clone(),
+                objects_len: n.objects_len,
+                chosen_len: n.chosen_len,
+                notes: Vec::new(),
+                import_note: String::new(),
+                pending: None,
+            }
+        };
+        note.meta.session = SessionNote::None;
+        note.render(&self.name);
         Arc::new(Part {
             name: self.name.clone(),
             stem: self.stem.clone(),
@@ -331,20 +390,19 @@ impl Part {
             colors: self.colors.clone(),
             topo: Arc::new(topo),
             size,
-            notes: self.notes.clone(),
-            import_note: self.import_note.clone(),
-            meta: self.meta.clone(),
+            note: Mutex::new(note),
             weld_ms,
         })
     }
 
     pub fn info(&self) -> PartInfo {
+        let note = self.note();
         PartInfo {
             name: self.name.clone(),
             triangles: self.topo.n_faces as u64,
             size: self.size.to_vec(),
-            notes: self.notes.clone(),
-            import_note: self.import_note.clone(),
+            notes: note.notes.clone(),
+            import_note: note.import_note.clone(),
             weld_ms: self.weld_ms,
         }
     }
@@ -457,7 +515,7 @@ enum Kind {
 
 /// `lastImportMeta` (`web/ui/io.js:273-285`): what the reader had to decide, for the import note.
 #[derive(Clone, Debug)]
-struct ImportMeta {
+pub(crate) struct ImportMeta {
     kind: Kind,
     /// the chosen object's meshes (`chosen[0].meshes`)
     meshes: usize,
@@ -469,6 +527,22 @@ struct ImportMeta {
     /// modifiers / support blockers kept for the 3MF export
     extras: usize,
     unit: String,
+    /// what a saved session did (`lastImportMeta.session` and `.restored`)
+    pub(crate) session: SessionNote,
+}
+
+/// What came of the session a 3MF carried (`lastImportMeta.session` / `.restored`, `web/ui/io.js:53-67`): nothing
+/// to say until it is restored, and nothing again once the part is rescaled (`forgetSessionNote`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) enum SessionNote {
+    #[default]
+    None,
+    /// restored onto the part: `n` hand-placed supports and the settings
+    Restored(usize),
+    /// added beside a plate's models: `n` supports, the plate keeps its settings
+    Beside(usize),
+    Changed,
+    Unreadable,
 }
 
 impl ImportMeta {
@@ -482,11 +556,11 @@ impl ImportMeta {
             why: None,
             extras: 0,
             unit: String::new(),
+            session: SessionNote::None,
         }
     }
 
-    /// The notes of `renderImportNote` (`web/ui/io.js:26-69`) in the web's order and words. Session notes
-    /// (`restored ...`) are for a file this app wrote with a session: M7.
+    /// The notes of `renderImportNote` (`web/ui/io.js:26-69`) in the web's order and words.
     fn clauses(&self, objects_len: usize, chosen_len: usize, chosen_name: &str) -> Vec<String> {
         let mut n = Vec::new();
         let head = |n: &mut Vec<String>| {
@@ -564,6 +638,29 @@ impl ImportMeta {
                 if !self.unit.is_empty() && self.unit != "millimeter" {
                     n.push(format!("converted from {} to mm", self.unit));
                 }
+                match self.session {
+                    SessionNote::None => {}
+                    SessionNote::Restored(0) => n.push("restored the settings".into()),
+                    SessionNote::Restored(k) => n.push(format!(
+                        "restored {} and the settings",
+                        plural(k, "hand-placed support", "hand-placed supports")
+                    )),
+                    // added beside a plate's models: the settings are the plate's (ui/models.js)
+                    SessionNote::Beside(0) => n.push("the plate keeps its settings".into()),
+                    SessionNote::Beside(k) => n.push(format!(
+                        "restored {}; the plate keeps its settings",
+                        plural(k, "hand-placed support", "hand-placed supports")
+                    )),
+                    SessionNote::Changed => {
+                        n.push(
+                            "saved supports not loaded: the part changed since it was exported"
+                                .into(),
+                        );
+                    }
+                    SessionNote::Unreadable => {
+                        n.push("saved supports not loaded: the saved session is damaged".into());
+                    }
+                }
             }
         }
         n
@@ -624,6 +721,9 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     let format = |message: String| FfiError::Format { message };
     let lower = path.to_ascii_lowercase();
     let mut parts: Vec<Loaded> = Vec::new();
+    // a 3MF this app or the site exported carries a session: its part loads, and the supports come back from the
+    // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
+    let mut own: Option<(usize, sf_io::json::Json)> = None;
     if lower.ends_with(".stl") {
         parts.push((
             stem(&path),
@@ -639,7 +739,13 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     } else if lower.ends_with(".3mf") {
         let m = read_three_mf_unmerged(&bytes).map_err(format)?;
         drop(bytes);
-        let objects = m.objects;
+        let mut objects = m.objects;
+        if let Some(session) = m.session
+            && let Some(i) = sf_io::session::part_object_of(&objects)
+        {
+            own = Some((objects.len(), session));
+            objects = vec![objects.swap_remove(i)];
+        }
         let (skipped, unit) = (m.skipped, m.unit);
         let file = |mut meta: ImportMeta| {
             meta.skipped = skipped;
@@ -675,7 +781,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
         return Err(format("no triangles in the file".into()));
     }
     let base = stem(&path);
-    let objects_len = parts.len();
+    let objects_len = own.as_ref().map_or(parts.len(), |(n, _)| *n);
     Ok(parts
         .into_iter()
         .enumerate()
@@ -685,7 +791,7 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
             } else {
                 name
             };
-            Arc::new(Part::new(
+            let part = Part::new(
                 name,
                 base.clone(),
                 pos,
@@ -694,7 +800,11 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
                 meta,
                 objects_len,
                 1,
-            ))
+            );
+            Arc::new(match &own {
+                Some((_, session)) => part.with_session(session.clone()),
+                None => part,
+            })
         })
         .collect())
 }
@@ -761,11 +871,14 @@ pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>
         None
     };
     // the tallies of `cutChosen` (io.js:288-311): sums, the first reason, the first object's meshes
-    let mut meta = parts[0].meta.clone();
-    meta.cut = parts.iter().map(|p| p.meta.cut).sum();
-    meta.uncut = parts.iter().map(|p| p.meta.uncut).sum();
-    meta.why = parts.iter().find_map(|p| p.meta.why);
-    meta.extras = parts.iter().map(|p| p.meta.extras).sum();
+    let metas: Vec<ImportMeta> = parts.iter().map(|p| p.note().meta.clone()).collect();
+    let mut meta = metas[0].clone();
+    meta.cut = metas.iter().map(|m| m.cut).sum();
+    meta.uncut = metas.iter().map(|m| m.uncut).sum();
+    meta.why = metas.iter().find_map(|m| m.why);
+    meta.extras = metas.iter().map(|m| m.extras).sum();
+    // a saved session belongs to the one part it was exported with: a merge of several has none
+    meta.session = SessionNote::None;
     let total = (object_count as usize).max(parts.len());
     let stem = parts[0].stem.clone();
     Ok(Arc::new(Part::new(
