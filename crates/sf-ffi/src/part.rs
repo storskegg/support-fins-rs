@@ -4,8 +4,10 @@ use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 
+use sf_engine::jsnum;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
 use sf_io::obj::read_obj;
+use sf_io::scale::{scale_about, scale_from_percent};
 use sf_io::stl::read_stl;
 use sf_io::threemf::{
     MergeItem, PartColors, PartKind, ReadExtra, ThreeMfObject, merge_colors, read_three_mf_unmerged,
@@ -54,6 +56,21 @@ pub struct PartInfo {
     /// How long welding the vertices took at load (`buildTopology`), ms: the readout's "weld" time
     /// (`web/ui/part.js` `analysisTiming`).
     pub weld_ms: f64,
+}
+
+/// `scaleFromPercent` (`web/scale.js:26-31`) on the percent field's text (`Number(v)`): the factor, 10-1000 %
+/// clamped and rounded to the 2 decimals the field shows, or `None` for junk, empty (`Number('')` is 0) or a
+/// non-positive value, where the field shows the scale that holds again.
+#[uniffi::export]
+pub fn scale_from_percent_text(text: String) -> Option<f64> {
+    scale_from_percent(jsnum::string_to_number(&text))
+}
+
+/// The percent field's text for a scale (`+(scale * 100).toFixed(2)` as a number, `web/ui/scale.js:30`): "150",
+/// "33.33", "12.5".
+#[uniffi::export]
+pub fn scale_percent_text(factor: f64) -> String {
+    jsnum::to_js_string(jsnum::string_to_number(&jsnum::to_fixed(factor * 100.0, 2)))
 }
 
 /// `analyze`'s numbers (web/overhangs.js `analyze`), for the readout.
@@ -168,6 +185,28 @@ pub struct Part {
     weld_ms: f64,
 }
 
+/// The box of a position soup: `[hi - lo; 3]`, zero for an empty one.
+fn bbox_size(positions: &[f64]) -> [f64; 3] {
+    let (lo, hi) = bbox(positions);
+    if positions.is_empty() {
+        [0.0; 3]
+    } else {
+        [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
+    }
+}
+
+fn bbox(positions: &[f64]) -> ([f64; 3], [f64; 3]) {
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for v in positions.as_chunks::<3>().0 {
+        for k in 0..3 {
+            lo[k] = lo[k].min(v[k]);
+            hi[k] = hi[k].max(v[k]);
+        }
+    }
+    (lo, hi)
+}
+
 impl Part {
     fn new(
         name: String,
@@ -179,19 +218,7 @@ impl Part {
         objects_len: usize,
         chosen_len: usize,
     ) -> Part {
-        let mut lo = [f64::INFINITY; 3];
-        let mut hi = [f64::NEG_INFINITY; 3];
-        for v in positions.as_chunks::<3>().0 {
-            for k in 0..3 {
-                lo[k] = lo[k].min(v[k]);
-                hi[k] = hi[k].max(v[k]);
-            }
-        }
-        let size = if positions.is_empty() {
-            [0.0; 3]
-        } else {
-            [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]]
-        };
+        let size = bbox_size(&positions);
         let notes = meta.clauses(objects_len, chosen_len, &name);
         let import_note = meta.line(&notes);
         let started = std::time::Instant::now();
@@ -256,6 +283,61 @@ fn threshold(deg: f64) -> Result<f64, FfiError> {
 
 #[uniffi::export]
 impl Part {
+    /// This part scaled uniformly by `factor` about the centre of its box (`setScale`, `web/ui/scale.js:41-65`),
+    /// welded afresh. Call it on the part as loaded, never on a scaled one, so every scale is taken from 100 %
+    /// and never compounded. The positions take the page's two f32 roundings, exactly: `setPart` centres the
+    /// loaded `Float32Array` (`web/ui/part.js:81-90`: the centre is `(min + max) / 2` in f64 of the box, each
+    /// position stored as `f32(p - centre)`), then `scaleAbout(centred, s, [0, 0, 0], centre)` stores
+    /// `f32(centre + s * centred)`. (`setPart` centres that result once more for the page; the Rust part stays in
+    /// the file frame, as the load does, so that last translation is not made.) A slicer's own parts are scaled
+    /// from the uncentred file frame, `scaleAbout(positions, s, centre)`, one rounding, as `scale.js:56-58` does;
+    /// the colours, the notes and the name are the part's.
+    pub fn scaled(&self, factor: f64) -> Arc<Part> {
+        let (lo, hi) = bbox(&self.topo.pos);
+        let c = [
+            (lo[0] + hi[0]) / 2.0,
+            (lo[1] + hi[1]) / 2.0,
+            (lo[2] + hi[2]) / 2.0,
+        ];
+        let centred: Vec<f64> = self
+            .topo
+            .pos
+            .iter()
+            .enumerate()
+            .map(|(i, p)| ((p - c[i % 3]) as f32) as f64)
+            .collect();
+        let positions = scale_about(&centred, factor, [0.0; 3], c);
+        let slicer = self.slicer.as_ref().map(|sl| Slicer {
+            positions: scale_about(&sl.positions, factor, c, c),
+            colors: sl.colors.clone(),
+            extras: sl
+                .extras
+                .iter()
+                .map(|e| {
+                    let mut e = e.clone();
+                    e.positions = scale_about(&e.positions, factor, c, c);
+                    e
+                })
+                .collect(),
+        });
+        let size = bbox_size(&positions);
+        let started = std::time::Instant::now();
+        let topo = build_topology(positions);
+        let weld_ms = started.elapsed().as_secs_f64() * 1e3;
+        Arc::new(Part {
+            name: self.name.clone(),
+            stem: self.stem.clone(),
+            slicer: slicer.map(Arc::new),
+            colors: self.colors.clone(),
+            topo: Arc::new(topo),
+            size,
+            notes: self.notes.clone(),
+            import_note: self.import_note.clone(),
+            meta: self.meta.clone(),
+            weld_ms,
+        })
+    }
+
     pub fn info(&self) -> PartInfo {
         PartInfo {
             name: self.name.clone(),
@@ -370,6 +452,7 @@ enum Kind {
     Stl,
     Obj,
     ThreeMf,
+    Step,
 }
 
 /// `lastImportMeta` (`web/ui/io.js:273-285`): what the reader had to decide, for the import note.
@@ -419,6 +502,13 @@ impl ImportMeta {
                 if objects_len > 1 {
                     head(&mut n);
                 }
+            }
+            // `parseStep` (web/ui/io.js:313-350): the pick's note, then the tessellation tolerance
+            Kind::Step => {
+                if objects_len > 1 {
+                    head(&mut n);
+                }
+                n.push("tessellated at 0.01 mm".into());
             }
             Kind::ThreeMf => {
                 if objects_len > 1 {
@@ -487,6 +577,7 @@ impl ImportMeta {
         let tag = match self.kind {
             Kind::ThreeMf => "3MF",
             Kind::Obj => "OBJ",
+            Kind::Step => "STEP",
             Kind::Stl => return String::new(),
         };
         format!("{tag}: {}.", clauses.join("; "))
@@ -571,8 +662,13 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
                     .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
             );
         }
+    } else if lower.ends_with(".step") || lower.ends_with(".stp") || sf_step::is_step(&bytes) {
+        // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
+        for o in sf_step::read_step(&bytes).map_err(format)? {
+            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Step)));
+        }
     } else {
-        return Err(format("reads .stl, .3mf and .obj only".into()));
+        return Err(format("reads .stl, .3mf, .obj and .step only".into()));
     }
     parts.retain(|(_, p, _, _, _)| !p.is_empty());
     if parts.is_empty() {

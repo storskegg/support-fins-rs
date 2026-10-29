@@ -131,13 +131,13 @@ fn load_parts_reports_io_and_format_errors() {
     let missing = load_parts("/no/such/file.stl".into()).err().unwrap();
     assert!(matches!(missing, FfiError::Io { .. }), "{missing:?}");
     assert!(missing.to_string().contains("/no/such/file.stl"));
-    let ext = tmp("x.step");
+    let ext = tmp("x.dxf");
     std::fs::write(&ext, "ISO-10303").unwrap();
     let e = load_parts(ext.to_string_lossy().into_owned())
         .err()
         .unwrap();
     assert!(
-        matches!(&e, FfiError::Format { message } if message == "reads .stl, .3mf and .obj only"),
+        matches!(&e, FfiError::Format { message } if message == "reads .stl, .3mf, .obj and .step only"),
         "{e:?}"
     );
     let bad = tmp("bad.3mf");
@@ -444,4 +444,128 @@ fn merge_parts_of_one_is_itself_and_of_none_is_an_error() {
         &a
     ));
     assert!(merge_parts(vec![], 0).is_err());
+}
+
+// web/ui/scale.js `setScale`: a uniform scale about the box centre, from the part as loaded.
+#[test]
+fn scaled_part_is_the_box_scaled_about_its_centre() {
+    let p = load("sphere");
+    let lo_hi = |q: &Part| {
+        let pos = &q.topology().pos;
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for v in pos.as_chunks::<3>().0 {
+            for k in 0..3 {
+                lo[k] = lo[k].min(v[k]);
+                hi[k] = hi[k].max(v[k]);
+            }
+        }
+        (lo, hi)
+    };
+    let (lo, hi) = lo_hi(&p);
+    let s = p.scaled(2.5);
+    let (slo, shi) = lo_hi(&s);
+    for k in 0..3 {
+        let c = (lo[k] + hi[k]) / 2.0;
+        assert!(((slo[k] + shi[k]) / 2.0 - c).abs() < 1e-3, "centre kept");
+        assert!(((shi[k] - slo[k]) - 2.5 * (hi[k] - lo[k])).abs() < 1e-3);
+    }
+    assert_eq!(s.info().triangles, p.info().triangles);
+    assert_eq!(s.info().name, p.info().name);
+    assert_eq!(s.info().notes, p.info().notes);
+    let size = s.info().size;
+    assert!((size[0] - 2.5 * p.info().size[0]).abs() < 1e-3);
+}
+
+#[test]
+fn scaling_from_the_base_never_compounds() {
+    let p = load("sphere");
+    let twice = p.scaled(2.0).scaled(0.5);
+    let back = p.scaled(1.0);
+    for (a, b) in twice.info().size.iter().zip(back.info().size.iter()) {
+        assert!((a - b).abs() < 1e-3);
+    }
+    // the app keeps the base and rescales it: 150 % then 100 % is the base again
+    assert_eq!(p.scaled(1.0).topology().pos, p.topology().pos);
+}
+
+#[test]
+fn percent_text_is_the_fields_wording() {
+    use sf_ffi::{scale_from_percent_text, scale_percent_text};
+    assert_eq!(scale_from_percent_text("150".into()), Some(1.5));
+    assert_eq!(scale_from_percent_text(" 5 ".into()), Some(0.1));
+    assert_eq!(scale_from_percent_text("5000".into()), Some(10.0));
+    assert_eq!(scale_from_percent_text("33.333".into()), Some(0.3333));
+    assert_eq!(scale_from_percent_text("".into()), None);
+    assert_eq!(scale_from_percent_text("abc".into()), None);
+    assert_eq!(scale_from_percent_text("-3".into()), None);
+    assert_eq!(scale_from_percent_text("1e2".into()), Some(1.0));
+    assert_eq!(scale_percent_text(1.0), "100");
+    assert_eq!(scale_percent_text(1.5), "150");
+    assert_eq!(scale_percent_text(0.3333), "33.33");
+    assert_eq!(scale_percent_text(0.125), "12.5");
+    assert_eq!(scale_percent_text(10.0), "1000");
+}
+
+// STEP (web/step.js, web/ui/io.js parseStep): a one-body file is one part named from the file's own name for the
+// body; a two-body file is two pickable parts; the note says the tessellation tolerance.
+#[test]
+fn load_parts_reads_step_files_through_opencascade() {
+    assert!(
+        sf_step::available(),
+        "OpenCascade is not in this build: run `just occt`"
+    );
+    let fixtures = sf_testkit::upstream_root().join("tests/fixtures");
+    let one = load_parts(fixtures.join("bracket.step").to_string_lossy().into_owned()).unwrap();
+    assert_eq!(one.len(), 1);
+    let i = one[0].info();
+    assert_eq!(i.name, "Bracket");
+    assert_eq!(i.notes, vec!["tessellated at 0.01 mm"]);
+    assert_eq!(i.import_note, "STEP: tessellated at 0.01 mm.");
+    for (s, want) in i.size.iter().zip([40.0, 20.0, 30.0]) {
+        assert!((s - want).abs() < 1e-3, "{:?}", i.size);
+    }
+
+    let two = load_parts(
+        fixtures
+            .join("two-bodies.step")
+            .to_string_lossy()
+            .into_owned(),
+    )
+    .unwrap();
+    let mut names: Vec<String> = two.iter().map(|p| p.info().name).collect();
+    names.sort();
+    assert_eq!(names, ["Bracket", "Peg"]);
+    let peg = two.iter().find(|p| p.info().name == "Peg").unwrap();
+    assert_eq!(
+        peg.info().import_note,
+        "STEP: imported “Peg” of 2 objects; tessellated at 0.01 mm."
+    );
+    let merged = merge_parts(two, 2).unwrap().info();
+    assert_eq!(
+        merged.import_note,
+        "STEP: merged 2 of 2 objects into one part; tessellated at 0.01 mm."
+    );
+
+    // the page sniffs the content: a STEP under any name loads, and under .stp
+    let bytes = std::fs::read(fixtures.join("bracket.step")).unwrap();
+    for name in ["sniffed.dat", "short.stp", "UPPER.STEP"] {
+        let p = tmp(name);
+        std::fs::write(&p, &bytes).unwrap();
+        assert_eq!(
+            load_parts(p.to_string_lossy().into_owned()).unwrap().len(),
+            1,
+            "{name}"
+        );
+    }
+    // a broken one says what the page says
+    let bad = tmp("broken.step");
+    std::fs::write(&bad, "ISO-10303-21;\nnot really").unwrap();
+    let e = load_parts(bad.to_string_lossy().into_owned())
+        .err()
+        .unwrap();
+    assert!(
+        matches!(&e, FfiError::Format { message } if message == "the CAD kernel could not read this STEP file"),
+        "{e:?}"
+    );
 }

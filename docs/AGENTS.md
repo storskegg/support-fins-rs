@@ -27,7 +27,7 @@ you start a ticket, and again whenever a review sends you back.
    ```
    Do all your work, builds and commits inside that directory.
 
-   **Heavy runs take the machine lock.** `app-test`, `app-uitest` and every `bench-*` recipe go
+   **Heavy runs take the machine lock.** `app-test`, `app-uibuild`, `app-uitest` and every `bench-*` recipe go
    through `tools/lock/lock.py`: one at a time on the Mac, whichever worktree starts them. If it
    prints "waiting for <holder>", wait; never work around it, and never wait for the load to drop
    (the Mac idles around 3). Benchmarks record the load before and during the run.
@@ -37,8 +37,14 @@ you start a ticket, and again whenever a review sends you back.
    silently skips new test files (201 tests run instead of 211). `just gate` prints the test count.
 
    **UI tests (`app-uitest`) are the orchestrator's only.** They take over the user's mouse and
-   keyboard, and `FinsLoopUITests` is flaky under heavy load (a hit point while scrolling, `FinsLoopUITests.swift:51`; the lock exists partly to prevent that), so no agent runs them and `just gate` leaves them out. The headless
-   `EndToEndTests` in `app-test` covers the same loop.
+   keyboard (the lock keeps them alone on the machine), so no agent runs them and `just gate` leaves them out. The headless
+   `EndToEndTests` in `app-test` covers the same loop. **Do compile them:** `just app-uibuild`
+   (`xcodebuild build-for-testing` of the SupportFinsUI scheme, derived data in your worktree's `.dd-ui`)
+   drives nothing, and `just gate` runs it with the app gates, so add and extend UI tests freely, but a
+   UI test that doesn't compile fails the gate. Every UI test subclasses `PartWindowUITestCase`
+   (`app/SupportFinsUITests`): launch with nothing restored, `openFixturePart()`, `element(_:)` scoped to
+   the part's window (`popoverElement(_:)` for a toolbar popover's), `scrollIntoView(_:)` instead of scrolling over a row, `waitForFile` for exports,
+   `menuBarItem(_:)` for menus. Don't find elements app-wide or click by screen coordinates.
 
    **After merges the orchestrator runs `just tidy --apply`** to remove worktrees whose work is
    on GitHub. Don't delete your own worktree; say in your report when you're done with it.

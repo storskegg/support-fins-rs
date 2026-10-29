@@ -108,9 +108,9 @@ struct OpenFlowTests {
         #expect(p.entries.map(\.name) == ["bracket", "bracket supports"] && p.selected == [1])
     }
 
-    @Test func dropsTakeSTLOBJAnd3MFOnly() {
-        for n in ["a.stl", "a.STL", "b.obj", "c.3mf"] { #expect(OpenRules.accepts(URL(fileURLWithPath: "/x/" + n)), "\(n)") }
-        for n in ["a.step", "a.stp", "a.png"] { #expect(!OpenRules.accepts(URL(fileURLWithPath: "/x/" + n)), "\(n)") }
+    @Test func dropsTakeSTLOBJ3MFAndSTEP() {
+        for n in ["a.stl", "a.STL", "b.obj", "c.3mf", "d.step", "e.STP"] { #expect(OpenRules.accepts(URL(fileURLWithPath: "/x/" + n)), "\(n)") }
+        for n in ["a.png", "a.iges", "a.stepx"] { #expect(!OpenRules.accepts(URL(fileURLWithPath: "/x/" + n)), "\(n)") }
     }
 }
 

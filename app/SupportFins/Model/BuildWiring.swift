@@ -48,7 +48,9 @@ final class BuildWiring {
     var spinnerVisible: Bool { scheduler?.spinnerVisible ?? false }
 
     /// A part was loaded (`session.replaceParts` has run): build against its first object from now on.
-    func attach() {
+    /// `reusing`: the part's own build, kept by the plates while the model was parked (`Plates/`); its fins are
+    /// shown again at once and rebuilt only if they are not the ones the session asks for.
+    func attach(reusing kept: BuildModel? = nil) {
         generation += 1                      // stops the previous file's watch
         scheduler?.setEnabled(false)
         guard let first = session.parts.first else {
@@ -56,7 +58,7 @@ final class BuildWiring {
             controller.renderer.setSupports(nil)
             return
         }
-        let build = BuildModel(part: first.part)
+        let build = kept ?? BuildModel(part: first.part)
         let scheduler = BuildController(
             driver: build,
             request: { [session] in BuildRequest(rotation: session.pose.columnMajor, settings: session.settings) },
@@ -87,7 +89,21 @@ final class BuildWiring {
         controller.renderer.setSupports(nil)
         watch()
         // the session's toggle may already be on (a second file in the window)
-        scheduler.setEnabled(session.finsOn)
+        scheduler.setEnabled(session.finsOn, reusing: kept != nil)
+        if kept != nil { show() }
+    }
+
+    /// The model on show is parked (`Plates/`): the build it made stays with it, untouched, and nothing follows
+    /// the session for it any more. Returns that build.
+    @discardableResult
+    func detach() -> BuildModel? {
+        generation += 1
+        scheduler?.stop()
+        let kept = build
+        build?.onUpdate = nil
+        build = nil; scheduler = nil; removal = nil; exporter = nil
+        controller.renderer.setSupports(nil)
+        return kept
     }
 
     /// The fins of the latest build on the viewer, minus the removed ones; the removal pointer re-armed to match.

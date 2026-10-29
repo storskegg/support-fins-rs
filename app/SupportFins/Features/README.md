@@ -14,13 +14,15 @@ To add one:
 What a feature may register (`Features/Contributions.swift`): `overlays` (alignment, `order`: higher is on top),
 `modifiers` (sheets, drop targets, `WindowModifier.onChange`), `windowToolbarItems`, `toolbarSlots` plus
 `registerTools(in:)` for the floating toolbar's badges (declare a `static let` `ToolbarSlot` of your own),
-`inspectorSections` (slot `.top`, `.basics` or `.bottom`), `statusLines` (the status card), `escapeHandlers`
+`inspectorSections` (slot `.top`, `.stats` (rows at the end of the stats card), `.basics` or `.bottom`), `statusLines` (the status card), `escapeHandlers`
 (priority: higher first; return true to take the key and stop the cascade), `partWillShow` / `partDidShow`, and
-`static func menus(_:)` (`MenuSection`s for `.view`, `.model`, `.fileExport`, or your own `MenuID`; items come
+`static func menus(_:)` (`MenuSection`s for `.view`, `.model`, `.fileExport`, `.edit` (items after Undo and Redo), or your own `MenuID`; items come
 in section `order`, so a feature's items sit where the menu has them).
 
 Ties in `order` keep the `Features.all` order. Menus come in `MenuID.order` (View 0, Model 10), so a menu of your own
 sits where its order puts it; `FeatureCommands` has room for `menuSlots` menus (a test fails when they run out).
+A menu macOS already has (File, Edit, View, ...) is never a `MenuID` of your own: `.view` and `.fileExport` fill a
+`group` of the system's menu (`MenuID.SystemGroup`), and `FeatureSetTests` fails on a second menu of a system name.
 A contribution's content is called in a view of its own (`ContributionView`, and each menu in its own view), so what it reads from
 `host` is observed there: read the models inside the content closure, not before it.
 `FeatureSetTests` pins the overlay, menu-item and Esc orders; a change to a menu changes its snapshot there.

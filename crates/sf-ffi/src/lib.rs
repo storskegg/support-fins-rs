@@ -7,6 +7,7 @@
 
 mod builder;
 mod draw;
+mod footprint;
 mod gpu;
 mod part;
 mod records;
@@ -17,9 +18,14 @@ pub use builder::{
     export_file_name, export_with_drawn,
 };
 pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
+pub use footprint::{
+    Footprint, footprint_clash_cells, footprint_of_build, footprint_of_part, footprint_spot,
+    footprint_union, plate_under,
+};
 pub use gpu::GpuBuffer;
 pub use part::{
     AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts, merge_parts,
+    scale_from_percent_text, scale_percent_text,
 };
 pub use suggest::{
     LoadAlignment, StrengthAdvice, StrengthPose, SuggestContext, SuggestListener, SuggestResult,

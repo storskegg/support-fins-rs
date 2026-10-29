@@ -60,6 +60,11 @@ targets:
             LSHandlerRank: Alternate
             LSItemContentTypes: [com.storskegg.supportfins.3mf]
             CFBundleTypeExtensions: ["3mf"]
+          - CFBundleTypeName: STEP model
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [com.storskegg.supportfins.step]
+            CFBundleTypeExtensions: ["step", "stp"]
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: com.storskegg.supportfins.3mf
             UTTypeDescription: 3MF model
@@ -67,6 +72,12 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: ["3mf"]
               public.mime-type: ["model/3mf"]
+          - UTTypeIdentifier: com.storskegg.supportfins.step
+            UTTypeDescription: STEP model
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: ["step", "stp"]
+              public.mime-type: ["model/step"]
   SupportFinsTests:
     type: bundle.unit-test
     platform: macOS

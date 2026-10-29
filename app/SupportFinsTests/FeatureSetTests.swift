@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Testing
 @testable import Support_Fins
@@ -116,21 +117,42 @@ struct FeatureSetTests {
 
     /// `FeatureCommands` shows a fixed number of menus.
     @Test func theMenuBarHasRoomForEveryMenu() {
-        #expect(FeatureSet.menuIDs().filter { !$0.isFileGroup }.count <= FeatureCommands.menuSlots)
+        #expect(FeatureSet.menuIDs().filter(\.isOwnMenu).count <= FeatureCommands.menuSlots)
+    }
+
+    /// A feature menu named like one macOS already has fills that menu (`MenuID.group`): a `CommandMenu("View")` was a
+    /// second View menu beside the system's ("File Edit View View Model Window Help").
+    @Test func noFeatureMenuDuplicatesASystemMenu() {
+        let ids = FeatureSet.menuIDs()
+        for id in ids where MenuID.systemTitles.contains(id.title) {
+            #expect(!id.isOwnMenu, "\(id.title) would be a second \(id.title) menu")
+        }
+        let own = ids.filter(\.isOwnMenu).map(\.title)
+        #expect(Set(own).count == own.count)
+        #expect(MenuID.view.group == .beforeToolbar && MenuID.fileExport.group == .afterNewItem && MenuID.edit.group == .afterUndoRedo)
+    }
+
+    /// The real menu bar of the test host (the app): every title once.
+    @MainActor @Test func theMenuBarNamesEachMenuOnce() throws {
+        let titles = try #require(NSApp?.mainMenu).items.map(\.title)
+        #expect(Set(titles).count == titles.count, "\(titles)")
+        #expect(titles.filter { $0 == "View" }.count <= 1)
     }
 
     // MARK: the real features
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
         let model = ViewerModel()
-        var expected = ["empty-state", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar"]
+        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "plate-toast"]
         #if DEBUG
         expected.insert("frame-time", at: 0)
         #endif
         #expect(model.features.overlays.map(\.id) == expected)
-        #expect(model.toolbar.slots.map(\.id) == ["rotate", "suggest", "strength", "section", "view"])
+        #expect(model.toolbar.slots.map(\.id) == ["rotate", "scale-badge", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
         #expect(model.features.inspectorSections(.top).map(\.id) == ["readout"])
+        // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
+        #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["remove-fins"])
     }
 
@@ -144,7 +166,7 @@ struct FeatureSetTests {
         #expect(model.toolbar.badges[.suggest] == nil && model.toolbar.badges[.strength] == nil)   // no part yet
     }
 
-    /// The menu bar, as it has always been: View, Model, then File's Export. Keep in step with docs/UI-MAP.md.
+    /// The menu bar, as it has always been: View, Model, then File's Export and Add Model, and Edit's Remove Model. Keep in step with docs/UI-MAP.md.
     @Test func theMenuBarKeepsItsItemsAndTheirOrder() {
         var view = ["View", "  Show Rotate Rings", "  Rebuild While Dragging", "  Frame Part [0]", "  Home", "  Show Print Layers"]
         #if DEBUG
@@ -152,13 +174,14 @@ struct FeatureSetTests {
         #endif
         view += ["  -", "  Front [1]", "  Back [2]", "  Left [3]", "  Right [4]", "  Top [5]", "  Bottom [6]", "  -", "  Section View"]
         let model = ["Model", "  Rotate 90° About X", "  Rotate 90° About Y", "  Rotate 90° About Z", "  Reset Rotation", "  -",
-                     "  Lay a Face Flat", "  -", "  Suggest Orientation", "  Strength Arrow…"]
-        let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]"]
+                     "  Lay a Face Flat", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
+        let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
+        let edit = ["Edit", "  Remove Model from Plate"]
         // no window focused
-        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file)
+        #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)
         let window = ViewerModel()
-        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file)
+        #expect(FeatureSet.menuSnapshot(in: window.features) == view + model + file + edit)
     }
 
     /// The menu bar can hold the features of a window that has just closed: the menus read them as no window.

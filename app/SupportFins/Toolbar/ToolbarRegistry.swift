@@ -24,6 +24,8 @@ struct ToolbarBadge {
     /// click turns it on and opens its popover; opening another popover leaves it on (its badge stays lit); a click on
     /// the lit badge brings its popover back, and with the popover open turns it off. A panel badge has none.
     var tool: (isOn: () -> Bool, setOn: (Bool) -> Void)?
+    /// Text after the badge's title (Scale: the percent while it is not 100, `#scale-now`).
+    var detail: () -> String = { "" }
 
     init<Content: View>(isLit: @escaping () -> Bool = { false }, @ViewBuilder popover: @escaping () -> Content) {
         self.isLit = isLit
@@ -49,8 +51,10 @@ final class ToolbarRegistry {
     func register(_ slot: ToolbarSlot, badge: ToolbarBadge) { badges[slot] = badge }
 
     func register<Content: View>(_ slot: ToolbarSlot, isLit: @escaping () -> Bool = { false },
-                                 @ViewBuilder popover: @escaping () -> Content) {
-        badges[slot] = ToolbarBadge(isLit: isLit, popover: popover)
+                                 detail: @escaping () -> String = { "" }, @ViewBuilder popover: @escaping () -> Content) {
+        var badge = ToolbarBadge(isLit: isLit, popover: popover)
+        badge.detail = detail
+        badges[slot] = badge
     }
 
     /// Register a tool badge: lit while the tool is on, with its popover.

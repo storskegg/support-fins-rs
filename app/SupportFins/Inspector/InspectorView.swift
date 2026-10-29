@@ -35,6 +35,13 @@ struct InspectorView: View {
                 MoreSettingsSection(settings: $settings, open: $sections.more)
             }
             ForEach(bottom) { $0.content() }
+            #if DEBUG
+            // the last row of the form, not a bar over it: a `safeAreaInset` bar had no background, so the rows
+            // scrolled under it and a click aimed at the one beneath (the Tine grip slider) landed on the bar
+            Section {
+                Toggle("Benchmark orbit", isOn: Binding(get: { controller.benchmarking }, set: { controller.setBenchmark($0) }))
+            }
+            #endif
         }
         .formStyle(.grouped)
         .onChange(of: settings) { _, new in SettingsStore().save(new) }
@@ -42,11 +49,5 @@ struct InspectorView: View {
         .onChange(of: settings.highlightSmall, initial: true) { _, on in controller.highlightSmall = on }
         // Show midair starts draws the red cones only (`web/ui/islands.js:30-34`)
         .onChange(of: settings.showIslands, initial: true) { _, on in controller.showsIslands = on }
-        #if DEBUG
-        .safeAreaInset(edge: .bottom) {
-            Toggle("Benchmark orbit", isOn: Binding(get: { controller.benchmarking }, set: { controller.setBenchmark($0) }))
-                .padding(8)
-        }
-        #endif
     }
 }

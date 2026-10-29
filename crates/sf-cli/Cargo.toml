@@ -15,6 +15,7 @@ path = "src/main.rs"
 sf-engine.workspace = true
 sf-io.workspace = true
 sf-cut.workspace = true
+sf-step.workspace = true
 indexmap.workspace = true
 
 [dev-dependencies]

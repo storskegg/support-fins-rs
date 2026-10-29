@@ -25,6 +25,12 @@ final class BuildModel {
     /// The pose (nine numbers, column-major) `latest` was built in: the fins lag the pose while it differs from the
     /// session's (a live rebuild while a ring is dragged).
     private(set) var latestRotation: [Double]?
+    /// The request `latest` was built for (pose, options, tunables): equal to the one a refresh would make, the
+    /// fins are current. Nil before a build lands and after `clear()`.
+    private(set) var latestRequest: BuildRequest?
+    /// The request of the newest `build()` call still wanted (in flight or landed); nil after `cancel()` / `clear()`.
+    /// A parked model's build is stale when this is not the request its plate's settings would make (`Plates/`).
+    private(set) var requested: BuildRequest?
     /// A build is outstanding.
     private(set) var building = false
     /// The newest request's failure (the engine's JS-identical message), or nil.
@@ -62,6 +68,7 @@ final class BuildModel {
         generation = g
         wanted = g
         wantedRotation = rotation
+        requested = BuildRequest(rotation: rotation, optionsJSON: optionsJSON, tunablesJSON: tunablesJSON)
         return g
     }
 
@@ -69,6 +76,7 @@ final class BuildModel {
     /// (`Builder.cancel`), and its result will not be delivered here. The fins already shown stay until `clear()`.
     func cancel() {
         builder.cancel()
+        requested = latestRequest
         wanted = nil
         building = false
         resumeWaiters()
@@ -80,6 +88,8 @@ final class BuildModel {
         error = nil
         latest = nil
         latestRotation = nil
+        latestRequest = nil
+        requested = nil
         summary = nil
         records = nil
         keys = []
@@ -118,6 +128,7 @@ final class BuildModel {
                 keys = FinKey.assign(records.fins)
                 latest = result
                 latestRotation = wantedRotation
+                latestRequest = requested
                 error = nil
             } catch {
                 // the engine's JSON is the contract (docs/FFI.md): a mismatch is a bug to see, not to hide

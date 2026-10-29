@@ -100,6 +100,22 @@ struct SectionModelTests {
         #expect(tool.isOn && host.toolbar.open == nil)
     }
 
+    /// A rescale reloads the part (`ui/scale.js setScale` -> `setPart` -> `resetPartState` -> `setSection(false)`,
+    /// `ui/part.js:157`): the cut goes off and its popover folds, as for a new file.
+    @Test func aRescaleSwitchesTheCutOff() async throws {
+        let host = ViewerModel()
+        let controller = try #require(host.controller, "no Metal device")
+        let stl = URL(fileURLWithPath: try TestParts.write(TestParts.box(-10, 10, -5, 5, 0, 20), name: "section-\(UUID().uuidString).stl"))
+        await host.load(url: stl)
+        let scale = try #require(host.features[ScaleFeature.self])
+        host.toolbar.toggle(.section)
+        #expect(controller.section.isOn && host.toolbar.open == .section)
+        scale.model.commit(text: "150")
+        for _ in 0..<1000 where scale.model.scale != 1.5 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(scale.model.scale == 1.5, "the reload")
+        #expect(!controller.section.isOn && host.toolbar.open == nil)
+    }
+
     @Test func tiltingAndPushingTheCutNeverTouchesThePose() throws {
         let (host, _, tool) = try window()
         let pose = host.session.pose

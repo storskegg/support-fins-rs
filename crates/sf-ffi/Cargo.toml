@@ -20,10 +20,12 @@ sf-engine.workspace = true
 sf-io.workspace = true
 sf-cut.workspace = true
 sf-cli.workspace = true
+sf-step.workspace = true
 uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]
 sf-testkit.workspace = true
+parity = { path = "../../parity" }
 
 [lints]
 workspace = true

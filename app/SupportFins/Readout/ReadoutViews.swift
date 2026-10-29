@@ -8,11 +8,13 @@ struct StatsCard: View {
     var part: PartReadout
     var fit: FitReadout?
     var fins: FinReadout?
+    /// Rows other features add after Analysis (`InspectorSlot.stats`: Add model, Remove model).
+    var rows: [InspectorSection] = []
     @State private var showFinInfo = false
 
     var body: some View {
         Section("Part") {
-            LabeledContent("File", value: fileName)
+            LabeledContent("File") { Text(fileName).accessibilityIdentifier("stat-name") }
             LabeledContent("Triangles", value: part.triangles)
             LabeledContent("Size", value: part.size)
             if let fit {
@@ -43,6 +45,7 @@ struct StatsCard: View {
             LabeledContent("Analysis") {
                 Text(fins?.time ?? part.time).font(.caption).foregroundStyle(.secondary)
             }
+            ForEach(rows) { $0.content() }
         }
     }
 
