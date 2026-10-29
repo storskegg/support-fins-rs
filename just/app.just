@@ -41,6 +41,13 @@ app-project:
 app-test: app-core app-project
     tools/lock/lock.py app-test -- bash -ec "swift test -j {{xcode_jobs}} --package-path app/SupportFinsViewer; xcodebuild test -jobs {{xcode_jobs}} -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'"
 
+# Nothing drives the mouse or keyboard, so any agent may run it, and `just gate` does whenever the app gates run: a UI
+# test that does not compile cannot reach review. Its own derived data inside the worktree (`.dd-ui`, gitignored),
+# apart from app-uitest's fixed path, so it never touches the signed runner the Accessibility permission was given to.
+# Compile the UI tests without running them (xcodebuild build-for-testing).
+app-uibuild: app-core app-project
+    tools/lock/lock.py app-uibuild -- xcodebuild build-for-testing -jobs {{xcode_jobs}} -derivedDataPath "{{justfile_directory()}}/.dd-ui" -project app/SupportFins.xcodeproj -scheme SupportFinsUI -destination 'platform=macOS'
+
 # The window driven end to end (XCUITest): open a part, Add fins, change a setting, export. Needs the Accessibility
 # permission for Xcode's test runner; `app-test` runs the same loop headless (EndToEndTests).
 #
