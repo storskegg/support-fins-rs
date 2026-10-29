@@ -22,15 +22,17 @@ struct InspectorView: View {
                 PrinterSection(settings: $settings, open: $sections.printer)
                 PlacementSection(settings: $settings)
                 TinesSection(settings: $settings, open: $sections.tines)
-                Picker("Cutouts", selection: $settings.cutout) {
-                    Text("None").tag(FinSettings.Cutout.none)
-                    Text("Diamond").tag(FinSettings.Cutout.diamond)
-                    Text("Triangle").tag(FinSettings.Cutout.triangle)
-                    Text("Arch").tag(FinSettings.Cutout.arch)
-                    Text("Lattice").tag(FinSettings.Cutout.lattice)
-                    Text("Honeycomb").tag(FinSettings.Cutout.honeycomb)
+                FindRow("cutout") {
+                    Picker("Cutouts", selection: $settings.cutout) {
+                        Text("None").tag(FinSettings.Cutout.none)
+                        Text("Diamond").tag(FinSettings.Cutout.diamond)
+                        Text("Triangle").tag(FinSettings.Cutout.triangle)
+                        Text("Arch").tag(FinSettings.Cutout.arch)
+                        Text("Lattice").tag(FinSettings.Cutout.lattice)
+                        Text("Honeycomb").tag(FinSettings.Cutout.honeycomb)
+                    }
+                    .tipCard(pic: "cutout", Tip.cutout)
                 }
-                .tipCard(pic: "cutout", Tip.cutout)
                 ForEach(basics) { $0.content() }
                 MoreSettingsSection(settings: $settings, open: $sections.more)
             }

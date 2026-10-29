@@ -7,10 +7,12 @@ struct AugmentToggle: View {
     var body: some View {
         if model.augmentOffered {
             HStack {
-                Toggle(model.augmentTitle, isOn: Binding(get: { model.session.addByHand }, set: { _ in model.toggleAugment() }))
-                    .toggleStyle(.button)
-                    .tipCard(pic: "add-walls", DrawTip.augment)
-                    .accessibilityIdentifier("augment-toggle")
+                FindRow("augment-toggle") {
+                    Toggle(model.augmentTitle, isOn: Binding(get: { model.session.addByHand }, set: { _ in model.toggleAugment() }))
+                        .toggleStyle(.button)
+                        .tipCard(pic: "add-walls", DrawTip.augment)
+                        .accessibilityIdentifier("augment-toggle")
+                }
             }
         }
     }
@@ -24,8 +26,15 @@ struct DrawControls: View {
 
     var body: some View {
         if model.controlsShown {
-            VStack(alignment: .leading, spacing: 8) {
-                if model.hintShown {
+            FindBlock(.draw) { controls }
+        }
+    }
+
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if model.hintShown {
+                // the page's Line and Curve buttons are one segmented control here: one row of the settings search
+                FindRow("draw-shape") {
                     Picker("Wall shape", selection: Binding(get: { model.shape }, set: { model.setShape($0) })) {
                         Text("Line").tag(DrawModel.Shape.line)
                         Text("Curve").tag(DrawModel.Shape.curve)
@@ -34,23 +43,29 @@ struct DrawControls: View {
                     .labelsHidden()
                     .accessibilityLabel("Wall shape")
                     .accessibilityIdentifier("draw-shape")
-                    Text(model.hint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("draw-hint")
                 }
-                HStack {
-                    if model.started {
+                Text(model.hint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("draw-hint")
+            }
+            HStack {
+                if model.started {
+                    FindRow("draw-back") {
                         Button("Back one point") { _ = model.undoPoint() }
                             .tipCard(DrawTip.back)
                             .accessibilityIdentifier("draw-back")
                     }
-                    if model.selectedID != nil {
+                }
+                if model.selectedID != nil {
+                    FindRow("draw-remove") {
                         Button("Remove selected") { model.removeSelected() }
                             .tipCard(pic: "draw-remove", DrawTip.removeSelected)
                             .accessibilityIdentifier("draw-remove")
                     }
+                }
+                FindRow("draw-clear") {
                     Button("Clear all") { model.clearAll() }
                         .disabled(!model.hasWalls)
                         .accessibilityIdentifier("draw-clear")

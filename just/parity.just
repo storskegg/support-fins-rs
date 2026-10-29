@@ -10,7 +10,7 @@ parity:
 oracle module="":
     #!/usr/bin/env bash
     set -euo pipefail
-    flags="--allow-read --allow-write --allow-run=git,zstd --allow-env"
+    flags="--allow-read --allow-write --allow-run=git,zstd --allow-env --node-modules-dir=none"
     if [ -n "{{module}}" ]; then
         deno run $flags "parity/oracle/{{module}}.js"
     else

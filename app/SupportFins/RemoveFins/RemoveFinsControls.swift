@@ -8,12 +8,16 @@ struct RemoveFinsControls: View {
     var body: some View {
         if let model, model.controlsShown {
             HStack {
-                Toggle(model.toggleLabel, isOn: Binding(get: { model.armed }, set: { _ in model.toggle() }))
-                    .toggleStyle(.button)
-                    .tipCard(pic: "remove-fins", JS.t("Click a fin to remove just that one. Esc or right-click cancels."))
+                FindRow("remove-fins-toggle") {
+                    Toggle(model.toggleLabel, isOn: Binding(get: { model.armed }, set: { _ in model.toggle() }))
+                        .toggleStyle(.button)
+                        .tipCard(pic: "remove-fins", JS.t("Click a fin to remove just that one. Esc or right-click cancels."))
+                }
                 if model.canRestore {
-                    Button("Restore all") { model.restoreAll() }
-                        .tipCard(pic: "restore-fins", JS.t("Bring back every fin removed in this orientation."))
+                    FindRow("restore-fins") {
+                        Button("Restore all") { model.restoreAll() }
+                            .tipCard(pic: "restore-fins", JS.t("Bring back every fin removed in this orientation."))
+                    }
                 }
             }
         }

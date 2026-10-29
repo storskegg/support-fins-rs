@@ -5,23 +5,36 @@ import SwiftUI
 struct PrinterSection: View {
     @Binding var settings: FinSettings
     @Binding var open: Bool
+    @Environment(SettingsSearch.self) private var search: SettingsSearch?
 
     var body: some View {
-        DisclosureGroup(isExpanded: $open) {
-            Picker("Nozzle", selection: Binding(get: { settings.nozzle }, set: { settings.setNozzle($0) })) {
-                ForEach(FinSettings.nozzleChoices, id: \.self) { Text("\(FinSettings.nozzleText($0)) mm").tag($0) }
+        FindBlock(.printer) { group }
+    }
+
+    private var group: some View {
+        DisclosureGroup(isExpanded: search?.expandedBinding(.printer, user: $open) ?? $open) {
+            FindRow("nozzle-fld") {
+                Picker("Nozzle", selection: Binding(get: { settings.nozzle }, set: { settings.setNozzle($0) })) {
+                    ForEach(FinSettings.nozzleChoices, id: \.self) { Text("\(FinSettings.nozzleText($0)) mm").tag($0) }
+                }
+                .tipCard(pic: "nozzle", Tip.nozzle)
             }
-            .tipCard(pic: "nozzle", Tip.nozzle)
             if settings.visibility.layerHeight {
-                NumberField(title: "Layer height", value: $settings.layerHeight, limits: FinSettings.layerHeightLimits, unit: "mm", help: Tip.layerHeight, pic: "layer-height")
+                FindRow("layerh-fld") {
+                    NumberField(title: "Layer height", value: $settings.layerHeight, limits: FinSettings.layerHeightLimits, unit: "mm", help: Tip.layerHeight, pic: "layer-height")
+                }
             }
-            NumberField(title: "Support gap", value: $settings.gap, limits: FinSettings.gapLimits, unit: "mm", help: Tip.gap, pic: "gap")
-            Picker("Interface material", selection: $settings.interfaceMaterial) {
-                Text("Off").tag(FinSettings.InterfaceMaterial.off)
-                Text("Flat contacts").tag(FinSettings.InterfaceMaterial.flat)
-                Text("Everywhere").tag(FinSettings.InterfaceMaterial.all)
+            FindRow("gap") {
+                NumberField(title: "Support gap", value: $settings.gap, limits: FinSettings.gapLimits, unit: "mm", help: Tip.gap, pic: "gap")
             }
-            .tipCard(pic: "iface", Tip.iface)
+            FindRow("iface") {
+                Picker("Interface material", selection: $settings.interfaceMaterial) {
+                    Text("Off").tag(FinSettings.InterfaceMaterial.off)
+                    Text("Flat contacts").tag(FinSettings.InterfaceMaterial.flat)
+                    Text("Everywhere").tag(FinSettings.InterfaceMaterial.all)
+                }
+                .tipCard(pic: "iface", Tip.iface)
+            }
         } label: {
             HStack {
                 Image(systemName: "printer")
