@@ -95,7 +95,7 @@ final class ExportModel {
     @ObservationIgnored private let panel: any SavePanel
     @ObservationIgnored private let removedKeys: @MainActor () -> Set<FinKey>
     /// The format ⌘E writes again.
-    private(set) var lastFormat = ExportFormat.stl
+    var lastFormat = ExportFormat.stl
     /// The hand-placed supports of Draw (Features/Draw): written between the fins and the pad, and not offered while
     /// they are being re-stood.
     struct Drawn {

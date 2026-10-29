@@ -38,7 +38,12 @@ extension PlateBoard {
                 parkedPlates.append(pi)
             }
         }
-        controller.renderer.setPlateScene(PlateScene(beds: beds, edited: active, parked: parked))
+        // the cells models of this plate share, red on the bed (`checkOverlap`); not per frame of a ring's turn
+        if !session.ringDragging { clashCells = computeClash() }
+        let clash = clashCells
+        clashing = !clash.isEmpty
+        let cells = clash.map { SIMD2<Float>(Float($0.x), Float($0.y)) + shift }
+        controller.renderer.setPlateScene(PlateScene(beds: beds, edited: active, parked: parked, clash: cells))
     }
 
     private func zeroFlags(_ part: CorePart, _ device: MTLDevice) -> MTLBuffer? {
