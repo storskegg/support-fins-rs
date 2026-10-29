@@ -70,6 +70,7 @@ struct SearchField: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("Search settings", text: $search.query)
+                .lineLimit(1)
                 .textFieldStyle(.plain)
                 .focused($focused)
                 .autocorrectionDisabled()
