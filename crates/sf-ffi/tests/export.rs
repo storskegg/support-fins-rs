@@ -4,7 +4,10 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use sf_ffi::{ExportKind, Part, build_part, export, export_file_name, load_parts};
+use sf_ffi::{
+    ExportKind, Part, PlateFile, PlateModel, build_part, export, export_file_name, export_plate,
+    export_plates, load_parts,
+};
 use sf_io::json::{Json, parse};
 use sf_testkit::upstream_root;
 
@@ -161,5 +164,103 @@ fn file_names_are_the_pages() {
         export_file_name("x".into(), ExportKind::Stl, f64::NAN, 0.0),
         "x-fins.stl",
         "a setting that is not positive is left out"
+    );
+}
+
+fn plate_models(spec: &Json) -> Vec<PlateModel> {
+    arr(field(spec, "models"))
+        .iter()
+        .map(|m| {
+            let part = part_of(field(m, "part"));
+            let fins = matches!(field(m, "fins"), Json::Bool(true));
+            let rot: Vec<f64> = arr(field(m, "rot"))
+                .iter()
+                .map(|x| if let Json::Num(v) = x { *v } else { panic!() })
+                .collect();
+            let build = fins.then(|| {
+                Arc::new(
+                    build_part(
+                        &part,
+                        &rot,
+                        &field(m, "dialog").stringify(),
+                        &field(m, "tunables").stringify(),
+                    )
+                    .unwrap(),
+                )
+            });
+            let num = |v: &Json| if let Json::Num(n) = v { *n } else { panic!() };
+            let placed = arr(field(m, "placed"));
+            PlateModel {
+                part,
+                build,
+                drawn: None,
+                pose: rot,
+                threshold: 45.0,
+                removed: arr(field(m, "removed"))
+                    .iter()
+                    .map(|v| num(v) as u64)
+                    .collect(),
+                x: num(&placed[0]),
+                y: num(&placed[1]),
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn a_plate_of_several_models_and_the_zip_of_plates_are_the_pages_bytes() {
+    let corpus = corpus();
+    let plates = arr(field(&corpus, "plates"));
+    assert!(plates.len() >= 4);
+    let dir = std::env::temp_dir().join(format!("sf-ffi-plate-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let bed = |spec: &Json| {
+        let b = arr(field(spec, "bed"));
+        format!("{{\"bed\":{}}}", Json::Arr(b.to_vec()).stringify())
+    };
+    for (n, spec) in plates.iter().enumerate() {
+        let name = text(field(spec, "name"));
+        let path = dir.join(format!("plate{n}")).to_string_lossy().into_owned();
+        if spec.get("zip").is_some() {
+            let files: Vec<PlateFile> = arr(field(spec, "zip"))
+                .iter()
+                .map(|z| {
+                    let i = if let Json::Num(v) = field(z, "plate") {
+                        *v as usize
+                    } else {
+                        panic!()
+                    };
+                    PlateFile {
+                        name: text(field(z, "name")).to_string(),
+                        models: plate_models(&plates[i]),
+                    }
+                })
+                .collect();
+            export_plates(path.clone(), files, bed(&plates[0]))
+                .unwrap_or_else(|e| panic!("{name}: {e}"));
+        } else {
+            export_plate(path.clone(), plate_models(spec), bed(spec))
+                .unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(
+            bytes.len() as f64,
+            if let Json::Num(v) = field(spec, "bytes") {
+                *v
+            } else {
+                panic!()
+            },
+            "{name}: size"
+        );
+        assert_eq!(&fnv64(&bytes), text(field(spec, "hash")), "{name}: bytes");
+    }
+    // a plate with no models has nothing to write
+    assert!(
+        export_plate(
+            dir.join("none").to_string_lossy().into_owned(),
+            vec![],
+            "{}".into()
+        )
+        .is_err()
     );
 }

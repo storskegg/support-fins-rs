@@ -105,6 +105,37 @@ final class PlatesUITests: XCTestCase {
         }
     }
 
+    /// Export > All plates (3MF): two plates, the menu item, the Save panel, a .zip in the temp directory.
+    func testExportAllPlatesWritesAZip() throws {
+        let first = try writeSTL("first.stl", slab: 30)
+        let second = try writeSTL("second.stl", slab: 20)
+        app.launch()
+        if !panelExists("open-panel", timeout: 5) && !element("add-part").exists { app.typeKey("o", modifierFlags: .command) }
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
+        chooseInPanel(first.path)
+        let name = element("stat-name")
+        XCTAssertTrue(name.waitForExistence(timeout: 20), "the part's window opened")
+        element("plate-add").click()
+        let importButton = element("empty-import")
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5), "an empty plate offers Import")
+        importButton.click()
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel for the new plate")
+        chooseInPanel(second.path)
+        waitFor("the File row follows the new plate's model", timeout: 20) { self.text(name).hasPrefix("second") }
+
+        element("export-menu").click()
+        let all = app.menuItems.matching(identifier: "All plates (3MF)").allElementsBoundByIndex.first { $0.isHittable }
+        try XCTUnwrap(all, "the export menu's All plates item").click()
+        XCTAssertTrue(panelExists("save-panel", timeout: 10), "the Save panel")
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        app.typeText(dir.path)
+        app.typeKey(.return, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        waitFor("the zip is written", timeout: 30) {
+            ((try? FileManager.default.contentsOfDirectory(at: self.dir, includingPropertiesForKeys: nil)) ?? []).contains { $0.pathExtension == "zip" }
+        }
+    }
+
     // MARK: helpers
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }

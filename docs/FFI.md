@@ -321,3 +321,25 @@ ported and replayed, for the Move and Arrange tools to put behind the FFI when t
 `BuildResult::kept_added(removed, drawn)` (crate-internal) is what the export writes and the footprint rasterizes: the fins
 less the removed ones, the drawn walls, then the pad. `footprint_of_build` passes no drawn walls until Draw's app side lands
 (the page's `activeAdded()` counts them).
+
+### Plate exports and Arrange (M6)
+
+```rust
+#[derive(uniffi::Record)] struct PlateModel { part: Arc<Part>, build: Option<Arc<BuildResult>>, drawn: Option<Arc<DrawnSweep>>,
+    pose: Vec<f64>, threshold: f64, removed: Vec<u64>, x: f64, y: f64 }
+#[derive(uniffi::Record)] struct PlateFile { name: String, models: Vec<PlateModel> }
+fn export_plate(path: String, models: Vec<PlateModel>, options_json: String) -> Result<(), FfiError>;
+fn export_plates(path: String, plates: Vec<PlateFile>, options_json: String) -> Result<(), FfiError>;
+fn footprint_arrange(grids: Vec<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Vec<f64>;   // flat x, y per footprint
+```
+
+`export_plate` writes a plate of several models as one 3MF (`FORMATS['export-3mf']` over `plateGeometry`, `ui/export.js`, through
+`writePlate3MF`): each model its own objects (the part, its supports with the interface crest split off, a slicer's own parts, its
+paint) standing at (`x`, `y`) on the plate, titled with the first model's name, no session yet. A model with a `build` carries its
+fins less the `removed` record ids, its `drawn` walls, and the pad -- the same `kept_added` the single-model `export` uses; with no
+`build` it is the part alone, seated from `pose` (nine numbers, column-major) at `threshold`. `options_json` is `{ "bed": [x, y] }`,
+the build volume the spots are on. `export_plates` writes each `PlateFile` as a 3MF entry named `name` of one .zip (`zipStore`,
+`exportAll` in `ui/plates.js`). The bytes are the page's: `parity/oracle/ffiexport.js` writes plates of one, two and three models
+(fins, a fin removed, the part alone, the interface crest) and the zip through the real writers, and
+`crates/sf-ffi/tests/export.rs` compares them. `footprint_arrange` is `arrange`'s placement (`sf_engine::footprint::arrange`: `pack`'s
+spots, a model with no room in a row past the bed's right edge).

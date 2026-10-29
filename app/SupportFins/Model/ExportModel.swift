@@ -95,7 +95,7 @@ final class ExportModel {
     @ObservationIgnored private let panel: any SavePanel
     @ObservationIgnored private let removedKeys: @MainActor () -> Set<FinKey>
     /// The format ⌘E writes again.
-    private(set) var lastFormat = ExportFormat.stl
+    var lastFormat = ExportFormat.stl
 
     init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, source: @escaping @MainActor () -> Source?,
          removed: @escaping @MainActor () -> Set<FinKey> = { [] },

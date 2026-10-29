@@ -154,3 +154,15 @@ pub fn plate_under(
         .map(|(plate, xy)| vec![plate as f64, xy[0], xy[1]])
         .unwrap_or_default()
 }
+
+/// Arrange (`arrange`, `ui/arrange.js`): where each model of the plate goes on a `bx` x `by` bed, `gap` mm apart --
+/// the biggest first, each at the free spot nearest the centre, a model with no room left in a row past the bed's
+/// right edge. Flat `x, y` per footprint, in the order given.
+#[uniffi::export]
+pub fn footprint_arrange(grids: Vec<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Vec<f64> {
+    let refs: Vec<&Grid> = grids.iter().map(|f| &f.grid).collect();
+    fp::arrange(&refs, bx, by, gap)
+        .into_iter()
+        .flatten()
+        .collect()
+}

@@ -31,6 +31,7 @@ final class PlatesFeature: Feature {
         [
             WindowOverlay("plate-labels", order: 25, ignoresSafeArea: true) { PlateLabels(board: self.board) },
             WindowOverlay("plate-tabs", order: 65, alignment: .top) { PlateTabs(board: self.board) },
+            WindowOverlay("clash-banner", order: 66, alignment: .top) { ClashBanner(board: self.board) },
             WindowOverlay("plate-toast", order: 70, alignment: .bottom) { PlateToast(board: self.board) },
         ]
     }
@@ -45,9 +46,29 @@ final class PlatesFeature: Feature {
         [
             // the plate's settings: a change rebuilds the parked models' fins (`scheduleParked`)
             .onChange("plates-settings", of: { SettingsKey(session: self.host.session) }) { _, _ in self.board.scheduleParked() },
+            // the models' footprints change with a turn, a fin rebuild, a removal, or the seating the analysis lands:
+            // the clash cells and the banner follow (`checkOverlap`)
+            .onChange("plates-clash", of: { FootprintKey(host: self.host) }) { _, _ in self.board.sync() },
             // the beds follow the build volume
             .onChange("plates-volume", of: { self.host.controller?.volume }) { _, _ in self.board.sync() },
         ]
+    }
+
+    /// What the live model's footprint is made from.
+    struct FootprintKey: Equatable {
+        var pose: Pose
+        var finsOn: Bool
+        var build: ObjectIdentifier?
+        var removed: Set<FinKey>
+        var size: SIMD3<Float>
+
+        @MainActor init(host: ViewerModel) {
+            pose = host.session.pose
+            finsOn = host.session.finsOn
+            build = host.wiring?.build?.latest.map(ObjectIdentifier.init)
+            removed = host.session.removedFins
+            size = host.controller?.posedSize ?? .zero
+        }
     }
 
     /// What a support build follows: the options, the tunables, the mode and fins on or off (`settingsKey`).
