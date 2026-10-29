@@ -124,20 +124,28 @@ class PartWindowUITestCase: XCTestCase {
 
     /// Scroll `target` into view in the scroll view that holds it, by scrolling that scroll view (whose centre stays
     /// put), never by scrolling over a row that moves with the content; between steps, wait for the content to settle.
-    func scrollIntoView(_ target: XCUIElement, maxSteps: Int = 20, file: StaticString = #filePath, line: UInt = #line) {
+    /// In view means hittable, wholly below the scroll view's top and at least `bottomMargin` above its bottom: XCUITest
+    /// calls an element hittable while something drawn over the view's bottom edge covers it (#184 saw a click on the
+    /// Tine grip slider land on the debug Benchmark orbit bar).
+    func scrollIntoView(_ target: XCUIElement, bottomMargin: CGFloat = 60, maxSteps: Int = 20,
+                        file: StaticString = #filePath, line: UInt = #line) {
         // the innermost scroll view holding it (the smallest), not one that only contains that one
         let holders = partWindow.scrollViews.containing(.any, identifier: target.identifier).allElementsBoundByIndex
         guard let scroller = holders.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
             XCTFail("no scroll view holds \(target.identifier)", file: file, line: line)
             return
         }
-        for _ in 0..<maxSteps where !target.isHittable {
+        func inView() -> Bool {
+            let f = target.frame, s = scroller.frame
+            return target.isHittable && f.minY >= s.minY && f.maxY <= s.maxY - bottomMargin
+        }
+        for _ in 0..<maxSteps where !inView() {
             // content below the middle: scroll down (negative delta), above it: up
             let down = target.frame.midY > scroller.frame.midY
             scroller.scroll(byDeltaX: 0, deltaY: down ? -60 : 60)
             waitForFrameToSettle(target)
         }
-        XCTAssertTrue(target.isHittable, "\(target.identifier) scrolled into view", file: file, line: line)
+        XCTAssertTrue(inView(), "\(target.identifier) scrolled into view", file: file, line: line)
     }
 
     // MARK: the menu bar
