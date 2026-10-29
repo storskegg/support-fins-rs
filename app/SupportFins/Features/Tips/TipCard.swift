@@ -13,7 +13,8 @@ struct TipCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let pic, TipPictures.has(pic) {
-                TipPicture(key: pic).frame(maxWidth: .infinity)
+                // the pictures have no words and are drawn as the web draws them, left to right in every language
+                TipPicture(key: pic).environment(\.layoutDirection, .leftToRight).frame(maxWidth: .infinity)
             }
             if !text.isEmpty {
                 Text(verbatim: text).font(.callout).fixedSize(horizontal: false, vertical: true)
@@ -50,6 +51,8 @@ private struct TipCardModifier: ViewModifier {
                 shown = focused
             })
             .onDisappear { wait?.cancel(); shown = false }
+            // `.leading` is the logical edge: the card sits beside the setting on the side the inspector's content starts,
+            // which is the left in English and, mirrored with the inspector, the right in Arabic
             .popover(isPresented: $shown, arrowEdge: .leading) { TipCard(pic: pic, text: text) }
             .accessibilityHint(text)
     }
