@@ -1,7 +1,7 @@
 import XCTest
 
 /// Draw through the real window (docs/UI-MAP.md rows `fin-mode`, `draw-back`, `draw-clear`, `augment-toggle`): open a
-/// part, Add fins, switch Placement to Draw, look at the part from below (View > Bottom, key 6) so its red underside
+/// part, Add fins, switch Placement to Draw, look at the part from below (View > Bottom) so its red underside
 /// faces the camera, click two points across it, read "1 drawn wall" in the Fins row, take a point back, clear.
 ///
 /// Elements are found by the accessibility identifiers the app sets: `fins-toggle`, `fin-mode-draw`, `draw-hint`,
@@ -47,11 +47,14 @@ final class DrawUITests: XCTestCase {
         waitFor("nothing drawn yet", timeout: 30) { (fins.value as? String ?? fins.label) == "none yet" }
 
         // look at the part from below, then click two points across the slab's red underside
-        app.typeKey("6", modifierFlags: [])
-        Thread.sleep(forTimeInterval: 1)           // the camera glides 450 ms
-        let window = app.windows.firstMatch
-        let a = window.coordinate(withNormalizedOffset: CGVector(dx: 0.27, dy: 0.5))
-        let b = window.coordinate(withNormalizedOffset: CGVector(dx: 0.45, dy: 0.5))
+        app.menuBars.menuBarItems["View"].click()
+        app.menuBars.menuItems["Bottom"].click()
+        Thread.sleep(forTimeInterval: 1.5)         // the camera glides 450 ms
+        // the part is framed and centred in the viewer: two points in its middle third lie on the slab underside, clear of the stem under its middle
+        let viewport = element("viewport")
+        XCTAssertTrue(viewport.waitForExistence(timeout: 10), "the viewer")
+        let a = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.38, dy: 0.32))
+        let b = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.32))
         a.click()
         let back = element("draw-back")
         XCTAssertTrue(back.waitForExistence(timeout: 10), "Back one point is offered while a wall is half drawn")

@@ -30,6 +30,7 @@ struct ContentView: View {
             if let controller = model.controller {
                 ViewerViewport(controller: controller)
                     .ignoresSafeArea()
+                    .accessibilityIdentifier("viewport")
             }
         }
         .overlay { OverlayStack(overlays: overlays) }
