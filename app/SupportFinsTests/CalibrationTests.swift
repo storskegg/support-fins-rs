@@ -47,7 +47,7 @@ struct CalibrationTests {
         #expect(rows.count == CalibrationCatalog.coupons.count)
         for (row, coupon) in zip(rows, CalibrationCatalog.coupons) {
             let e = try #require(estimates.coupons[coupon.file])
-            #expect(row["title"] as? String == coupon.name + CalibrationCatalog.detail(e), coupon.name)
+            #expect(row["title"] as? String == coupon.name + CalibrationCatalog.detail(e), "\(coupon.name)")
             let download = try #require(row["download"] as? [String: Any])
             #expect(download["file"] as? String == coupon.file && download["title"] as? String == coupon.file)
         }
@@ -88,7 +88,7 @@ struct CalibrationTests {
             model.export(coupon, to: dest)
             #expect(model.error == nil, "\(model.error ?? "")")
             let source = try #require(CalibrationCatalog.resourceURL(coupon.file))
-            #expect(try Data(contentsOf: dest) == Data(contentsOf: source), coupon.file)
+            #expect(try Data(contentsOf: dest) == Data(contentsOf: source), "\(coupon.file)")
         }
         // a file that is there is replaced (the Save panel asked)
         let dest = dir.appending(path: "angle-coupon.stl")
