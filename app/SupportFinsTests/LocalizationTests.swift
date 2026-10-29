@@ -121,3 +121,20 @@ struct ViewCubeLocalizationTests {
         #expect(ViewCube.Face.front.localizedLabel(bundle: try #require(L10n.Language("en")).bundle) == "Front")
     }
 }
+
+@Suite("Localization: the import note")
+struct ImportNoteLocalizationTests {
+    @Test("the engine's English note is said again in the language, clause by clause")
+    func note() throws {
+        let de = try #require(L10n.Language("de"))
+        let en = try #require(L10n.Language("en"))
+        let note = "3MF: merged 2 of 5 objects into one part; cut out 1 negative part; restored 3 hand-placed supports and the settings."
+        #expect(ImportNote.localized(note, in: en) == note)
+        let shown = ImportNote.localized(note, in: de)
+        #expect(shown.hasPrefix("3MF: ") && shown.hasSuffix(".") && shown != note)
+        #expect(shown.contains(JS.tn("restored {n} hand-placed support and the settings", "restored {n} hand-placed supports and the settings", 3, in: de)))
+        // not a note of the engine's: left alone
+        #expect(ImportNote.localized("something else", in: de) == "something else")
+        #expect(ImportNote.localized("OBJ: a clause nobody knows.", in: de) == "OBJ: a clause nobody knows.")
+    }
+}

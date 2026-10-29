@@ -57,8 +57,12 @@ public enum NavPreset: String, CaseIterable, Sendable, Identifiable {
 
     /// A drag with `button` down. OrbitControls swaps orbit and pan while Shift, Ctrl or Cmd is held
     /// (`onMouseDown`), which is how the chords in the hints come free.
-    public func dragAction(_ button: Button, modifier: Bool) -> NavAction {
-        swap(buttonAction(button), modifier)
+    public func dragAction(_ button: Button, modifier: Bool, option: Bool = false, shift: Bool = false) -> NavAction {
+        let a = swap(buttonAction(button), modifier)
+        // The CAD presets leave the left button to picking and a trackpad has no middle one: Option-drag orbits there
+        // and Option+Shift-drag pans (native; docs/UI-MAP.md section 6).
+        if a == .none, button == .left, option { return shift ? .pan : .orbit }
+        return a
     }
 
     /// A two-finger trackpad scroll, which has no button. Default keeps the Mac habit (scroll orbits, Shift or

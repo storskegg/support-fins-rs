@@ -222,3 +222,66 @@ pub fn cli_rotation_matrix(deg: [f64; 3]) -> [f64; 9] {
         cx * cy,
     ]
 }
+
+/// `Triangle.closestPointToPoint(p, target)` (three.core.js:15625-15704, r185): the point of triangle
+/// `abc` nearest `p` (Ericson, Real-Time Collision Detection 5.1.5). Every `Vector3` op is the plain f64
+/// one three.js does, in its order: `subVectors`, `dot` (`x * x + y * y + z * z`), `addScaledVector`
+/// (`x += v.x * s`).
+pub fn triangle_closest_point(a: [f64; 3], b: [f64; 3], c: [f64; 3], p: [f64; 3]) -> [f64; 3] {
+    let sub = |u: [f64; 3], v: [f64; 3]| [u[0] - v[0], u[1] - v[1], u[2] - v[2]];
+    let dot = |u: [f64; 3], v: [f64; 3]| u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+    let add_scaled = |mut t: [f64; 3], v: [f64; 3], s: f64| {
+        t[0] += v[0] * s;
+        t[1] += v[1] * s;
+        t[2] += v[2] * s;
+        t
+    };
+    let vab = sub(b, a);
+    let vac = sub(c, a);
+    let vap = sub(p, a);
+    let d1 = dot(vab, vap);
+    let d2 = dot(vac, vap);
+    if d1 <= 0.0 && d2 <= 0.0 {
+        // vertex region of A; barycentric coords (1, 0, 0)
+        return a;
+    }
+    let vbp = sub(p, b);
+    let d3 = dot(vab, vbp);
+    let d4 = dot(vac, vbp);
+    if d3 >= 0.0 && d4 <= d3 {
+        // vertex region of B; barycentric coords (0, 1, 0)
+        return b;
+    }
+    let vc = d1 * d4 - d3 * d2;
+    if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+        let v = d1 / (d1 - d3);
+        // edge region of AB; barycentric coords (1-v, v, 0)
+        return add_scaled(a, vab, v);
+    }
+    let vcp = sub(p, c);
+    let d5 = dot(vab, vcp);
+    let d6 = dot(vac, vcp);
+    if d6 >= 0.0 && d5 <= d6 {
+        // vertex region of C; barycentric coords (0, 0, 1)
+        return c;
+    }
+    let vb = d5 * d2 - d1 * d6;
+    if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+        let w = d2 / (d2 - d6);
+        // edge region of AC; barycentric coords (1-w, 0, w)
+        return add_scaled(a, vac, w);
+    }
+    let va = d3 * d6 - d5 * d4;
+    if va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0 {
+        let vbc = sub(c, b);
+        let w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+        // edge region of BC; barycentric coords (0, 1-w, w)
+        return add_scaled(b, vbc, w);
+    }
+    // face region
+    let denom = 1.0 / (va + vb + vc);
+    // u = va * denom
+    let v = vb * denom;
+    let w = vc * denom;
+    add_scaled(add_scaled(a, vab, v), vac, w)
+}

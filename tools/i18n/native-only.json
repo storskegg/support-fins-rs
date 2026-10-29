@@ -1,53 +1,422 @@
 {
-  "3D view": { "why": "VoiceOver label of the 3D view (the web draws a canvas without one)", "de": "3D-Ansicht", "zh": "3D 视图", "pt": "Vista 3D", "ar": "العرض ثلاثي الأبعاد", "nl": "3D-weergave" },
-  "Benchmark orbit": { "why": "debug-build toggle (Settings, `#if DEBUG`)", "dev": true },
-  "Show Frame Time": { "why": "debug-build menu item (the web's #fps)", "dev": true },
-  "Cube": { "why": "the generated demo part's name when no file is given (tests, benchmarks)", "dev": true },
-  "Turning…": { "why": "Strength popover: the button while the strongest pose is searched", "de": "Drehe…", "zh": "正在旋转…", "pt": "Girando…", "ar": "جارٍ التدوير…", "nl": "Bezig met draaien…" },
-  "Custom build volume": { "why": "title of the custom-volume sheet (the web has bare inputs)", "de": "Eigener Bauraum", "zh": "自定义打印空间", "pt": "Volume útil personalizado", "ar": "حجم طباعة مخصص", "nl": "Eigen bouwvolume" },
-  "Width": { "why": "custom-volume sheet field (the web's aria-label is `width`)", "de": "Breite", "zh": "宽度", "pt": "Largura", "ar": "العرض", "nl": "Breedte" },
-  "Depth": { "why": "custom-volume sheet field (the web's aria-label is `depth`)", "de": "Tiefe", "zh": "深度", "pt": "Profundidade", "ar": "العمق", "nl": "Diepte" },
-  "Height": { "why": "custom-volume sheet field (the web's aria-label is `height`)", "de": "Höhe", "zh": "高度", "pt": "Altura", "ar": "الارتفاع", "nl": "Hoogte" },
-  "Use This Size": { "why": "custom-volume sheet button", "de": "Diese Größe verwenden", "zh": "使用此尺寸", "pt": "Usar este tamanho", "ar": "استخدام هذا الحجم", "nl": "Deze afmeting gebruiken" },
-  "Build the supports for this pose": { "why": "tooltip of the toolbar's Add fins (the web's button has none)", "de": "Die Stützen für diese Lage erzeugen", "zh": "为当前摆位生成支撑", "pt": "Gerar os suportes para esta posição", "ar": "إنشاء الدعامات لهذا الوضع", "nl": "De steunen voor deze positie opbouwen" },
-  "Face": { "why": "inspector row: the face under the pointer", "de": "Fläche", "zh": "面", "pt": "Face", "ar": "الوجه", "nl": "Vlak" },
-  "{face} (object {object})": { "why": "inspector row: the face under the pointer, with the object it belongs to", "de": "{face} (Objekt {object})", "zh": "{face}（对象 {object}）", "pt": "{face} (objeto {object})", "ar": "{face} (الكائن {object})", "nl": "{face} (object {object})" },
-  "Status": { "why": "title of the inspector's status card", "de": "Status", "zh": "状态", "pt": "Status", "ar": "الحالة", "nl": "Status" },
-  "Inspector": { "why": "toolbar toggle of the inspector sidebar", "de": "Informationen", "zh": "检查器", "pt": "Inspetor", "ar": "المفتش", "nl": "Inspecteur" },
-  "Rebuild while dragging": { "why": "View popover: native improvement, the fins follow a ring drag", "de": "Beim Ziehen neu erzeugen", "zh": "拖动时重建", "pt": "Recriar ao arrastar", "ar": "إعادة البناء أثناء السحب", "nl": "Opnieuw opbouwen tijdens slepen" },
-  "Rebuild While Dragging": { "why": "View menu item of the same", "like": "Rebuild while dragging" },
-  "Rebuild the fins while a rotate ring is dragged, so they follow the part. Off builds them when the drag ends.": { "why": "tooltip of the same", "de": "Die Finnen beim Ziehen eines Drehrings neu erzeugen, damit sie dem Bauteil folgen. Aus erzeugt sie erst, wenn das Ziehen endet.", "zh": "拖动旋转环时重建鳍片，使其跟随零件。关闭则在拖动结束时重建。", "pt": "Recria as aletas enquanto um anel de rotação é arrastado, para que acompanhem a peça. Desligado, são criadas quando o arrasto termina.", "ar": "إعادة بناء الزعانف أثناء سحب حلقة التدوير لتتبع القطعة. عند الإيقاف تُبنى عند انتهاء السحب.", "nl": "Bouw de vinnen opnieuw op terwijl een draairing wordt versleept, zodat ze het onderdeel volgen. Uit bouwt ze pas als het slepen stopt." },
-  "The file's mesh could not be shared with the GPU.": { "why": "error alert", "de": "Das Netz der Datei konnte nicht mit der GPU geteilt werden.", "zh": "无法将文件的网格共享给 GPU。", "pt": "A malha do arquivo não pôde ser compartilhada com a GPU.", "ar": "تعذّرت مشاركة شبكة الملف مع وحدة معالجة الرسومات.", "nl": "Het raster van het bestand kon niet met de GPU worden gedeeld." },
-  "Open an STL, 3MF, STEP or OBJ file.": { "why": "error alert for a file of another type", "de": "Öffnen Sie eine STL-, 3MF-, STEP- oder OBJ-Datei.", "zh": "请打开 STL、3MF、STEP 或 OBJ 文件。", "pt": "Abra um arquivo STL, 3MF, STEP ou OBJ.", "ar": "افتح ملف STL أو 3MF أو STEP أو OBJ.", "nl": "Open een STL-, 3MF-, STEP- of OBJ-bestand." },
-  "The build was cancelled.": { "why": "status text when a build is cancelled", "de": "Die Erzeugung wurde abgebrochen.", "zh": "生成已取消。", "pt": "A geração foi cancelada.", "ar": "أُلغي التوليد.", "nl": "De opbouw is geannuleerd." },
-  "This Mac has no usable Metal device.": { "why": "status text when Metal is missing", "de": "Dieser Mac hat kein verwendbares Metal-Gerät.", "zh": "这台 Mac 没有可用的 Metal 设备。", "pt": "Este Mac não tem um dispositivo Metal utilizável.", "ar": "لا يحتوي هذا الـ Mac على جهاز Metal صالح للاستخدام.", "nl": "Deze Mac heeft geen bruikbaar Metal-apparaat." },
-  "The file has no mesh.": { "why": "status text for an empty file", "de": "Die Datei enthält kein Netz.", "zh": "文件中没有网格。", "pt": "O arquivo não tem malha.", "ar": "لا يحتوي الملف على شبكة.", "nl": "Het bestand bevat geen raster." },
-  "These objects cannot be merged.": { "why": "status text when the picked objects cannot merge", "de": "Diese Objekte lassen sich nicht zusammenführen.", "zh": "这些对象无法合并。", "pt": "Estes objetos não podem ser mesclados.", "ar": "لا يمكن دمج هذه الكائنات.", "nl": "Deze objecten kunnen niet worden samengevoegd." },
-  "The merged mesh could not be shared with the GPU.": { "why": "status text", "de": "Das zusammengeführte Netz konnte nicht mit der GPU geteilt werden.", "zh": "无法将合并后的网格共享给 GPU。", "pt": "A malha mesclada não pôde ser compartilhada com a GPU.", "ar": "تعذّرت مشاركة الشبكة المدمجة مع وحدة معالجة الرسومات.", "nl": "Het samengevoegde raster kon niet met de GPU worden gedeeld." },
-  "Model": { "why": "the Model menu of the menu bar", "de": "Modell", "zh": "模型", "pt": "Modelo", "ar": "النموذج", "nl": "Model" },
-  "Reset Rotation": { "why": "Model menu item (the popover's button is `Reset`)", "de": "Drehung zurücksetzen", "zh": "重置旋转", "pt": "Zerar rotação", "ar": "إعادة تعيين التدوير", "nl": "Rotatie resetten" },
-  "Lay a Face Flat": { "why": "Model menu item, title case", "like": "Lay a face flat" },
-  "Show Rotate Rings": { "why": "View menu item, title case", "like": "Show rotate rings" },
-  "Suggest Orientation": { "why": "Model menu item, title case", "like": "Suggest orientation" },
-  "Show Print Layers": { "why": "View menu item, title case", "like": "Show layers" },
-  "Strength Arrow…": { "why": "Model menu item", "de": "Belastungspfeil…", "zh": "受力箭头…", "pt": "Seta de resistência…", "ar": "سهم القوة…", "nl": "Krachtpijl…" },
-  "Section View": { "why": "View menu item (the web's button is `Section`)", "de": "Schnittansicht", "zh": "剖切视图", "pt": "Vista em corte", "ar": "عرض المقطع", "nl": "Doorsnedeweergave" },
-  "Add Model to Plate…": { "why": "File menu item (the web's button is `Add model`)", "de": "Modell zur Platte hinzufügen…", "zh": "添加模型到打印板…", "pt": "Adicionar modelo à mesa…", "ar": "إضافة نموذج إلى اللوحة…", "nl": "Model aan plaat toevoegen…" },
-  "Remove Model from Plate": { "why": "Edit menu item (the web's button is `Remove model`)", "de": "Modell von der Platte entfernen", "zh": "从打印板移除模型", "pt": "Remover modelo da mesa", "ar": "إزالة النموذج من اللوحة", "nl": "Model van plaat verwijderen" },
-  "Export Again": { "why": "File menu item: repeat the last export", "de": "Erneut exportieren", "zh": "再次导出", "pt": "Exportar novamente", "ar": "تصدير مرة أخرى", "nl": "Opnieuw exporteren" },
-  "Frame Part": { "why": "View menu item (the web has none)", "de": "Bauteil einpassen", "zh": "适配零件", "pt": "Enquadrar peça", "ar": "ملاءمة القطعة", "nl": "Onderdeel passend maken" },
-  "Home": { "why": "View menu item for the view cube's home", "de": "Startansicht", "zh": "初始视图", "pt": "Vista inicial", "ar": "المنظر الافتراضي", "nl": "Startweergave" },
-  "Turn Part": { "why": "undo action name", "de": "Bauteil drehen", "zh": "旋转零件", "pt": "Girar peça", "ar": "تدوير القطعة", "nl": "Onderdeel draaien" },
-  "Move Model": { "why": "undo action name", "de": "Modell verschieben", "zh": "移动模型", "pt": "Mover modelo", "ar": "تحريك النموذج", "nl": "Model verplaatsen" },
-  "Remove Fin": { "why": "undo action name", "de": "Finne entfernen", "zh": "移除鳍片", "pt": "Remover aleta", "ar": "إزالة الزعنفة", "nl": "Vin verwijderen" },
-  "Restore Fins": { "why": "undo action name", "de": "Finnen wiederherstellen", "zh": "恢复鳍片", "pt": "Restaurar aletas", "ar": "استعادة الزعانف", "nl": "Vinnen herstellen" },
-  "Change Settings": { "why": "undo action name", "de": "Einstellungen ändern", "zh": "更改设置", "pt": "Alterar configurações", "ar": "تغيير الإعدادات", "nl": "Instellingen wijzigen" },
-  "Draw Wall": { "why": "undo action name", "de": "Wand zeichnen", "zh": "绘制墙", "pt": "Desenhar parede", "ar": "رسم جدار", "nl": "Wand tekenen" },
-  "Add Sway Brace": { "why": "undo action name", "de": "Stützrippe hinzufügen", "zh": "添加防晃撑", "pt": "Adicionar escora lateral", "ar": "إضافة دعامة منع التمايل", "nl": "Verstevigingsrib toevoegen" },
-  "Remove Support": { "why": "undo action name", "de": "Stütze entfernen", "zh": "移除支撑", "pt": "Remover suporte", "ar": "إزالة الدعامة", "nl": "Support verwijderen" },
-  "Clear Walls": { "why": "undo action name", "de": "Wände löschen", "zh": "清除墙", "pt": "Limpar paredes", "ar": "مسح الجدران", "nl": "Wanden wissen" },
-  "Lay Face Flat": { "why": "undo action name", "like": "Lay a face flat" },
-  "Rotate 90° About {axis}": { "why": "undo action name and Model menu item", "de": "90° um {axis} drehen", "zh": "绕 {axis} 旋转 90°", "pt": "Girar 90° em torno de {axis}", "ar": "تدوير 90° حول {axis}", "nl": "90° draaien om {axis}" },
-  "Rotate 90 degrees about {axis}": { "why": "tooltip and VoiceOver label of the X/Y/Z buttons (the web's aria-label, English only there)", "de": "Um 90 Grad um {axis} drehen", "zh": "绕 {axis} 旋转 90 度", "pt": "Girar 90 graus em torno de {axis}", "ar": "تدوير 90 درجة حول {axis}", "nl": "90 graden draaien om {axis}" },
-  "selected": { "why": "VoiceOver value of the selected plate tab", "de": "ausgewählt", "zh": "已选中", "pt": "selecionado", "ar": "محدد", "nl": "geselecteerd" }
+  "3D view": {
+    "why": "VoiceOver label of the 3D view (the web draws a canvas without one)",
+    "de": "3D-Ansicht",
+    "zh": "3D 视图",
+    "pt": "Vista 3D",
+    "ar": "العرض ثلاثي الأبعاد",
+    "nl": "3D-weergave"
+  },
+  "Benchmark orbit": {
+    "why": "debug-build toggle (Settings, `#if DEBUG`)",
+    "dev": true
+  },
+  "Show Frame Time": {
+    "why": "debug-build menu item (the web's #fps)",
+    "dev": true
+  },
+  "Cube": {
+    "why": "the generated demo part's name when no file is given (tests, benchmarks)",
+    "dev": true
+  },
+  "Turning…": {
+    "why": "Strength popover: the button while the strongest pose is searched",
+    "de": "Drehe…",
+    "zh": "正在旋转…",
+    "pt": "Girando…",
+    "ar": "جارٍ التدوير…",
+    "nl": "Bezig met draaien…"
+  },
+  "Custom build volume": {
+    "why": "title of the custom-volume sheet (the web has bare inputs)",
+    "de": "Eigener Bauraum",
+    "zh": "自定义打印空间",
+    "pt": "Volume útil personalizado",
+    "ar": "حجم طباعة مخصص",
+    "nl": "Eigen bouwvolume"
+  },
+  "Width": {
+    "why": "custom-volume sheet field (the web's aria-label is `width`)",
+    "de": "Breite",
+    "zh": "宽度",
+    "pt": "Largura",
+    "ar": "العرض",
+    "nl": "Breedte"
+  },
+  "Depth": {
+    "why": "custom-volume sheet field (the web's aria-label is `depth`)",
+    "de": "Tiefe",
+    "zh": "深度",
+    "pt": "Profundidade",
+    "ar": "العمق",
+    "nl": "Diepte"
+  },
+  "Height": {
+    "why": "custom-volume sheet field (the web's aria-label is `height`)",
+    "de": "Höhe",
+    "zh": "高度",
+    "pt": "Altura",
+    "ar": "الارتفاع",
+    "nl": "Hoogte"
+  },
+  "Use This Size": {
+    "why": "custom-volume sheet button",
+    "de": "Diese Größe verwenden",
+    "zh": "使用此尺寸",
+    "pt": "Usar este tamanho",
+    "ar": "استخدام هذا الحجم",
+    "nl": "Deze afmeting gebruiken"
+  },
+  "Build the supports for this pose": {
+    "why": "tooltip of the toolbar's Add fins (the web's button has none)",
+    "de": "Die Stützen für diese Lage erzeugen",
+    "zh": "为当前摆位生成支撑",
+    "pt": "Gerar os suportes para esta posição",
+    "ar": "إنشاء الدعامات لهذا الوضع",
+    "nl": "De steunen voor deze positie opbouwen"
+  },
+  "Face": {
+    "why": "inspector row: the face under the pointer",
+    "de": "Fläche",
+    "zh": "面",
+    "pt": "Face",
+    "ar": "الوجه",
+    "nl": "Vlak"
+  },
+  "{face} (object {object})": {
+    "why": "inspector row: the face under the pointer, with the object it belongs to",
+    "de": "{face} (Objekt {object})",
+    "zh": "{face}（对象 {object}）",
+    "pt": "{face} (objeto {object})",
+    "ar": "{face} (الكائن {object})",
+    "nl": "{face} (object {object})"
+  },
+  "Status": {
+    "why": "title of the inspector's status card",
+    "de": "Status",
+    "zh": "状态",
+    "pt": "Status",
+    "ar": "الحالة",
+    "nl": "Status"
+  },
+  "Inspector": {
+    "why": "toolbar toggle of the inspector sidebar",
+    "de": "Informationen",
+    "zh": "检查器",
+    "pt": "Inspetor",
+    "ar": "المفتش",
+    "nl": "Inspecteur"
+  },
+  "Rebuild while dragging": {
+    "why": "View popover: native improvement, the fins follow a ring drag",
+    "de": "Beim Ziehen neu erzeugen",
+    "zh": "拖动时重建",
+    "pt": "Recriar ao arrastar",
+    "ar": "إعادة البناء أثناء السحب",
+    "nl": "Opnieuw opbouwen tijdens slepen"
+  },
+  "Rebuild While Dragging": {
+    "why": "View menu item of the same",
+    "like": "Rebuild while dragging"
+  },
+  "Rebuild the fins while a rotate ring is dragged, so they follow the part. Off builds them when the drag ends.": {
+    "why": "tooltip of the same",
+    "de": "Die Finnen beim Ziehen eines Drehrings neu erzeugen, damit sie dem Bauteil folgen. Aus erzeugt sie erst, wenn das Ziehen endet.",
+    "zh": "拖动旋转环时重建鳍片，使其跟随零件。关闭则在拖动结束时重建。",
+    "pt": "Recria as aletas enquanto um anel de rotação é arrastado, para que acompanhem a peça. Desligado, são criadas quando o arrasto termina.",
+    "ar": "إعادة بناء الزعانف أثناء سحب حلقة التدوير لتتبع القطعة. عند الإيقاف تُبنى عند انتهاء السحب.",
+    "nl": "Bouw de vinnen opnieuw op terwijl een draairing wordt versleept, zodat ze het onderdeel volgen. Uit bouwt ze pas als het slepen stopt."
+  },
+  "The file's mesh could not be shared with the GPU.": {
+    "why": "error alert",
+    "de": "Das Netz der Datei konnte nicht mit der GPU geteilt werden.",
+    "zh": "无法将文件的网格共享给 GPU。",
+    "pt": "A malha do arquivo não pôde ser compartilhada com a GPU.",
+    "ar": "تعذّرت مشاركة شبكة الملف مع وحدة معالجة الرسومات.",
+    "nl": "Het raster van het bestand kon niet met de GPU worden gedeeld."
+  },
+  "Open an STL, 3MF, STEP or OBJ file.": {
+    "why": "error alert for a file of another type",
+    "de": "Öffnen Sie eine STL-, 3MF-, STEP- oder OBJ-Datei.",
+    "zh": "请打开 STL、3MF、STEP 或 OBJ 文件。",
+    "pt": "Abra um arquivo STL, 3MF, STEP ou OBJ.",
+    "ar": "افتح ملف STL أو 3MF أو STEP أو OBJ.",
+    "nl": "Open een STL-, 3MF-, STEP- of OBJ-bestand."
+  },
+  "The build was cancelled.": {
+    "why": "status text when a build is cancelled",
+    "de": "Die Erzeugung wurde abgebrochen.",
+    "zh": "生成已取消。",
+    "pt": "A geração foi cancelada.",
+    "ar": "أُلغي التوليد.",
+    "nl": "De opbouw is geannuleerd."
+  },
+  "This Mac has no usable Metal device.": {
+    "why": "status text when Metal is missing",
+    "de": "Dieser Mac hat kein verwendbares Metal-Gerät.",
+    "zh": "这台 Mac 没有可用的 Metal 设备。",
+    "pt": "Este Mac não tem um dispositivo Metal utilizável.",
+    "ar": "لا يحتوي هذا الـ Mac على جهاز Metal صالح للاستخدام.",
+    "nl": "Deze Mac heeft geen bruikbaar Metal-apparaat."
+  },
+  "The file has no mesh.": {
+    "why": "status text for an empty file",
+    "de": "Die Datei enthält kein Netz.",
+    "zh": "文件中没有网格。",
+    "pt": "O arquivo não tem malha.",
+    "ar": "لا يحتوي الملف على شبكة.",
+    "nl": "Het bestand bevat geen raster."
+  },
+  "These objects cannot be merged.": {
+    "why": "status text when the picked objects cannot merge",
+    "de": "Diese Objekte lassen sich nicht zusammenführen.",
+    "zh": "这些对象无法合并。",
+    "pt": "Estes objetos não podem ser mesclados.",
+    "ar": "لا يمكن دمج هذه الكائنات.",
+    "nl": "Deze objecten kunnen niet worden samengevoegd."
+  },
+  "The merged mesh could not be shared with the GPU.": {
+    "why": "status text",
+    "de": "Das zusammengeführte Netz konnte nicht mit der GPU geteilt werden.",
+    "zh": "无法将合并后的网格共享给 GPU。",
+    "pt": "A malha mesclada não pôde ser compartilhada com a GPU.",
+    "ar": "تعذّرت مشاركة الشبكة المدمجة مع وحدة معالجة الرسومات.",
+    "nl": "Het samengevoegde raster kon niet met de GPU worden gedeeld."
+  },
+  "Model": {
+    "why": "the Model menu of the menu bar",
+    "de": "Modell",
+    "zh": "模型",
+    "pt": "Modelo",
+    "ar": "النموذج",
+    "nl": "Model"
+  },
+  "Reset Rotation": {
+    "why": "Model menu item (the popover's button is `Reset`)",
+    "de": "Drehung zurücksetzen",
+    "zh": "重置旋转",
+    "pt": "Zerar rotação",
+    "ar": "إعادة تعيين التدوير",
+    "nl": "Rotatie resetten"
+  },
+  "Lay a Face Flat": {
+    "why": "Model menu item, title case",
+    "like": "Lay a face flat"
+  },
+  "Show Rotate Rings": {
+    "why": "View menu item, title case",
+    "like": "Show rotate rings"
+  },
+  "Suggest Orientation": {
+    "why": "Model menu item, title case",
+    "like": "Suggest orientation"
+  },
+  "Show Print Layers": {
+    "why": "View menu item, title case",
+    "like": "Show layers"
+  },
+  "Strength Arrow…": {
+    "why": "Model menu item",
+    "de": "Belastungspfeil…",
+    "zh": "受力箭头…",
+    "pt": "Seta de resistência…",
+    "ar": "سهم القوة…",
+    "nl": "Krachtpijl…"
+  },
+  "Section View": {
+    "why": "View menu item (the web's button is `Section`)",
+    "de": "Schnittansicht",
+    "zh": "剖切视图",
+    "pt": "Vista em corte",
+    "ar": "عرض المقطع",
+    "nl": "Doorsnedeweergave"
+  },
+  "Add Model to Plate…": {
+    "why": "File menu item (the web's button is `Add model`)",
+    "de": "Modell zur Platte hinzufügen…",
+    "zh": "添加模型到打印板…",
+    "pt": "Adicionar modelo à mesa…",
+    "ar": "إضافة نموذج إلى اللوحة…",
+    "nl": "Model aan plaat toevoegen…"
+  },
+  "Remove Model from Plate": {
+    "why": "Edit menu item (the web's button is `Remove model`)",
+    "de": "Modell von der Platte entfernen",
+    "zh": "从打印板移除模型",
+    "pt": "Remover modelo da mesa",
+    "ar": "إزالة النموذج من اللوحة",
+    "nl": "Model van plaat verwijderen"
+  },
+  "Export Again": {
+    "why": "File menu item: repeat the last export",
+    "de": "Erneut exportieren",
+    "zh": "再次导出",
+    "pt": "Exportar novamente",
+    "ar": "تصدير مرة أخرى",
+    "nl": "Opnieuw exporteren"
+  },
+  "Frame Part": {
+    "why": "View menu item (the web has none)",
+    "de": "Bauteil einpassen",
+    "zh": "适配零件",
+    "pt": "Enquadrar peça",
+    "ar": "ملاءمة القطعة",
+    "nl": "Onderdeel passend maken"
+  },
+  "Home": {
+    "why": "View menu item for the view cube's home",
+    "de": "Startansicht",
+    "zh": "初始视图",
+    "pt": "Vista inicial",
+    "ar": "المنظر الافتراضي",
+    "nl": "Startweergave"
+  },
+  "Turn Part": {
+    "why": "undo action name",
+    "de": "Bauteil drehen",
+    "zh": "旋转零件",
+    "pt": "Girar peça",
+    "ar": "تدوير القطعة",
+    "nl": "Onderdeel draaien"
+  },
+  "Move Model": {
+    "why": "undo action name",
+    "de": "Modell verschieben",
+    "zh": "移动模型",
+    "pt": "Mover modelo",
+    "ar": "تحريك النموذج",
+    "nl": "Model verplaatsen"
+  },
+  "Remove Fin": {
+    "why": "undo action name",
+    "de": "Finne entfernen",
+    "zh": "移除鳍片",
+    "pt": "Remover aleta",
+    "ar": "إزالة الزعنفة",
+    "nl": "Vin verwijderen"
+  },
+  "Restore Fins": {
+    "why": "undo action name",
+    "de": "Finnen wiederherstellen",
+    "zh": "恢复鳍片",
+    "pt": "Restaurar aletas",
+    "ar": "استعادة الزعانف",
+    "nl": "Vinnen herstellen"
+  },
+  "Change Settings": {
+    "why": "undo action name",
+    "de": "Einstellungen ändern",
+    "zh": "更改设置",
+    "pt": "Alterar configurações",
+    "ar": "تغيير الإعدادات",
+    "nl": "Instellingen wijzigen"
+  },
+  "Draw Wall": {
+    "why": "undo action name",
+    "de": "Wand zeichnen",
+    "zh": "绘制墙",
+    "pt": "Desenhar parede",
+    "ar": "رسم جدار",
+    "nl": "Wand tekenen"
+  },
+  "Add Sway Brace": {
+    "why": "undo action name",
+    "de": "Stützrippe hinzufügen",
+    "zh": "添加防晃撑",
+    "pt": "Adicionar escora lateral",
+    "ar": "إضافة دعامة منع التمايل",
+    "nl": "Verstevigingsrib toevoegen"
+  },
+  "Remove Support": {
+    "why": "undo action name",
+    "de": "Stütze entfernen",
+    "zh": "移除支撑",
+    "pt": "Remover suporte",
+    "ar": "إزالة الدعامة",
+    "nl": "Support verwijderen"
+  },
+  "Clear Walls": {
+    "why": "undo action name",
+    "de": "Wände löschen",
+    "zh": "清除墙",
+    "pt": "Limpar paredes",
+    "ar": "مسح الجدران",
+    "nl": "Wanden wissen"
+  },
+  "Lay Face Flat": {
+    "why": "undo action name",
+    "like": "Lay a face flat"
+  },
+  "Rotate 90° About {axis}": {
+    "why": "undo action name and Model menu item",
+    "de": "90° um {axis} drehen",
+    "zh": "绕 {axis} 旋转 90°",
+    "pt": "Girar 90° em torno de {axis}",
+    "ar": "تدوير 90° حول {axis}",
+    "nl": "90° draaien om {axis}"
+  },
+  "Rotate 90 degrees about {axis}": {
+    "why": "tooltip and VoiceOver label of the X/Y/Z buttons (the web's aria-label, English only there)",
+    "de": "Um 90 Grad um {axis} drehen",
+    "zh": "绕 {axis} 旋转 90 度",
+    "pt": "Girar 90 graus em torno de {axis}",
+    "ar": "تدوير 90 درجة حول {axis}",
+    "nl": "90 graden draaien om {axis}"
+  },
+  "selected": {
+    "why": "VoiceOver value of the selected plate tab",
+    "de": "ausgewählt",
+    "zh": "已选中",
+    "pt": "selecionado",
+    "ar": "محدد",
+    "nl": "geselecteerd"
+  },
+  "{n} percent": {
+    "why": "VoiceOver value of a slider in percent",
+    "de": "{n} Prozent",
+    "zh": "百分之{n}",
+    "pt": "{n} por cento",
+    "ar": "{n} بالمئة",
+    "nl": "{n} procent"
+  },
+  "{n} degrees": {
+    "why": "VoiceOver value of the overhang slider",
+    "de": "{n} Grad",
+    "zh": "{n} 度",
+    "pt": "{n} graus",
+    "ar": "{n} درجة",
+    "nl": "{n} graden"
+  },
+  "About these supports": {
+    "why": "VoiceOver label of the status card's info button",
+    "de": "Über diese Stützen",
+    "zh": "关于这些支撑",
+    "pt": "Sobre estes suportes",
+    "ar": "حول هذه الدعامات",
+    "nl": "Over deze supports"
+  },
+  "About the support material": {
+    "why": "VoiceOver label of the grams receipt's info button",
+    "de": "Über das Stützmaterial",
+    "zh": "关于支撑耗材",
+    "pt": "Sobre o material dos suportes",
+    "ar": "حول مادة الدعامات",
+    "nl": "Over het supportmateriaal"
+  },
+  "View cube": {
+    "why": "VoiceOver label of the view cube",
+    "de": "Ansichtswürfel",
+    "zh": "视图立方体",
+    "pt": "Cubo de vistas",
+    "ar": "مكعب العرض",
+    "nl": "Weergavekubus"
+  },
+  "Choose a face to look at the part from there": {
+    "why": "VoiceOver hint of the view cube",
+    "de": "Eine Fläche wählen, um das Bauteil von dort anzusehen",
+    "zh": "选择一个面，从该方向查看零件",
+    "pt": "Escolha uma face para ver a peça a partir dela",
+    "ar": "اختر وجهًا لعرض القطعة منه",
+    "nl": "Kies een vlak om het onderdeel van daaruit te bekijken"
+  }
 }

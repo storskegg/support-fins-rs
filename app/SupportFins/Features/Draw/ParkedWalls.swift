@@ -97,6 +97,13 @@ extension DrawFeature {
         return ps.finsOn ? p.sweepNow(for: s, settings: ps.settings) : nil
     }
 
+    /// The hand-placed walls of model `m` of the plate (`gs[0].session()`'s `walls`): the live model's are the window's, a
+    /// parked one's are kept with it.
+    func wallsOf(_ m: ModelSlot, board: PlateBoard) -> [DrawnWall] {
+        if m === board.plate.liveSlot { return host.session.drawnWalls }
+        return (m.stash?.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls)?.walls ?? []
+    }
+
     /// `takeState`: the walls and the add-by-hand state go with the model when it is parked.
     func modelState() -> Any? {
         let s = host.session
