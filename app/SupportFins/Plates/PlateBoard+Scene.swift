@@ -18,11 +18,12 @@ extension PlateBoard {
         for (k, m) in plate.models.enumerated() where k != plate.live {
             guard let s = m.stash, let flags = s.flags ?? zeroFlags(s.part, device) else { continue }
             let layer = session.finsOn ? s.supportLayer(device: device) : nil
+            let drawn = host.features[DrawFeature.self]?.parkedDrawn(s) { [weak self] in self?.sync() }
             parked.append(ParkedDrawable(
                 mesh: s.part, flags: flags, rotation: s.pose.float3x3, offset: s.offset,
                 origin: SIMD2(Float(m.xy.x), Float(m.xy.y)) + shift,
                 supports: layer, hiddenFins: layer == nil ? [] : s.build.hiddenRanges(removed: s.removedFins),
-                stale: isStale(s)))
+                drawn: drawn?.mesh, stale: isStale(s)))
             parkedSlots.append(m)
         }
         controller.renderer.setPlateScene(PlateScene(beds: [shift], edited: 0, parked: parked))
@@ -51,7 +52,9 @@ extension PlateBoard {
         } else if let s = m.stash {
             let latest = session.finsOn ? s.build.latest : nil
             let ids = latest == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
-            key = FootprintKey(pose: s.pose.columnMajor, offset: s.offset, build: latest.map(ObjectIdentifier.init), removed: ids)
+            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.parkedDrawn(s) { [weak self] in self?.sync() }?.sweep
+            key = FootprintKey(pose: s.pose.columnMajor, offset: s.offset, build: latest.map(ObjectIdentifier.init), removed: ids,
+                               drawn: drawn.map(ObjectIdentifier.init))
             part = s.part.part
             wanted = latest
         } else {

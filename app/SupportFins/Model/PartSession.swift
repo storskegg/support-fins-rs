@@ -91,6 +91,9 @@ final class PartSession {
         self.parts = parts
         self.pose = pose
         self.removedFins = removedFins
+        // the walls belong to a model (`takeState`): the one put on show brings its own back (Features/Draw)
+        drawnWalls = []
+        addByHand = false
         self.owner = owner
     }
 
