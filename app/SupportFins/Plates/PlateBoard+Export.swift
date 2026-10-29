@@ -96,6 +96,7 @@ extension PlateBoard {
     @discardableResult
     func exportPlate() async -> URL? {
         guard canExportPlate, !busy else { return nil }
+        CrashReporter.note("plate: export")
         busy = true
         defer { busy = false }
         // the other models' fins, kept to the plate's settings: wait for any still building, then write them as they stand

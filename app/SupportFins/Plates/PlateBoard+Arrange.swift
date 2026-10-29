@@ -35,6 +35,7 @@ extension PlateBoard {
     /// the clash banner, "Arrange first" in the Export menu and the toolbar's Arrange (`arrange`, `ui/arrange.js`).
     func arrange() async {
         guard hasLive, !arranging, !busy, !session.dragLocked else { return }
+        CrashReporter.note("plate: arrange")
         let plate = self.plate
         let building = host.wiring?.build?.building == true
         let current = await parkedSettled(seconds: 0)

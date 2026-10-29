@@ -39,6 +39,8 @@ final class ViewerModel {
     private(set) var loadingURL: URL?
     /// The name of the file on show, which can differ from the document's when a file is opened in place.
     var openedName: String?
+    /// The file on show (the crash report's "Include the model file" box); nil for a part made in place.
+    private(set) var openedURL: URL?
     var hasPart: Bool { (controller?.partCount ?? 0) > 0 }
 
     /// No part, nothing loading and no picker open: the intro (or the compact button) fills the window.
@@ -111,7 +113,11 @@ final class ViewerModel {
         controller.rotation = session.pose.float3x3
         wiring?.attach()
         controller.show(parts.map(\.mesh), name: first.name)
-        if !keepingPose { openedName = url?.lastPathComponent ?? first.name }
+        if !keepingPose {
+            openedName = url?.lastPathComponent ?? first.name
+            openedURL = url
+            CrashReporter.note("open file: \(openedName ?? "?") (\(url?.pathExtension.uppercased() ?? "-")), \(parts.count) objects, \(parts.reduce(0) { $0 + $1.mesh.faceCount }) triangles")
+        }
         status = nil
         features.partDidShow(parts)
         addingModel = false

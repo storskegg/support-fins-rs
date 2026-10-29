@@ -457,6 +457,7 @@ impl Builder {
                         continue; // superseded before it started
                     }
                     let cancel = Cancel::new(job.cancel.clone());
+                    let _op = crate::crash::operation("build");
                     let built = catch_unwind(AssertUnwindSafe(|| {
                         build_part_cancellable(
                             &part,
@@ -647,6 +648,7 @@ pub fn export(
     builds: Vec<Arc<BuildResult>>,
     options_json: String,
 ) -> Result<(), FfiError> {
+    let _op = crate::crash::operation("export");
     export_impl(&path, &parts, &builds, &[], &options_json)
 }
 
@@ -660,6 +662,7 @@ pub fn export_with_drawn(
     drawn: Option<Arc<crate::draw::DrawnSweep>>,
     options_json: String,
 ) -> Result<(), FfiError> {
+    let _op = crate::crash::operation("export");
     let tris = drawn.as_ref().map_or(&[][..], |d| d.tris());
     export_impl(&path, &parts, &builds, tris, &options_json)
 }
@@ -769,6 +772,7 @@ pub fn export_plate(
     models: Vec<PlateModel>,
     options_json: String,
 ) -> Result<(), FfiError> {
+    let _op = crate::crash::operation("export plate");
     let bytes = plate_3mf_bytes(&models, plate_bed(&options_json)?)?;
     write_file(&path, bytes)
 }
@@ -780,6 +784,7 @@ pub fn export_plates(
     plates: Vec<PlateFile>,
     options_json: String,
 ) -> Result<(), FfiError> {
+    let _op = crate::crash::operation("export plates");
     let bed = plate_bed(&options_json)?;
     let mut files = Vec::with_capacity(plates.len());
     for p in &plates {
