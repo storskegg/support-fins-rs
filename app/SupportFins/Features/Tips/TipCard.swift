@@ -22,6 +22,7 @@ struct TipCard: View {
         }
         .padding(12)
         .frame(width: 264, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tip-card")
     }
 }
