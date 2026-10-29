@@ -84,7 +84,7 @@ extension DrawFeature {
     func parkedDrawn(_ s: ParkedModel, settings: FinSettings, finsOn: Bool, landed: @escaping @MainActor () -> Void)
         -> (sweep: DrawnSweep?, mesh: OverlayMesh?)? {
         guard finsOn, let p = s.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls, !p.walls.isEmpty else { return nil }
-        return p.standing(for: s, settings: settings, device: host.controller?.renderer.device, landed: landed)
+        return p.standing(for: s, settings: settings, device: host?.controller?.renderer.device, landed: landed)
     }
 
     /// The walls a plate export writes for model `m` (`PlateBoard.drawn`, `plateGeometry`), in print space about its own
@@ -100,21 +100,21 @@ extension DrawFeature {
     /// The hand-placed walls of model `m` of the plate (`gs[0].session()`'s `walls`): the live model's are the window's, a
     /// parked one's are kept with it.
     func wallsOf(_ m: ModelSlot, board: PlateBoard) -> [DrawnWall] {
-        if m === board.plate.liveSlot { return host.session.drawnWalls }
+        if m === board.plate.liveSlot { return model.session.drawnWalls }
         return (m.stash?.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls)?.walls ?? []
     }
 
     /// `takeState`: the walls and the add-by-hand state go with the model when it is parked.
     func modelState() -> Any? {
-        let s = host.session
+        let s = model.session
         return s.drawnWalls.isEmpty && !s.addByHand ? nil : ParkedWalls(walls: s.drawnWalls, addByHand: s.addByHand)
     }
 
     /// `restoreState`: they come back with it, as the state of a model put on show (not an undo step).
     func restoreModelState(_ state: Any) {
         guard let p = state as? ParkedWalls else { return }
-        host.session.drawnWalls = p.walls
-        host.session.addByHand = p.addByHand
+        model.session.drawnWalls = p.walls
+        model.session.addByHand = p.addByHand
         model.sync()
     }
 }

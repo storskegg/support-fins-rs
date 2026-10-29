@@ -3,12 +3,12 @@ import SwiftUI
 /// Export: the window toolbar's Export menu, and File > Export with ⌘E for the last format used.
 @MainActor
 final class ExportFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
 
     init(host: ViewerModel) { self.host = host }
 
     var windowToolbarItems: [WindowToolbarItem] {
-        [WindowToolbarItem("export", order: 0) { ExportMenu(model: self.host.wiring?.exporter, board: self.host.features[PlatesFeature.self]?.board) }]
+        [WindowToolbarItem("export", order: 0) { ExportMenu(model: self.host?.wiring?.exporter, board: self.host?.features[PlatesFeature.self]?.board) }]
     }
 
     /// The Export items (docs/UI-MAP.md `export`, `export-stl`, `export-3mf`, `export-fins`, `export-all`,
@@ -53,8 +53,8 @@ final class ExportFeature: Feature {
 
     /// docs/UI-MAP.md "Export > STL / 3MF / Fins only (⌘E for the last used)".
     static func menus(_ f: ExportFeature?) -> [MenuSection] {
-        let exporter = f?.host.wiring?.exporter
-        let board = f?.host.features[PlatesFeature.self]?.board
+        let exporter = f?.host?.wiring?.exporter
+        let board = f?.host?.features[PlatesFeature.self]?.board
         let again = exporter?.lastFormat ?? .stl
         return [MenuSection(menu: .fileExport, order: 0, entries: [
             .submenu(JS.t("Export"), itemEntries(exporter, board: board)),

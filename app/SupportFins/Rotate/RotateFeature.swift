@@ -10,7 +10,7 @@ extension ToolbarSlot {
 /// hint, the Model menu's pose commands and Show Rotate Rings.
 @MainActor
 final class RotateFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     /// Lay a face flat (`ui/pose.js`).
     let layFace: LayFaceModel
     /// The Rotate popover's model (`ui/pose.js`).
@@ -36,15 +36,15 @@ final class RotateFeature: Feature {
     func partWillShow() { layFace.cancel() }
 
     var overlays: [WindowOverlay] {
-        [WindowOverlay("lay-face-hint", order: 50, alignment: .top) { LayFaceHint(model: self.layFace, clashBannerUp: self.host.features[PlatesFeature.self]?.board.clashing == true) }]
+        [WindowOverlay("lay-face-hint", order: 50, alignment: .top) { LayFaceHint(model: self.layFace, clashBannerUp: self.host?.features[PlatesFeature.self]?.board.clashing == true) }]
     }
 
     var modifiers: [WindowModifier] {
         [
             // a turn from anywhere (undo, redo, Suggest) disarms lay-flat
-            .onChange("lay-face-disarm-on-pose", of: { self.host.session.pose }) { _, _ in self.layFace.cancel() },
+            .onChange("lay-face-disarm-on-pose", of: { self.host?.session.pose }) { _, _ in self.layFace.cancel() },
             // arming folds the popover: the next click is on the part, which would only dismiss it
-            .onChange("fold-on-arm", of: { self.layFace.armed }) { _, armed in if armed { self.host.toolbar.fold() } },
+            .onChange("fold-on-arm", of: { self.layFace.armed }) { _, armed in if armed { self.host?.toolbar.fold() } },
         ]
     }
 
@@ -57,8 +57,8 @@ final class RotateFeature: Feature {
     }
 
     static func menus(_ f: RotateFeature?) -> [MenuSection] {
-        let session = f?.host.session, layFace = f?.layFace, rotate = f?.rotate
-        let hasPart = f?.host.hasPart == true
+        let session = f?.host?.session, layFace = f?.layFace, rotate = f?.rotate
+        let hasPart = f?.host?.hasPart == true
         return [
             MenuSection(menu: .model, order: 0, entries:
                 // ⌘R, ⌥⌘R, ⌃⌘R (native; the web has no shortcut)

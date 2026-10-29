@@ -11,7 +11,7 @@ extension ToolbarSlot {
 /// Plate, a click on a parked model to edit it, and the Undo toast of a removal. The state is `PlateBoard`.
 @MainActor
 final class PlatesFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let board: PlateBoard
 
     init(host: ViewerModel) {
@@ -27,16 +27,18 @@ final class PlatesFeature: Feature {
     /// Arrange (`#arrange-btn`, `ui/arrange.js` `syncButton`): there only while a model is on show and the plate has
     /// more than one; a click packs the plate (`PlateBoard.arrange`), the button greyed while it waits for the builds.
     func registerTools(in toolbar: ToolbarRegistry) {
-        guard host.controller != nil else { return }
+        guard host?.controller != nil else { return }
         toolbar.registerAction(.arrange, isShown: { [board] in board.arrangeShown }, isEnabled: { [board] in !board.arranging && !board.busy }) {
             [board] in Task { await board.arrange() }
         }
     }
 
+    func close() { board.close() }
+
     // MARK: a part arrives
 
     func partWillShow() {
-        if !board.swapping && host.addingModel { board.willAdd() }
+        if !board.swapping && host?.addingModel == true { board.willAdd() }
     }
 
     func partDidShow(_ parts: [LoadedPart]) {
@@ -56,19 +58,19 @@ final class PlatesFeature: Feature {
 
     var inspectorSections: [InspectorSection] {
         [InspectorSection("plate-part-buttons", slot: .stats) {
-            if self.host.hasPart { PlatePartButtons(feature: self) }
+            if self.host?.hasPart == true { PlatePartButtons(feature: self) }
         }]
     }
 
     var modifiers: [WindowModifier] {
         [
             // the plate's settings: a change rebuilds the parked models' fins (`scheduleParked`)
-            .onChange("plates-settings", of: { SettingsKey(session: self.host.session) }) { _, _ in self.board.scheduleParked() },
+            .onChange("plates-settings", of: { self.host.map { SettingsKey(session: $0.session) } }) { _, _ in self.board.scheduleParked() },
             // the models' footprints change with a turn, a fin rebuild, a removal, or the seating the analysis lands:
             // the clash cells and the banner follow (`checkOverlap`)
-            .onChange("plates-clash", of: { FootprintKey(host: self.host) }) { _, _ in self.board.sync() },
+            .onChange("plates-clash", of: { self.host.map { FootprintKey(host: $0) } }) { _, _ in self.board.sync() },
             // the beds follow the build volume
-            .onChange("plates-volume", of: { self.host.controller?.volume }) { _, _ in self.board.sync() },
+            .onChange("plates-volume", of: { self.host?.controller?.volume }) { _, _ in self.board.sync() },
         ]
     }
 
@@ -119,21 +121,24 @@ final class PlatesFeature: Feature {
     /// Several files at once go one to a plate, starting on this one if it is empty; in turn, a 3MF's object picker
     /// waiting for its answer (`loadFiles`, `ui/io.js`).
     func loadFiles(_ urls: [URL]) {
-        Task {
+        Task { [weak self] in
             for url in urls where OpenRules.accepts(url) {
-                board.freePlate()
-                await host.load(url: url)
-                while host.picker != nil { try? await Task.sleep(for: .milliseconds(100)) }
+                // the window holds only for the load itself: closed meanwhile, the rest are not opened
+                guard self?.host != nil else { return }
+                self?.board.freePlate()
+                await self?.host?.load(url: url)
+                while self?.host?.picker != nil { try? await Task.sleep(for: .milliseconds(100)) }
             }
-            board.dropEmptyPlate()
+            self?.board.dropEmptyPlate()
         }
     }
 
     func addModels(_ urls: [URL]) {
-        Task {
+        Task { [weak self] in
             for url in urls where OpenRules.accepts(url) {
-                await host.load(url: url, adding: true)
-                while host.picker != nil { try? await Task.sleep(for: .milliseconds(100)) }
+                guard self?.host != nil else { return }
+                await self?.host?.load(url: url, adding: true)
+                while self?.host?.picker != nil { try? await Task.sleep(for: .milliseconds(100)) }
             }
         }
     }

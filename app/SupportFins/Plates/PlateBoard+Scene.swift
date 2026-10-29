@@ -9,7 +9,7 @@ extension PlateBoard {
     /// Lay the scene out for the plate being edited: its bed shifted by minus the live model's spot, and every parked
     /// model where it stands, in the ghost look.
     func sync() {
-        guard let controller = host.controller else { return }
+        guard let controller = host?.controller else { return }
         let live = plate.liveSlot
         let shift = SIMD2<Float>(Float(-live.xy.x), Float(-live.xy.y))
         let device = controller.renderer.device
@@ -28,7 +28,7 @@ extension PlateBoard {
                 let finsOn = pi == active ? session.finsOn : (pl.settings?.finsOn ?? false)
                 let layer = finsOn ? s.supportLayer(device: device) : nil
                 let plateSettings = pi == active ? session.settings : (pl.settings?.settings ?? session.settings)
-                let drawn = host.features[DrawFeature.self]?.parkedDrawn(s, settings: plateSettings, finsOn: finsOn) { [weak self] in self?.sync() }
+                let drawn = host?.features[DrawFeature.self]?.parkedDrawn(s, settings: plateSettings, finsOn: finsOn) { [weak self] in self?.sync() }
                 parked.append(ParkedDrawable(
                     mesh: s.part, flags: flags, rotation: s.pose.float3x3, offset: s.offset,
                     origin: SIMD2(Float(m.xy.x), Float(m.xy.y)) + bed,
@@ -58,18 +58,18 @@ extension PlateBoard {
         let key: FootprintKey, part: Part, wanted: BuildResult?
         var drawn: DrawnSweep?
         if m === plate.liveSlot, hasLive, let first = session.parts.first {
-            let build = host.wiring?.build
+            let build = host?.wiring?.build
             let latest = session.finsOn ? build?.latest : nil
             let ids = latest == nil ? [] : (build?.matchedRemovals(of: session.removedFins).keys.sorted().map { UInt64($0) } ?? [])
-            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.model.exportDrawn.sweep
-            key = FootprintKey(pose: session.pose.columnMajor, offset: host.controller?.renderer.offset ?? .zero,
+            drawn = latest == nil ? nil : host?.features[DrawFeature.self]?.model.exportDrawn.sweep
+            key = FootprintKey(pose: session.pose.columnMajor, offset: host?.controller?.renderer.offset ?? .zero,
                                build: latest.map(ObjectIdentifier.init), removed: ids, drawn: drawn.map(ObjectIdentifier.init))
             part = first.part
             wanted = latest
         } else if let s = m.stash {
             let latest = session.finsOn ? s.build.latest : nil
             let ids = latest == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
-            drawn = latest == nil ? nil : host.features[DrawFeature.self]?.parkedDrawn(s, settings: session.settings, finsOn: session.finsOn) { [weak self] in self?.sync() }?.sweep
+            drawn = latest == nil ? nil : host?.features[DrawFeature.self]?.parkedDrawn(s, settings: session.settings, finsOn: session.finsOn) { [weak self] in self?.sync() }?.sweep
             key = FootprintKey(pose: s.pose.columnMajor, offset: s.offset, build: latest.map(ObjectIdentifier.init), removed: ids,
                                drawn: drawn.map(ObjectIdentifier.init))
             part = s.part.part

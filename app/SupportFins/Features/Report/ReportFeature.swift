@@ -4,13 +4,15 @@ import SupportFinsCore
 /// The report links under the status card (`#report-row`, `ui/report.js`) and Edit > Copy Build Settings.
 @MainActor
 final class ReportFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let model: ReportModel
 
     init(host: ViewerModel) {
         self.host = host
         model = ReportModel(host: host)
     }
+
+    func close() { model.close() }
 
     var inspectorSections: [InspectorSection] {
         [InspectorSection("report", slot: .top, order: 10) { ReportRow(model: self.model) }]

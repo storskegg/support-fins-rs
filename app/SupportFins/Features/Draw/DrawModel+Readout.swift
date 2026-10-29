@@ -42,8 +42,8 @@ extension DrawModel {
         let s = session.settings
         guard let kit = try? DrawKit(part: core.part, rot: session.pose.columnMajor, thresholdDeg: s.threshold,
                                      settingsJson: s.drawSettingsJSON(), tunablesJson: s.tunablesJSON()) else { return nil }
-        let auto = autoLike ? host.wiring?.build?.latest : nil
-        let ids = auto == nil ? [] : (host.wiring?.build?.matchedRemovals(of: session.removedFins).keys.sorted().map { UInt64($0) } ?? [])
+        let auto = autoLike ? host?.wiring?.build?.latest : nil
+        let ids = auto == nil ? [] : (host?.wiring?.build?.matchedRemovals(of: session.removedFins).keys.sorted().map { UInt64($0) } ?? [])
         return try? kit.sweep(wallsJson: session.drawnWalls.json, autoBuild: auto, removed: ids)
     }
 }

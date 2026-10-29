@@ -13,7 +13,7 @@ extension ToolbarSlot {
 /// its handle, the clipping and the ghost are the viewer's (`SectionTool`, `Section/SectionRenderer.swift`).
 @MainActor
 final class SectionFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let model: SectionModel?
 
     init(host: ViewerModel) {
@@ -33,7 +33,7 @@ final class SectionFeature: Feature {
     /// the next switch on.
     func setOn(_ on: Bool) {
         model?.setOn(on)
-        if model?.isOn != true, host.toolbar.open == .section { host.toolbar.fold() }
+        if model?.isOn != true, let toolbar = host?.toolbar, toolbar.open == .section { toolbar.fold() }
     }
 
     /// A new part: the old part's cut means nothing on it (`resetPartState`, `ui/part.js:157`).
@@ -45,7 +45,7 @@ final class SectionFeature: Feature {
             .divider,
             .check(JS.t("Section View"),
                    help: JS.t("Cut the view with a plane to see and draw inside the part. Drag the arrow or the sheet (or Shift + scroll) to push the cut, the rings to tilt it. Click again to turn it off. View only: the export is whole."),
-                   enabled: f?.host.hasPart == true,
+                   enabled: f?.host?.hasPart == true,
                    isOn: Binding(get: { model?.isOn ?? false }, set: { f?.setOn($0) })),
         ])]
     }
