@@ -418,5 +418,13 @@
     "pt": "Escolha uma face para ver a peça a partir dela",
     "ar": "اختر وجهًا لعرض القطعة منه",
     "nl": "Kies een vlak om het onderdeel van daaruit te bekijken"
+  },
+  "Copy Build Settings": {
+    "why": "Edit menu item for the report row's Copy settings (title case, names what it copies)",
+    "de": "Einstellungen des Aufbaus kopieren",
+    "zh": "复制本次生成的设置",
+    "pt": "Copiar configurações da geração",
+    "ar": "نسخ إعدادات البناء",
+    "nl": "Instellingen van de opbouw kopiëren"
   }
 }

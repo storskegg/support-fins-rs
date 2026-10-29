@@ -18,5 +18,6 @@
   "View": "MenuID: the system menu's name, matched against the feature menus",
   "Format": "MenuID: the system menu's name, matched against the feature menus",
   "Window": "MenuID: the system menu's name, matched against the feature menus",
-  "Help": "MenuID: the system menu's name, matched against the feature menus"
+  "Help": "MenuID: the system menu's name, matched against the feature menus",
+  "Support Fins for Mac %arg": "ReportModel.site: the issue report's `where` (the web writes location.host, untranslated); the report is for the maintainers"
 }
