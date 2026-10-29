@@ -19,8 +19,8 @@ pub use builder::{
 };
 pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
 pub use footprint::{
-    Footprint, footprint_clash_cells, footprint_of_build, footprint_of_build_with_drawn, footprint_of_part, footprint_spot,
-    footprint_union, plate_under,
+    Footprint, footprint_clash_cells, footprint_of_build, footprint_of_build_with_drawn,
+    footprint_of_part, footprint_spot, footprint_union, plate_under,
 };
 pub use gpu::GpuBuffer;
 pub use part::{

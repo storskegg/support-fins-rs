@@ -116,7 +116,7 @@ struct FeatureSetTests {
 
     /// `FeatureCommands` shows a fixed number of menus.
     @Test func theMenuBarHasRoomForEveryMenu() {
-        #expect(FeatureSet.menuIDs().filter { !$0.isFileGroup && !$0.isEditGroup }.count <= FeatureCommands.menuSlots)
+        #expect(FeatureSet.menuIDs().filter { !$0.isFileGroup }.count <= FeatureCommands.menuSlots)
     }
 
     // MARK: the real features
