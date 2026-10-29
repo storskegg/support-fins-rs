@@ -275,12 +275,112 @@ fn positions_value(p: &[f64], double: bool) -> Value {
     }
 }
 
+fn attrs_value(a: &Attrs) -> Value {
+    Value::Obj(
+        a.iter()
+            .map(|(k, v)| (k.clone(), Value::from(v.as_str())))
+            .collect(),
+    )
+}
+
+fn node_value(n: &XmlNode) -> Value {
+    Value::Obj(vec![
+        ("name".into(), Value::from(n.name.as_str())),
+        ("attributes".into(), attrs_value(&n.attributes)),
+        (
+            "children".into(),
+            Value::Arr(n.children.iter().map(node_value).collect()),
+        ),
+    ])
+}
+
+fn pairs_value(p: &[(String, String)]) -> Value {
+    Value::Arr(
+        p.iter()
+            .map(|(k, v)| Value::Arr(vec![Value::from(k.as_str()), Value::from(v.as_str())]))
+            .collect(),
+    )
+}
+
+fn source_value(s: &SourceMesh) -> Value {
+    Value::Obj(vec![
+        ("attributes".into(), attrs_value(&s.attributes)),
+        ("vertices".into(), Value::from(s.vertices.clone())),
+        ("indices".into(), Value::from(s.indices.clone())),
+        (
+            "triangleAttributes".into(),
+            Value::Arr(
+                s.triangle_attributes
+                    .iter()
+                    .map(|a| a.as_ref().map_or(Value::Undefined, attrs_value))
+                    .collect(),
+            ),
+        ),
+        (
+            "properties".into(),
+            Value::Arr(s.properties.iter().map(node_value).collect()),
+        ),
+        (
+            "modelAttributes".into(),
+            s.model_attributes.as_ref().map_or(Value::Null, attrs_value),
+        ),
+    ])
+}
+
+fn component_value(c: &ComponentInfo, double: bool) -> Value {
+    Value::Obj(vec![
+        ("path".into(), Value::from(c.path.as_str())),
+        ("objectId".into(), Value::from(c.object_id.as_str())),
+        (
+            "partId".into(),
+            c.part_id.as_deref().map_or(Value::Null, Value::from),
+        ),
+        (
+            "route".into(),
+            Value::Arr(c.route.iter().map(|&i| Value::from(i as f64)).collect()),
+        ),
+        ("kind".into(), Value::from(c.kind)),
+        (
+            "transform".into(),
+            c.transform.map_or(Value::Null, |m| Value::from(m.to_vec())),
+        ),
+        (
+            "cornerOrder".into(),
+            Value::from(c.corner_order.iter().map(|&k| k as f64).collect::<Vec<_>>()),
+        ),
+        (
+            "source".into(),
+            c.source.as_deref().map_or(Value::Undefined, source_value),
+        ),
+        ("firstTriangle".into(), Value::from(c.first_triangle as f64)),
+        ("buildIndex".into(), Value::from(c.build_index as f64)),
+        ("unitScale".into(), Value::from(c.unit_scale)),
+        ("sourceFaces".into(), Value::U32(c.source_faces.clone())),
+        ("positions".into(), positions_value(&c.positions, double)),
+        (
+            "settings".into(),
+            Value::Arr(
+                c.settings
+                    .iter()
+                    .map(|p| {
+                        Value::Obj(vec![
+                            ("attributes".into(), attrs_value(&p.attributes)),
+                            ("metadata".into(), pairs_value(&p.metadata)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("objectSettings".into(), pairs_value(&c.object_settings)),
+    ])
+}
+
 fn result_value(r: &ThreeMf, double: bool, strict: bool) -> Value {
     let objects = r
         .objects
         .iter()
         .map(|o| {
-            Value::Obj(vec![
+            let mut fields = vec![
                 ("name".into(), Value::from(o.name.as_str())),
                 ("positions".into(), positions_value(&o.positions, double)),
                 ("tris".into(), Value::from(o.tris as f64)),
@@ -315,7 +415,14 @@ fn result_value(r: &ThreeMf, double: bool, strict: bool) -> Value {
                             .collect(),
                     ),
                 ),
-            ])
+            ];
+            if let Some(cs) = &o.components {
+                fields.push((
+                    "components".into(),
+                    Value::Arr(cs.iter().map(|c| component_value(c, double)).collect()),
+                ));
+            }
+            Value::Obj(fields)
         })
         .collect();
     Value::Obj(vec![
@@ -375,6 +482,7 @@ fn run_read_parts(c: &Case) -> Result<Value, String> {
             .map(|v| v.num() as usize),
         double_precision: o.is_some_and(|o| bool_of(field(o, "doublePrecision"))),
         outward_winding: o.is_some_and(|o| bool_of(field(o, "outwardWinding"))),
+        with_components: o.is_some_and(|o| bool_of(field(o, "withComponents"))),
     };
     read_three_mf_parts(&parts, &opts)
         .map(|r| result_value(&r, opts.double_precision, opts.build_index.is_some()))

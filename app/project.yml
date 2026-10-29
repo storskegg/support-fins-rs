@@ -1,6 +1,10 @@
 # The source of truth for the Xcode project (`just app-project` generates app/SupportFins.xcodeproj, which is
 # git-ignored). The viewer and SupportFinsCore (track D, `just app-core` builds its XCFramework) are local packages.
 name: SupportFins
+# MARKETING_VERSION: generated from web/changelog.json (tools/whatsnew/gen.js)
+configFiles:
+  Debug: Version.xcconfig
+  Release: Version.xcconfig
 options:
   bundleIdPrefix: com.storskegg
   deploymentTarget:

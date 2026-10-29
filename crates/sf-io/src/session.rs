@@ -897,6 +897,7 @@ mod tests {
             },
             colors: None,
             extras: vec![],
+            components: None,
         };
         assert_eq!(part_object_of(&[o("a"), o("a supports")]), Some(0));
         assert_eq!(part_object_of(&[o("a supports"), o("a")]), Some(1));

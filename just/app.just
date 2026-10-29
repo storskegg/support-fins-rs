@@ -80,3 +80,7 @@ i18n-check: app-uibuild
 # The tip cards' pictures (web/ui/tippics.js) as drawing data for the app (Features/Tips); `--check` is in `just gate`.
 tippics-gen *args:
     deno run -A --config tools/tippics/deno.json tools/tippics/gen.ts {{args}}
+
+# What's new (web/changelog.json) as the app's changelog.json and its version (app/Version.xcconfig); `--check` is in `just gate`.
+whatsnew-gen *args:
+    deno run -A --no-config tools/whatsnew/gen.js {{args}}

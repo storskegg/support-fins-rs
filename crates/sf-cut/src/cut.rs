@@ -36,6 +36,11 @@ pub struct CutResult {
     /// why NONE was, when that is the whole object's reason: `open` (the part is not a closed
     /// solid), `whole` (the negatives remove all of it) or `load`
     pub why: Option<&'static str>,
+    /// `options.provenance` only: each output triangle's input body face, or -1 for a face the
+    /// cutter made. Boolean-library provenance hints, NOT paint coordinates: verify coplanar
+    /// containment before remapping facet attributes. An uncut fallback retains identity
+    /// indices, and must still be checked via why/cut/uncut.
+    pub source_faces: Option<Vec<i32>>,
 }
 
 /// The `${x},${y},${z}` key of a point: exact-equal points weld (`-0` and `0` are one string in JS,
@@ -210,6 +215,17 @@ pub fn cut_negatives(
     colors: Option<&PartColors>,
     extras: &[ReadExtra],
 ) -> CutResult {
+    cut_negatives_with(positions, colors, extras, false)
+}
+
+/// `cutNegatives(obj, { provenance })` (web/cut.js): with `provenance`, the result carries
+/// `source_faces` (input body face IDs, -1 for faces the cutter made). Geometry is unchanged.
+pub fn cut_negatives_with(
+    positions: &[f64],
+    colors: Option<&PartColors>,
+    extras: &[ReadExtra],
+    provenance: bool,
+) -> CutResult {
     let negs: Vec<&ReadExtra> = extras
         .iter()
         .filter(|e| e.kind == PartKind::Negative)
@@ -220,6 +236,7 @@ pub fn cut_negatives(
         cut: 0,
         uncut: negs.len(),
         why: None,
+        source_faces: provenance.then(|| (0..(positions.len() / 9) as i32).collect()),
     };
     if negs.is_empty() {
         return same;
@@ -270,6 +287,18 @@ pub fn cut_negatives(
             pos[i * 3 + k] = out.vert_properties[o + k] as f64;
         }
     }
+    let source_faces = provenance.then(|| {
+        let mut sf = vec![-1i32; out.tri_verts.len() / 3];
+        for (r, &oid) in out.run_original_id.iter().enumerate() {
+            if oid != part_id {
+                continue;
+            }
+            for t in (out.run_index[r] / 3) as usize..(out.run_index[r + 1] / 3) as usize {
+                sf[t] = out.face_id[t] as i32;
+            }
+        }
+        sf
+    });
     let colors = carry_colors(
         positions,
         colors,
@@ -285,6 +314,7 @@ pub fn cut_negatives(
         cut: n_tools,
         uncut: negs.len() - n_tools,
         why: None,
+        source_faces,
     }
 }
 
