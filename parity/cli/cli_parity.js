@@ -95,6 +95,18 @@ const { block } = await import(`${UPSTREAM_ROOT}/tests/_util.js`);
   await put("pj-emptyplate", { positions: lb, plateIDs: ["", 5] });
   await put("pj-negative", { negative: true });
   await put("pj-cutters", { positions: lb, steep: true, cutters: [{ positions: block(2, 6, 2, 6, 2, 6) }] });
+  // plugins/cli/tests/project.test.js (23039e2): a cutter component that wraps a valid leaf and an
+  // empty one; the strict project policy must refuse it, in both CLIs, with the same words
+  {
+    const { xmlTree, child, editXML } = await import(`${UPSTREAM_ROOT}/plugins/cli/project-xml.js`);
+    const original = await fixture({ upright: true, cutters: [{ positions: block(4, 8, 4, 8, -1, 21) }] });
+    const zip = new ProjectZip(original), path = "3D/Objects/cutter0.model";
+    const xml = await zip.text(path), cutter = child(child(xmlTree(xml), "resources"), "object"), mesh = child(cutter, "mesh");
+    const nested = '<object id="2"><components><component objectid="30"/><component objectid="31"/></components></object>'
+      + `<object id="30">${xml.slice(mesh.start, mesh.end)}</object>`
+      + '<object id="31"><mesh><vertices/><triangles/></mesh></object>';
+    Deno.writeFileSync(`${inputs}/pj-cutter-nested-empty.3mf`, new Uint8Array(await (await zip.patch(new Map([[path, new TextEncoder().encode(editXML(xml, [[cutter.start, cutter.end, nested]]))]]))).arrayBuffer()));
+  }
 }
 
 const INPUT_NAMES = new Set([...Deno.readDirSync(inputs)].map((e) => e.name));
@@ -217,6 +229,8 @@ PJ("check-resume", "pj-lb.3mf", ["--check", "--resume"]);
 // a project with real cutters needs the cut (#72)
 PJ("cutters", "pj-cutters.3mf", ["--json"]);
 PJ("cutters-check", "pj-cutters.3mf", ["--check", "--json"]);
+PJ("cutter-nested-empty-check", "pj-cutter-nested-empty.3mf", ["--check", "--object", "1", "--json"]);
+PJ("cutter-nested-empty", "pj-cutter-nested-empty.3mf", ["--object", "1", "--json"]);
 // a missing file: only the prefix of the runtime's message is compared
 add("err-missing-file", ["nope.stl", "--rot", "40,0,0"]);
 

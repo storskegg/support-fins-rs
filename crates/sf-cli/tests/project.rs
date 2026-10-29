@@ -151,6 +151,42 @@ fn plate_ids(r: &Run) -> String {
 
 // ---- Separate walls / nozzle ------------------------------------------------------------------
 
+// project.test.js:120 (ed555da / 23039e2)
+#[test]
+fn an_empty_nested_cutter_cannot_hide_beside_a_valid_leaf_in_the_same_component() {
+    let original = fixture(&Fx {
+        upright: true,
+        cutters: vec![Cutter {
+            positions: Some(block(4.0, 8.0, 4.0, 8.0, -1.0, 21.0)),
+            ..Default::default()
+        }],
+        ..plain()
+    });
+    let path = "3D/Objects/cutter0.model";
+    let xml = member_text(&original, path);
+    let tree = xml_tree(&xml).unwrap();
+    let cutter = child(child(&tree, "resources").unwrap(), "object").unwrap();
+    let mesh = child(cutter, "mesh").unwrap();
+    let nested = format!(
+        "<object id=\"2\"><components><component objectid=\"30\"/><component objectid=\"31\"/></components></object>\
+         <object id=\"30\">{}</object>\
+         <object id=\"31\"><mesh><vertices/><triangles/></mesh></object>",
+        &xml[mesh.start..mesh.end]
+    );
+    let edited = edit_xml(&xml, vec![(cutter.start, cutter.end, nested)]).unwrap();
+    let source = patched(&original, &[(path, Some(edited.into_bytes()))]);
+    let checked = cli(&source, &["--check", "--object", "1"]);
+    assert!(
+        checked.code != 0 && checked.fs.len() == 1,
+        "incomplete nested cutter accepted"
+    );
+    assert!(
+        checked.out.join("\n").contains("empty cutter geometry"),
+        "missing nested geometry was not explained: {}",
+        checked.out.join("\n")
+    );
+}
+
 #[test]
 fn separate_walls_reaches_selected_geometry_and_preserves_the_other_model_and_settings() {
     let source = fixture(&Fx {
@@ -455,6 +491,7 @@ fn preserve_compressed_painted_meshes_settings_plates_and_source_add_aligned_sup
             build_index: Some(i),
             double_precision: true,
             outward_winding: true,
+            ..Default::default()
         };
         let original = read_three_mf_parts(&all, &opts).unwrap().objects.remove(0);
         let direct = compute_fins(
@@ -1232,6 +1269,7 @@ fn mirrored_build_keeps_its_pose_and_outward_supports() {
         build_index: Some(2),
         double_precision: true,
         outward_winding: true,
+        ..Default::default()
     };
     let fins = read_three_mf_parts(&members(&zip), &opts)
         .unwrap()
@@ -2394,6 +2432,7 @@ fn negatives_strict_adapter_rejects_exceptions_incomplete_and_invalid_results() 
             },
             positions: cavity().positions.unwrap(),
         }],
+        components: None,
     };
     let good = || CutResult {
         positions: positions.clone(),
@@ -2554,6 +2593,7 @@ fn negatives_cut_all_occurrences(mode: &str, mirror: bool) {
             build_index: Some(0),
             double_precision: true,
             outward_winding: true,
+            ..Default::default()
         },
     )
     .unwrap()
@@ -2597,6 +2637,7 @@ fn negatives_cut_all_occurrences(mode: &str, mirror: bool) {
             build_index: Some(2),
             double_precision: true,
             outward_winding: true,
+            ..Default::default()
         },
     )
     .unwrap()

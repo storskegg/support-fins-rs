@@ -71,6 +71,27 @@ pub fn subtract_project_negatives(
     expected: usize,
     cut: &Cutter<'_>,
 ) -> Result<Vec<f64>, String> {
+    if let Some(components) = &model.components {
+        if components
+            .iter()
+            .any(|c| c.kind == "negative" && c.positions.is_empty())
+        {
+            return Err("negative parts contain missing or empty cutter geometry".to_string());
+        }
+        // One declared negative component can wrap several leaf meshes. Count root
+        // component occurrences, not leaf meshes or mesh IDs reused at other poses.
+        let occurrences: HashSet<Option<usize>> = components
+            .iter()
+            .filter(|c| c.kind == "negative" && !c.positions.is_empty())
+            .map(|c| c.route.first().copied())
+            .collect();
+        if occurrences.len() != expected {
+            return Err(format!(
+                "negative parts: expected {expected} cutter components, decoded {} occurrences; missing or empty cutter geometry",
+                occurrences.len()
+            ));
+        }
+    }
     let negatives: Vec<ReadExtra> = model
         .extras
         .iter()
@@ -235,6 +256,7 @@ pub fn project_positions(
             build_index: Some(plan.number - 1),
             double_precision: true,
             outward_winding: true,
+            with_components: plan.negative_count > 0,
         },
     )?;
     let model = parsed.objects.into_iter().next().ok_or("no object")?;

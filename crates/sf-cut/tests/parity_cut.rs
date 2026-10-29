@@ -67,6 +67,22 @@ fn colors_out(c: Option<&PartColors>) -> Value {
     ])
 }
 
+fn extras_in(v: &Value) -> Vec<ReadExtra> {
+    v.arr()
+        .iter()
+        .map(|e| ReadExtra {
+            kind: match e.get("kind").str() {
+                "negative" => PartKind::Negative,
+                "modifier" => PartKind::Modifier,
+                k => panic!("{k}"),
+            },
+            name: e.get("name").str().into(),
+            settings: PartSettings::default(),
+            positions: f32v(e.get("positions")),
+        })
+        .collect()
+}
+
 #[test]
 fn cut_negatives_matches_js() {
     let cases = load_cases("cut", "cutNegatives");
@@ -74,20 +90,7 @@ fn cut_negatives_matches_js() {
     for c in cases {
         let positions = f32v(&c.args[0]);
         let colors = colors_in(&c.args[1]);
-        let extras: Vec<ReadExtra> = c.args[2]
-            .arr()
-            .iter()
-            .map(|e| ReadExtra {
-                kind: match e.get("kind").str() {
-                    "negative" => PartKind::Negative,
-                    "modifier" => PartKind::Modifier,
-                    k => panic!("{k}"),
-                },
-                name: e.get("name").str().into(),
-                settings: PartSettings::default(),
-                positions: f32v(e.get("positions")),
-            })
-            .collect();
+        let extras = extras_in(&c.args[2]);
         let r = sf_cut::cut_negatives(&positions, colors.as_ref(), &extras);
         let actual = Value::Obj(vec![
             (
@@ -101,6 +104,46 @@ fn cut_negatives_matches_js() {
                 "why".into(),
                 r.why.map_or(Value::Null, |w| Value::Str(w.into())),
             ),
+        ]);
+        let expected = c
+            .out
+            .as_ref()
+            .unwrap_or_else(|| panic!("{}: recorded a throw", c.id));
+        if let Err(m) = compare(&actual, expected, &Tol::Exact) {
+            panic!(
+                "{}: out{}: actual {} vs expected {}",
+                c.id, m.path, m.actual, m.expected
+            );
+        }
+    }
+}
+
+/// `cutNegatives(obj, { provenance: true })` (tests/provenance.test.js): the same geometry, plus
+/// each triangle's input face (-1 for a cutter's), on every case of `cutNegatives`.
+#[test]
+fn cut_negatives_provenance_matches_js() {
+    let cases = load_cases("cut", "cutNegativesProvenance");
+    assert!(cases.len() > 40, "{} cases", cases.len());
+    for c in cases {
+        let positions = f32v(&c.args[0]);
+        let colors = colors_in(&c.args[1]);
+        let extras = extras_in(&c.args[2]);
+        let plain = sf_cut::cut_negatives(&positions, colors.as_ref(), &extras);
+        let r = sf_cut::cut_negatives_with(&positions, colors.as_ref(), &extras, true);
+        assert!(plain.source_faces.is_none(), "{}", c.id);
+        assert_eq!(plain.positions, r.positions, "{}: geometry changed", c.id);
+        let actual = Value::Obj(vec![
+            (
+                "sourceFaces".into(),
+                Value::I32(r.source_faces.clone().expect("sourceFaces")),
+            ),
+            ("cut".into(), Value::Num(r.cut as f64)),
+            ("uncut".into(), Value::Num(r.uncut as f64)),
+            (
+                "why".into(),
+                r.why.map_or(Value::Null, |w| Value::Str(w.into())),
+            ),
+            ("samePositions".into(), Value::Bool(true)),
         ]);
         let expected = c
             .out

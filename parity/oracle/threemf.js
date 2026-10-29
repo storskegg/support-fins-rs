@@ -285,7 +285,10 @@ for (const [id, bytes] of reads) {
 // readThreeMFParts with options, over the unzipped hand-made packages
 const { unzip } = await import(`${WEB}zip.js`);
 const optSets = { default: undefined, strict0: { buildIndex: 0 }, strict1: { buildIndex: 1 }, double: { doublePrecision: true }, outward: { outwardWinding: true },
-  all: { buildIndex: 0, doublePrecision: true, outwardWinding: true } };
+  all: { buildIndex: 0, doublePrecision: true, outwardWinding: true },
+  // withComponents: one record per leaf occurrence (tests/provenance.test.js)
+  components: { withComponents: true },
+  componentsAll: { buildIndex: 0, doublePrecision: true, outwardWinding: true, withComponents: true } };
 for (const [id, bytes] of reads) {
   if (!/^(hand:|slicer:)/.test(id) || /not_zip|empty_zip|no_model$/.test(id)) continue;
   const parts = await unzip(bytes);
@@ -294,6 +297,56 @@ for (const [id, bytes] of reads) {
     const args = opts === undefined ? [parts] : [parts, opts];
     try { direct.readThreeMFParts.push({ id: `${id}|${oid}`, args, out: T.readThreeMFParts(parts, opts) }); } catch (e) { direct.readThreeMFParts.push({ id: `${id}|${oid}`, args, throws: e.message }); }
   }
+}
+// tests/provenance.test.js's package: nested and repeated components, a mirrored item, a duplicate
+// item, an empty cutter, inches, a Bambu config with part and object metadata, a material table
+{
+  const CORE = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02", PROD = "http://schemas.microsoft.com/3dmanufacturing/production/2015/06";
+  const I = "1 0 0 0 1 0 0 0 1 0 0 0";
+  const wrap = (resources, build = "", unit = "millimeter") => `<model xmlns="${CORE}" xmlns:p="${PROD}" unit="${unit}"><resources>${resources}</resources><build>${build}</build></model>`;
+  const fixture = ({ mirror = false, duplicate = false, empty = false, unit = "millimeter" } = {}) => {
+    const root = '<object id="100"><components>'
+      + '<component objectid="11" p:path="/3D/Objects/part.model" transform="1 0 0 0 1 0 0 0 1 3 4 0"/>'
+      + '<component objectid="11" p:path="/3D/Objects/part.model" transform="1 0 0 0 1 0 0 0 1 20 4 0"/>'
+      + '<component objectid="12" p:path="/3D/Objects/cut.model"/>'
+      + '<component objectid="12" p:path="/3D/Objects/cut.model" transform="1 0 0 0 1 0 0 0 1 5 0 0"/>'
+      + "</components></object>";
+    const part = '<basematerials id="5"><base name="one" displaycolor="#FFFFFF"/><base name="two" displaycolor="#FFFFFF"/></basematerials>'
+      + '<object id="1" pid="5" pindex="0">'
+      + T.meshXML(triples(block(0, 10, 0, 10, 0, 10)), (i) => i === 0 ? ' paint_color="4" p1="1" seam="8" custom="keep&amp;this"' : "")
+      + '</object><object id="11"><components><component objectid="1" transform="1 0 0 0 1 0 0 0 1 0 0 2"/></components></object>';
+    const config = '<config><object id="100"><metadata key="extruder" value="2"/>'
+      + '<part id="11" subtype="normal_part"><metadata key="name" value="body"/><metadata key="extruder" value="3"/><metadata key="source_file" value="original.stl"/></part>'
+      + '<part id="12" subtype="negative_part"><metadata key="name" value="cut"/></part></object></config>';
+    return new Map(Object.entries({
+      "3D/3dmodel.model": wrap(root, `<item objectid="100" transform="${mirror ? "-1 0 0 0 1 0 0 0 1 100 0 0" : I}"/>` + (duplicate ? '<item objectid="100"/>' : ""), unit),
+      "3D/Objects/part.model": wrap(part),
+      "3D/Objects/cut.model": wrap('<object id="12">' + (empty ? "<mesh><vertices/><triangles/></mesh>" : T.meshXML(triples(block(1, 2, 1, 2, 1, 12)))) + "</object>"),
+      "Metadata/model_settings.config": config,
+    }).map(([k, v]) => [k, enc(v)]));
+  };
+  const add = (id, parts, opts) => {
+    try { direct.readThreeMFParts.push({ id: `prov:${id}`, args: [parts, opts], out: T.readThreeMFParts(parts, opts) }); } catch (e) { direct.readThreeMFParts.push({ id: `prov:${id}`, args: [parts, opts], throws: e.message }); }
+  };
+  const base = { buildIndex: 0, doublePrecision: true, outwardWinding: true };
+  for (const mirror of [false, true]) {
+    add(`ordinary mirrored=${mirror}`, fixture({ mirror }), base);
+    add(`components mirrored=${mirror}`, fixture({ mirror }), { ...base, withComponents: true });
+  }
+  add("duplicate items, no options", fixture({ duplicate: true }), { withComponents: true });
+  add("inch, empty cutter", fixture({ unit: "inch", empty: true }), { withComponents: true });
+  add("empty cutter, strict", fixture({ empty: true }), { ...base, withComponents: true });
+  const cyclic = fixture();
+  cyclic.set("3D/Objects/part.model", enc(wrap('<object id="11"><components><component objectid="11"/></components></object>')));
+  add("cyclic, strict", cyclic, { buildIndex: 0, withComponents: true });
+  const missing = fixture();
+  missing.delete("3D/Objects/part.model");
+  add("missing part, strict", missing, { buildIndex: 0, withComponents: true });
+  // tests/project.test.js: an empty leaf beside a valid one in one cutter component
+  const nested = fixture();
+  nested.set("3D/Objects/cut.model", enc(wrap('<object id="12"><components><component objectid="30"/><component objectid="31"/></components></object>'
+    + `<object id="30">${T.meshXML(triples(block(1, 2, 1, 2, 1, 12)))}</object><object id="31"><mesh><vertices/><triangles/></mesh></object>`)));
+  add("nested cutter, empty leaf", nested, { ...base, withComponents: true });
 }
 // strict-mode checks
 const strictXml = {
