@@ -15,7 +15,8 @@ struct ViewToolbar: View {
                               enabled: session.canRedo) { session.redo() }
                 Divider().frame(height: 18).padding(.horizontal, 2)
                 ForEach(registry.slots) { slot in
-                    SlotButton(slot: slot, registry: registry)
+                    // a slot whose badge says it is not shown has no button (Arrange without several models)
+                    if registry.badges[slot]?.isShown() ?? true { SlotButton(slot: slot, registry: registry) }
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
@@ -55,7 +56,7 @@ private struct SlotButton: View {
     var body: some View {
         let badge = registry.badges[slot]
         ToolbarButton(title: slot.title, systemImage: slot.systemImage, help: slot.help,
-                      enabled: badge != nil, detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
+                      enabled: badge != nil && (badge?.isEnabled() ?? true), detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
             registry.toggle(slot)
         }
         .overlay(alignment: .top) {
@@ -65,10 +66,24 @@ private struct SlotButton: View {
             }
         }
         .accessibilityIdentifier("toolbar-\(slot.id)")
+        .modifier(OnOffValue(state: badge?.toggle.map { $0.isOn() ? "on" : "off" }))
         .popover(isPresented: Binding(get: { registry.open == slot && badge != nil },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {
             badge?.popover().padding(12)
         }
+    }
+}
+
+/// A toggle badge says whether its tool is on to the accessibility tree (a UI test reads it as selected); other badges
+/// say nothing.
+private struct OnOffValue: ViewModifier {
+    let state: String?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let state {
+            // selected is what XCUITest reads reliably on a button (`isSelected`); the value says it in words
+            content.accessibilityValue(state).accessibilityAddTraits(state == "on" ? .isSelected : [])
+        } else { content }
     }
 }

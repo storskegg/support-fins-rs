@@ -13,12 +13,12 @@ struct SessionSnapshot: Equatable, Sendable {
     /// Which model of the plate the step edits (`who` in `ui/history.js`'s snapshot): undoing it edits that model
     /// again. Nil with one model (`Plates/`).
     var owner: UUID?
-    /// A step that moved models on the plate (Move, Arrange: `pushMoves`, `ui/history.js`): each model with where it
-    /// stood before, which an undo puts back. Nil for an edit of a model.
-    var moves: [SlotMove]?
+    /// A move step (`{ moves }` in `ui/history.js`): models of the plate that were moved, each from its spot `xy`.
+    /// Empty for every other step; undoing one puts those models back and leaves the pose, settings and removed fins.
+    var moves: [SlotMove] = []
 }
 
-/// A model of the plate and its spot on it (an undo step of Move or Arrange).
+/// A model of the plate and a spot of it, mm from the bed's centre (`{ who, xy }`, `pushMove` / `pushMoves`).
 struct SlotMove: Equatable, Sendable {
     var who: UUID
     var xy: SIMD2<Double>
@@ -45,9 +45,12 @@ final class PartSession {
     var owner: UUID?
     @ObservationIgnored var focus: ((UUID) -> Void)?
     @ObservationIgnored var isOnPlate: ((UUID) -> Bool)?
-    /// Where a model stands now, and put models at spots: what undoing or redoing a move step does (`Plates/`).
+    /// Where slot `id` stands now, nil when it is not on the plate: what a move step's redo remembers.
     @ObservationIgnored var slotSpot: ((UUID) -> SIMD2<Double>?)?
+    /// Put the slots at their spots (`placeSlots`, `ui/move.js`): an undo or redo of a move.
     @ObservationIgnored var placeSlots: (([SlotMove]) -> Void)?
+    /// A model is being dragged: undo and redo wait for the drop (`dragging`, `ui/history.js` `step`).
+    var dragLocked = false
     private(set) var history = History<SessionSnapshot>()
     /// A rotate ring is being dragged (set by `RingEdits`). Not part of the history: the drag is one step, taken
     /// when it ends. The window rebuilds the fins live while this is true (`BuildWiring`).
@@ -72,8 +75,8 @@ final class PartSession {
     }
 
     var snapshot: SessionSnapshot { SessionSnapshot(pose: pose, settings: settings, removedFins: removedFins, finsOn: finsOn, owner: owner) }
-    var canUndo: Bool { history.canUndo }
-    var canRedo: Bool { history.canRedo }
+    var canUndo: Bool { history.canUndo && !dragLocked }
+    var canRedo: Bool { history.canRedo && !dragLocked }
 
     /// A new part: the pose, settings' edits and history start over (`resetPartState`, `resetHistory`).
     func replaceParts(_ parts: [CorePart], keepingSettings: Bool = true) {
@@ -92,14 +95,6 @@ final class PartSession {
         self.pose = pose
         self.removedFins = removedFins
         self.owner = owner
-    }
-
-    /// Models were moved, each from its `xy` (Arrange, a drag of Move): one undo step (`pushMoves`, `ui/history.js`).
-    func pushMoves(_ moves: [SlotMove], name: String? = "Move") {
-        var step = snapshot
-        step.moves = moves
-        history.push(step)
-        register(name)
     }
 
     /// The plate's undo history, taken away when the plate is left (`takeHistory`, `ui/history.js`).
@@ -125,6 +120,16 @@ final class PartSession {
         body()
         guard snapshot != before else { return }
         history.push(before)
+        register(name)
+    }
+
+    /// Models of the plate were moved, each from its spot: one undo step, nothing but their spots (`pushMoves`,
+    /// `ui/history.js`; `pushMove` is one model).
+    func pushMoves(_ moves: [SlotMove], name: String? = nil) {
+        guard !moves.isEmpty else { return }
+        var step = snapshot
+        step.moves = moves
+        history.push(step)
         register(name)
     }
 
@@ -175,44 +180,44 @@ final class PartSession {
         if let m = undoManager, m.canRedo { m.redo() } else { performRedo() }
     }
 
-    /// A step is passed over when its model is no longer on the plate (`step`, `ui/history.js`); a move step is
-    /// passed over when none of its models is.
+    /// Whether a step can be taken now: an ordinary step belongs to a model still on the plate, a move step moves at
+    /// least one that is (`step`, `ui/history.js`: the rest are passed over, and come back with the model's Undo).
     private func accepts(_ s: SessionSnapshot) -> Bool {
-        if let moves = s.moves { return moves.contains { isOnPlate?($0.who) ?? true } }
+        if !s.moves.isEmpty { return s.moves.contains { isOnPlate?($0.who) ?? true } }
         return s.owner.map { isOnPlate?($0) ?? true } ?? true
     }
 
-    /// Undo or redo a move step: the models still on the plate go back where they stood, and the step that undoes
-    /// it takes where they stand now.
-    private func performMoves(_ s: SessionSnapshot) -> SessionSnapshot {
-        let on = (s.moves ?? []).filter { isOnPlate?($0.who) ?? true }
-        var inverse = snapshot
-        inverse.moves = on.map { SlotMove(who: $0.who, xy: slotSpot?($0.who) ?? $0.xy) }
+    /// A move step taken from `stack`: the models still on the plate go back to their spots, and what they stood at
+    /// is what the other stack keeps (`on.map(x => ({ who, xy: who.xy }))`).
+    private func takeMove(_ step: SessionSnapshot) -> SessionSnapshot {
+        let on = step.moves.filter { isOnPlate?($0.who) ?? true }
+        var current = snapshot
+        current.moves = on.compactMap { m in slotSpot?(m.who).map { SlotMove(who: m.who, xy: $0) } }
         placeSlots?(on)
-        return inverse
+        return current
     }
 
     private func performUndo() {
-        guard let i = history.undoIndex(accepting: { [self] in accepts($0) }) else { return }
+        guard !dragLocked, let i = history.undoIndex(accepting: accepts) else { return }
         let step = history.undoStack[i]
-        if step.moves != nil {
-            _ = history.undo(at: i, current: performMoves(step))
-        } else {
+        if step.moves.isEmpty {
             // edit the step's model first, then take the state it leaves for the redo (`step`, `ui/history.js`)
             if let o = step.owner, o != owner { focus?(o) }
             restore(history.undo(at: i, current: snapshot))
+        } else {
+            _ = history.undo(at: i, current: takeMove(step))
         }
         undoManager?.registerUndo(withTarget: self) { $0.performRedo() }
     }
 
     private func performRedo() {
-        guard let i = history.redoIndex(accepting: { [self] in accepts($0) }) else { return }
+        guard !dragLocked, let i = history.redoIndex(accepting: accepts) else { return }
         let step = history.redoStack[i]
-        if step.moves != nil {
-            _ = history.redo(at: i, current: performMoves(step))
-        } else {
+        if step.moves.isEmpty {
             if let o = step.owner, o != owner { focus?(o) }
             restore(history.redo(at: i, current: snapshot))
+        } else {
+            _ = history.redo(at: i, current: takeMove(step))
         }
         undoManager?.registerUndo(withTarget: self) { $0.performUndo() }
     }

@@ -313,10 +313,12 @@ fn footprint_spot(others: Vec<Arc<Footprint>>, grid: Option<Arc<Footprint>>, bx:
 //   the centre, else past the others' right edge. Two numbers.
 fn footprint_clash_cells(placed: Vec<Arc<Footprint>>) -> Vec<i64>;   // the cells any two share (`checkOverlap`), x, y pairs
 fn plate_under(x: f64, y: f64, active: u64, count: u64, pitch: f64, bx: f64, by: f64) -> Vec<f64>;   // `plateUnder`: [plate, x, y] or []
+fn footprint_drag_step(at: Vec<f64>, to: Vec<f64>, grid: Arc<Footprint>, others: Vec<Arc<Footprint>>) -> Vec<f64>;
+//   Move's step (`dragStep` with `clashAt` as the probe): where the model with footprint `grid` goes from `at` when the pointer asks for `to`,
+//   `others` placed where they stand; the clash is the cells shared with them. Never into a worse clash; stops at the edge, slides along it. Two numbers.
 ```
 
-`sf_engine::footprint` also has `pack` (Arrange's packing) and `drag_step` (Move's clamp, with the clash probe as a closure),
-ported and replayed, for the Move and Arrange tools to put behind the FFI when they land.
+`sf_engine::footprint` also has `pack` (Arrange's packing), ported and replayed, for Arrange to put behind the FFI when it lands; `drag_step` (Move's clamp) is `footprint_drag_step` above.
 
 `BuildResult::kept_added(removed, drawn)` (crate-internal) is what the export writes and the footprint rasterizes: the fins
 less the removed ones, the drawn walls, then the pad. `footprint_of_build` passes no drawn walls until Draw's app side lands

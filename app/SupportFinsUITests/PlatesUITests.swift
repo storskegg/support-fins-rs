@@ -103,4 +103,23 @@ final class PlatesUITests: PartWindowUITestCase {
         saveInPanel(into: dir)
         XCTAssertNotNil(waitForFile(in: dir, timeout: 30, minSize: 100) { $0.pathExtension == "zip" }, "the zip is written")
     }
+
+    /// The toolbar's Arrange appears with the second model (`toolbar-arrange`) and a click on it is harmless on a plate
+    /// that has nothing to pack together.
+    func testArrangeBadgeAppearsWithSeveralModels() throws {
+        let first = try writeSTL("first.stl", slab: 30)
+        let second = try writeSTL("second.stl", slab: 20)
+        try openPart(first)
+        let name = element("stat-name")
+        waitFor("the File row names the first model", timeout: 20) { self.text(name).hasPrefix("first") }
+        XCTAssertFalse(element("toolbar-arrange").exists, "no Arrange with one model")
+        element("add-part").click()
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel for Add model")
+        chooseInPanel(second.path)
+        waitFor("the File row follows the new model", timeout: 20) { self.text(name).hasPrefix("second") }
+        let arrange = element("toolbar-arrange")
+        XCTAssertTrue(arrange.waitForExistence(timeout: 10), "Arrange with two models")
+        arrange.click()
+        XCTAssertTrue(element("toolbar-arrange").exists)
+    }
 }

@@ -45,6 +45,8 @@ struct ReadoutSections: View {
     var extraLines: [StatusLine] = []
     /// Rows other features add at the end of the stats card (`InspectorSlot.stats`).
     var statsRows: [InspectorSection] = []
+    /// Where the models stand on the plate, for the Volume row (`updateFit`): nil without a plate.
+    var plateFit: (() -> PlateFit)?
 
     @State private var analysis: Analysis?
     @State private var afterRemoval: AfterRemoval?
@@ -89,9 +91,11 @@ struct ReadoutSections: View {
             smallHoleCount: built?.smallHoleRegions ?? 0, islandCount: analysis?.islands ?? 0,
             highlightSmall: settings.highlightSmall, flatRegions: flatRegions,
             analysisMs: analysis?.summary.analyzeMs ?? 0, weldMs: analysis?.weldMs ?? 0))
+        let plate = plateFit?() ?? PlateFit()
         let fit = FitReadout.make(FitInput(
             size: dims, added: built?.addedBounds.map { (x0: $0.min[0], x1: $0.max[0], y0: $0.min[1], y1: $0.max[1], z1: $0.max[2]) },
-            volume: (Double(controller.volume.x), Double(controller.volume.y), Double(controller.volume.z))))
+            volume: (Double(controller.volume.x), Double(controller.volume.y), Double(controller.volume.z)),
+            spot: (plate.spot.x, plate.spot.y), parkedOff: plate.parkedOff, clash: plate.clash))
         let fins = FinReadout.make(built, context(settings, built, regions))
         Group {
             StatsCard(fileName: controller.meshName, part: part, fit: analysis == nil ? nil : fit, fins: fins, rows: statsRows)

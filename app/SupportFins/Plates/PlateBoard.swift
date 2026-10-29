@@ -44,8 +44,6 @@ final class PlateBoard {
     @ObservationIgnored var clashCells: [SIMD2<Int64>] = []
     /// Arrange is waiting for the fin builds to land (`waiting`, `ui/arrange.js`).
     var arranging = false
-    /// A model is being dragged (Move): Arrange and undo wait for the drop. Set by the Move tool.
-    var dragging = false
     /// The hand-placed walls drawn for a model, in print space about its own spot (Draw): what an export writes with
     /// its fins. The Draw feature sets it; no walls until it does.
     @ObservationIgnored var drawn: (ModelSlot) -> DrawnSweep? = { _ in nil }

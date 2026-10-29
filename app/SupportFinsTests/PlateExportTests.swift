@@ -49,8 +49,6 @@ struct PlateExportTests {
         #expect(board.clashing)
         let cells = try #require(model.controller?.renderer.plateScene.clash)
         #expect(!cells.isEmpty)
-        #expect(board.clashAt(board.plate.liveSlot, board.plate.models[0].xy) > 0)
-        #expect(board.clashAt(board.plate.liveSlot, [200, 200]) == 0)
     }
 
     @Test func arrangePacksTheModelsClearAndIsOneUndoStep() async throws {
@@ -82,10 +80,10 @@ struct PlateExportTests {
         #expect(!model.session.canUndo)
         try await helper.add(model, "second")
         overlap(board)
-        board.dragging = true
+        model.session.dragLocked = true
         await board.arrange()
         #expect(board.clashing)
-        board.dragging = false
+        model.session.dragLocked = false
     }
 
     @Test func aPlatesThreeMFHoldsEveryModelAtItsSpotAndIsNamedAfterThem() async throws {
@@ -185,5 +183,28 @@ struct PlateExportTests {
         _ = await board.settlePlate(0)
         let want = BuildRequest(rotation: stale.pose.columnMajor, settings: board.plateSettings(0).settings)
         #expect(stale.build.requested == want && !stale.build.building)
+    }
+
+    @Test func theToolbarsArrangeIsThereWithSeveralModelsAndIsOneUndoStep() async throws {
+        let (model, board) = try await helper.window(name: "first")
+        let registry = model.toolbar
+        // one model: no button (`syncButton`)
+        #expect(registry.slots.contains(.arrange) && registry.badges[.arrange]?.isShown() == false)
+        try await helper.add(model, "second", slab: 20)
+        #expect(registry.badges[.arrange]?.isShown() == true && registry.badges[.arrange]?.isEnabled() == true)
+        // the slot sits between Move and Rotate
+        let ids = registry.slots.map(\.id)
+        #expect(ids.firstIndex(of: "move")! < ids.firstIndex(of: "arrange")! && ids.firstIndex(of: "arrange")! < ids.firstIndex(of: "rotate")!)
+        overlap(board)
+        let before = board.plate.models.map(\.xy)
+        registry.toggle(.arrange)
+        #expect(await eventually { !board.clashing })
+        let after = board.plate.models.map(\.xy)
+        #expect(after != before)
+        model.session.undo()
+        #expect(board.plate.models.map(\.xy) == before, "one undo step puts them back")
+        // the last model off: no button again
+        board.removeModel()
+        #expect(registry.badges[.arrange]?.isShown() == false)
     }
 }

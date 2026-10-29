@@ -25,15 +25,8 @@ extension PlateBoard {
         return stride(from: 0, to: flat.count - 1, by: 2).map { SIMD2(flat[$0], flat[$0 + 1]) }
     }
 
-    /// How many cells slot `m` would share with the others standing at `xy` (a drag's step: Move stops short of a
-    /// collision) (`clashAt`).
-    func clashAt(_ m: ModelSlot, _ xy: SIMD2<Double>) -> Int {
-        guard hasLive, plate.models.count > 1 else { return 0 }
-        let fps = footprints()
-        guard let me = fps.first(where: { $0.slot === m }) else { return 0 }
-        let at = me.grid.placed(x: xy.x, y: xy.y)
-        return fps.filter { $0.slot !== m }.reduce(0) { $0 + Int(at.sharedCount(other: $1.grid.placed(x: $1.slot.xy.x, y: $1.slot.xy.y))) }
-    }
+    /// The toolbar's Arrange shows with a model on show and more than one on the plate (`syncButton`, `ui/arrange.js`).
+    var arrangeShown: Bool { hasLive && modelCount > 1 }
 
     /// Arrange: pack the plate's models -- the biggest first, each at the free spot nearest the bed's centre, `gap` mm
     /// from the others, turned as they are (a turn about Z would be a new pose and rebuild the fins) -- once every fin
@@ -41,7 +34,7 @@ extension PlateBoard {
     /// no room left for goes past its right edge, where the Volume line says it hangs off. This is the entry point for
     /// the clash banner, "Arrange first" in the Export menu and the toolbar's Arrange (`arrange`, `ui/arrange.js`).
     func arrange() async {
-        guard hasLive, !arranging, !busy, !dragging else { return }
+        guard hasLive, !arranging, !busy, !session.dragLocked else { return }
         let plate = self.plate
         let building = host.wiring?.build?.building == true
         let current = await parkedSettled(seconds: 0)
@@ -51,7 +44,7 @@ extension PlateBoard {
             _ = await parkedSettled(seconds: 30)
             arranging = false
             // switched, or picked up, meanwhile: that press was for another plate
-            guard self.plate === plate, hasLive, !busy, !dragging else { return }
+            guard self.plate === plate, hasLive, !busy, !session.dragLocked else { return }
         }
         let fps = footprints()
         guard fps.count >= 2, let v = host.controller?.volume else { return }
