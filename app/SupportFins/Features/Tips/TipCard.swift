@@ -47,7 +47,7 @@ private struct TipCardModifier: ViewModifier {
                 }
             }
             // keyboard focus shows it too, as the web's `focusin` does when the last input was a key (`tips.js`)
-            .background(FocusProbe { focused in
+            .background(TipFocusProbe { focused in
                 wait?.cancel()
                 shown = focused
             })
@@ -69,7 +69,7 @@ extension View {
 /// Reports when keyboard focus moves into or out of the view it sits behind: the window's first responder lies within the
 /// view's frame, and focus got there by a key (Tab), not a click (`byKey` in `web/ui/tips.js`: a click in a field also
 /// counts as `:focus-visible` there, and must not raise the card).
-private struct FocusProbe: NSViewRepresentable {
+struct TipFocusProbe: NSViewRepresentable {
     let onChange: @MainActor (Bool) -> Void
 
     func makeNSView(context: Context) -> ProbeView {
@@ -79,6 +79,9 @@ private struct FocusProbe: NSViewRepresentable {
     }
 
     func updateNSView(_ v: ProbeView, context: Context) { v.onChange = onChange }
+
+    /// Whether focus that just moved got there by a key. A test stands in for the key event it cannot post.
+    @MainActor static var keyDriven: @MainActor () -> Bool = { NSApp.currentEvent?.type == .keyDown }
 
     final class ProbeView: NSView {
         var onChange: (@MainActor (Bool) -> Void)?
@@ -97,7 +100,7 @@ private struct FocusProbe: NSViewRepresentable {
             let theirs = r.convert(r.bounds, to: nil)
             let within = mine.contains(CGPoint(x: theirs.midX, y: theirs.midY))
             // focus that arrived by a click leaves the card alone; focus leaving always hides it
-            if within { if NSApp.currentEvent?.type == .keyDown { set(true) } } else { set(false) }
+            if within { if TipFocusProbe.keyDriven() { set(true) } } else { set(false) }
         }
 
         private func set(_ on: Bool) {

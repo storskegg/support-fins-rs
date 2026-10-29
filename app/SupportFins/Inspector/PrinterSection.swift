@@ -25,7 +25,7 @@ struct PrinterSection: View {
                 }
             }
             FindRow("gap") {
-                NumberField(title: "Support gap", value: $settings.gap, limits: FinSettings.gapLimits, unit: "mm", help: Tip.gap, pic: "gap")
+                NumberField(title: "Support gap", value: $settings.gap, limits: FinSettings.gapLimits, unit: "mm", help: Tip.gap, pic: "gap", fieldID: "support-gap")
             }
             FindRow("iface") {
                 Picker("Interface material", selection: $settings.interfaceMaterial) {

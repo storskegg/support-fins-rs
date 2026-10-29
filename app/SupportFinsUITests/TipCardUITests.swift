@@ -1,7 +1,7 @@
 import XCTest
 
 /// The tip cards (`web/ui/tips.js`): resting on a setting shows its tooltip under its picture, moving away closes the
-/// card, and Tab into a setting shows it too. The printer row of the inspector has a picture (`printer`). The launch,
+/// card, and Tab into a number field shows it too. The printer row of the inspector has a picture (`printer`). The launch,
 /// the window and the helpers are `PartWindowUITestCase`'s.
 final class TipCardUITests: PartWindowUITestCase {
     private let tooltip = "Your printer: nozzle, layer height, support gap, interface material. Click to change."
@@ -25,18 +25,26 @@ final class TipCardUITests: PartWindowUITestCase {
         waitFor("the card closes", timeout: 5) { !self.card.exists }
     }
 
-    func testTabIntoASettingShowsTheCard() throws {
+    /// Keyboard focus raises the card. With the Mac's default keyboard settings Tab visits only text fields (sliders, toggles
+    /// and pickers need Keyboard navigation, which a test must not change), so the setting is a number field with a card:
+    /// the Support gap, in the Printer section. A click into it shows no card by itself (the web's `byKey`): the pointer
+    /// moves away, Shift-Tab leaves the field and Tab comes back to it.
+    func testTabbingIntoANumberFieldShowsItsCard() throws {
         try openFixturePart()
-        XCTAssertTrue(element("printer-row").waitForExistence(timeout: 10))
+        let row = element("printer-row")
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.click()   // unfolds the Printer section
+        let gap = element("support-gap")
+        XCTAssertTrue(gap.waitForExistence(timeout: 5), "the Support gap field")
+        gap.click()
         element("fins-toggle").hover()   // the pointer rests on a control with no card
-        var tabs = 0
-        while !card.exists && tabs < 30 {
-            app.typeKey(.tab, modifierFlags: [])
-            tabs += 1
-            _ = card.waitForExistence(timeout: 0.5)
-        }
-        XCTAssertTrue(card.exists, "Tab reached a setting with a card (\(tabs) presses)")
-        XCTAssertFalse(card.staticTexts.allElementsBoundByIndex.filter { !$0.label.isEmpty }.isEmpty, "the card has its tooltip")
+        waitFor("no card from the click or the pointer", timeout: 5) { !self.card.exists }
+
+        app.typeKey(.tab, modifierFlags: .shift)   // out of the field
+        app.typeKey(.tab, modifierFlags: [])       // and back in, by the keyboard
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "the card shows on keyboard focus")
+        XCTAssertTrue(card.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Clearance between a support top'")).count > 0,
+                      "it is the Support gap's tooltip")
     }
 }
 

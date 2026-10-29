@@ -11,6 +11,8 @@ struct NumberField: View {
     var help = ""
     /// the key of the setting's tip-card picture (`data-tip-pic`)
     var pic: String?
+    /// the field's accessibility identifier (UI tests)
+    var fieldID: String?
 
     var body: some View {
         LabeledContent {
@@ -19,6 +21,7 @@ struct NumberField: View {
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 64)
+                    .accessibilityIdentifier(fieldID ?? "")
                 if let unit { Text(unit).foregroundStyle(.secondary) }
                 Stepper(title, value: clamped, in: limits.range, step: limits.step).labelsHidden()
             }
