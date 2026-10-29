@@ -6,7 +6,7 @@ import SwiftUI
 /// `tools/helpbook`) that `CFBundleHelpBookFolder` registers. Calibration Prints and the guide are `CalibrationFeature`'s.
 @MainActor
 final class HelpFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
 
     init(host: ViewerModel) { self.host = host }
 

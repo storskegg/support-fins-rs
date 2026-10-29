@@ -4,7 +4,7 @@ import SwiftUI
 /// Calibration Guide the guide (docs/CALIBRATION.md) in the browser.
 @MainActor
 final class CalibrationFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     let model = CalibrationModel()
 
     init(host: ViewerModel) { self.host = host }

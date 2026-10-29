@@ -10,7 +10,7 @@ extension ToolbarSlot {
 /// toolbar they sit over, the View menu's commands and the debug frame-time readout.
 @MainActor
 final class ViewFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     /// The View popover's Mouse preset (`ui/navigation.js`).
     let settings: ViewSettings
 
@@ -22,7 +22,7 @@ final class ViewFeature: Feature {
     var toolbarSlots: [ToolbarSlot] { [.view] }
 
     func registerTools(in toolbar: ToolbarRegistry) {
-        guard let controller = host.controller else { return }
+        guard let controller = host?.controller else { return }
         toolbar.register(.view) { [settings] in ViewPopover(controller: controller, settings: settings) }
     }
 
@@ -30,18 +30,18 @@ final class ViewFeature: Feature {
         var layers: [WindowOverlay] = []
         #if DEBUG
         layers.append(WindowOverlay("frame-time", order: 10, ignoresSafeArea: true) {
-            if let controller = self.host.controller, controller.showsFrameTime { FrameOverlay(controller: controller) }
+            if let controller = self.host?.controller, controller.showsFrameTime { FrameOverlay(controller: controller) }
         })
         #endif
         layers.append(WindowOverlay("view-cube-and-toolbar", order: 60, alignment: .bottom) {
-            if let controller = self.host.controller, self.host.hasPart {
+            if let host = self.host, let controller = host.controller, host.hasPart {
                 // the view cube sits above the toolbar's left end, and steps aside for a popover (`ui/viewcube.js`)
-                let toolbar = self.host.toolbar
+                let toolbar = host.toolbar
                 VStack(alignment: .leading, spacing: 8) {
                     ViewCubeView(controller: controller)
                         .opacity(toolbar.open == nil && toolbar.flash == nil ? 1 : 0)
                         .allowsHitTesting(toolbar.open == nil && toolbar.flash == nil)
-                    ViewToolbar(session: self.host.session, registry: toolbar)
+                    ViewToolbar(session: host.session, registry: toolbar)
                 }
             }
         })
@@ -50,7 +50,7 @@ final class ViewFeature: Feature {
 
     /// View menu: the camera views of docs/UI-MAP.md (the web app's View popover) with ⌘0..⌘6.
     static func menus(_ f: ViewFeature?) -> [MenuSection] {
-        let viewer = f?.host.controller, settings = f?.settings
+        let viewer = f?.host?.controller, settings = f?.settings
         var entries: [MenuEntry] = [
             // a native improvement: the fins follow a ring drag; off, they are built when it ends, as in the web
             .check(JS.t("Rebuild While Dragging"),

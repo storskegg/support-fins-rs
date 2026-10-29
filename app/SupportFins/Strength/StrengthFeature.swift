@@ -9,7 +9,7 @@ extension ToolbarSlot {
 /// Strength arrow (`ui/strength.js`): the load popover and Model > Strength Arrow…, for a single part.
 @MainActor
 final class StrengthFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
     private(set) var model: StrengthModel?
 
     init(host: ViewerModel) { self.host = host }
@@ -17,6 +17,7 @@ final class StrengthFeature: Feature {
     var toolbarSlots: [ToolbarSlot] { [.strength] }
 
     func partDidShow(_ parts: [LoadedPart]) {
+        guard let host else { return }
         let strength = StrengthModel(part: parts.singleCorePart, pose: PoseAccess.session(host.session))
         if let controller = host.controller {
             strength.threshold = controller.thresholdDegrees
@@ -31,21 +32,21 @@ final class StrengthFeature: Feature {
     func restoreModelState(_ state: Any) { if let load = state as? SIMD3<Double> { model?.restore(load: load) } }
 
     func registerTools(in toolbar: ToolbarRegistry) {
-        guard host.controller != nil, let strength = model else { toolbar.unregister(.strength); return }
+        guard host?.controller != nil, let strength = model else { toolbar.unregister(.strength); return }
         toolbar.register(.strength, isLit: { strength.isLit }) { StrengthPopover(model: strength) }
     }
 
     var modifiers: [WindowModifier] {
         [
-            .onChange("strength-pose", of: { self.host.session.pose }) { _, _ in self.model?.poseChanged() },
-            .onChange("strength-threshold", of: { self.host.controller?.thresholdDegrees }) { _, t in
+            .onChange("strength-pose", of: { self.host?.session.pose }) { _, _ in self.model?.poseChanged() },
+            .onChange("strength-threshold", of: { self.host?.controller?.thresholdDegrees }) { _, t in
                 if let t { self.model?.threshold = t }
             },
         ]
     }
 
     static func menus(_ f: StrengthFeature?) -> [MenuSection] {
-        let toolbar = f?.host.toolbar
+        let toolbar = f?.host?.toolbar
         return [MenuSection(menu: .model, order: 20, entries: [
             .item(JS.t("Strength Arrow…"), enabled: toolbar?.badges[.strength] != nil) { toolbar?.open = .strength },
         ])]

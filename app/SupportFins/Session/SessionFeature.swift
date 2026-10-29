@@ -6,12 +6,12 @@ import SwiftUI
 /// `PartSession.sessionJSON`); this feature is the opening half.
 @MainActor
 final class SessionFeature: Feature {
-    unowned let host: ViewerModel
+    weak let host: ViewerModel?
 
     init(host: ViewerModel) { self.host = host }
 
     func partDidShow(_ parts: [LoadedPart]) {
-        guard let core = parts.count == 1 ? parts[0].mesh as? CorePart : nil, core.part.hasSession() else { return }
+        guard let host, let core = parts.count == 1 ? parts[0].mesh as? CorePart : nil, core.part.hasSession() else { return }
         // added to a plate of models: they keep the plate's settings (`beside`, `ui/models.js`); the board has already
         // given this model its slot
         let beside = (host.features[PlatesFeature.self]?.board.modelCount ?? 1) > 1

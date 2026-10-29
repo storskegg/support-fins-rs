@@ -36,18 +36,19 @@ extension PlateBoard {
     func arrange() async {
         guard hasLive, !arranging, !busy, !session.dragLocked else { return }
         let plate = self.plate
-        let building = host.wiring?.build?.building == true
+        let building = host?.wiring?.build?.building == true
         let current = await parkedSettled(seconds: 0)
         if building || !current {
             arranging = true
-            await host.wiring?.build?.settled()
+            let build = host?.wiring?.build      // not the window: it may close meanwhile
+            await build?.settled()
             _ = await parkedSettled(seconds: 30)
             arranging = false
             // switched, or picked up, meanwhile: that press was for another plate
             guard self.plate === plate, hasLive, !busy, !session.dragLocked else { return }
         }
         let fps = footprints()
-        guard fps.count >= 2, let v = host.controller?.volume else { return }
+        guard fps.count >= 2, let v = host?.controller?.volume else { return }
         let at = footprintArrange(grids: fps.map(\.grid), bx: Double(v.x), by: Double(v.y), gap: Self.gap)
         let moves = fps.enumerated().compactMap { k, f -> (slot: ModelSlot, xy: SIMD2<Double>)? in
             let xy = SIMD2(at[2 * k], at[2 * k + 1])
@@ -71,7 +72,7 @@ extension PlateBoard {
     func placeLive(_ m: ModelSlot, _ xy: SIMD2<Double>) {
         let d = xy - m.xy
         m.xy = xy
-        host.controller?.renderer.camera.target -= SIMD3(Float(d.x), Float(d.y), 0)
+        host?.controller?.renderer.camera.target -= SIMD3(Float(d.x), Float(d.y), 0)
     }
 }
 

@@ -129,7 +129,8 @@ struct DrawModelTests {
     }
 
     @Test func backOneTakesBackThePointAndEscCancelsTheWallInProgress() async throws {
-        let (_, draw, kit) = try await drawWindow()
+        let (window, draw, kit) = try await drawWindow()
+        defer { withExtendedLifetime(window) {} }        // the window holds the session Draw edits
         let a = try below(kit, faces: 24, x: -12, y: 12)
         #expect(!draw.undoPoint(), "nothing to take back")
         draw.pointerClicked(a)

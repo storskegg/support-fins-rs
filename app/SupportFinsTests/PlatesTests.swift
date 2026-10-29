@@ -156,7 +156,8 @@ struct PlatesTests {
     }
 
     @Test func aPlateSwitchWhileEmptyAndTheLastEmptyPlateAreDropped() async throws {
-        let (_, board) = try await window()
+        let (model, board) = try await window()
+        defer { withExtendedLifetime(model) {} }         // the board works through its window
         board.addPlate()
         board.freePlate()
         #expect(board.plates.count == 2, "an empty plate is not added to")

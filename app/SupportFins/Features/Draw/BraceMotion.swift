@@ -205,6 +205,9 @@ final class BraceMotion {
         return busy
     }
 
+    /// The window closed: the frame loop ends.
+    func stop() { loop?.cancel(); loop = nil }
+
     /// The frame loop: runs while something moves.
     private func kick() {
         guard runsLoop, loop == nil else { return }

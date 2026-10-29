@@ -30,6 +30,13 @@ final class ViewerModel {
         features = FeatureSet(host: self)
     }
 
+    /// The window closed (SwiftUI drops its model): what the features and the build started stops now, rather than
+    /// when each Task next wakes to find the window gone (the features hold it weakly).
+    isolated deinit {
+        features?.close()
+        wiring?.close()
+    }
+
     /// The object picker, while a file with several objects waits for a choice (`pickObjects`, `ui/io.js:140`).
     var picker: ObjectPickerModel?
     /// A file was tried in this window (the empty window then shows only the button, `#drop.compact`).

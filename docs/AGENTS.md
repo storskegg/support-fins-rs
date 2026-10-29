@@ -43,6 +43,7 @@ you start a ticket, and again whenever a review sends you back.
    `FinSettings()`; `"{}"` stays only for empty-input and engine-default comparisons, with a comment saying why.
    The FFI also refuses tunables outside the ranges the inspector clamps to (`check_tunable_ranges`, docs/FFI.md).
 
+
    **UI tests (`app-uitest`) are the orchestrator's only.** They take over the user's mouse and
    keyboard (the lock keeps them alone on the machine), so no agent runs them and `just gate` leaves them out. The headless
    `EndToEndTests` in `app-test` covers the same loop. **Do compile them:** `just app-uibuild`
@@ -61,8 +62,11 @@ you start a ticket, and again whenever a review sends you back.
    Don't work around it.
 3. Before opening the PR, and again before you report back, run `just gate` in your worktree. It
    runs every gate a PR needs (fmt, clippy with `-D warnings`, every test, the deno tests,
-   `cli-parity`, and the app gates when `app/` or the bindings changed) and prints one summary
-   table. It must exit 0. Paste the table in the PR. `just check` is the quick Rust-only subset.
+   `cli-parity`, and the app gates, always: app tests, UI-test build, i18n check, and the Swift warnings against
+   `tools/gate/swift-warnings.baseline`, because the engine crates are the app's engine) and prints one summary
+   table. It must exit 0. Paste the table in the PR. A new Swift warning fails it: fix it (the baseline only shrinks;
+   `tools/gate/swift_warnings.py --update` rewrites it). `--no-app` skips the app gates with a loud warning and is not a
+   full gate. `just check` is the quick Rust-only subset.
 4. Commit in small logical steps. Every commit message ends with:
    ```
    Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>

@@ -25,7 +25,7 @@ extension PlateBoard {
     /// A parked model of the plate being edited hangs off the bed (dragged there), its fins counted
     /// (`parkedOff`, `ui/models.js:193-200`).
     var parkedHangsOff: Bool {
-        guard let v = host.controller?.volume else { return false }
+        guard let v = host?.controller?.volume else { return false }
         let e = 1e-6
         return plate.models.enumerated().contains { k, m in
             guard k != plate.live, let box = parkedBox(m) else { return false }
@@ -37,7 +37,7 @@ extension PlateBoard {
     /// The xy box a parked model and its fins cover on its plate (`footprint(m)`, `ui/models.js:181-189`): its mesh's
     /// box through its pose and seating, unioned with its fins', both about its own spot, then at `xy`.
     func parkedBox(_ m: ModelSlot) -> (x0: Double, y0: Double, x1: Double, y1: Double)? {
-        guard let s = m.stash, let device = host.controller?.renderer.device else { return nil }
+        guard let s = m.stash, let device = host?.controller?.renderer.device else { return nil }
         let b = s.part.bounds, rot = s.pose.float3x3
         var lo = SIMD2<Float>(repeating: .infinity), hi = SIMD2<Float>(repeating: -.infinity)
         for i in 0..<8 {
