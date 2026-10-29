@@ -74,11 +74,15 @@ private struct SlotButton: View {
     }
 }
 
-/// A toggle badge says whether its tool is on to the accessibility tree (a UI test reads it); other badges say nothing.
+/// A toggle badge says whether its tool is on to the accessibility tree (a UI test reads it as selected); other badges
+/// say nothing.
 private struct OnOffValue: ViewModifier {
     let state: String?
 
     @ViewBuilder func body(content: Content) -> some View {
-        if let state { content.accessibilityValue(state) } else { content }
+        if let state {
+            // selected is what XCUITest reads reliably on a button (`isSelected`); the value says it in words
+            content.accessibilityValue(state).accessibilityAddTraits(state == "on" ? .isSelected : [])
+        } else { content }
     }
 }

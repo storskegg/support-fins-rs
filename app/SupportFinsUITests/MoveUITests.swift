@@ -1,7 +1,7 @@
 import XCTest
 
 /// Move through the real window: open a part, then turn the tool on and off with the toolbar's Move badge, the M
-/// key, Esc and Model > Move. The badge says whether the tool is on in its accessibility value ("on" / "off"). A drag
+/// key, Esc and Model > Move. The badge says whether the tool is on by being selected. A drag
 /// across the plate needs window coordinates, so it is left to the headless `MoveModelTests`. Elements are found by
 /// identifier (`toolbar-move`, `fins-toggle`); the menu bar only through `app.menuBars`.
 final class MoveUITests: XCTestCase {
@@ -56,7 +56,8 @@ final class MoveUITests: XCTestCase {
 
     // MARK: helpers
 
-    private func state(_ e: XCUIElement) -> String { (e.value as? String) ?? "" }
+    /// "on" while the badge is selected (its tool is on), else "off".
+    private func state(_ e: XCUIElement) -> String { e.isSelected ? "on" : "off" }
 
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
