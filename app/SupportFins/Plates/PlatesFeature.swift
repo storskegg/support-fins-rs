@@ -32,7 +32,7 @@ final class PlatesFeature: Feature {
     }
 
     var inspectorSections: [InspectorSection] {
-        [InspectorSection("plate-part-buttons", slot: .top, order: 20) {
+        [InspectorSection("plate-part-buttons", slot: .stats) {
             if self.host.hasPart { PlatePartButtons(feature: self) }
         }]
     }
@@ -99,21 +99,20 @@ final class PlatesFeature: Feature {
     }
 }
 
-/// The stats card's Add model and Remove model (`part-btns`, `index.html:219-224`).
+/// The stats card's Add model and Remove model (`part-btns`, `index.html:219-224`): the card's last row, after
+/// Analysis, so the status card follows them as on the web (where it sits in the other rail).
 struct PlatePartButtons: View {
     let feature: PlatesFeature
 
     var body: some View {
-        Section {
-            HStack {
-                Button("Add model") { feature.addModels() }
-                    .help(PlatesFeature.addHelp)
-                    .accessibilityIdentifier("add-part")
-                Button("Remove model") { feature.board.removeModel() }
-                    .help(PlatesFeature.removeHelp)
-                    .disabled(!feature.board.hasLive || feature.board.busy)
-                    .accessibilityIdentifier("remove-part")
-            }
+        HStack {
+            Button("Add model") { feature.addModels() }
+                .help(PlatesFeature.addHelp)
+                .accessibilityIdentifier("add-part")
+            Button("Remove model") { feature.board.removeModel() }
+                .help(PlatesFeature.removeHelp)
+                .disabled(!feature.board.hasLive || feature.board.busy)
+                .accessibilityIdentifier("remove-part")
         }
     }
 }

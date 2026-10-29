@@ -315,5 +315,6 @@ fn plate_under(x: f64, y: f64, active: u64, count: u64, pitch: f64, bx: f64, by:
 `sf_engine::footprint` also has `pack` (Arrange's packing) and `drag_step` (Move's clamp, with the clash probe as a closure),
 ported and replayed, for the Move and Arrange tools to put behind the FFI when they land.
 
-`BuildResult::kept_added(removed)` (crate-internal) is what the export writes and the footprint rasterizes: the fins less the
-removed ones, then the pad.
+`BuildResult::kept_added(removed, drawn)` (crate-internal) is what the export writes and the footprint rasterizes: the fins
+less the removed ones, the drawn walls, then the pad. `footprint_of_build` passes no drawn walls until Draw's app side lands
+(the page's `activeAdded()` counts them).

@@ -61,6 +61,9 @@ struct WindowToolbarItem: Identifiable {
 enum InspectorSlot: Int, CaseIterable {
     /// Above everything: the stats and status cards.
     case top
+    /// Inside the stats card (Part), after Analysis: the web's `part-btns` (Add model, Remove model). The readout
+    /// draws these, not the inspector.
+    case stats
     /// In the settings block, after Cutouts and before More settings (Remove fins).
     case basics
     /// After the settings block.
