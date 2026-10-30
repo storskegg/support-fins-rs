@@ -192,6 +192,18 @@ Estimates are what the file needs, so a refused file costs a few milliseconds an
 input of the audit stays under 30 MB (`crates/sf-ffi/examples/limits_probe.rs`). Reaching a limit says nothing about
 whether a *build* of a large part will be fast: a 7.7 M-triangle file loads in about 1.2 s and 2.3 GB.
 
+**Builds of a part loaded anyway** (X-07): a build whose bed pad or overhang sampling would take more than its budget
+(`sf_engine::guards::Limits`: 32 million first-layer outline bucket cells, 8 million brim lattice blocks, 100,000 Sure hold
+rings, 32 million overhang sub-triangles in one walk), or whose counters could no longer advance, fails with
+`LimitExceeded { kind: Dimension, estimate: the part's largest side in mm, limit: 2000, message }`, the message saying what
+could not be built ("this model is 7,600,000 mm across (over 2,000 mm): too large to build supports for: its overhang
+needs about 7,266,151,536,400 cells (the limit is 32,000,000)"). It comes through `failed` like any build error, and from
+`build_part` / `build_part_cancellable`, Suggest and the other exports (`crash::panic_error` maps the unwind). It is not a
+prompt: there is no "build anyway". Only a part over the load limit reaches a budget, and it does so in milliseconds: the
+audit's 1e30 and 7.6 km coupons fail in under 100 ms and under 450 MB, where they used to take 4 to 7 GB and never end.
+The loops that can be long also poll the cancel flag every 4096 cells, so `cancel` stops a long build within
+milliseconds.
+
 **The app's prompt** (track 2C): every load goes through `ViewerModel.load`, which catches `LimitExceeded`, shows an alert
 on the window (title "Load <file> anyway?", a message built from `kind`, `estimate` and `limit` -- never the engine's
 `message` -- and, for `Triangles`, about 280 bytes of memory per triangle; buttons Cancel (default, Return and Esc) and

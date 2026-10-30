@@ -87,6 +87,10 @@ fn payload_text(p: &(dyn Any + Send)) -> String {
 /// A caught panic as the error Swift sees: `FfiError::Engine("internal error: <message>")`. The panic hook has
 /// already written its crash report by the time this runs.
 pub fn panic_error(payload: Box<dyn Any + Send>) -> FfiError {
+    // X-07: a build over its budget unwinds with this payload (no panic, no hook, no crash report)
+    if let Some(o) = payload.downcast_ref::<sf_engine::guards::OverBudget>() {
+        return FfiError::from(*o);
+    }
     FfiError::Engine {
         message: format!("internal error: {}", payload_text(payload.as_ref())),
     }

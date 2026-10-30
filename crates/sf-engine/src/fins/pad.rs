@@ -1,6 +1,6 @@
 //! Port of `web/fins/pad.js`. Read `docs/AGENTS.md` before changing anything here.
 
-use crate::guards::JsSort;
+use crate::guards::{self, JsSort};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
@@ -373,6 +373,16 @@ fn build_pad_inner(
         }
     };
     let n_theta = fin.pad_segs as usize;
+    // X-07: the rings within 2D's step bound (`as usize` of 1e30 would be a ring count no memory holds)
+    if guards::too_many_steps(jsnum::max(r1, r2), pad.cell) {
+        guards::OverBudget {
+            what: "bed pad",
+            need: jsnum::ceil(jsnum::max(r1, r2) / pad.cell) * fin.pad_segs,
+            budget: guards::MAX_STEPS * fin.pad_segs,
+            across_mm: 2.0 * jsnum::max(r1, r2),
+        }
+        .raise();
+    }
     let n_ring = jsnum::max(2.0, jsnum::ceil(jsnum::max(r1, r2) / pad.cell)) as usize;
 
     // Ring/segment vertex in world XY, at radial fraction `fr` and angle index `j`.
@@ -445,6 +455,89 @@ fn build_pad_inner(
     })
 }
 
+/// `brimPad`'s outline buckets: cells of this side (mm).
+const OUTLINE_BUCKET: f64 = 0.5;
+
+/// `brimPad`'s bucket key: `i * 73856093 ^ j * 19349663`. Both products are doubles; `^` takes ToInt32 of each.
+fn bucket_key(i: f64, j: f64) -> i32 {
+    jsnum::to_int32(i * 73856093.0) ^ jsnum::to_int32(j * 19349663.0)
+}
+
+/// `brimPad`'s bucketing of the first-layer outline (web/fins/pad.js): each segment `[x0, y0, x1, y1]` is entered
+/// in every [`OUTLINE_BUCKET`] cell its box, grown by `reach`, touches.
+fn bucket_outline(outline: &[f64], reach: f64, cfg: &Config) -> IndexMap<i32, Vec<f64>> {
+    let b = OUTLINE_BUCKET;
+    let key = bucket_key;
+    let mut bucket: IndexMap<i32, Vec<f64>> = IndexMap::new();
+    // X-07: what the loop below will take, before it takes any of it -- the cells it visits (each one an entry)
+    // within `cfg.limits.pad_buckets`, and every counter below 2^53 (past it `+= 1` stops advancing and the JS never
+    // ends). A part within the load limits is far under both, and takes the same loop.
+    {
+        let (mut need, mut ends) = (0.0, true);
+        let (mut lo_x, mut hi_x, mut lo_y, mut hi_y) = (
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        );
+        let span = |p: f64, q: f64| -> (f64, f64) {
+            (
+                jsnum::floor((jsnum::min(p, q) - reach) / b),
+                jsnum::floor((jsnum::max(p, q) + reach) / b),
+            )
+        };
+        let count = |lo: f64, hi: f64| if hi >= lo { hi - lo + 1.0 } else { 0.0 };
+        let mut i = 0;
+        while i < outline.len() {
+            let (x0, y0, x1, y1) = (outline[i], outline[i + 1], outline[i + 2], outline[i + 3]);
+            let (i0, i1) = span(x0, x1);
+            let (j0, j1) = span(y0, y1);
+            let (ni, nj) = (count(i0, i1), count(j0, j1));
+            // (the outer loop runs its `ni` steps even when the inner one has none)
+            if ni > 0.0 {
+                need += ni * jsnum::max(nj, 1.0);
+                let exact = |v: f64| v.abs() < guards::EXACT_INTEGERS;
+                ends &= exact(i0) && exact(i1) && (nj == 0.0 || (exact(j0) && exact(j1)));
+            }
+            lo_x = jsnum::min(lo_x, jsnum::min(x0, x1));
+            hi_x = jsnum::max(hi_x, jsnum::max(x0, x1));
+            lo_y = jsnum::min(lo_y, jsnum::min(y0, y1));
+            hi_y = jsnum::max(hi_y, jsnum::max(y0, y1));
+            i += 4;
+        }
+        guards::OverBudget::check(
+            "first-layer outline",
+            need,
+            cfg.limits.pad_buckets,
+            ends,
+            jsnum::max(hi_x - lo_x, hi_y - lo_y),
+        );
+    }
+    // and a poll every 4096 cells, not only per segment: one segment of a part loaded anyway can be millions
+    let mut polls: u32 = 0;
+    let mut i = 0;
+    while i < outline.len() {
+        cfg.cancel.check();
+        let (x0, y0, x1, y1) = (outline[i], outline[i + 1], outline[i + 2], outline[i + 3]);
+        let mut bi = jsnum::floor((jsnum::min(x0, x1) - reach) / b);
+        while bi <= jsnum::floor((jsnum::max(x0, x1) + reach) / b) {
+            let mut bj = jsnum::floor((jsnum::min(y0, y1) - reach) / b);
+            while bj <= jsnum::floor((jsnum::max(y0, y1) + reach) / b) {
+                let k = key(bi, bj);
+                bucket.entry(k).or_default().extend([x0, y0, x1, y1]);
+                bj += 1.0;
+                polls = polls.wrapping_add(1);
+                if polls & 4095 == 0 {
+                    cfg.cancel.check();
+                }
+            }
+            bi += 1.0;
+        }
+        i += 4;
+    }
+    bucket
+}
+
 /// Port of `brimPad` (web/fins/pad.js:274-522): the BRIM-STYLE pad (PAD.style 'light', and
 /// 'custom'): the same oval, `h` tall (one layer for 'light'), standing `g` off the part's
 /// first-layer outline -- see PAD.style for why. `grab` raises (or, negative, lowers) its top
@@ -510,29 +603,10 @@ fn brim_pad(
     }
 
     // The part's first-layer outline (firstLayerOutline, cut at zc), bucketed.
-    let b = 0.5;
+    let b = OUTLINE_BUCKET;
     let reach = jsnum::max(g, 0.0) + 2.0 * cell;
-    let mut bucket: IndexMap<i32, Vec<f64>> = IndexMap::new();
-    // `i * 73856093 ^ j * 19349663`: both products are doubles; `^` takes ToInt32 of each
-    let key = |i: f64, j: f64| -> i32 {
-        jsnum::to_int32(i * 73856093.0) ^ jsnum::to_int32(j * 19349663.0)
-    };
-    let mut i = 0;
-    while i < outline.len() {
-        cfg.cancel.check();
-        let (x0, y0, x1, y1) = (outline[i], outline[i + 1], outline[i + 2], outline[i + 3]);
-        let mut bi = jsnum::floor((jsnum::min(x0, x1) - reach) / b);
-        while bi <= jsnum::floor((jsnum::max(x0, x1) + reach) / b) {
-            let mut bj = jsnum::floor((jsnum::min(y0, y1) - reach) / b);
-            while bj <= jsnum::floor((jsnum::max(y0, y1) + reach) / b) {
-                let k = key(bi, bj);
-                bucket.entry(k).or_default().extend([x0, y0, x1, y1]);
-                bj += 1.0;
-            }
-            bi += 1.0;
-        }
-        i += 4;
-    }
+    let key = bucket_key;
+    let bucket = bucket_outline(outline, reach, cfg);
     // Signed distance to the outline, capped at `reach` (negative = inside it).
     let dist = |x: f64, y: f64| -> f64 {
         let arr = bucket.get(&key(jsnum::floor(x / b), jsnum::floor(y / b)));
@@ -599,6 +673,19 @@ fn brim_pad(
     let half = |s: f64| r2 * jsnum::sqrt(jsnum::max(0.0, 1.0 - jsnum::pow(s / r1, 2.0)));
     let s_at = |i: usize| -r1 + (2.0 * r1 * i as f64) / (n_s - 1) as f64;
     let fine = cell / r2;
+    // X-07: the lattice's blocks (columns x rows / BLOCK^2, the rows being what the fraction loop below makes) within
+    // `cfg.limits.pad_blocks`, and that loop able to end (`f += fine` must move `f` near 1).
+    {
+        let cols = jsnum::max(3.0, jsnum::ceil((2.0 * r1) / cell) + 1.0);
+        let rows = 2.0 * jsnum::ceil(1.0 / fine) + 3.0;
+        guards::OverBudget::check(
+            "bed pad",
+            jsnum::ceil(cols / BLOCK as f64) * jsnum::ceil(rows / BLOCK as f64),
+            cfg.limits.pad_blocks,
+            fine > 0.0 && 1.0 + fine > 1.0 && cols < guards::EXACT_INTEGERS,
+            2.0 * jsnum::max(r1, r2),
+        );
+    }
     // `new Set([-1, 1])`: insertion order, SameValueZero (so +0 and -0 are one value)
     let mut fr: Vec<f64> = vec![-1.0, 1.0];
     let mut seen: HashSet<u64> = HashSet::new();
@@ -1127,5 +1214,91 @@ fn brim_pad(
         auto_sure: None,
         small_foot: None,
         outline: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cancel::{Cancel, Cancelled, catch};
+    use crate::guards::{Limits, OverBudget, catch_over_budget};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+
+    /// X-07: the outline of a part loaded anyway (one segment 10 km long and wide: 4e14 cells) is refused before
+    /// a bucket is made.
+    #[test]
+    fn an_outline_over_the_bucket_budget_is_refused_up_front() {
+        let t = Instant::now();
+        let r = catch_over_budget(|| {
+            bucket_outline(&[0.0, 0.0, 1e7, 1e7], 0.32, &Config::default()).len()
+        });
+        let o = r.expect_err("over budget");
+        assert_eq!(o.need, (2e7f64 + 2.0) * (2e7 + 2.0));
+        assert_eq!(o.budget, guards::PAD_BUCKET_BUDGET);
+        assert!(t.elapsed() < Duration::from_millis(50), "{:?}", t.elapsed());
+    }
+
+    /// Past 2^53 a `+= 1` counter stops: refused even with the budgets lifted.
+    #[test]
+    fn a_counter_that_could_not_advance_is_refused_even_with_the_budget_lifted() {
+        let cfg = Config {
+            limits: Limits::lifted(),
+            ..Default::default()
+        };
+        let r = catch_over_budget(|| bucket_outline(&[1e30, 0.0, 1e30, 1.0], 0.32, &cfg).len());
+        assert_eq!(r.map_err(|o: OverBudget| o.need), Err(f64::INFINITY));
+    }
+
+    /// An ordinary outline is bucketed exactly as before (the cells each segment's box touches, in order).
+    #[test]
+    fn an_outline_under_the_budget_is_bucketed_as_before() {
+        let outline = [0.0, 0.0, 3.0, 1.0, 3.0, 1.0, -2.0, 4.5];
+        let got = bucket_outline(&outline, 0.32, &Config::default());
+        let mut want: IndexMap<i32, Vec<f64>> = IndexMap::new();
+        for s in outline.chunks(4) {
+            let (x0, y0, x1, y1) = (s[0], s[1], s[2], s[3]);
+            let mut bi = jsnum::floor((x0.min(x1) - 0.32) / 0.5);
+            while bi <= jsnum::floor((x0.max(x1) + 0.32) / 0.5) {
+                let mut bj = jsnum::floor((y0.min(y1) - 0.32) / 0.5);
+                while bj <= jsnum::floor((y0.max(y1) + 0.32) / 0.5) {
+                    want.entry(bucket_key(bi, bj))
+                        .or_default()
+                        .extend([x0, y0, x1, y1]);
+                    bj += 1.0;
+                }
+                bi += 1.0;
+            }
+        }
+        assert_eq!(got, want);
+    }
+
+    /// With the budget lifted, a cancel raised while one huge segment is bucketed stops it within 100 ms (it was
+    /// polled once per segment).
+    #[test]
+    fn a_cancel_raised_inside_one_huge_segment_stops_it_within_100_ms() {
+        let flag = Arc::new(AtomicBool::new(false));
+        let cfg = Config {
+            limits: Limits::lifted(),
+            cancel: Cancel::new(flag.clone()),
+            ..Default::default()
+        };
+        let f2 = flag.clone();
+        let raised = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            f2.store(true, Ordering::SeqCst);
+            Instant::now()
+        });
+        // 2e7 x 2e5 cells: minutes of work
+        let r = catch(|| bucket_outline(&[0.0, 0.0, 1e7, 1e5], 0.32, &cfg).len());
+        let back = Instant::now();
+        let raised = raised.join().unwrap();
+        assert_eq!(r, Err(Cancelled));
+        let late = back.saturating_duration_since(raised);
+        assert!(
+            late < Duration::from_millis(100),
+            "returned {late:?} after the raise"
+        );
     }
 }

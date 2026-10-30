@@ -9,8 +9,14 @@
 //!   calls equal, so parity holds for every finite input. With a NaN the order is some permutation.
 //! * [`MAX_STEPS`] / [`too_many_steps`], the bound on a loop that steps a float across an extent.
 //!   `v += 0.25` stops changing `v` past ~1e15, and even before that a 1e12 mm extent is 4e12 rows.
+//! * [`Limits`] / [`OverBudget`] (fix track X-07), the budgets on the bed pad's work. A build that would take more
+//!   unwinds with an [`OverBudget`] payload (as a cancel unwinds with `Cancelled`), which the FFI turns into
+//!   `FfiError::LimitExceeded`; [`catch_over_budget`] catches it. The budgets are sized so that a part within the
+//!   2 m "Load anyway?" limit stays under them in any pose, so only a part loaded anyway can reach one; the JS has
+//!   no budget there and runs out of memory or never ends.
 
 use std::cmp::Ordering;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
 /// The most steps any extent-driven float loop takes. A metre at 0.25 mm is 4,000; this is 25 m at that step.
 pub const MAX_STEPS: f64 = 100_000.0;
@@ -29,6 +35,134 @@ pub fn in_reach(p: &[f64; 3]) -> bool {
 pub fn too_many_steps(extent: f64, step: f64) -> bool {
     let n = extent / step;
     n.is_nan() || n > MAX_STEPS
+}
+
+/// The most first-layer outline bucket cells (0.5 mm square, one per segment that comes within reach) a brim pad
+/// takes: 32 million, about 1 GB of entries. A part's outline that fits a 2 m square covers at most ~2 x 4000 x 4000
+/// cells when it is convex, whatever the pose (a 2 m square turned 45 degrees is ~16 million).
+pub const PAD_BUCKET_BUDGET: f64 = 32e6;
+
+/// The most 12 x 12-cell blocks a brim pad's lattice takes: 8 million. A pad under a 2 m square part turned 45 degrees
+/// is ~5.6 million at the 0.1 mm brim cell.
+pub const PAD_BLOCK_BUDGET: f64 = 8e6;
+
+/// The most sub-triangles one walk of the leftover overhang faces makes (`fins::fill`, FILL.sample = 1 mm, a face
+/// of longest edge `e` makes `ceil(e)^2`): 32 million, about 1.3 GB of points where they are gathered. A 2 m square
+/// overhang (two triangles, 2.83 m diagonals) is 16 million.
+pub const FILL_POINT_BUDGET: f64 = 32e6;
+
+/// A loop counter at or past this magnitude no longer changes when 1 is added (2^53).
+pub const EXACT_INTEGERS: f64 = 9_007_199_254_740_992.0;
+
+/// The budgets a build works within (`Config::limits`). Not JS tunables: [`Default`] is what every build uses;
+/// [`Limits::lifted`] is for tests that need a build to run away.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Limits {
+    /// [`PAD_BUCKET_BUDGET`]
+    pub pad_buckets: f64,
+    /// [`PAD_BLOCK_BUDGET`]
+    pub pad_blocks: f64,
+    /// [`FILL_POINT_BUDGET`]
+    pub fill_points: f64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            pad_buckets: PAD_BUCKET_BUDGET,
+            pad_blocks: PAD_BLOCK_BUDGET,
+            fill_points: FILL_POINT_BUDGET,
+        }
+    }
+}
+
+impl Limits {
+    /// No budgets. A loop whose counter could no longer advance is still refused.
+    pub fn lifted() -> Self {
+        Limits {
+            pad_buckets: f64::INFINITY,
+            pad_blocks: f64::INFINITY,
+            fill_points: f64::INFINITY,
+        }
+    }
+}
+
+/// What a build over one of its [`Limits`] unwinds with: what was being built, how many cells it needed (infinite
+/// when a loop could not end), the budget, and how far across (mm) the thing it was built for is (which may be far
+/// smaller than the part: a part at x = 1e30 seats to coordinates where adding 1 changes nothing).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OverBudget {
+    pub what: &'static str,
+    pub need: f64,
+    pub budget: f64,
+    pub across_mm: f64,
+}
+
+impl OverBudget {
+    /// Unwind with this payload (no panic message, no panic hook, as `Cancel::check` does).
+    pub fn raise(self) -> ! {
+        resume_unwind(Box::new(self))
+    }
+
+    /// Unwind when `need` cells is over `budget`, or not a number, or `ends` is false (a counter would stop
+    /// advancing).
+    #[inline]
+    pub fn check(what: &'static str, need: f64, budget: f64, ends: bool, across_mm: f64) {
+        if !ends || need.is_nan() || need > budget {
+            OverBudget {
+                what,
+                need: if ends { need } else { f64::INFINITY },
+                budget,
+                across_mm,
+            }
+            .raise();
+        }
+    }
+}
+
+fn cells_text(n: f64) -> String {
+    if n.is_finite() && n < 1e15 {
+        let s = format!("{n:.0}");
+        let mut out = String::new();
+        for (i, c) in s.chars().enumerate() {
+            if i > 0 && (s.len() - i) % 3 == 0 {
+                out.push(',');
+            }
+            out.push(c);
+        }
+        out
+    } else if n.is_finite() {
+        format!("{n:e}")
+    } else {
+        "more".to_string()
+    }
+}
+
+impl std::fmt::Display for OverBudget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "too large to build supports for: its {} needs {} cells (the limit is {})",
+            self.what,
+            if self.need.is_finite() {
+                format!("about {}", cells_text(self.need))
+            } else {
+                "too many".to_string()
+            },
+            cells_text(self.budget)
+        )
+    }
+}
+
+/// Run `f`; `Err` when it unwound with an [`OverBudget`]. Any other unwind (a cancel, a panic) goes on.
+pub fn catch_over_budget<T>(f: impl FnOnce() -> T) -> Result<T, OverBudget> {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(v) => Ok(v),
+        Err(p) => match p.downcast::<OverBudget>() {
+            Ok(o) => Err(*o),
+            Err(p) => resume_unwind(p),
+        },
+    }
 }
 
 /// A total preorder on `f64` that agrees with the JS comparator `a - b` (negative first, positive last, zero equal)

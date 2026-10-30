@@ -56,6 +56,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 
 use indexmap::{IndexMap, IndexSet};
 use rayon::prelude::*;
@@ -296,12 +297,16 @@ fn leftover_faces(
 
 /// One face's sub-triangle centroids, `put(x, y, z, area)` in the order JS visits them
 /// (web/fins/fill.js:104-137): the face subdivided into n x n sub-triangles.
+///
+/// `spent` counts the sub-triangles of the walk this face is part of (X-07; faces of 256 or more): a walk over
+/// `cfg.limits.fill_points` unwinds with an [`OverBudget`](crate::guards::OverBudget) before this face makes any.
 fn face_points(
     topo: &Topology,
     result: &Targets,
     rot: &Rot3,
     cfg: &Config,
     f: usize,
+    spent: &AtomicU64,
     put: &mut dyn FnMut(f64, f64, f64, f64),
 ) {
     let pos = &topo.pos;
@@ -324,12 +329,46 @@ fn face_points(
         ),
         jsnum::hypot(&[a_[0] - c_[0], a_[1] - c_[1], a_[2] - c_[2]]),
     );
-    let n = jsnum::max(1.0, jsnum::ceil(edge / s)) as usize;
+    let n_f = jsnum::max(1.0, jsnum::ceil(edge / s));
+    // X-07: a face of fewer than SMALL_FACE sub-triangles costs O(1), so only bigger ones (where a part loaded
+    // anyway runs away: 7e12 for one face of the 7.6 km coupon) are counted against the walk's budget, and the
+    // walks over ordinary meshes of small faces never touch the shared counter.
+    const SMALL_FACE: f64 = 256.0;
+    let mine = n_f * n_f;
+    if mine.is_nan() || mine >= SMALL_FACE {
+        let budget = cfg.limits.fill_points;
+        let over = |need: f64| crate::guards::OverBudget {
+            what: "overhang",
+            need,
+            budget,
+            across_mm: edge,
+        };
+        // (`mine` alone first: the walk's sum fits a u64 only while each face's does)
+        if mine.is_nan() || mine > budget || n_f >= crate::guards::EXACT_INTEGERS {
+            over(if n_f < crate::guards::EXACT_INTEGERS {
+                mine
+            } else {
+                f64::INFINITY
+            })
+            .raise();
+        }
+        let total =
+            spent.fetch_add(mine as u64, std::sync::atomic::Ordering::Relaxed) as f64 + mine;
+        if total > budget {
+            over(total).raise();
+        }
+    }
+    let n = n_f as usize;
     let a = topo.area[f] / ((n * n) as f64);
-    // n x n sub-triangles: centroids on the barycentric grid
+    // n x n sub-triangles: centroids on the barycentric grid (with a cancel poll every 4096 of them: X-07)
+    let mut polls: u32 = 0;
     for i in 0..n {
         let mut j = 0;
         while i + j < n {
+            polls = polls.wrapping_add(1);
+            if polls & 4095 == 0 {
+                cfg.cancel.check();
+            }
             let (fi, fj) = (i as f64, j as f64);
             let uv = [
                 [fi + 1.0 / 3.0, fj + 1.0 / 3.0],
@@ -362,9 +401,10 @@ fn each_leftover_point(
     cfg: &Config,
     put: &mut dyn FnMut(f64, f64, f64, f64),
 ) {
+    let spent = AtomicU64::new(0);
     for f in leftover_faces(topo, result, cls, regions) {
         cfg.cancel.check();
-        face_points(topo, result, rot, cfg, f, put);
+        face_points(topo, result, rot, cfg, f, &spent, put);
     }
 }
 
@@ -381,6 +421,7 @@ fn bare_sums(
 ) -> (f64, f64) {
     let (mut all, mut far) = (Cells::default(), Cells::default());
     let faces = leftover_faces(topo, result, cls, None);
+    let spent = AtomicU64::new(0);
     // The points of a block of faces, with whether the wall tops leave each one bare (the `near`
     // lookups are the cost, and pure): blocks are made in parallel and joined in face order, so
     // the cells below are filled in the order the serial walk fills them. [x, y, z, area, bare].
@@ -390,7 +431,7 @@ fn bare_sums(
             if cfg.cancel.is_cancelled() {
                 break; // unused: the poll below unwinds
             }
-            face_points(topo, result, rot, cfg, f, &mut |x, y, z, a| {
+            face_points(topo, result, rot, cfg, f, &spent, &mut |x, y, z, a| {
                 if z < PLATE_Z {
                     return;
                 }

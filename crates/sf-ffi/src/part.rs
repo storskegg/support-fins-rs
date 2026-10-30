@@ -65,6 +65,30 @@ pub struct LoadOptions {
     pub allow_large: bool,
 }
 
+impl From<sf_engine::guards::OverBudget> for FfiError {
+    /// X-07: a build over its budget (only a part loaded past the 2 m limit reaches one) is the `Dimension` limit,
+    /// `estimate` how far across the thing being built is (mm). A build of a known part says the part's size
+    /// instead ([`FfiError::too_large`]).
+    fn from(o: sf_engine::guards::OverBudget) -> Self {
+        FfiError::too_large(o.across_mm, o)
+    }
+}
+
+impl FfiError {
+    /// X-07: `LimitExceeded { Dimension }` for a build over its budget, of a part `across_mm` across: "this model
+    /// is 1e30 mm across (over 2,000 mm): too large to build supports for: its first-layer outline needs too many
+    /// cells (the limit is 32,000,000)".
+    pub fn too_large(across_mm: f64, o: sf_engine::guards::OverBudget) -> Self {
+        let l = sf_io::limits::LimitExceeded::dimension(across_mm);
+        FfiError::LimitExceeded {
+            kind: LimitKind::Dimension,
+            estimate: l.estimate,
+            limit: l.limit,
+            message: format!("{l}: {o}"),
+        }
+    }
+}
+
 impl From<ReadError> for FfiError {
     fn from(e: ReadError) -> Self {
         match e {

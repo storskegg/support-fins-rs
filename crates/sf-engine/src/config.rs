@@ -78,6 +78,8 @@ pub struct Config {
     pub nozzle: crate::nozzle::NozzleState,
     /// Not a JS tunable: the build's cancel flag (see `crate::cancel`). Unset = never cancelled.
     pub cancel: crate::cancel::Cancel,
+    /// Not a JS tunable: the budgets on runaway work (`crate::guards::Limits`, X-07).
+    pub limits: crate::guards::Limits,
 }
 
 /// `opts.tunables` as `applyTunables` reads it (web/fins.js:93-141). `None` = the key is absent
