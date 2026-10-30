@@ -15,7 +15,7 @@ swift-bindings:
     pkg=app/SupportFinsCore
     gen=target/swift-gen
     rm -rf "$gen" && mkdir -p "$gen/headers"
-    cargo run --release -q -p sf-ffi --bin uniffi-bindgen -- generate --library "$lib" --language swift --out-dir "$gen"
+    cargo run --release -q -p sf-bindgen --bin uniffi-bindgen -- generate --library "$lib" --language swift --out-dir "$gen"
     cp "$gen/sf_ffi.swift" "$pkg/Sources/SupportFinsCore/sf_ffi.swift"
     # FfiError's errorDescription is UniFFI's String(reflecting: self), a Swift type dump; use the hand-written one
     # (FfiError+Description.swift). Fail loudly if a UniFFI update changes the line.

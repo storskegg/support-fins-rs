@@ -555,6 +555,76 @@
         }
       }
     },
+    "Acknowledgements" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danksagungen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "致谢"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agradecimentos"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شكر وتقدير"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dankbetuigingen"
+          }
+        }
+      }
+    },
+    "Acknowledgements…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danksagungen …"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "致谢…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agradecimentos…"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شكر وتقدير…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dankbetuigingen…"
+          }
+        }
+      }
+    },
     "Add Model to Plate…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13202,6 +13272,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Support Fins in je slicer of CAD: dezelfde engine als deze website."
+          }
+        }
+      }
+    },
+    "Support Fins is built on open-source software. Its licences ask for these notices." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support Fins basiert auf Open-Source-Software. Deren Lizenzen verlangen diese Hinweise."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support Fins 基于开源软件构建。这些软件的许可证要求列出以下声明。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Support Fins é construído com software de código aberto. As licenças dele pedem estes avisos."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعتمد Support Fins على برامج مفتوحة المصدر. وتتطلب تراخيصها هذه الإشعارات."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support Fins is gebouwd op opensourcesoftware. De licenties daarvan vragen om deze vermeldingen."
           }
         }
       }

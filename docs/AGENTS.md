@@ -173,6 +173,53 @@ The port is accepted when it passes the ported JS tests. See `docs/PORT-PLAN.md`
   match **bit for bit**.
 - A test that fails is information. Report it. Never edit the test or the corpus to make it pass.
 
+## Divergences
+
+The port is a literal port of the JS. These are the places it is not (the October 2026 fix round, PRs #212-#230). Each is
+either a case where the JS is broken on the input (it throws, hangs or runs out of memory) or a difference in timing only.
+In every one the parity corpora replay exactly and the 77 `bench_m5` output hashes are unchanged. A new divergence goes
+here in the PR that makes it; one that is not listed fails review.
+
+| What differs | Why | PR |
+|---|---|---|
+| Tunables out of range (a junk nozzle or wall-line count) are refused at the FFI; the JS ignores them silently. | The JS carries on with a nonsense value. | #216 |
+| `rasterize` skips triangles with a non-finite vertex or one beyond 1e12 mm. | The JS produces NaN rows or loops. Finite, sane input is unchanged. | #217 |
+| A region with a point beyond 100 m, or non-finite, gets no wall. | Same. | #217 |
+| Extent-driven row and step loops stop at 100,000 steps. | The JS loops for as long as the extent says. | #217 |
+| A sort keyed on NaN returns some permutation, not V8's. | Rust's sort panics on a non-total order; V8's result for NaN keys is an accident. | #217 |
+| Session JSON nested deeper than 128 is unreadable (the session is then ignored, as for any unreadable one). | The JS parses deeper; no file the app writes is deeper than 10. A stack-overflow guard. | #218 (#219 meant the same limit) |
+| A model part with more than 50,000 `<object>`s is refused. | The JS has no limit; 200,000 one-line objects cost 390 MB to parse. | #218 |
+| `read_three_mf_*_with`, `read_stl_with` and `read_obj_with` refuse NaN and inf coordinates; the legacy `read_stl`, `read_obj` and `read_three_mf` do not. | The corpora pin NaN for the legacy readers; the app calls the `_with` ones. | #218 |
+| A nested `<object>` inside a `<part>` reads the part under its own root id. | The Rust panicked on it (S-02); the JS never reached that state. | #218 |
+| Numeric FFI inputs are range-checked at the door: rotation entries within 2, scale 0 to 1000, plate coordinates within 4000 mm, gap within 1000 cells, wide-search density 0 to 100, print-space points within 1e5 mm. | The JS accepts anything and produces NaN or runs unbounded. | #219 |
+| `step_objects` answers "the CAD kernel could not read this STEP file" for a tree with an out-of-range index or a cycle. | The JS throws a TypeError or overflows its stack. The shim never produces such a tree, so the corpora are unchanged. | #220 |
+| An Esc, Back or Undo pressed while a Draw check runs cancels that click. | Timing only. In the web the check is synchronous, so it finishes first and the key applies after. | #225 |
+
+Also not literal, but not engine divergences: a failed open shows the translated prefix of the web's English-only alert (#212),
+the app adds a "Load anyway?" prompt over the load limits where the JS drops or loads silently (#221), and the app has crash
+reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and searches (#213, #220, #223, #224, #228).
+
+## Pitfalls
+
+- **Swift 6.4 Debug builds abort** in `swift_task_dealloc` ("freed pointer was not the last allocation") when a `Task` or
+  `Task.detached` closure captures a struct that holds a `SIMD3<Double>` next to other fields. Copy the inputs into plain
+  arrays, scalars or class references before the closure, and keep per-click state on the main actor. After an app test
+  run, look for a new `Support Fins-*.ips` in `~/Library/Logs/DiagnosticReports`.
+- **Sandbox writes.** Never create a sibling of a save-panel URL (a temp file next to it): the sandbox grants the one URL,
+  not its folder. Write the temp file in an app-owned directory and move the bytes in, or write in place (#230).
+- **`.overlay(strokeBorder)` swallows clicks** on the view under it unless it ends in `.allowsHitTesting(false)`.
+- **A bare `[i]` inside `#expect` crashes the test host** when `i` is out of range, and the macOS crash dialog follows.
+  Guard it with `#require` (or `try #require(a.indices.contains(i))`) first.
+- **Accessibility identifiers** on a container hide the identified elements inside it (bugs #204 and #206).
+
+## Licences and Acknowledgements
+
+`deny.toml` holds the licence allow-list, the bans and the allowed sources; `cargo deny check` is a gate step. The app's
+Support Fins ▸ Acknowledgements… window shows `app/SupportFins/Resources/Acknowledgements.txt`, which `tools/licenses/gen.py`
+writes from Cargo.lock (OpenCascade with its LGPL relinking note, Manifold, uniffi, then every shipped crate with its licence
+text). The gate fails when the file is stale: after a dependency change run `tools/licenses/gen.py`. A crate under a licence
+outside the allow-list fails both, so adding one is a decision to make in `deny.toml` and the script's `ALLOWED` together.
+
 ## PR body template
 
 ```markdown

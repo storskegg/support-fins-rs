@@ -10,11 +10,6 @@ publish.workspace = true
 [lib]
 crate-type = ["staticlib", "lib"]
 
-# The binding generator, run by `just swift-bindings` (`cargo run -p sf-ffi --bin uniffi-bindgen`).
-[[bin]]
-name = "uniffi-bindgen"
-path = "uniffi-bindgen.rs"
-
 [features]
 # the app's static library installs `BigBlocks` as its global allocator (C-05); tests and probes do not
 app-alloc = []
@@ -28,7 +23,8 @@ sf-cli = { workspace = true, default-features = false }
 sf-step = { workspace = true, default-features = false }
 serde_json.workspace = true
 rustc-demangle.workspace = true
-uniffi = { workspace = true, features = ["cli"] }
+# no `cli`/`bindgen`: the generator is the sf-bindgen crate (X-14), so the library does not build uniffi_bindgen and its parsers
+uniffi = { workspace = true, default-features = false }
 
 [dev-dependencies]
 # the tests compare load_step_parts with load_parts reading STEP in process, which needs OpenCascade
