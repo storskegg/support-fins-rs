@@ -429,6 +429,7 @@ impl Part {
 
     /// `rot`: nine numbers, column-major (the engine's `Rot3`).
     pub fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError> {
+        let _op = crate::crash::operation("analyze");
         let started = std::time::Instant::now();
         let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
         let analyze_ms = started.elapsed().as_secs_f64() * 1e3;
@@ -447,6 +448,7 @@ impl Part {
     /// The spots whose first layer starts in midair in this pose (`findIslands`, `web/ui/islands.js`
     /// `updateIslands`): no face there is red, so the readout counts them and the viewer marks them.
     pub fn islands(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Vec<Island>, FfiError> {
+        let _op = crate::crash::operation("islands");
         let rot = rot9(&rot)?;
         let cfg = sf_engine::config::Config::default();
         let a = analyze(&self.topo, threshold(threshold_deg)?, &rot);
@@ -741,6 +743,7 @@ pub fn reads_as_step(path: String) -> Result<bool, FfiError> {
 /// an error, never a panic.
 #[uniffi::export]
 pub fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiError> {
+    let _op = crate::crash::operation("load model");
     let parts = step_loaded(sf_step::wire::decode(&kernel))?;
     finish_parts(&path, parts, None)
 }
@@ -765,6 +768,7 @@ fn step_loaded(read: Result<Option<sf_step::RawResult>, String>) -> Result<Vec<L
 /// [`load_step_parts`]).
 #[uniffi::export]
 pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
+    let _op = crate::crash::operation("load model");
     let bytes = std::fs::read(&path).map_err(|e| FfiError::Io {
         message: format!("{path}: {e}"),
     })?;
@@ -878,6 +882,7 @@ fn finish_parts(
 /// line (`io.js:34`, `:267`), `TOTAL` being the file's object count, which a `Part` does not know, so the caller passes it. One part comes back as itself.
 #[uniffi::export]
 pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError> {
+    let _op = crate::crash::operation("merge parts");
     match parts.len() {
         0 => {
             return Err(FfiError::Engine {

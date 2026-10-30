@@ -22,6 +22,9 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "-"
+    # an archive strips the installed product (STRIP_STYLE all drops local symbols, which is every Rust function): keep them, so a
+    # crash report's backtrace names the engine's frames (docs/FFI.md "Crash reports")
+    STRIP_STYLE: debugging
 packages:
   Viewer:
     path: SupportFinsViewer

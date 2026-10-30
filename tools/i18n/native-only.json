@@ -478,5 +478,53 @@
     "pt": "Relatar um problema",
     "ar": "الإبلاغ عن مشكلة",
     "nl": "Een probleem melden"
+  },
+  "Support Fins closed unexpectedly last time.": {
+    "why": "crash banner: the last run did not end normally (agent translation, native check pending)",
+    "de": "Support Fins wurde beim letzten Mal unerwartet beendet.",
+    "zh": "Support Fins 上次意外退出。",
+    "pt": "O Support Fins fechou inesperadamente da última vez.",
+    "ar": "تم إغلاق Support Fins بشكل غير متوقع في المرة الماضية.",
+    "nl": "Support Fins is de vorige keer onverwacht gesloten."
+  },
+  "Show Report": {
+    "why": "crash banner button: reveals the report in Finder (agent translation)",
+    "de": "Bericht zeigen",
+    "zh": "显示报告",
+    "pt": "Mostrar relatório",
+    "ar": "إظهار التقرير",
+    "nl": "Rapport tonen"
+  },
+  "Save crash report…": {
+    "why": "crash banner button: saves a zip of the report (agent translation)",
+    "de": "Absturzbericht speichern…",
+    "zh": "保存崩溃报告…",
+    "pt": "Salvar relatório de falha…",
+    "ar": "حفظ تقرير الأعطال…",
+    "nl": "Crashrapport bewaren…"
+  },
+  "Dismiss": {
+    "why": "crash banner button: hides the banner (agent translation)",
+    "de": "Schließen",
+    "zh": "忽略",
+    "pt": "Dispensar",
+    "ar": "تجاهل",
+    "nl": "Sluiten"
+  },
+  "Include the model file that was open": {
+    "why": "checkbox in the Save crash report panel, off by default (agent translation)",
+    "de": "Die geöffnete Modelldatei beilegen",
+    "zh": "包含当时打开的模型文件",
+    "pt": "Incluir o arquivo do modelo que estava aberto",
+    "ar": "تضمين ملف النموذج الذي كان مفتوحًا",
+    "nl": "Het geopende modelbestand toevoegen"
+  },
+  "Show crash reports": {
+    "why": "Help menu item: opens the crash report folder in Finder (agent translation)",
+    "de": "Absturzberichte zeigen",
+    "zh": "显示崩溃报告",
+    "pt": "Mostrar relatórios de falha",
+    "ar": "إظهار تقارير الأعطال",
+    "nl": "Crashrapporten tonen"
   }
 }

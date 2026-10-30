@@ -238,7 +238,10 @@ private struct MenuEntryView: View {
     var body: some View {
         switch entry {
         case .button(let b):
-            Button(b.title, action: b.action)
+            Button(b.title) {
+                CrashReporter.note("menu: \(b.title)")
+                b.action()
+            }
                 .keyboardShortcut(b.shortcut.map { KeyboardShortcut($0, modifiers: b.modifiers) })
                 .help(b.help ?? "")
                 .disabled(!b.enabled)

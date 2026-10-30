@@ -22,6 +22,7 @@
 //! here it assigns `ctx.crest`, so `drawn_wall` takes `ctx: &mut BuildCtx` and the new part
 //! stays set after the call, as in JS.
 
+use crate::guards::JsSort;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -78,7 +79,7 @@ fn solid_at(tris: &Tris, x: f64, y: f64, z: f64) -> bool {
         .filter(|&zz| zz < z)
         .collect();
     // `.sort((p, q) => p - q)`: a NaN difference compares as 0
-    zs.sort_by(|p, q| {
+    zs.js_sort_by(|p, q| {
         let d = p - q;
         if d < 0.0 {
             std::cmp::Ordering::Less

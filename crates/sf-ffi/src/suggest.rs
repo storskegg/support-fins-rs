@@ -506,6 +506,11 @@ impl Suggester {
                     if latest.load(Ordering::SeqCst) != job.generation {
                         continue;
                     }
+                    let _op = crate::crash::operation(match &job.work {
+                        Work::Rank { density: None, .. } => "suggest",
+                        Work::Rank { .. } => "suggest wide",
+                        Work::Strength { .. } => "strength",
+                    });
                     let done = catch_unwind(AssertUnwindSafe(|| match &job.work {
                         Work::Rank {
                             threshold_deg,

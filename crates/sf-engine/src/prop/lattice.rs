@@ -5,6 +5,7 @@
 //! standalone strut already takes; `strut_patches` routes each strut the way `buildProps`
 //! routes a standalone small region.
 
+use crate::guards::JsSort;
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -163,7 +164,7 @@ pub fn lattice_struts(
             inside.push((dist[k] as f64 / 3.0) * CELL);
         }
     }
-    inside.sort_by(|a, b| cmp_diff(a - b));
+    inside.js_sort_by(|a, b| cmp_diff(a - b));
     if inside.is_empty() {
         return None;
     }

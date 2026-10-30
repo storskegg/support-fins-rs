@@ -13,6 +13,7 @@
 //! jagged overhang's islands don't cut them short.
 
 use crate::config::Config;
+use crate::guards::JsSort;
 use crate::jsnum;
 
 /// `CURVED` (web/prop/curved.js:15). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
@@ -82,7 +83,7 @@ pub fn line_bend(line: &[[f64; 3]], cfg: &Config) -> f64 {
         return 0.0;
     }
     // `(a, b) => a - b`: a NaN difference counts as equal
-    heads.sort_by(|a, b| {
+    heads.js_sort_by(|a, b| {
         let d = a - b;
         if d < 0.0 {
             std::cmp::Ordering::Less

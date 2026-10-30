@@ -264,6 +264,7 @@ impl DrawKit {
         b: Vec<f64>,
         m: Option<Vec<f64>>,
     ) -> Result<Arc<DrawnGhost>, FfiError> {
+        let _op = crate::crash::operation("draw wall ghost");
         let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
         let m = m.map(|m| v3(&m, "m")).transpose()?;
         let opts = DrawOpts {
@@ -283,6 +284,7 @@ impl DrawKit {
         b: Vec<f64>,
         m: Option<Vec<f64>>,
     ) -> Result<Arc<DrawnGhost>, FfiError> {
+        let _op = crate::crash::operation("draw wall check");
         let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
         let m = m.map(|m| v3(&m, "m")).transpose()?;
         // (with the topology, so a wall the rebuild will refuse for its ends against a side wall
@@ -306,6 +308,7 @@ impl DrawKit {
         auto_build: Option<Arc<BuildResult>>,
         removed: Vec<u64>,
     ) -> Result<Arc<DrawnSweep>, FfiError> {
+        let _op = crate::crash::operation("draw sweep");
         let walls = parse_walls(&walls_json)?;
         let gone: HashSet<usize> = removed.iter().map(|&i| i as usize).collect();
         let sweep = sweep_drawn(
@@ -332,6 +335,7 @@ impl DrawKit {
         auto_build: Option<Arc<BuildResult>>,
         removed: Vec<u64>,
     ) -> Result<Arc<BraceSpot>, FfiError> {
+        let _op = crate::crash::operation("draw brace");
         let p = v3(&point, "point")?;
         if face as usize >= self.part.topology().n_faces {
             return Err(engine("face is out of range"));

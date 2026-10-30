@@ -6,6 +6,7 @@
 #![allow(unsafe_code)]
 
 mod builder;
+pub mod crash;
 mod draw;
 mod footprint;
 mod gpu;
@@ -19,6 +20,9 @@ pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, PlateFile, PlateModel, build_part,
     build_part_cancellable, export, export_file_name, export_plate, export_plates,
     export_with_drawn,
+};
+pub use crash::{
+    crash_breadcrumb, crash_breadcrumbs, crash_reports_start, crash_set_settings, crash_zip,
 };
 pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
 pub use footprint::{
@@ -42,13 +46,18 @@ uniffi::setup_scaffolding!();
 /// The crate version and the pinned upstream commit, e.g. `0.1.0 (upstream 23039e2)`.
 #[uniffi::export]
 pub fn engine_version() -> String {
+    format!(
+        "{} (upstream {})",
+        env!("CARGO_PKG_VERSION"),
+        upstream_pin()
+    )
+}
+
+/// The pinned upstream commit, seven characters (the `UPSTREAM` file).
+pub(crate) fn upstream_pin() -> String {
     let commit = include_str!("../../../UPSTREAM")
         .lines()
         .find_map(|l| l.trim().strip_prefix("commit="))
         .unwrap_or("unknown");
-    format!(
-        "{} (upstream {})",
-        env!("CARGO_PKG_VERSION"),
-        &commit[..commit.len().min(7)]
-    )
+    commit[..commit.len().min(7)].to_string()
 }

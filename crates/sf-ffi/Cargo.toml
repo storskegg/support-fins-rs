@@ -22,6 +22,7 @@ sf-cut.workspace = true
 # without OpenCascade (sf-step's `occt` feature, through sf-cli's): the app reads STEP out of process (StepReader XPC service)
 sf-cli = { workspace = true, default-features = false }
 sf-step = { workspace = true, default-features = false }
+serde_json.workspace = true
 uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]

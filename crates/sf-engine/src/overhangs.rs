@@ -1,6 +1,7 @@
 //! Port of `web/overhangs.js`: topology (weld + adjacency, once per file) and
 //! `analyze` (orientation → overhang regions, per pose).
 
+use crate::guards::JsSort;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use indexmap::IndexMap;
@@ -445,7 +446,7 @@ pub fn analyze_with(topo: &Topology, threshold_deg: f64, rot: &Rot3, par: bool) 
         .filter(|g| g.area >= MIN_REGION_AREA)
         .collect();
     // `.sort((a, b) => b.area - a.area)`: stable; a NaN difference counts as equal
-    regions.sort_by(|a, b| {
+    regions.js_sort_by(|a, b| {
         let d = b.area - a.area;
         if d < 0.0 {
             std::cmp::Ordering::Less
