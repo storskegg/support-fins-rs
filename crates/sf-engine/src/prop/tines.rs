@@ -8,6 +8,7 @@
 //! Split out of prop.js, which re-exports the public names.
 
 use crate::config::Config;
+use crate::guards::JsSort;
 use crate::inside::inside_part;
 use crate::jsnum;
 use crate::kiss::{KissOpts, kiss_ends};
@@ -145,7 +146,7 @@ fn square_to_run(dirs: Vec<Dir>, line: &[[f64; 3]], k: usize) -> Vec<Dir> {
             .filter(|u| u.2 > 1e-6)
             .collect();
         // `.sort((p, q) => q.dot - p.dot)`: stable; a NaN difference counts as equal
-        ranked.sort_by(|p, q| {
+        ranked.js_sort_by(|p, q| {
             let d = q.2 - p.2;
             if d < 0.0 {
                 std::cmp::Ordering::Less

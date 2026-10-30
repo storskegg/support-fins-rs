@@ -9,6 +9,7 @@
 //! page and carried to the Worker in opts.tunables (fins.js applyTunables).
 
 use crate::config::Config;
+use crate::guards::JsSort;
 use crate::jsnum;
 use crate::solids::{box_extrude, ribbon};
 use crate::types::V4;
@@ -676,7 +677,7 @@ fn strip_solid(s0: f64, s1: f64, zb: f64, zt: f64, obst: &[Vec<P2>]) -> Vec<Vec<
             cuts.push(r);
         }
     }
-    cuts.sort_by(|u, v| by_difference(*u, *v));
+    cuts.js_sort_by(|u, v| by_difference(*u, *v));
     let mut polys = Vec::new();
     for n in 0..cuts.len().saturating_sub(1) {
         let za = cuts[n];
@@ -694,7 +695,9 @@ fn strip_solid(s0: f64, s1: f64, zb: f64, zt: f64, obst: &[Vec<P2>]) -> Vec<Vec<
                 act.push(p);
             }
         }
-        act.sort_by(|u, v| by_difference(span_at(u, zm).unwrap()[0], span_at(v, zm).unwrap()[0]));
+        act.js_sort_by(|u, v| {
+            by_difference(span_at(u, zm).unwrap()[0], span_at(v, zm).unwrap()[0])
+        });
         // The solid's edges in this slab, as functions of z. Every obstacle edge is
         // straight across the slab, so each is read at two interior heights and
         // extended to the slab's ends -- reading AT an end can fall a rounding hair
