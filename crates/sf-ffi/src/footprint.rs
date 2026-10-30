@@ -33,9 +33,16 @@ fn opt(f: &Option<Arc<Footprint>>) -> Option<&Grid> {
 
 #[uniffi::export]
 impl Footprint {
-    /// The grid's corner cell and size in cells (`x0`, `y0`, `w`, `h`).
+    /// The grid's corner cell and size in cells (`x0`, `y0`, `w`, `h`), cells of [`Footprint::cell_size`] mm.
     pub fn bounds(&self) -> Vec<i64> {
         vec![self.grid.x0, self.grid.y0, self.grid.w, self.grid.h]
+    }
+
+    /// The side of a cell in mm: 1, or more for a part too big to hold in 1 mm cells (`CELL_BUDGET`, about 2 m
+    /// square), whose footprint is built from coarser cells that it touches anywhere. `shared` and `clash` cells
+    /// are then corners of these cells (still in mm).
+    pub fn cell_size(&self) -> i64 {
+        self.grid.cell
     }
 
     /// How many cells are set (the area in mm²): `area`.

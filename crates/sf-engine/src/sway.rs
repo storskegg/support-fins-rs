@@ -7,6 +7,7 @@
 //! spaced EVENLY up the whole height). The gap arrives in `opts` rather than being read from
 //! FIN/PROP, so the module depends on neither.
 
+use crate::guards::JsSort;
 use indexmap::IndexMap;
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
@@ -912,7 +913,7 @@ pub fn build_sway_rib(
         }
         z = jsnum::min(h, z + sw.level_step);
     }
-    level_heights.sort_by(|a, b| num_ord(a - b));
+    level_heights.js_sort_by(|a, b| num_ord(a - b));
     let levels: Vec<SwayLevel> = level_heights
         .iter()
         .map(|&z| SwayLevel {
@@ -1048,7 +1049,7 @@ fn plan_hull(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
         (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
     };
     let mut sorted: Vec<[f64; 2]> = points.iter().map(|p| [p[0], p[1]]).collect();
-    sorted.sort_by(|a, b| num_ord(or(a[0] - b[0], a[1] - b[1])));
+    sorted.js_sort_by(|a, b| num_ord(or(a[0] - b[0], a[1] - b[1])));
     let pts: Vec<[f64; 2]> = sorted
         .iter()
         .enumerate()
@@ -1347,7 +1348,7 @@ fn columns_for(p: &Patch, cfg: &Config) -> Vec<f64> {
         });
         k += 1.0;
     }
-    samples.sort_by(|x, y| num_ord(or(y.top - x.top, y.edge - x.edge)));
+    samples.js_sort_by(|x, y| num_ord(or(y.top - x.top, y.edge - x.edge)));
     let apart = jsnum::max(sw.pitch / 2.0, w / (n + 1.0));
     let mut cols: Vec<f64> = Vec::new();
     for s in &samples {
@@ -1437,7 +1438,7 @@ pub fn build_sway_braces(
             p,
         })
         .collect();
-    cands.sort_by(|a, b| num_ord(b.score - a.score));
+    cands.js_sort_by(|a, b| num_ord(b.score - a.score));
     if cands.is_empty() {
         return none("no upright side is tall and flat enough to brace in this pose".to_string());
     }
