@@ -20,18 +20,11 @@ final class CrashBannerUITests: PartWindowUITestCase {
         XCTAssertTrue(element("crash-banner-save").exists)
 
         // Dismiss before the Help menu is opened: a click that arrives while a menu is still closing (just after Esc)
-        // is taken by the menu's tracking, not the button. The app is activated and the part window made key first
-        // (a click on its title bar, clear of the toolbar), so this checks Dismiss itself; the first click in a window
-        // that is not key is the app test `theBannerTakesTheFirstClickInAnInactiveWindow`.
-        app.activate()
-        partWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0)).withOffset(CGVector(dx: 0, dy: 12)).click()
-        Thread.sleep(forTimeInterval: 0.5)
-        attachState("before Dismiss")
+        // is taken by the menu's tracking, not the button
         let dismiss = element("crash-banner-dismiss")
         let hittable = dismiss.isHittable
         XCTAssertTrue(hittable, "Dismiss can be clicked")
         dismiss.click()
-        attachState("just after Dismiss")
         let gone = waitUntil(timeout: 5) { !message.exists }
         if !gone { attachState("5 s after Dismiss") }
         XCTAssertTrue(gone, "the banner is gone")

@@ -184,21 +184,35 @@ struct CrashReportsTests {
         #expect(!r.showsBanner, "a dismissed banner stays down for the rest of the run")
     }
 
-    /// The banner's buttons take the first click in a window that is not key (the UI test's window after the Open
-    /// panel, or any window behind another app's): AppKit asks the view under the pointer `acceptsFirstMouse`, and a
-    /// plain SwiftUI view says no, so that click only made the window key and Dismiss did nothing.
-    @Test func theBannerTakesTheFirstClickInAnInactiveWindow() throws {
-        func hitView<V: View>(_ root: V) -> NSView? {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 120), styleMask: [.titled], backing: .buffered, defer: true)
-            window.contentView = NSHostingView(rootView: root.frame(width: 400, height: 120))
-            window.contentView?.layoutSubtreeIfNeeded()
-            let view = window.contentView!
-            return view.hitTest(view.convert(NSPoint(x: 200, y: 60), to: view.superview))
+    /// A click on the banner's Dismiss reaches its action. The orange border was an overlay shape over the whole strip,
+    /// and a shape takes the clicks inside it: every button under it was dead (the UI test's Dismiss click did nothing,
+    /// and no `seen.marker` was written). The click goes through AppKit (`NSWindow.sendEvent`), as a user's does.
+    @Test func aClickOnDismissReachesItsAction() throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        folder.writeMarker(now: Date().addingTimeInterval(-60))
+        let r = CrashReporter(folder: folder)
+        r.start(register: false)
+        #expect(r.showsBanner)
+        let banner = CrashBanner(reporter: r, model: { nil })
+        let size = NSHostingView(rootView: banner).fittingSize
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = NSHostingView(rootView: banner.frame(width: size.width, height: size.height, alignment: .top))
+        window.orderBack(nil)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        // Dismiss is the strip's last button: its middle is ~35 pt in from the 14 pt padding; the strip's 8 pt top
+        // margin is above it (window points run from the bottom)
+        let p = NSPoint(x: size.width - 14 - 35, y: (size.height - 8) / 2)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let e = try #require(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                    windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            window.sendEvent(e)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
-        let plain = hitView(Button("Dismiss") {}.frame(width: 400, height: 120))
-        #expect(plain?.acceptsFirstMouse(for: nil) == false, "a plain SwiftUI button: the first click only activates the window")
-        let banner = hitView(FirstMouse { Button("Dismiss") {}.frame(width: 400, height: 120) })
-        #expect(banner?.acceptsFirstMouse(for: nil) == true, "the banner's button takes it")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        #expect(!r.showsBanner, "Dismiss ran")
+        #expect(FileManager.default.fileExists(atPath: folder.seenURL.path), "and marked the reports seen")
     }
 
     @Test func aUnitTestHostWithoutAFolderDoesNotStart() {

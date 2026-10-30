@@ -9,11 +9,7 @@ final class CrashReportsFeature: Feature {
     init(host: ViewerModel) { self.host = host }
 
     var overlays: [WindowOverlay] {
-        // FirstMouse: the buttons work on the first click when the window is not key (after the Open panel, or behind
-        // another app), as a user expects of a banner
-        [WindowOverlay("crash-banner", order: 80, alignment: .top) {
-            FirstMouse { CrashBanner(reporter: CrashReporter.shared, model: { self.host?.openedURL }) }
-        }]
+        [WindowOverlay("crash-banner", order: 80, alignment: .top) { CrashBanner(reporter: CrashReporter.shared, model: { self.host?.openedURL }) }]
     }
 
     static func menus(_ f: CrashReportsFeature?) -> [MenuSection] {
@@ -43,7 +39,8 @@ struct CrashBanner: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.orange.opacity(0.7)))
+            // the border is drawn over the strip: it must not take the clicks meant for the buttons under it
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.orange.opacity(0.7)).allowsHitTesting(false))
             .shadow(radius: 12)
             .padding(.top, 8)
         }
