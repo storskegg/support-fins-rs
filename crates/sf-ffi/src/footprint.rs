@@ -66,7 +66,7 @@ fn pair(v: &[f64], what: &str) -> Result<[f64; 2], FfiError> {
 }
 
 fn reach(v: i64, what: &str) -> Result<i64, FfiError> {
-    if v.abs() <= MAX_REACH {
+    if v.unsigned_abs() <= MAX_REACH as u64 {
         Ok(v)
     } else {
         Err(engine(format!("{what} must be within {MAX_REACH} cells")))
@@ -77,7 +77,7 @@ fn reach(v: i64, what: &str) -> Result<i64, FfiError> {
 /// non-finite vertex) before it is asked for.
 fn check_extent(tris: &[f64], m: Option<&[f64; 16]>) -> Result<(), FfiError> {
     let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
-    for v in tris.chunks_exact(3) {
+    for v in tris.as_chunks::<3>().0 {
         let (mut x, mut y) = (v[0], v[1]);
         if let Some(m) = m {
             (x, y) = (

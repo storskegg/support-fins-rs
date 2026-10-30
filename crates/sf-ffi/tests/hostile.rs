@@ -1359,7 +1359,7 @@ fn exports() -> Vec<(String, bool)> {
                 if head.starts_with("impl ") {
                     let ty = head
                         .trim_start_matches("impl ")
-                        .split(|c: char| c == ' ' || c == '{' || c == '<')
+                        .split([' ', '{', '<'])
                         .next()
                         .unwrap()
                         .to_string();
