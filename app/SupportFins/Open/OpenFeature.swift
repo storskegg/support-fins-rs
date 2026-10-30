@@ -22,7 +22,8 @@ final class OpenFeature: Feature {
                         ReadingStepSpinner()
                     }
                     if let status = self.host?.status {
-                        Text(status).padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
+                        Text(status).accessibilityIdentifier("load-status")
+                            .padding(8).background(.regularMaterial, in: .rect(cornerRadius: 8)).padding()
                     }
                 }
             },

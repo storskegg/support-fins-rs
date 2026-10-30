@@ -3072,6 +3072,41 @@
         }
       }
     },
+    "Couldn't read this STEP file" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese STEP-Datei konnte nicht gelesen werden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取此 STEP 文件"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler este arquivo STEP"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّرت قراءة ملف STEP هذا"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kan dit STEP-bestand niet lezen"
+          }
+        }
+      }
+    },
     "Cross-rib height" : {
       "extractionState" : "manual",
       "localizations" : {

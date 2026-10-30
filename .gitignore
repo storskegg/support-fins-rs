@@ -24,3 +24,7 @@ tools/dashboard/state.json
 
 # `just swift-warnings`'s derived data
 /.dd-warnings/
+
+# Generated: the StepReader service's static library (`just swift-bindings`) and Info.plist (`just app-project`)
+/app/StepRead/sf_step_xpc.xcframework/
+/app/StepReader/Info.plist

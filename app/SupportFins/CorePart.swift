@@ -88,18 +88,28 @@ final class CorePart: MeshSource {
     }
 }
 
-/// `load_parts`: STL, OBJ, 3MF and STEP (one `Part` per object).
+/// `load_parts`: STL, OBJ, 3MF and STEP (one `Part` per object). STEP is read in the StepReader XPC service (X-01).
 struct CoreLoader: PartLoading {
     struct NoFile: LocalizedError { var errorDescription: String? { "Open an STL, 3MF, STEP or OBJ file." } }
     struct Unreadable: LocalizedError { var errorDescription: String? { JS.t("The file's mesh could not be shared with the GPU.") } }
 
     func load(url: URL?, device: MTLDevice) async throws -> [LoadedPart] {
         guard let url else { throw NoFile() }
-        let path = url.path(percentEncoded: false)
-        let parts = try await Task.detached(priority: .userInitiated) { try loadParts(path: path) }.value
+        let parts = try await Self.parts(at: url.path(percentEncoded: false))
         return try parts.map { part in
             guard let core = CorePart(part: part, device: device) else { throw Unreadable() }
             return LoadedPart(name: core.info.name, mesh: core)
         }
+    }
+
+    /// The engine's parts of a file: `load_parts`, except that a file it would read as STEP (`reads_as_step`) is read
+    /// by OpenCascade in the StepReader XPC service and made into parts by `load_step_parts`, so the app's process never
+    /// runs OpenCascade.
+    nonisolated static func parts(at path: String, stepTimeout: Duration = StepReader.timeout) async throws -> [Part] {
+        let step = try await Task.detached(priority: .userInitiated) { try readsAsStep(path: path) }.value
+        guard step else { return try await Task.detached(priority: .userInitiated) { try loadParts(path: path) }.value }
+        let file = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+        let kernel = try await StepReader.read(file, timeout: stepTimeout)
+        return try await Task.detached(priority: .userInitiated) { try loadStepParts(path: path, kernel: kernel) }.value
     }
 }

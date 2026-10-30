@@ -712,9 +712,60 @@ fn cut_object(o: ThreeMfObject) -> Loaded {
     (o.name, positions, slicer, colors, meta)
 }
 
+/// Whether `load_parts` reads this file as STEP: not named `.stl`, `.obj` or `.3mf`, and named `.step` / `.stp` or
+/// starting with "ISO-10303-21;" (the page sniffs the content, `parseStep`, web/ui/io.js:313-350). `head` is the file's
+/// first bytes (64 are enough).
+fn reads_as_step_file(lower: &str, head: &[u8]) -> bool {
+    !(lower.ends_with(".stl") || lower.ends_with(".obj") || lower.ends_with(".3mf"))
+        && (lower.ends_with(".step") || lower.ends_with(".stp") || sf_step::is_step(head))
+}
+
+/// Whether `load_parts` would read the file at `path` as STEP (X-01): the app then reads it in its StepReader XPC
+/// service and loads the result with [`load_step_parts`], so OpenCascade never runs in the app's process.
+#[uniffi::export]
+pub fn reads_as_step(path: String) -> Result<bool, FfiError> {
+    use std::io::Read;
+    let io = |e: std::io::Error| FfiError::Io {
+        message: format!("{path}: {e}"),
+    };
+    let mut head = Vec::with_capacity(64);
+    std::fs::File::open(&path)
+        .map_err(io)?
+        .take(64)
+        .read_to_end(&mut head)
+        .map_err(io)?;
+    Ok(reads_as_step_file(&path.to_ascii_lowercase(), &head))
+}
+
+/// A STEP file's parts from what the StepReader XPC service read (`kernel`: `sf_step::wire` bytes, X-01): the parts
+/// `load_parts` makes of the file in a build with OpenCascade, the same names, meshes and notes. The bytes come from
+/// another process and are checked (`sf_step::wire::decode`, then `step_objects`' index checks): a malformed result is
+/// an error, never a panic.
+#[uniffi::export]
+pub fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiError> {
+    let _op = crate::crash::operation("load model");
+    let parts = step_loaded(sf_step::wire::decode(&kernel))?;
+    finish_parts(&path, parts, None)
+}
+
+/// `parseStep` (web/ui/io.js:313-350): the kernel's read (`Ok(None)` is `success: false`) -> the objects.
+fn step_loaded(read: Result<Option<sf_step::RawResult>, String>) -> Result<Vec<Loaded>, FfiError> {
+    let format = |message: String| FfiError::Format { message };
+    let raw = read.map_err(format)?;
+    Ok(sf_step::step_objects(raw.as_ref())
+        .map_err(format)?
+        .into_iter()
+        .map(|o| (o.name, o.positions, None, None, ImportMeta::new(Kind::Step)))
+        .collect())
+}
+
 /// STL / OBJ / 3MF: one `Part` per object (the file transform of a 3MF is applied by the reader, as
 /// the CLI's `readPart` gets it). A 3MF object's negative parts are cut out at import, as the page does
 /// (`web/ui/io.js`), through `sf-cut`; `PartInfo.notes` says what was cut and why anything was not.
+///
+/// STEP runs OpenCascade in this process, which only a build with sf-step's `occt` feature can (the tests, the
+/// CLI's); the app's engine has none and reads STEP through its StepReader XPC service ([`reads_as_step`],
+/// [`load_step_parts`]).
 #[uniffi::export]
 pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
     let _op = crate::crash::operation("load model");
@@ -771,19 +822,29 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
                     .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
             );
         }
-    } else if lower.ends_with(".step") || lower.ends_with(".stp") || sf_step::is_step(&bytes) {
+    } else if reads_as_step_file(&lower, &bytes) {
         // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
-        for o in sf_step::read_step(&bytes).map_err(format)? {
-            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Step)));
-        }
+        parts = step_loaded(sf_step::read_raw(&bytes))?;
     } else {
         return Err(format("reads .stl, .3mf, .obj and .step only".into()));
     }
+    finish_parts(&path, parts, own)
+}
+
+/// The loaded objects as `Part`s: empty ones dropped, unnamed ones named after the file, a saved session (`own`: the
+/// file's object count and the session) put on its part.
+fn finish_parts(
+    path: &str,
+    mut parts: Vec<Loaded>,
+    own: Option<(usize, sf_io::json::Json)>,
+) -> Result<Vec<Arc<Part>>, FfiError> {
     parts.retain(|(_, p, _, _, _)| !p.is_empty());
     if parts.is_empty() {
-        return Err(format("no triangles in the file".into()));
+        return Err(FfiError::Format {
+            message: "no triangles in the file".into(),
+        });
     }
-    let base = stem(&path);
+    let base = stem(path);
     let objects_len = own.as_ref().map_or(parts.len(), |(n, _)| *n);
     Ok(parts
         .into_iter()

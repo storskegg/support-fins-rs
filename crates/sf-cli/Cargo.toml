@@ -11,11 +11,16 @@ publish.workspace = true
 name = "support-fins"
 path = "src/main.rs"
 
+[features]
+default = ["occt"]
+# STEP through OpenCascade, in this process (a crash ends only the CLI). Off in the app's engine (sf-ffi).
+occt = ["sf-step/occt"]
+
 [dependencies]
 sf-engine.workspace = true
 sf-io.workspace = true
 sf-cut.workspace = true
-sf-step.workspace = true
+sf-step = { workspace = true, default-features = false }
 indexmap.workspace = true
 
 [dev-dependencies]
