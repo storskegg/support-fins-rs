@@ -51,6 +51,7 @@
 //! -- counts, not a clock, so the output is the same on every machine. Red no wall can reach is
 //! returned (`unserved`), never hidden: quality first, surface the dropped overhang.
 
+use crate::guards::JsSort;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -558,7 +559,7 @@ fn candidate_lines(
             .iter()
             .map(|&i| (-uy * pts[i].x + ux * pts[i].y, i))
             .collect();
-        across.sort_by(|p, q| num_ord(p.0 - q.0));
+        across.js_sort_by(|p, q| num_ord(p.0 - q.0));
         let (mut best, mut best_at, mut w, mut lo) = (-1.0, 0.0, 0.0, 0usize);
         for hi in 0..across.len() {
             w += pts[across[hi].1].w;
@@ -604,7 +605,7 @@ fn candidate_lines(
     // the best directions, each also SHIFTED across itself: the heaviest band's centre
     // often sits ~5 mm off a wall already built, inside its foot (a tall wall's is 3 mm
     // a side), and a line a few mm over clears it
-    dirs.sort_by(|p, q| num_ord(q.c.weight - p.c.weight));
+    dirs.js_sort_by(|p, q| num_ord(q.c.weight - p.c.weight));
     let mut out: Vec<Cand> = Vec::new();
     let take = {
         let n = jsnum::trunc(fill.best_dirs);
@@ -635,8 +636,8 @@ fn candidate_lines(
     // all by the red they'd hold (stable: on a tie a direction's own line stays ahead of
     // its shifts; between directions, the better direction's lines come first), each
     // followed by its lines from an island start's end (lineAt's `ends`)
-    out.sort_by(|p, q| num_ord(q.weight - p.weight));
-    narrow_out.sort_by(|p, q| num_ord(q.weight - p.weight));
+    out.js_sort_by(|p, q| num_ord(q.weight - p.weight));
+    narrow_out.js_sort_by(|p, q| num_ord(q.weight - p.weight));
     out.extend(narrow_out);
     let mut flat = Vec::new();
     for c in out {
@@ -669,7 +670,7 @@ fn line_at(
         .filter(|(v, _)| jsnum::abs(v - off) <= r)
         .map(|&(_, i)| (ux * pts[i].x + uy * pts[i].y, i))
         .collect();
-    band.sort_by(|p, q| num_ord(p.0 - q.0));
+    band.js_sort_by(|p, q| num_ord(p.0 - q.0));
     #[derive(Clone, Copy)]
     struct Run {
         from: usize,
@@ -1505,7 +1506,7 @@ fn tie_fill(
             }
         }
     }
-    pairs.sort_by(|p, q| num_ord(p.d - q.d));
+    pairs.js_sort_by(|p, q| num_ord(p.d - q.d));
     let mut count = vec![0.0f64; props.len()];
     let mut n = 0;
     for PairD { a, b, k, j, .. } in pairs {
@@ -1966,7 +1967,7 @@ impl Fill<'_> {
                 (g, w)
             })
             .collect();
-        gs.sort_by(|p, q| num_ord(q.1 - p.1));
+        gs.js_sort_by(|p, q| num_ord(q.1 - p.1));
         gs.into_iter().map(|x| x.0).collect()
     }
 

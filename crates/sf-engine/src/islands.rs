@@ -4,6 +4,7 @@
 //! face around its low point is steeper than the overhang angle. Found on the mesh, not by
 //! slicing. In print space: the part posed by `rot` and seated by `res.offset`.
 
+use crate::guards::JsSort;
 use std::collections::HashMap;
 
 use indexmap::{IndexMap, IndexSet};
@@ -540,7 +541,7 @@ pub fn find_islands(
     }
 
     // merge starts a boss rim or a corner shares into one island, lowest first
-    found.sort_by(|a, b| {
+    found.js_sort_by(|a, b| {
         let d = a.z - b.z;
         if d < 0.0 {
             std::cmp::Ordering::Less

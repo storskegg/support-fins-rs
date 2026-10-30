@@ -360,7 +360,8 @@ a part, its pose and a build into the triangles the page rasterizes, and hands g
 ```rust
 #[derive(uniffi::Object)] struct Footprint;   // the 1 mm cells of the bed a model covers at any height; never empty
 impl Footprint {
-  fn bounds(&self) -> Vec<i64>;                              // x0, y0, w, h in cells
+  fn bounds(&self) -> Vec<i64>;                              // x0, y0, w, h in cells of `cell_size()` mm
+  fn cell_size(&self) -> i64;                                // a cell's side in mm: 1, or more past CELL_BUDGET (4M cells, ~2 m square); a coarse cell is set when anything touches it, and `shared` / `clash` cells are then those cells' corners in mm
   fn area(&self) -> u64;                                     // cells set (mm²)
   fn placed(&self, x: f64, y: f64) -> Arc<Footprint>;        // `placed`: standing at (x, y); off the mm grid it widens
   fn shared(&self, other: Arc<Footprint>) -> Vec<i64>;       // `shared`: the cells both cover, flat x, y pairs
@@ -480,3 +481,31 @@ fn js_number_text(x: f64) -> String;                          // String(x): a nu
   files (`parity_session.rs`, `session.rs`); `export` writes the page's bytes for the same models; and Deno's real
   `readThreeMF` + `partObjectOf` + `restoreSession` (`parity/cli/session_check.js`, run by `session.rs`) read the files the
   native side wrote to the state they were written from.
+
+## Crash reports (fix plan 1D; `crates/sf-ffi/src/crash.rs`)
+
+Nothing is sent over the network; reports are files in a folder Swift names (`~/Library/Logs/Support Fins/`, the sandbox container's).
+
+- **`crash_reports_start(dir, app_version, settings_json)`** once at launch: creates `dir`, remembers the app version and the settings,
+  and installs the panic hook (once; it chains to the previous hook). Until it is called the hook writes nothing.
+  **`crash_set_settings(json)`** replaces the settings text (the `{"options": ..., "tunables": ...}` of the build in force).
+- **The hook** writes a report for *every* panic, including those `catch_unwind` turns into errors (the build and suggest workers):
+  `crash-rust-<time>-<n>.json` and `.txt` with the message, file/line/column, `Backtrace::force_capture()` (symbolicated), the thread
+  name, the operation, the app version, the engine version, the upstream pin, a UTC timestamp, the breadcrumbs and the settings.
+- **Operation context:** `crash::operation("build")` returns a guard that sets a thread-local name until dropped. The entry points that
+  set it: `load_parts` ("load model"), `merge_parts`, `Part::analyze`/`islands`, the build worker ("build"), the suggest worker
+  ("suggest", "suggest wide", "strength"), `export*`, `build_report`, `DrawKit::ghost`/`check_wall`/`sweep`/`brace_at` ("draw ...").
+  Rayon worker threads carry none (the thread name says where it ran).
+- **Breadcrumbs:** `crash_breadcrumb(text)` pushes into a ring of the last 50 (`crash_breadcrumbs()` reads it). Swift keeps its own copy
+  and saves it to the folder; both end up in the reports.
+- **`crash_zip(names, datas)`** is `sf_io::zip::zip_store` for Save crash report... .
+- Test: `crates/sf-ffi/tests/crash.rs` forces a panic inside `catch_unwind` and reads the report back.
+- **When the banner shows.** Only for a leftover running marker (the last run did not end normally) and for MetricKit crash or hang
+  diagnostics. A `crash-rust-*` report alone (a panic that was caught and became an error) never raises it: the app went on. Those
+  reports stay in the folder and are reachable through Help > Show crash reports.
+- **Release symbols.** Checked on a Release build (`nm`, `atos`): `sf_ffi` functions (Rust v0-mangled, local symbols) are in the binary
+  and `atos` resolves them, and the build also writes `Support Fins.app.dSYM`. The Rust release profile is cargo's default (no debug
+  info, no strip), so a Rust frame has a function name but no file:line (the panic's own file:line is separate, from `Location`).
+  A plain `xcodebuild build` does not strip (`DEPLOYMENT_POSTPROCESSING = NO`), but an Archive does with `STRIP_STYLE = all`, which
+  removes every local symbol, i.e. all Rust frames. `app/project.yml` therefore sets `STRIP_STYLE: debugging` (only debug symbols go).
+  To symbolicate a MetricKit address later: `atos -o "Support Fins.app.dSYM/Contents/Resources/DWARF/Support Fins" -arch arm64 -l <load address> <address>`.

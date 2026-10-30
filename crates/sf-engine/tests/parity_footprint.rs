@@ -37,6 +37,7 @@ fn grid(v: &Value) -> Option<Grid> {
         h: int(v.get("h")),
         bits,
         bed,
+        cell: 1,
     })
 }
 

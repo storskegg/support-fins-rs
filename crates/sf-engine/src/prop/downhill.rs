@@ -43,6 +43,7 @@ impl Default for DownhillConfig {
     }
 }
 
+use crate::guards::JsSort;
 use std::collections::HashMap;
 
 use crate::config::Config;
@@ -207,7 +208,7 @@ pub fn downhill_lines(
         .enumerate()
         .map(|(i, p)| (q6(p[0] * ax + p[1] * ay), i))
         .collect();
-    across.sort_by(|a, b| {
+    across.js_sort_by(|a, b| {
         ordering(or(a.0 - b.0, || {
             or(q6(top[a.1][0]) - q6(top[b.1][0]), || {
                 q6(top[a.1][1]) - q6(top[b.1][1])
@@ -373,7 +374,7 @@ pub fn downhill_lines(
             reached(l, &mut done);
         }
         let mut order: Vec<usize> = (0..cover.len()).filter(|&i| !done[i]).collect();
-        order.sort_by(|&a, &b| {
+        order.js_sort_by(|&a, &b| {
             ordering(or(cover[b][2] - cover[a][2], || {
                 or(cover[a][0] - cover[b][0], || cover[a][1] - cover[b][1])
             }))

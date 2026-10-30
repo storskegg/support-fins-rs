@@ -4,6 +4,7 @@
 //! horizontal circular boundary loops with a common centre. An ellipse, open arc, uneven rim or
 //! non-circular inner boundary keeps the existing placement path.
 
+use crate::guards::JsSort;
 use std::sync::{Arc, Mutex};
 
 use indexmap::{IndexMap, IndexSet};
@@ -94,7 +95,7 @@ fn circle(points: &[[f64; 3]]) -> Option<Circle> {
         .iter()
         .map(|p| angle(jsnum::atan2(p[1] - cy, p[0] - cx)))
         .collect();
-    angles.sort_by(|a, b| cmp_diff(a - b));
+    angles.js_sort_by(|a, b| cmp_diff(a - b));
     let mut max_gap = 0.0f64;
     for i in 0..angles.len() {
         max_gap = jsnum::max(max_gap, angle(angles[(i + 1) % angles.len()] - angles[i]));
@@ -335,7 +336,7 @@ pub fn circular_footprint(tris: &[f64]) -> Option<CircularFrame> {
     if loops.len() > 2 {
         return None;
     }
-    loops.sort_by(|a, b| cmp_diff(b.fitted.radius - a.fitted.radius));
+    loops.js_sort_by(|a, b| cmp_diff(b.fitted.radius - a.fitted.radius));
     let outer = &loops[0];
     let [cx, cy] = outer.fitted.centre;
     if loops.iter().any(|l| {

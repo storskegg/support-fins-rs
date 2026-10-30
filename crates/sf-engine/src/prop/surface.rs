@@ -221,6 +221,7 @@ fn low_first<'a>(g: &'a ZGrid, tris: &[f64]) -> &'a Low {
         let mut order: Vec<usize> = (0..n).collect();
         // JS: order.sort((p, q) => lb[p] - lb[q] || p - q); a NaN difference (-inf - -inf)
         // falls through to the index, like a zero.
+        // (a total order already: `lb` holds no NaN, so `slice::sort_by` cannot panic here, and it is the fast one)
         order.sort_by(|&p, &q| {
             let d = lb[p] - lb[q];
             if d < 0.0 {

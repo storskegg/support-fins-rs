@@ -21,6 +21,7 @@ sf-io.workspace = true
 sf-cut.workspace = true
 sf-cli.workspace = true
 sf-step.workspace = true
+serde_json.workspace = true
 uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]

@@ -1,5 +1,6 @@
 //! Port of `web/fins/pad.js`. Read `docs/AGENTS.md` before changing anything here.
 
+use crate::guards::JsSort;
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
@@ -628,7 +629,7 @@ fn brim_pad(
         f += fine;
     }
     let mut rows = fr;
-    rows.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    rows.js_sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n_r = rows.len();
     let mid = rows
         .iter()
