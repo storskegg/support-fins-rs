@@ -20,7 +20,8 @@ final class CrashBannerUITests: PartWindowUITestCase {
         XCTAssertTrue(element("crash-banner-save").exists)
 
         // Dismiss before the Help menu is opened: a click that arrives while a menu is still closing (just after Esc)
-        // is taken by the menu's tracking, not the button
+        // is taken by the menu's tracking, not the button. The window is not key here (after the Open panel): the
+        // click is deliberately not preceded by one that activates it, since the banner must take the first click
         let dismiss = element("crash-banner-dismiss")
         XCTAssertTrue(dismiss.isHittable, "Dismiss can be clicked")
         dismiss.click()

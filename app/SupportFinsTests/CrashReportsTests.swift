@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import Observation
+import SwiftUI
 import Testing
 
 @testable import Support_Fins
@@ -180,6 +182,23 @@ struct CrashReportsTests {
         r.refresh()
         r.record(metrics: [.init(kind: "hang", json: Data("{}".utf8))])
         #expect(!r.showsBanner, "a dismissed banner stays down for the rest of the run")
+    }
+
+    /// The banner's buttons take the first click in a window that is not key (the UI test's window after the Open
+    /// panel, or any window behind another app's): AppKit asks the view under the pointer `acceptsFirstMouse`, and a
+    /// plain SwiftUI view says no, so that click only made the window key and Dismiss did nothing.
+    @Test func theBannerTakesTheFirstClickInAnInactiveWindow() throws {
+        func hitView<V: View>(_ root: V) -> NSView? {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 120), styleMask: [.titled], backing: .buffered, defer: true)
+            window.contentView = NSHostingView(rootView: root.frame(width: 400, height: 120))
+            window.contentView?.layoutSubtreeIfNeeded()
+            let view = window.contentView!
+            return view.hitTest(view.convert(NSPoint(x: 200, y: 60), to: view.superview))
+        }
+        let plain = hitView(Button("Dismiss") {}.frame(width: 400, height: 120))
+        #expect(plain?.acceptsFirstMouse(for: nil) == false, "a plain SwiftUI button: the first click only activates the window")
+        let banner = hitView(FirstMouse { Button("Dismiss") {}.frame(width: 400, height: 120) })
+        #expect(banner?.acceptsFirstMouse(for: nil) == true, "the banner's button takes it")
     }
 
     @Test func aUnitTestHostWithoutAFolderDoesNotStart() {
