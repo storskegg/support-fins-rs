@@ -8,7 +8,8 @@ build output (target/, .dd/, .build/) of worktrees that are kept but idle.
 A worktree is removed only when all of these hold:
   - git has not touched it for --idle minutes (default 20), so an agent's live worktree is safe;
   - it has no modified or staged files, and no untracked file that isn't also on origin/main;
-  - every commit in it is on a remote branch, a merge, or inside a merged or closed PR's head;
+  - every commit in it is on origin/main, a merge, or inside a merged or closed PR's head (a pushed branch with no
+    PR yet is still someone's work in progress, so it stays);
   - it does not hold an open PR's head (that PR's author comes back to it for review fixes).
 Kept worktrees idle for --clean-after hours (default 2) lose only their build output, which rebuilds.
 Folders that are not worktrees (e.g. a demo build) are left alone, unless their name ends in `.dd`.
@@ -89,13 +90,13 @@ def main():
                                                                      or l[3:].rstrip("/") == "private-fixtures"))]
         unique = []
         if not local:
-            cand = git(wt, "rev-list", "HEAD", "--not", "--remotes", "--no-merges").split()
+            cand = git(wt, "rev-list", "HEAD", "--not", "origin/main", "--no-merges").split()
             if cand:
                 covered = set()
                 for h in done_heads:
                     if subprocess.run(["git", "-C", str(wt), "merge-base", "--is-ancestor", h, "HEAD"],
                                       capture_output=True).returncode == 0:
-                        covered |= set(git(wt, "rev-list", h, "--not", "--remotes", "--no-merges").split())
+                        covered |= set(git(wt, "rev-list", h, "--not", "origin/main", "--no-merges").split())
                 unique = [c for c in cand if c not in covered]
         if not local and not unique:
             remove.append((wt, "work is on GitHub"))
