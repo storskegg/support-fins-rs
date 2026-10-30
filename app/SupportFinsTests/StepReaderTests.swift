@@ -69,29 +69,83 @@ struct StepReaderTests {
         print("StepReaderTests timings (service read + load_step_parts):", times.joined(separator: ", "))
     }
 
+    /// How a read of one of the files that crashed the app ended. Every one is an error the window shows; none ends this
+    /// process.
+    enum Outcome: Equatable {
+        /// OpenCascade faulted: its `step-read` exited 128 + the signal (`StepReader.Failure.Reason.crashed`)
+        case crashed
+        /// OpenCascade looped until the read's timeout (`.timeout`)
+        case timeout
+        /// OpenCascade got through and said it could not read the file (the kernel's `success: false`, an exception the
+        /// shim caught): `load_step_parts` says `sf_step::UNREADABLE`
+        case refused
+        /// anything else (a dropped connection, parts, another error): a failure of the test
+        case other(String)
+    }
+
+    /// `sf_step::UNREADABLE` (crates/sf-step/src/lib.rs): what `load_step_parts` says for the kernel's `success: false`.
+    nonisolated static let unreadable = "the CAD kernel could not read this STEP file"
+
+    nonisolated static func outcome(of error: Error) -> Outcome {
+        if let failure = error as? StepReader.Failure {
+            switch failure.reason {
+            case .crashed: return .crashed
+            case .timeout: return .timeout
+            case .connection: return .other("\(error)")
+            }
+        }
+        if case .Format(let message)? = error as? FfiError, message == unreadable { return .refused }
+        return .other("\(error)")
+    }
+
+    /// The five files OpenCascade loops forever on (`crates/sf-step-xpc/tests/segv_files.rs`): always the timeout.
+    nonisolated static let hangs: Set<String> = [
+        "assembly_015.step", "loft_023.step", "pocket_018.step", "shell-and-face_017.step", "sphere_013.step",
+    ]
+
+    @Test("OpenCascade's own refusal of a file is an error the window shows, like a fault; nothing else is")
+    func outcomes() {
+        #expect(Self.outcome(of: StepReader.Failure(reason: .crashed)) == .crashed)
+        #expect(Self.outcome(of: StepReader.Failure(reason: .timeout)) == .timeout)
+        #expect(Self.outcome(of: FfiError.Format(message: Self.unreadable)) == .refused)
+        #expect(Self.outcome(of: StepReader.Failure(reason: .connection)) != .crashed)
+        #expect(Self.outcome(of: FfiError.Format(message: "no triangles in the file")) != .refused)
+        // the message the window shows for it
+        #expect(FfiError.Format(message: Self.unreadable).localizedDescription.contains(Self.unreadable))
+    }
+
     /// The 104 mutants that crashed the app and the audit's two repros: each is an error, and this process lives on.
-    /// 101 make OpenCascade fault (its `step-read` exits), 5 make it loop until the timeout ends the read (the service
-    /// kills that `step-read`).
+    /// 5 make OpenCascade loop until the timeout ends the read (the service kills that `step-read`); the others make it
+    /// fault (its `step-read` exits). Not always: some of these files make OpenCascade read memory it does not own, and
+    /// what it finds there differs from run to run. Most runs it faults (on `cone_022.step`, 33,000 runs of `step-read`:
+    /// SIGSEGV 99.1%, SIGTRAP 0.8%, SIGBUS 0.1%); now and then the read lands on mapped memory, OpenCascade gets as far as
+    /// a check of its own and refuses the file (`success: false`). That is an error the window shows too, so a file other
+    /// than the five may end either way; never otherwise, and the two repros always fault.
     @Test("every file that crashed the app is an error now")
     func filesThatCrashedTheApp() async throws {
         let files = try Self.files(in: "segv")
         #expect(files.count == 106)
-        var reasons: [StepReader.Failure.Reason: Int] = [:]
+        var outcomes: [String: Outcome] = [:]
         for f in files {
+            let name = f.lastPathComponent
             do {
                 let parts = try await CoreLoader.parts(at: f.path(percentEncoded: false), stepTimeout: .seconds(5))
-                Issue.record("\(f.lastPathComponent): \(parts.count) parts")
-            } catch let failure as StepReader.Failure {
-                reasons[failure.reason, default: 0] += 1
+                outcomes[name] = .other("\(parts.count) parts")
             } catch {
-                // OpenCascade read it after all and said why not: still an error, as the page shows it
-                Issue.record("\(f.lastPathComponent): \(error)")
+                outcomes[name] = Self.outcome(of: error)
             }
         }
-        print("StepReaderTests: \(reasons)")
-        #expect(reasons[.crashed] == 101)
-        #expect(reasons[.timeout] == 5)
-        #expect(reasons[.connection] == nil)
+        let tally = Dictionary(grouping: outcomes.values.map { "\($0)" }, by: { $0 }).mapValues(\.count)
+        print("StepReaderTests: \(tally.sorted { $0.key < $1.key })")
+        for (name, outcome) in outcomes.sorted(by: { $0.key < $1.key }) {
+            if Self.hangs.contains(name) {
+                #expect(outcome == .timeout, "\(name)")
+            } else if name.hasPrefix("step_segv_") {
+                #expect(outcome == .crashed, "\(name)")
+            } else {
+                #expect(outcome == .crashed || outcome == .refused, "\(name)")
+            }
+        }
         // and the service comes back for the next file
         let sphere = resources.appending(path: "step-fixtures/sphere.step").path(percentEncoded: false)
         #expect(try await CoreLoader.parts(at: sphere).count == 1)
