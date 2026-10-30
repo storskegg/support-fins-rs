@@ -37,6 +37,9 @@ void sfcc_set_context(const char *bytes, size_t length);
 /// The size of each half of the context buffer.
 #define SFCC_CONTEXT_CAPACITY (256 * 1024)
 
+/// How many of the six fatal signals have our handler now (6 once installed, unless code since replaced one).
+int sfcc_handlers_in_place(void);
+
 /// How many images the table holds now (the tests check it saw the process's images).
 int sfcc_image_count(void);
 

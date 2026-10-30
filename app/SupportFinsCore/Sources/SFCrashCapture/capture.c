@@ -417,6 +417,15 @@ static void image_removed(const struct mach_header *mh, intptr_t slide) {
     }
 }
 
+int sfcc_handlers_in_place(void) {
+    int n = 0;
+    for (int i = 0; i < FATAL_COUNT; i++) {
+        struct sigaction now;
+        if (sigaction(fatal_signals[i], NULL, &now) == 0 && (now.sa_flags & SA_SIGINFO) && now.sa_sigaction == handler) n++;
+    }
+    return n;
+}
+
 int sfcc_image_count(void) {
     int n = atomic_load(&image_slots);
     return n > MAX_IMAGES ? MAX_IMAGES : n;

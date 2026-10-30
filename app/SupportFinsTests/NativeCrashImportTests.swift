@@ -89,7 +89,7 @@ struct NativeCrashImportTests {
         let frames = try #require((j["signal"] as? [String: Any])?["frames"] as? [[String: Any]])
         #expect(frames.first?["symbol"] as? String == "abort" && frames.first?["symbolOffset"] as? Int == 8)
         let text = try String(contentsOf: try #require(report.files.first { $0.pathExtension == "txt" }), encoding: .utf8)
-        #expect(text.contains("Support Fins crashed (SIGSEGV)") && text.contains("abort + 8") && text.contains("sf_test_rust_panicking_stand_in + 4"), text)
+        #expect(text.contains("Support Fins crashed (SIGSEGV)") && text.contains("abort + 8") && text.contains("sf_test_rust_panicking_stand_in + 4"), "\(text)")
         #expect(text.contains("Last actions (oldest first):") && text.contains("edit: Add Fins"))
     }
 
@@ -155,7 +155,8 @@ struct NativeCrashImportTests {
     @Test func testsWriteTheirDumpsIntoAPerRunFolderOfTheirOwn() {
         let none = UserDefaults(suiteName: "sf-none-\(UUID().uuidString)")!
         let dir = CrashReporter.nativeTestFolder(environment: ["XCTestConfigurationFilePath": "/x", "SF_CRASH_RUN": "gate-123"], defaults: none)
-        #expect(dir?.standardizedFileURL == FileManager.default.temporaryDirectory.appending(path: "sf-native-crash/gate-123").standardizedFileURL)
+        #expect(dir?.standardizedFileURL.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                == FileManager.default.temporaryDirectory.appending(path: "sf-native-crash/gate-123").standardizedFileURL.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/")), "\(String(describing: dir))")
         #expect(CrashReporter.nativeTestFolder(environment: ["XCTestConfigurationFilePath": "/x", "SF_CRASH_RUN": "../../Logs"], defaults: none)?
             .standardizedFileURL.path.contains("/sf-native-crash/") == true, "a run name cannot climb out")
         #expect(CrashReporter.nativeTestFolder(environment: [:], defaults: none) == nil, "the app proper: the crash folder")
@@ -163,5 +164,6 @@ struct NativeCrashImportTests {
         let path = NativeCrashCapture.dumpPath
         #expect(path.contains("/sf-native-crash/") && !path.contains("Library/Logs"), "the test host's dump: \(path)")
         #expect(NativeCrashCapture.imageCount > 100, "the image table is filled")
+        #expect(NativeCrashCapture.handlersInPlace == 6, "every fatal signal still reaches the handler in the test host (XCTest did not replace it)")
     }
 }

@@ -21,6 +21,9 @@ public enum NativeCrashCapture {
     /// Where this process's dump would go ("" before `install`).
     public static var dumpPath: String { String(cString: sfcc_dump_path()) }
 
+    /// How many of the six fatal signals go to the handler now (6 once installed, unless something replaced one).
+    public static var handlersInPlace: Int { Int(sfcc_handlers_in_place()) }
+
     /// How many images the handler's table knows.
     public static var imageCount: Int { Int(sfcc_image_count()) }
 
