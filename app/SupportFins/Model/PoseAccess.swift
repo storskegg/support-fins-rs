@@ -41,6 +41,7 @@ extension FfiError {
     nonisolated var engineMessage: String {
         switch self {
         case .Io(let message), .Format(let message), .Engine(let message): message
+        case .LimitExceeded(_, _, _, let message): message
         case .Cancelled: "Cancelled."
         }
     }

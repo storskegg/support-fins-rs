@@ -25,10 +25,14 @@
 //! already in print space (oriented, seated on the plate).
 
 use crate::json::{self, Json};
+use crate::limits::{
+    LimitExceeded, LoadOptions, MAX_COMPONENT_DEPTH, MAX_OBJECTS_PER_PART, MAX_TRIANGLES,
+    ReadError, check_finite,
+};
 use crate::obj::ObjBbox;
 use crate::paintcode::{FilamentPainter, Paint};
 use crate::text::{decode, is_js_space, js_trim};
-use crate::zip::{ZipData, ZipFile, unzip, zip_store};
+use crate::zip::{ZipData, ZipFile, unzip_with, zip_store};
 use indexmap::{IndexMap, IndexSet};
 use sf_engine::jsnum;
 use std::collections::HashMap;
@@ -1353,6 +1357,9 @@ impl ModelParser {
                     }
                 }
                 "object" => {
+                    if self.objects.len() >= MAX_OBJECTS_PER_PART {
+                        return Err(too_many_objects());
+                    }
                     if self.strict
                         && (self.objects.contains_key(&js_string(a.get("id")))
                             || !a
@@ -1531,6 +1538,38 @@ fn parse_model_xml(xml: &str, strict: bool, with_components: bool) -> Result<Mod
 /// Model parts below this many bytes are parsed in one piece.
 const PAR_XML_MIN: usize = 4 << 20;
 
+fn too_many_objects() -> String {
+    format!(
+        "3MF: more than {MAX_OBJECTS_PER_PART} objects in one model part; the file is not a model"
+    )
+}
+
+/// How many `<object` tags `data` holds, counted in parallel (a rough count: `<objects` and text
+/// that happens to say `<object` count too). The chunked scan below holds every piece's items
+/// until it is done, so a part with a hundred thousand objects is turned away before it starts.
+fn count_object_tags(data: &[u8]) -> usize {
+    use rayon::prelude::*;
+    const CH: usize = 1 << 20;
+    const TAG: &[u8] = b"<object";
+    (0..data.len().div_ceil(CH))
+        .into_par_iter()
+        .map(|c| {
+            let (s, e) = (c * CH, ((c + 1) * CH).min(data.len()));
+            let win = &data[s..(e + TAG.len() - 1).min(data.len())];
+            let mut n = 0;
+            let mut at = 0;
+            while let Some(i) = win[at..e - s].iter().position(|&b| b == b'<') {
+                let i = at + i;
+                if win[i..].starts_with(TAG) {
+                    n += 1;
+                }
+                at = i + 1;
+            }
+            n
+        })
+        .sum()
+}
+
 /// `parse_model_xml` on a part's bytes: a big part is scanned in parallel pieces (`xmlscan`), and
 /// everything else, or anything the pieces cannot be shown to reproduce, in one sequential scan.
 /// `pieces` forces the piece count (tests).
@@ -1541,6 +1580,9 @@ fn parse_model_bytes(
     with_components: bool,
 ) -> Result<ModelPart, String> {
     use crate::xmlscan::{Item as Chunked, scan_chunks};
+    if data.len() >= PAR_XML_MIN && count_object_tags(data) > MAX_OBJECTS_PER_PART {
+        return Err(too_many_objects());
+    }
     let n = pieces.unwrap_or_else(|| {
         if data.len() < PAR_XML_MIN {
             1
@@ -1714,7 +1756,10 @@ fn bambu_component_settings(xml: Option<&str>) -> IndexMap<String, BambuObjectSe
                         attrs.get("value").cloned().unwrap_or_default(),
                     );
                     match part {
-                        Some(p) => o.parts[p].metadata.push(pair),
+                        Some(p) => match o.parts.get_mut(p) {
+                            Some(part) => part.metadata.push(pair),
+                            None => o.metadata.push(pair),
+                        },
                         None => o.metadata.push(pair),
                     }
                 }
@@ -1794,18 +1839,23 @@ fn truthy(s: &Option<String>) -> bool {
 /// id (= the component objectid), and the filament of each object and part, into `filaments`.
 /// Best-effort: absent config or unknown id just falls back to a generic label / a printing
 /// part at the call site.
+///
+/// A config whose nesting is inconsistent (an `<object>` opened inside a `<part>` and a `<metadata>`
+/// read for a part that is no longer there) is an error, not a panic (audit S-02).
 fn parse_bambu_config(
     config_xml: Option<&str>,
     filaments: &mut Filaments,
-) -> (IndexMap<String, String>, RootParts) {
+) -> Result<(IndexMap<String, String>, RootParts), String> {
     let mut names: IndexMap<String, String> = IndexMap::new();
     let mut parts: RootParts = IndexMap::new();
     let Some(xml) = config_xml.filter(|x| !x.is_empty()) else {
-        return (names, parts);
+        return Ok((names, parts));
     };
     let mut cur_id: Option<String> = None;
     let mut cur_part: Option<RoleProto> = None;
     let mut cur_part_key: Option<String> = None; // where `curPart` is stored in `parts`
+    let mut cur_part_root: Option<String> = None; // ... under which root object
+    let mut bad = false;
     let mut cur_part_id: Option<String> = None;
     let _ = scan_xml(xml, &mut |ev| {
         match ev {
@@ -1851,14 +1901,16 @@ fn parse_bambu_config(
                         let root = cur_id.clone().unwrap();
                         let key = js_string(a.get("id"));
                         parts
-                            .entry(root)
+                            .entry(root.clone())
                             .or_default()
                             .insert(key.clone(), p.clone());
                         cur_part_key = Some(key);
+                        cur_part_root = Some(root);
                     }
                     if self_closing {
                         cur_part = None;
                         cur_part_key = None;
+                        cur_part_root = None;
                     }
                 } else if t == "metadata"
                     && truthy(&cur_id)
@@ -1866,8 +1918,13 @@ fn parse_bambu_config(
                     && a.get("value").is_some_and(|v| !v.is_empty())
                 {
                     let value = a.get("value").unwrap();
-                    if let (Some(_), Some(key)) = (&cur_part, &cur_part_key) {
-                        let p = parts[cur_id.as_ref().unwrap()].get_mut(key).unwrap();
+                    if let (Some(_), Some(key), Some(root)) =
+                        (&cur_part, &cur_part_key, &cur_part_root)
+                    {
+                        let Some(p) = parts.get_mut(root).and_then(|m| m.get_mut(key)) else {
+                            bad = true;
+                            return Err(String::new());
+                        };
                         if p.name.is_empty() {
                             p.name = strip_ext(value);
                         }
@@ -1886,9 +1943,19 @@ fn parse_bambu_config(
                         a.get("key").unwrap().clone(),
                         a.get("value").cloned().unwrap_or_default(),
                     );
-                    let key = cur_part_key.clone().unwrap();
-                    let p = parts[cur_id.as_ref().unwrap()].get_mut(&key).unwrap();
-                    p.settings.bambu.as_mut().unwrap().push(pair);
+                    let (Some(key), Some(root)) = (&cur_part_key, &cur_part_root) else {
+                        bad = true;
+                        return Err(String::new());
+                    };
+                    let Some(bambu) = parts
+                        .get_mut(root)
+                        .and_then(|m| m.get_mut(key))
+                        .and_then(|p| p.settings.bambu.as_mut())
+                    else {
+                        bad = true;
+                        return Err(String::new());
+                    };
+                    bambu.push(pair);
                 }
             }
             XmlEvent::Close(tag) => match local(tag) {
@@ -1896,6 +1963,7 @@ fn parse_bambu_config(
                 "part" => {
                     cur_part = None;
                     cur_part_key = None;
+                    cur_part_root = None;
                     cur_part_id = None;
                 }
                 _ => {}
@@ -1903,7 +1971,14 @@ fn parse_bambu_config(
         }
         Ok(())
     });
-    (names, parts)
+    if bad {
+        return Err(
+            "3MF: Metadata/model_settings.config is inconsistent (a part's settings \
+                    outside the part)"
+                .to_string(),
+        );
+    }
+    Ok((names, parts))
 }
 
 /// Port of `addPrusa3Parts` (web/threemf.js:792-818): PrusaSlicer 3's
@@ -2167,6 +2242,9 @@ struct Emit<'a> {
     extra: IndexMap<RoleKey, Soup>,
     /// `withComponents`: one record per leaf mesh occurrence, for the build item being read
     components: Option<Vec<CompRec>>,
+    /// triangles emitted so far, over every build item (the running guard of the 20M limit)
+    emitted: u64,
+    allow_large: bool,
 }
 
 /// One leaf mesh occurrence while `emitObject` runs (`record` in web/threemf.js `emitObject`);
@@ -2238,6 +2316,51 @@ fn vert(verts: &[f64], o: f64) -> f64 {
     }
 }
 
+/// The refusal of a component chain deeper than [`MAX_COMPONENT_DEPTH`] (audit X-02).
+fn depth_error() -> ReadError {
+    format!("3MF: components are nested more than {MAX_COMPONENT_DEPTH} levels deep; the file is not a model")
+        .into()
+}
+
+/// How many triangles `emit_object` would emit for object `id` of `path` (every triangle of every
+/// occurrence, a DAG re-expanded at each reference as the emit does), without emitting any. A
+/// memo makes this linear in the number of objects however large the answer is (saturating).
+/// Skip-type objects count 0; a cycle edge counts 0, as the emit's `seen` makes it.
+fn count_tris(
+    e: &mut Emit,
+    path: &str,
+    id: &str,
+    memo: &mut HashMap<(String, String), u64>,
+    visiting: &mut IndexSet<(String, String)>,
+) -> Result<u64, ReadError> {
+    let key = (path.to_string(), id.to_string());
+    if let Some(&n) = memo.get(&key) {
+        return Ok(n);
+    }
+    if visiting.contains(&key) {
+        return Ok(0);
+    }
+    if visiting.len() >= MAX_COMPONENT_DEPTH {
+        return Err(depth_error());
+    }
+    let part = e.get_part(path)?;
+    let Some(obj) = part.as_ref().and_then(|p| p.objects.get(id)) else {
+        return Ok(0);
+    };
+    if is_skip_type(&obj.typ) {
+        return Ok(0);
+    }
+    visiting.insert(key.clone());
+    let mut n = (obj.tris.len() / 3) as u64;
+    for c in &obj.components {
+        let child_path = c.path.as_deref().map_or(path, part_name).to_string();
+        n = n.saturating_add(count_tris(e, &child_path, &c.objectid, memo, visiting)?);
+    }
+    visiting.shift_remove(&key);
+    memo.insert(key, n);
+    Ok(n)
+}
+
 /// Port of `emitObject` (web/threemf.js:877-967): flatten one object (mesh or assembly) into the
 /// sinks as a triangle soup, applying `m`. `path` is the part file the id lives in. A component
 /// may point at a DIFFERENT part via p:path, so id lookup and cycle detection are both keyed by
@@ -2270,7 +2393,7 @@ fn emit_object(
     mut fil: f64,
     route: &[usize],
     part_id: Option<&str>,
-) -> Result<(), String> {
+) -> Result<(), ReadError> {
     let part = e.get_part(path)?;
     let Some(obj) = part.as_ref().and_then(|p| p.objects.get(id)) else {
         stats.missing += 1; // dangling ref: a broken file
@@ -2293,9 +2416,16 @@ fn emit_object(
     {
         e.arena[r].name = strip_ext(&obj.name);
     }
+    if seen.len() >= MAX_COMPONENT_DEPTH {
+        return Err(depth_error());
+    }
     seen.insert(key.clone());
 
     let (verts, tris) = (&obj.verts, &obj.tris);
+    e.emitted = e.emitted.saturating_add((tris.len() / 3) as u64);
+    if !e.allow_large && e.emitted > MAX_TRIANGLES {
+        return Err(LimitExceeded::triangles(e.emitted).into());
+    }
     let at_root = path == e.root_name;
     let ranges: Option<Vec<PrusaVol>> = if role.is_some() || !at_root {
         None
@@ -2666,17 +2796,44 @@ pub struct ThreeMf {
 /// Port of `readThreeMF` (web/threemf.js:1056-1059): read a .3mf package into per-object
 /// triangle soups in millimetres. JS is `async` only for `unzip`'s inflate.
 pub fn read_three_mf(bytes: &[u8]) -> Result<ThreeMf, String> {
-    read_package(bytes, true)
+    read_package(bytes, true, &LoadOptions::default()).map_err(String::from)
 }
 
 /// `read_three_mf` without the merged soup: `positions` is left empty (a caller that takes the
 /// objects one by one has no use for the second copy of every triangle).
 pub fn read_three_mf_unmerged(bytes: &[u8]) -> Result<ThreeMf, String> {
-    read_package(bytes, false)
+    read_package(bytes, false, &LoadOptions::default()).map_err(String::from)
 }
 
-fn read_package(bytes: &[u8], merge: bool) -> Result<ThreeMf, String> {
-    let mut parts = unzip(bytes)?;
+/// [`read_three_mf_unmerged`] with the load options (`allow_large`), and the load-anyway limits
+/// as a [`ReadError::Limit`] instead of a message. The limits are checked before the work they
+/// guard: the ZIP's declared sizes before anything is inflated, the triangle count of the whole
+/// build before anything is emitted.
+pub fn read_three_mf_unmerged_with(bytes: &[u8], opts: &LoadOptions) -> Result<ThreeMf, ReadError> {
+    read_package(bytes, false, opts).and_then(finite)
+}
+
+/// [`read_three_mf`] with the load options.
+pub fn read_three_mf_with(bytes: &[u8], opts: &LoadOptions) -> Result<ThreeMf, ReadError> {
+    read_package(bytes, true, opts).and_then(finite)
+}
+
+/// Refuse a package whose geometry has a coordinate that is not a number (audit X-07). Only the
+/// hostile-input-safe entries do: the JS carries a missing vertex on as NaN, and the parity
+/// corpus pins that.
+fn finite(m: ThreeMf) -> Result<ThreeMf, ReadError> {
+    for o in &m.objects {
+        check_finite(&o.positions, "this 3MF")?;
+        for x in &o.extras {
+            check_finite(&x.positions, "this 3MF")?;
+        }
+    }
+    check_finite(&m.positions, "this 3MF")?;
+    Ok(m)
+}
+
+fn read_package(bytes: &[u8], merge: bool, load: &LoadOptions) -> Result<ThreeMf, ReadError> {
+    let mut parts = unzip_with(bytes, load)?;
     // The root model part is by far the biggest thing in the package (633 MB of XML for a plate
     // of 7.7M triangles). Parse it now and let go of its bytes before the soups are built.
     let pre = match find_root_part(&parts) {
@@ -2687,7 +2844,7 @@ fn read_package(bytes: &[u8], merge: bool) -> Result<ThreeMf, String> {
         }
         _ => None,
     };
-    read_three_mf_core(&parts, &ReadOpts::default(), pre, merge)
+    read_three_mf_core(&parts, &ReadOpts::default(), load, pre, merge)
 }
 
 /// The options object of `readThreeMFParts`; `Default` is the JS defaults.
@@ -2713,7 +2870,7 @@ pub fn read_three_mf_parts(
     parts: &IndexMap<String, Vec<u8>>,
     opts: &ReadOpts,
 ) -> Result<ThreeMf, String> {
-    read_three_mf_core(parts, opts, None, true)
+    read_three_mf_core(parts, opts, &LoadOptions::default(), None, true).map_err(String::from)
 }
 
 /// `read_three_mf_parts`, with the root model part optionally parsed already (`pre`: its name and
@@ -2721,14 +2878,15 @@ pub fn read_three_mf_parts(
 fn read_three_mf_core(
     parts: &IndexMap<String, Vec<u8>>,
     opts: &ReadOpts,
+    load: &LoadOptions,
     pre: Option<(String, ModelPart)>,
     merge: bool,
-) -> Result<ThreeMf, String> {
+) -> Result<ThreeMf, ReadError> {
     let strict = opts.build_index.is_some();
     let root_name = match (&pre, find_root_part(parts)) {
         (Some((n, _)), _) => n.clone(),
         (None, Some(n)) if parts.contains_key(&n) => n,
-        _ => return Err("no 3D model part found in this 3MF".to_string()),
+        _ => return Err("no 3D model part found in this 3MF".into()),
     };
 
     let mut e = Emit {
@@ -2747,6 +2905,8 @@ fn read_three_mf_core(
         },
         extra: IndexMap::new(),
         components: None,
+        emitted: 0,
+        allow_large: load.allow_large,
     };
     if let Some((name, part)) = pre {
         e.parsed.insert(name, Some(Rc::new(part)));
@@ -2756,7 +2916,7 @@ fn read_three_mf_core(
     let scale = unit_mm(&unit).unwrap_or(1.0);
     let text = |name: &str| parts.get(name).map(|d| decode(d));
     let bambu = text("Metadata/model_settings.config");
-    let (names, mut slicer_parts) = parse_bambu_config(bambu.as_deref(), &mut e.filaments);
+    let (names, mut slicer_parts) = parse_bambu_config(bambu.as_deref(), &mut e.filaments)?;
     let component_settings = opts
         .with_components
         .then(|| bambu_component_settings(bambu.as_deref()));
@@ -2811,6 +2971,29 @@ fn read_three_mf_core(
             .collect()
     };
 
+    // The whole build's triangle count, before a triangle is emitted: a few hundred bytes of
+    // components can expand to billions (audit X-03).
+    if !load.allow_large {
+        let mut memo = HashMap::new();
+        let mut total = 0u64;
+        for (index, item) in roots.iter().enumerate() {
+            if opts.build_index.is_some_and(|b| index != b) {
+                continue;
+            }
+            let n = count_tris(
+                &mut e,
+                &root_name,
+                &item.objectid,
+                &mut memo,
+                &mut IndexSet::new(),
+            )?;
+            total = total.saturating_add(n);
+        }
+        if total > MAX_TRIANGLES {
+            return Err(LimitExceeded::triangles(total).into());
+        }
+    }
+
     let mut objects: Vec<ThreeMfObject> = Vec::new();
     let (mut agg_meshes, mut agg_skipped, mut agg_dropped) = (0, 0, 0);
     for (index, item) in roots.iter().enumerate() {
@@ -2851,7 +3034,7 @@ fn read_three_mf_core(
             None,
         )?;
         if strict && (stats.missing != 0 || stats.dropped != 0 || stats.cycles != 0) {
-            return Err("selected object has missing resources, cyclic components or invalid triangle references".to_string());
+            return Err("selected object has missing resources, cyclic components or invalid triangle references".into());
         }
         // Fold stats first: a build item that was ALL support/dangling emits nothing
         // but its skipped count still has to be reported, not dropped with the item.
@@ -2964,7 +3147,7 @@ fn read_three_mf_core(
     }
 
     if objects.is_empty() {
-        return Err("this 3MF contains no printable mesh geometry".to_string());
+        return Err("this 3MF contains no printable mesh geometry".into());
     }
 
     let positions = if !merge {

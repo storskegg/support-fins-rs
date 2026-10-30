@@ -24,8 +24,8 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   never a partial one. A finished job whose generation is stale is still dropped without being
   delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
   build is byte-identical to one that was never cancellable.
-- **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled}`) carrying the JS-identical
-  message where one exists.
+- **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled, LimitExceeded}`) carrying the JS-identical
+  message where one exists. `LimitExceeded` is the one a host answers rather than shows: see "Load limits".
 
 ## Surface (M4a; extended in M4b)
 
@@ -40,6 +40,8 @@ impl GpuBuffer { fn address(&self) -> u64; fn len_bytes(&self) -> u64; fn stride
 fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF / STEP (one Part per object, negative parts cut out as ui/io.js does). STEP (.step/.stp, or any file whose content is "ISO-10303-21;") goes through sf-step: OpenCascade 7.6.1 at 0.01 mm / 0.1 rad as web/step.js, the assembly tree picks the objects (stepObjects), names come from the file, import_note is "STEP: [imported “X” of N objects; ]tessellated at 0.01 mm." A build without OpenCascade fails the load with "STEP import is not available in this build ...": the app's own build (sf-step's `occt` feature off, X-01; the app reads STEP with the two functions below)
 fn reads_as_step(path: String) -> Result<bool, FfiError>;  // X-01: whether load_parts would read the file as STEP (not named .stl/.obj/.3mf; named .step/.stp, or its first 64 bytes start "ISO-10303-21;"). Io error when it cannot be read
 fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiError>;  // X-01: the parts of a STEP file from the StepReader XPC service's read (`kernel`: sf_step::wire bytes), the parts load_parts makes of it in process; the bytes are decoded as untrusted (Format "the STEP reader sent back a malformed result"; a tree with an index out of range or a cycle is "the CAD kernel could not read this STEP file")
+fn load_parts_with(path: String, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError>;  // load_parts with the load options ("Load limits" below); load_parts is load_parts_with(path, LoadOptions { allow_large: false })
+fn load_step_parts_with(path: String, kernel: Vec<u8>, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError>;  // load_step_parts with the load options: the STEP's parts get the same limits as load_parts_with (finite coordinates; a part over 2 m is LimitExceeded unless allow_large)
 fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; note "merged N of TOTAL objects into one part" (TOTAL = object_count, the file's); one part returns itself
 fn scale_from_percent_text(text: String) -> Option<f64>;  // M6: scaleFromPercent(Number(text)): 10-1000 % clamped, rounded to the field's 2 decimals; None for junk, empty or <= 0
 fn scale_percent_text(factor: f64) -> String;               // M6: the field's text, +(factor * 100).toFixed(2) as JS prints it ("150", "33.33")
@@ -130,6 +132,47 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
 - **`export_file_name(base, kind, nozzle, layer_height) -> String`** is the name the page suggests
   (`ui/export.js` `plateName`, `exportName`): `{base}-fins-0.4nozzle-0.2layer.stl`, `...3mf`, `{base}-fins-only-...stl`;
   a setting that is not positive is left out. `kind` is `ExportKind::{Stl, ThreeMf, FinsOnly}`.
+
+## Load limits (hostile input, audit X-02 to X-07, S-02)
+
+`load_parts` / `load_parts_with` run the whole parse on a thread of their own with an 8 MiB stack (the caller may be a
+512 KiB cooperative-pool thread), and every limit below is checked before the work it guards.
+
+**Always refused** (`FfiError::Format`, a message, no override): component nesting deeper than 64 ("3MF: components are
+nested more than 64 levels deep"); more than 50,000 `<object>`s in one model part; JSON nested deeper than 128 (a 3MF
+session is then unreadable, so the file loads as a plain part, as for any unreadable session); ZIP entries that share
+bytes ("corrupt ZIP: entries overlap"); a coordinate that is not a number in an STL, OBJ, 3MF or STEP ("this STL has a
+coordinate that is not a number (triangle N); the file is damaged"). A malformed Bambu `model_settings.config` no longer
+panics (an `<object>` opened inside a `<part>` is read as the JS reads it).
+
+**Load anyway** (`FfiError::LimitExceeded`; `load_parts_with(path, LoadOptions { allow_large: true })` skips them):
+
+| `kind` | `estimate` | `limit` | hit when |
+|---|---|---|---|
+| `Triangles` | triangles after component expansion | 20,000,000 | an STL header, an OBJ, or a 3MF's whole build would emit more; a 3MF is counted from its object graph (memoised, so a 1 KB fan-out to 10^9 is counted, not expanded) before a triangle is emitted |
+| `Bytes` | bytes the archive claims to unpack to | 2,147,483,648 (2 GiB) | the central directory's sizes (each capped at what its data could give, 1032:1) add up to more, checked before anything is inflated; a stream that outgrows its claim stops at the running budget |
+| `Dimension` | the largest side of a part's box, mm | 2000 | any part of the file is wider than 2 m (checked after the parse, in `load_parts_with`, on each part's positions) |
+
+```rust
+#[derive(uniffi::Record)] struct LoadOptions { allow_large: bool /* default false */ }
+#[derive(uniffi::Enum)]   enum LimitKind { Triangles, Bytes, Dimension }
+FfiError::LimitExceeded { kind: LimitKind, estimate: f64, limit: f64, message: String }
+```
+
+`message` is a sentence the host can show as is ("this file expands to about 1,000,000,000 triangles (over 20,000,000)",
+"this file unpacks to about 3.2 GB (over 2.1 GB)", "this model is 7,600,000 mm across (over 2,000 mm)"). The
+host's flow: call `load_parts` (or `load_parts_with` with the default options); on `LimitExceeded` ask "Load anyway?"
+(Cancel the default) naming the `kind` and `estimate`; on yes call `load_parts_with(path, LoadOptions { allow_large: true })`.
+The constants are `sf_io::limits::{MAX_TRIANGLES, MAX_DECOMPRESSED_BYTES, MAX_DIMENSION_MM, MAX_COMPONENT_DEPTH,
+MAX_JSON_DEPTH, MAX_OBJECTS_PER_PART}` and will be tuned; the host should read `limit` from the error, not hard-code it.
+Estimates are what the file needs, so a refused file costs a few milliseconds and no allocation: peak RSS on every hostile
+input of the audit stays under 30 MB (`crates/sf-ffi/examples/limits_probe.rs`). Reaching a limit says nothing about
+whether a *build* of a large part will be fast: a 7.7 M-triangle file loads in about 1.2 s and 2.3 GB.
+
+The CLI takes `--allow-large` (not in `--help`, which stays the JS's text for `cli-parity`); its refusal lines end
+"; pass --allow-large to load it anyway". The Rust readers: `sf_io::{stl::read_stl_with, obj::read_obj_with,
+threemf::read_three_mf_unmerged_with, threemf::read_three_mf_with, zip::unzip_with}(bytes, &LoadOptions)`, returning
+`ReadError::{Msg, Limit}`; the old entries keep their signatures and apply the size limits with the default options, but only the `_with` entries refuse a coordinate that is not a number (the JS carries NaN on, and the parity corpora pin it); the loader and the CLI use the `_with` ones.
 
 ## M4b additions: orientation suggestions, strength, readout data
 

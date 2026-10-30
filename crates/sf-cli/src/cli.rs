@@ -9,10 +9,11 @@
 use sf_engine::jsnum;
 use sf_engine::types::Xyz;
 use sf_io::json::Json;
-use sf_io::obj::read_obj;
-use sf_io::stl::{read_stl, write_binary_stl};
-use sf_io::threemf::{ExtraPart, PartKind, ThreeMfOpts, read_three_mf, write_three_mf};
-use sf_io::zip::unzip;
+use sf_io::limits::{LoadOptions, ReadError, check_dimension, check_finite};
+use sf_io::obj::read_obj_with;
+use sf_io::stl::{read_stl_with, write_binary_stl};
+use sf_io::threemf::{ExtraPart, PartKind, ThreeMfOpts, read_three_mf_with, write_three_mf};
+use sf_io::zip::unzip_with;
 
 use crate::entry::{
     EngineOptions, compute_fins, nozzle_choice, option_visible, options_from_dialog, report_line,
@@ -221,6 +222,9 @@ pub struct Args {
     pub overwrite: bool,
     pub resume: bool,
     pub cache_dir: Option<String>,
+    /// `--allow-large` (not in the JS): load past the "Load anyway?" limits of `sf_io::limits`
+    /// (20 million triangles, 2 GiB unpacked, a side over 2 m)
+    pub allow_large: bool,
 }
 
 impl Args {
@@ -322,6 +326,7 @@ pub fn parse_args(argv: &[String]) -> Result<Args, ArgError> {
             "--disable-native-supports",
             "--overwrite",
             "--resume",
+            "--allow-large",
         ]
         .contains(&a.as_str())
         {
@@ -335,6 +340,7 @@ pub fn parse_args(argv: &[String]) -> Result<Args, ArgError> {
                 "--list-plates" => out.list_plates = true,
                 "--disable-native-supports" => out.disable_native_supports = true,
                 "--overwrite" => out.overwrite = true,
+                "--allow-large" => out.allow_large = true,
                 _ => out.resume = true,
             }
         } else if a.starts_with("--") {
@@ -502,18 +508,41 @@ fn plural(n: usize, one: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
 }
 
-/// Port of `readPart` (cli.js:218-250).
+/// The CLI's words for a refusal: a load-anyway limit says how to override it.
+fn load_refusal(e: ReadError) -> String {
+    match e {
+        ReadError::Limit(l) => format!("{l}; pass --allow-large to load it anyway"),
+        ReadError::Msg(m) => m,
+    }
+}
+
+/// Port of `readPart` (cli.js:218-250), then the hostile-input checks of `sf_io::limits`: a
+/// coordinate that is not a number is refused, a side over 2 m needs `--allow-large`.
 fn read_part(
     path: &str,
     bytes: &[u8],
     object: Option<&str>,
     warn: &dyn Fn(&str),
+    load: &LoadOptions,
+) -> Result<Read, String> {
+    let read = read_part_unchecked(path, bytes, object, warn, load)?;
+    check_finite(&read.positions, "this file")?;
+    check_dimension(&read.positions, load).map_err(|l| load_refusal(l.into()))?;
+    Ok(read)
+}
+
+fn read_part_unchecked(
+    path: &str,
+    bytes: &[u8],
+    object: Option<&str>,
+    warn: &dyn Fn(&str),
+    load: &LoadOptions,
 ) -> Result<Read, String> {
     let lower = path.to_ascii_lowercase();
     if lower.ends_with(".3mf") {
         // Our own export holds part + fins as one object: finning it would put fins under the old
         // fins. Refuse rather than print that.
-        let parts = unzip(bytes)?;
+        let parts = unzip_with(bytes, load).map_err(load_refusal)?;
         if let Some(model) = parts.get("3D/3dmodel.model")
             && String::from_utf8_lossy(model)
                 .contains("<metadata name=\"Application\">Support Fins</metadata>")
@@ -522,7 +551,7 @@ fn read_part(
                 "already has fins (a Support Fins export): fin the original part instead".into(),
             );
         }
-        let m = read_three_mf(bytes)?;
+        let m = read_three_mf_with(bytes, load).map_err(load_refusal)?;
         let objs: Vec<Obj> = m
             .objects
             .iter()
@@ -577,13 +606,14 @@ fn read_part(
     }
     if lower.ends_with(".stl") {
         return Ok(Read {
-            positions: read_stl(bytes).map_err(|e| e.0)?,
+            positions: read_stl_with(bytes, load).map_err(load_refusal)?,
             slicer: None,
         });
     }
     if lower.ends_with(".obj") {
         // OBJ has no unit (read as mm); several `o` objects pick like a 3MF plate's
-        let objs: Vec<Obj> = read_obj(bytes)?
+        let objs: Vec<Obj> = read_obj_with(bytes, load)
+            .map_err(load_refusal)?
             .objects
             .into_iter()
             .map(|o| Obj {
@@ -728,7 +758,16 @@ pub fn fin_file(
         return Err("won't overwrite the input; pick another -o".into());
     }
     let warn_line = |line: &str| io.err(&format!("support-fins: {input}: warning: {line}"));
-    let read = read_part(input, &io.read(input)?, args.object.as_deref(), &warn_line)?;
+    let load = LoadOptions {
+        allow_large: args.allow_large,
+    };
+    let read = read_part(
+        input,
+        &io.read(input)?,
+        args.object.as_deref(),
+        &warn_line,
+        &load,
+    )?;
     let posed = pose(&read.positions, args.rot);
     let r = compute_fins(&posed, engine)?;
     let base = input.rsplit(['/', '\\']).next().unwrap_or("");

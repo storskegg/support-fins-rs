@@ -2,6 +2,7 @@
 //!
 //! `read_stl` (M0) and `write_binary_stl` (M1).
 
+use crate::limits::{LimitExceeded, LoadOptions, MAX_TRIANGLES, ReadError, check_finite};
 use crate::text::{decode, is_js_space};
 use sf_engine::jsnum;
 
@@ -44,6 +45,20 @@ fn has_facet(head: &str) -> bool {
 /// returns those same f32 values widened to f64 (`v as f64`), so the engine sees exactly
 /// the numbers JS sees.
 pub fn read_stl(bytes: &[u8]) -> Result<Vec<f64>, StlError> {
+    read_stl_core(bytes, &LoadOptions { allow_large: true }).map_err(|e| StlError(e.to_string()))
+}
+
+/// [`read_stl`] as a hostile-input-safe load: also refuses a coordinate that is not finite
+/// (binary NaN/inf, or an ASCII number that overflows `f32`; audit X-07) and a file of more than
+/// [`MAX_TRIANGLES`] triangles unless `allow_large` (X-03; checked on the binary header's count
+/// before anything is read).
+pub fn read_stl_with(bytes: &[u8], opts: &LoadOptions) -> Result<Vec<f64>, ReadError> {
+    let pos = read_stl_core(bytes, opts)?;
+    check_finite(&pos, "this STL")?;
+    Ok(pos)
+}
+
+fn read_stl_core(bytes: &[u8], opts: &LoadOptions) -> Result<Vec<f64>, ReadError> {
     let head = decode(&bytes[..bytes.len().min(1024)]);
     let looks_ascii = starts_with_solid(&head) && has_facet(&head);
     if bytes.len() >= HEADER + 4 {
@@ -51,7 +66,10 @@ pub fn read_stl(bytes: &[u8]) -> Result<Vec<f64>, StlError> {
         let need = HEADER + 4 + n * PER_TRI;
         if bytes.len() == need || (n > 0 && bytes.len() > need && !looks_ascii) {
             if n == 0 {
-                return Err(StlError("STL has no triangles".into()));
+                return Err("STL has no triangles".into());
+            }
+            if !opts.allow_large && n as u64 > MAX_TRIANGLES {
+                return Err(LimitExceeded::triangles(n as u64).into());
             }
             let mut pos = Vec::with_capacity(n * 9);
             for f in 0..n {
@@ -65,12 +83,16 @@ pub fn read_stl(bytes: &[u8]) -> Result<Vec<f64>, StlError> {
         }
     }
     if !starts_with_solid(&head) {
-        return Err(StlError(
+        return Err(
             "not an STL: too short for binary and no \"solid\" line for ASCII (truncated file?)"
                 .into(),
-        ));
+        );
     }
-    read_ascii_stl(&decode(bytes))
+    let pos = read_ascii_stl(&decode(bytes)).map_err(|e| ReadError::Msg(e.0))?;
+    if !opts.allow_large && (pos.len() / 9) as u64 > MAX_TRIANGLES {
+        return Err(LimitExceeded::triangles((pos.len() / 9) as u64).into());
+    }
+    Ok(pos)
 }
 
 /// Port of `readAsciiSTL` (web/stl.js:103-116): scans `/\bvertex\s+(\S+)\s+(\S+)\s+(\S+)/gi`

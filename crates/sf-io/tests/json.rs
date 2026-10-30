@@ -86,3 +86,56 @@ fn negative_zero_survives_parse() {
     };
     assert_eq!(n.to_bits(), (-0.0f64).to_bits());
 }
+
+// ---- hostile input (audit X-05, X-06) ----
+
+fn nest(n: usize) -> String {
+    format!("{}1{}", "[".repeat(n), "]".repeat(n))
+}
+
+#[test]
+fn nesting_is_capped_at_128() {
+    assert!(parse(&nest(128)).is_some());
+    assert!(parse(&nest(129)).is_none());
+    // objects count too, and mixed
+    let mut deep = String::new();
+    for _ in 0..129 {
+        deep.push_str("{\"a\":[");
+    }
+    assert!(parse(&deep).is_none());
+    // a deep file is an Err, not a stack overflow, and drops without recursing past the cap
+    assert!(parse(&nest(1_000_000)).is_none());
+}
+
+#[test]
+fn a_duplicate_key_replaces_in_place_in_a_big_object_too() {
+    // past the 16 keys where lookup switches from a scan to a hash
+    let mut s = String::from("{");
+    for i in 0..40 {
+        s.push_str(&format!("\"k{i}\":{i},"));
+    }
+    s.push_str("\"k3\":\"again\",\"k39\":\"last\"}");
+    let j = parse(&s).unwrap();
+    let Json::Obj(kv) = &j else { panic!() };
+    assert_eq!(kv.len(), 40);
+    assert_eq!(kv[3], ("k3".to_string(), Json::Str("again".into())));
+    assert_eq!(kv[39].1, Json::Str("last".into()));
+    assert_eq!(kv[0].0, "k0");
+}
+
+#[test]
+fn an_object_of_200000_keys_parses_fast() {
+    let mut s = String::from("{");
+    for i in 0..200_000 {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(&format!("\"key{i}\":{i}"));
+    }
+    s.push('}');
+    let t = std::time::Instant::now();
+    let j = parse(&s).unwrap();
+    assert!(t.elapsed().as_secs_f64() < 2.0, "{:?}", t.elapsed());
+    let Json::Obj(kv) = j else { panic!() };
+    assert_eq!(kv.len(), 200_000);
+}
