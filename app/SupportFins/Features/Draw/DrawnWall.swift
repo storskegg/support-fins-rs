@@ -27,19 +27,13 @@ struct DrawnWall: Equatable, Identifiable, Sendable {
 
     /// The `walls_json` entry (docs/FFI.md, "M6 additions: Draw").
     var json: String {
-        func v(_ p: SIMD3<Double>) -> String { "[\(Self.number(p.x)),\(Self.number(p.y)),\(Self.number(p.z))]" }
+        func v(_ p: SIMD3<Double>) -> String { "[\(JS.number(p.x)),\(JS.number(p.y)),\(JS.number(p.z))]" }
         switch kind {
         case .wall:
             return "{\"kind\":\"wall\",\"a\":\(v(a)),\"b\":\(v(b))" + (m.map { ",\"m\":\(v($0))" } ?? "") + "}"
         case .sway:
             return "{\"kind\":\"sway\",\"a\":\(v(a)),\"face\":\(face),\"capped\":\(capped)}"
         }
-    }
-
-    /// A finite double as the shortest JSON text that reads back as the same value.
-    private static func number(_ x: Double) -> String {
-        if x == x.rounded(), abs(x) < 1e15 { return String(Int64(x)) }
-        return "\(x)"
     }
 }
 

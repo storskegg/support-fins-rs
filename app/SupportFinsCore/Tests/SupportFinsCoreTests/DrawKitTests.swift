@@ -4,16 +4,6 @@ import Testing
 
 @testable import SupportFinsCore
 
-private func modelPath(_ name: String) throws -> String {
-    var url = URL(fileURLWithPath: #filePath)
-    for _ in 0..<5 { url.deleteLastPathComponent() }
-    let upstream = try String(contentsOf: url.appendingPathComponent("UPSTREAM"), encoding: .utf8)
-    let line = try #require(upstream.split(separator: "\n").first { $0.hasPrefix("checkout=") })
-    var root = String(line.dropFirst("checkout=".count)).trimmingCharacters(in: .whitespaces)
-    if root.hasPrefix("~") { root = NSHomeDirectory() + root.dropFirst() }
-    return root + "/prototype/stress/models/\(name).stl"
-}
-
 private let settings = """
 {"tines":true,"tineDensity":1,"layerHeight":0.2,"plateOnly":false,"tallRibs":true,\
 "sway":{"gripFrom":0,"tineSpacing":6,"reach":0.15,"uncappedDepth":false,"crossRise":0.5}}

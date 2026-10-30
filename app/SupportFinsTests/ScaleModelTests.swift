@@ -10,14 +10,6 @@ import Viewer
 @MainActor
 @Suite("Scale")
 struct ScaleModelTests {
-    private func eventually(_ what: String, _ condition: () -> Bool) async throws {
-        for _ in 0..<1000 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("timed out: \(what)")
-    }
-
     private func window() async throws -> (ViewerModel, ScaleFeature) {
         let host = ViewerModel()
         try #require(host.controller != nil, "no Metal device")

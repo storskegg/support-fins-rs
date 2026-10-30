@@ -11,18 +11,10 @@ import simd
 @MainActor
 @Suite("Draw", .serialized)
 struct DrawModelTests {
-    private func eventually(_ what: String, _ condition: () -> Bool) async throws {
-        for _ in 0..<1500 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("timed out: \(what)")
-    }
-
     /// A click, and the engine answer it waits for (a wall or brace check runs off the main thread).
     private func click(_ draw: DrawModel, _ p: ViewerController.HandPointer) async throws {
         draw.pointerClicked(p)
-        try await eventually("the click's check") { !draw.clickPending }
+        try await eventually("the click's check", tries: 1500) { !draw.clickPending }
     }
 
     /// A window with a T-shaped part open (a stem under a slab: the slab's underside is an overhang), fins on, Draw mode.
@@ -41,7 +33,7 @@ struct DrawModelTests {
         window.session.perform("Add Fins") { window.session.finsOn = true }
         let draw = try #require(window.features[DrawFeature.self]).model
         draw.sync()
-        if draw.drawShown || draw.drawActive || draw.braceActive { try await eventually("the kit") { draw.kitReady } }
+        if draw.drawShown || draw.drawActive || draw.braceActive { try await eventually("the kit", tries: 1500) { draw.kitReady } }
         let part = try #require(window.session.parts.first).part
         let kit = try DrawKit(part: part, rot: window.session.pose.columnMajor, thresholdDeg: s.threshold,
                               settingsJson: s.drawSettingsJSON(), tunablesJson: s.tunablesJSON())
@@ -86,11 +78,11 @@ struct DrawModelTests {
         #expect(wall.kind == .wall && wall.m == nil)
         // the wall is stored in the part's own frame; the identity pose seats it on the plate
         #expect(abs(wall.a.x + 12) < 1e-6 && abs(wall.b.x - 12) < 1e-6 && abs(wall.a.y - 12) < 1e-6)
-        try await eventually("the sweep") { draw.outcomes[wall.id] != nil }
+        try await eventually("the sweep", tries: 1500) { draw.outcomes[wall.id] != nil }
         let o = try #require(draw.outcomes[wall.id])
         #expect(o.ok && o.length > 20 && o.triEnd > o.triStart)
         // the wall is on the viewer
-        try await eventually("the wall on the viewer") { c.renderer.drawScene?.walls != nil }
+        try await eventually("the wall on the viewer", tries: 1500) { c.renderer.drawScene?.walls != nil }
         // the readout
         let state = try #require(draw.readoutState)
         #expect(state.input.walls.count == 1 && state.input.walls[0].ok && state.added != nil)
@@ -107,13 +99,13 @@ struct DrawModelTests {
         let (window, draw, kit) = try await drawWindow()
         let wiring = try #require(window.wiring)
         let build = try #require(wiring.build)
-        try await eventually("Draw's build (the pad only)") { build.latest != nil && !build.building }
+        try await eventually("Draw's build (the pad only)", tries: 1500) { build.latest != nil && !build.building }
         #expect(build.latest?.fins().count() == 0, "Draw builds no walls of its own")
         let exporter = try #require(wiring.exporter)
         try await click(draw, try below(kit, faces: 24, x: -12, y: 12))
         try await click(draw, try below(kit, faces: 24, x: 12, y: 12))
         if !draw.sweepCurrent { #expect(exporter.availability.enabled.isEmpty, "not offered while the wall is being stood") }
-        try await eventually("the sweep") { draw.sweepCurrent }
+        try await eventually("the sweep", tries: 1500) { draw.sweepCurrent }
         #expect(exporter.availability.enabled.contains(.finsOnly))
         let dir = try Scratch.directory()
         let file = try #require(await exporter.write(.finsOnly, to: dir.appending(path: "fins.stl")), "\(exporter.error ?? "")")
@@ -154,7 +146,7 @@ struct DrawModelTests {
         try await click(draw, try below(kit, faces: 24, x: -12, y: 12))
         try await click(draw, try below(kit, faces: 24, x: 12, y: 12))
         let wall = try #require(window.session.drawnWalls.first)
-        try await eventually("the sweep") { draw.outcomes[wall.id] != nil && draw.sweepCurrent }
+        try await eventually("the sweep", tries: 1500) { draw.outcomes[wall.id] != nil && draw.sweepCurrent }
         // a click on the wall (a ray along its side, the part not in front of it) selects it; a second deselects
         try await click(draw, side(x: 10, z: 8))
         #expect(draw.selectedID == wall.id)
@@ -180,7 +172,7 @@ struct DrawModelTests {
         try await click(draw, try below(kit, faces: 24, x: -12, y: 12))
         try await click(draw, try below(kit, faces: 24, x: 12, y: 12))
         let wall = try #require(window.session.drawnWalls.first)
-        try await eventually("the sweep") { draw.outcomes[wall.id] != nil && draw.sweepCurrent }
+        try await eventually("the sweep", tries: 1500) { draw.outcomes[wall.id] != nil && draw.sweepCurrent }
         // a cut through y = 0 keeping -y: the wall (y = 12) is on the cut-away side
         func cut(keeping normal: SIMD3<Float>) {
             let turn = simd_quatf(from: SIMD3<Float>(0, 0, 1), to: normal)
@@ -227,7 +219,7 @@ struct DrawModelTests {
         #expect(window.session.drawnWalls.count == 1)
         let wall = window.session.drawnWalls[0]
         #expect(wall.m != nil && !draw.started)
-        try await eventually("the sweep") { draw.outcomes[wall.id] != nil }
+        try await eventually("the sweep", tries: 1500) { draw.outcomes[wall.id] != nil }
         #expect(draw.outcomes[wall.id]?.ok == true)
         // changing the shape starts a half-drawn wall over
         try await click(draw, try below(kit, faces: 24, x: -12, y: -10))
@@ -276,7 +268,7 @@ struct DrawModelTests {
     @Test func handPlacedWallsStayShownInAutoAfterTheToggleIsOff() async throws {
         let (window, draw, kit) = try await drawWindow(mode: .auto)
         draw.toggleAugment()
-        try await eventually("the kit") { draw.kitReady }
+        try await eventually("the kit", tries: 1500) { draw.kitReady }
         try await click(draw, try below(kit, faces: 24, x: -12, y: 12))
         try await click(draw, try below(kit, faces: 24, x: 12, y: 12))
         #expect(window.session.drawnWalls.count == 1)
@@ -302,12 +294,12 @@ struct DrawModelTests {
                                                location: CGPoint(x: 300, y: 200), size: CGSize(width: 800, height: 600))
         #expect(try kit.faceTakesBrace(face: UInt64(try #require(face))))
         draw.pointerMoved(hit)
-        try await eventually("the preview") { !draw.motion.ghosts.isEmpty }
+        try await eventually("the preview", tries: 1500) { !draw.motion.ghosts.isEmpty }
         #expect(draw.motion.tip.text.hasPrefix("Brace · "), "\(draw.motion.tip.text)")
         try await click(draw, hit)
         #expect(window.session.drawnWalls.count == 1 && window.session.drawnWalls[0].kind == .sway)
         let brace = window.session.drawnWalls[0]
-        try await eventually("the sweep") { draw.outcomes[brace.id] != nil }
+        try await eventually("the sweep", tries: 1500) { draw.outcomes[brace.id] != nil }
         #expect(draw.outcomes[brace.id]?.ok == true)
         let state = try #require(draw.readoutState)
         let ctx: ReadoutContext = { var c = ReadoutContext(); c.mode = "draw"; c.draw = state.input; return c }()
@@ -327,7 +319,7 @@ struct DrawModelTests {
         draw.pointerClicked(b)
         #expect(draw.clickPending && draw.started && window.session.drawnWalls.isEmpty, "the wall waits for the engine")
         draw.pointerClicked(c)                     // made while the wall is checked: it runs after the answer
-        try await eventually("the check") { !draw.clickPending }
+        try await eventually("the check", tries: 1500) { !draw.clickPending }
         #expect(window.session.drawnWalls.count == 1, "the wall lands")
         #expect(draw.started, "the click queued behind it starts the next wall")
         // Esc while the check runs: its answer must not place the wall
@@ -342,7 +334,7 @@ struct DrawModelTests {
         draw.pointerClicked(a)
         #expect(draw.clickPending)
         window.session.undo()
-        try await eventually("the dropped answer") { !draw.clickPending }
+        try await eventually("the dropped answer", tries: 1500) { !draw.clickPending }
         try await Task.sleep(for: .milliseconds(100))
         #expect(window.session.drawnWalls.isEmpty, "an answer for the old walls is dropped")
         // Back while it runs takes the point back, and the answer goes with it
@@ -362,7 +354,7 @@ struct DrawModelTests {
                                                location: CGPoint(x: 300, y: 200), size: CGSize(width: 800, height: 600))
         draw.pointerClicked(hit)
         #expect(draw.clickPending && window.session.drawnWalls.isEmpty, "the brace waits for the engine")
-        try await eventually("the brace") { !draw.clickPending }
+        try await eventually("the brace", tries: 1500) { !draw.clickPending }
         #expect(window.session.drawnWalls.count == 1 && window.session.drawnWalls[0].kind == .sway)
         // Sway braces off while the next is stood: it is not added
         draw.pointerClicked(hit)
@@ -371,7 +363,7 @@ struct DrawModelTests {
         s.sway = false
         window.session.setSettings(s)
         draw.sync()
-        try await eventually("the dropped answer") { !draw.clickPending }
+        try await eventually("the dropped answer", tries: 1500) { !draw.clickPending }
         try await Task.sleep(for: .milliseconds(100))
         #expect(window.session.drawnWalls.count == 1, "an answer for braces turned off is dropped")
     }
@@ -483,7 +475,7 @@ struct DrawModelTests {
         let (window, draw, kit) = try await drawWindow(sway: true, file: file)
         defer { withExtendedLifetime(window) {} }
         let build = try #require(window.wiring?.build)
-        try await eventually("Draw's build (the pad only)") { build.latest != nil && !build.building }
+        try await eventually("Draw's build (the pad only)", tries: 1500) { build.latest != nil && !build.building }
         let beat = Heartbeat()
         var worstCall = 0.0, worstBeat = 0.0
         func timed(_ what: String, _ p: ViewerController.HandPointer) async throws {
@@ -491,12 +483,12 @@ struct DrawModelTests {
             let t0 = ContinuousClock.now
             draw.pointerClicked(p)
             let call = Heartbeat.ms(ContinuousClock.now - t0)
-            try await eventually(what) { !draw.clickPending }
+            try await eventually(what, tries: 1500) { !draw.clickPending }
             let gap = beat.stop()
             print(String(format: "C-08 click %@: pointerClicked %.2f ms, main-thread longest job %.2f ms; walls %d, message '%@'", what, call, gap,
                          window.session.drawnWalls.count, draw.message))
             worstCall = max(worstCall, call); worstBeat = max(worstBeat, gap)
-            try await eventually("the sweep after \(what)") { draw.sweepCurrent || window.session.drawnWalls.isEmpty }
+            try await eventually("the sweep after \(what)", tries: 1500) { draw.sweepCurrent || window.session.drawnWalls.isEmpty }
         }
         // a sway brace on the post's outer side (the first: it builds the triangle index)
         try await timed("first brace", try grid.pointer(kit, box: 2, side: 3, at: SIMD3(40, 0, 30), origin: SIMD3(90, 0, 30)))
