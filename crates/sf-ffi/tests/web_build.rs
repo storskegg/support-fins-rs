@@ -88,7 +88,7 @@ fn check(r: &BuildResult, expected: &Json, name: &str) {
         "{name}: pad vertices"
     );
     assert_eq!(
-        Json::Str(fnv64(r.triangles())),
+        Json::Str(fnv64(&r.triangles())),
         *field(expected, "hash"),
         "{name}: triangles"
     );

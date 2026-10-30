@@ -1,8 +1,10 @@
 //! `Part`, `load_parts`, `AnalysisSummary`, `FfiError` (docs/FFI.md).
 
+use std::borrow::Cow;
 use std::fmt;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use sf_engine::jsnum;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
@@ -234,12 +236,20 @@ pub struct Part {
     slicer: Option<Arc<Slicer>>,
     /// a painted 3MF's colours by triangle of the (cut) part, written back by a 3MF export
     colors: Option<PartColors>,
-    topo: Arc<Topology>,
+    /// The welded topology, made by the first [`topology`](Self::topology) (C-05): opening a file with many objects
+    /// only reads their soups, and the picker needs a count and a size, so only the objects picked are welded.
+    topo: OnceLock<Arc<Topology>>,
+    /// The position soup until it is welded (the topology then owns it); the lock is the weld's, so two callers
+    /// do not weld the same part twice.
+    soup: Mutex<Option<Vec<f64>>>,
+    /// Triangles in the soup (`positions.len() / 9`; the weld drops none).
+    n_faces: usize,
     size: [f64; 3],
     /// What the reader decided (`lastImportMeta`), kept so a merge can sum it, and the import note it makes;
     /// a restored session or a rescale rewrites it.
     note: Mutex<NoteState>,
-    weld_ms: f64,
+    /// the weld's time in ms as `f64` bits; 0 until it has run
+    weld_ms: AtomicU64,
 }
 
 /// `lastImportMeta` with what `renderImportNote` needs of the file, the note it made, and the session a 3MF
@@ -312,18 +322,51 @@ impl Part {
     ) -> Part {
         let size = bbox_size(&positions);
         let note = NoteState::new(&name, meta, objects_len, chosen_len);
-        let started = std::time::Instant::now();
-        let topo = build_topology(positions);
-        let weld_ms = started.elapsed().as_secs_f64() * 1e3;
+        Part::unwelded(
+            name,
+            stem,
+            positions,
+            size,
+            slicer.map(Arc::new),
+            colors,
+            note,
+        )
+    }
+
+    fn unwelded(
+        name: String,
+        stem: String,
+        positions: Vec<f64>,
+        size: [f64; 3],
+        slicer: Option<Arc<Slicer>>,
+        colors: Option<PartColors>,
+        note: NoteState,
+    ) -> Part {
         Part {
             name,
             stem,
-            slicer: slicer.map(Arc::new),
+            slicer,
             colors,
-            topo: Arc::new(topo),
+            topo: OnceLock::new(),
+            n_faces: positions.len() / 9,
+            soup: Mutex::new(Some(positions)),
             size,
             note: Mutex::new(note),
-            weld_ms,
+            weld_ms: AtomicU64::new(0),
+        }
+    }
+
+    /// The soup as `f` sees it, welded or not, without welding it (a merge, a rescale and the session read the
+    /// positions; the topology's are the soup moved).
+    fn with_positions<R>(&self, f: impl FnOnce(&[f64]) -> R) -> R {
+        if let Some(t) = self.topo.get() {
+            return f(&t.pos);
+        }
+        let soup = self.soup.lock().unwrap_or_else(|e| e.into_inner());
+        match (self.topo.get(), soup.as_deref()) {
+            (Some(t), _) => f(&t.pos),
+            (None, Some(p)) => f(p),
+            (None, None) => f(&[]),
         }
     }
 
@@ -345,8 +388,27 @@ impl Part {
     }
 
     /// The part's topology, for the build and the tests.
+    /// It welds the part on the first call (C-05); later calls and other threads wait for that and share it.
     pub fn topology(&self) -> &Arc<Topology> {
-        &self.topo
+        if let Some(t) = self.topo.get() {
+            return t;
+        }
+        let mut soup = self.soup.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(t) = self.topo.get() {
+            return t;
+        }
+        let started = std::time::Instant::now();
+        let topo = build_topology(soup.take().unwrap_or_default());
+        self.weld_ms.store(
+            (started.elapsed().as_secs_f64() * 1e3).to_bits(),
+            Ordering::Relaxed,
+        );
+        self.topo.get_or_init(|| Arc::new(topo))
+    }
+
+    /// Whether the part has been welded yet (see [`topology`](Self::topology)): opening a file does not.
+    pub fn is_welded(&self) -> bool {
+        self.topo.get().is_some()
     }
 
     /// The part's name, as the page shows it.
@@ -424,19 +486,20 @@ impl Part {
                     message: format!("scale must be a number above 0 and at most {MAX_SCALE}"),
                 });
             }
-            let (lo, hi) = bbox(&self.topo.pos);
-            let c = [
-                (lo[0] + hi[0]) / 2.0,
-                (lo[1] + hi[1]) / 2.0,
-                (lo[2] + hi[2]) / 2.0,
-            ];
-            let centred: Vec<f64> = self
-                .topo
-                .pos
-                .iter()
-                .enumerate()
-                .map(|(i, p)| ((p - c[i % 3]) as f32) as f64)
-                .collect();
+            let (c, centred) = self.with_positions(|pos| {
+                let (lo, hi) = bbox(pos);
+                let c = [
+                    (lo[0] + hi[0]) / 2.0,
+                    (lo[1] + hi[1]) / 2.0,
+                    (lo[2] + hi[2]) / 2.0,
+                ];
+                let centred: Vec<f64> = pos
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| ((p - c[i % 3]) as f32) as f64)
+                    .collect();
+                (c, centred)
+            });
             let positions = scale_about(&centred, factor, [0.0; 3], c);
             let slicer = self.slicer.as_ref().map(|sl| Slicer {
                 positions: scale_about(&sl.positions, factor, c, c),
@@ -452,9 +515,6 @@ impl Part {
                     .collect(),
             });
             let size = bbox_size(&positions);
-            let started = std::time::Instant::now();
-            let topo = build_topology(positions);
-            let weld_ms = started.elapsed().as_secs_f64() * 1e3;
             // `forgetSessionNote` (`web/ui/io.js:90-96`, called by `setScale`): the supports a saved session brought
             // back are gone with the rescale, so the note no longer says they were restored
             let mut note = {
@@ -471,16 +531,18 @@ impl Part {
             };
             note.meta.session = SessionNote::None;
             note.render(&self.name);
-            Ok(Arc::new(Part {
-                name: self.name.clone(),
-                stem: self.stem.clone(),
-                slicer: slicer.map(Arc::new),
-                colors: self.colors.clone(),
-                topo: Arc::new(topo),
+            let scaled = Part::unwelded(
+                self.name.clone(),
+                self.stem.clone(),
+                positions,
                 size,
-                note: Mutex::new(note),
-                weld_ms,
-            }))
+                slicer.map(Arc::new),
+                self.colors.clone(),
+                note,
+            );
+            // welded here, off the main thread: a rescaled part is shown at once
+            scaled.topology();
+            Ok(Arc::new(scaled))
         })
     }
 
@@ -488,18 +550,18 @@ impl Part {
         let note = self.note();
         PartInfo {
             name: self.name.clone(),
-            triangles: self.topo.n_faces as u64,
+            triangles: self.n_faces as u64,
             size: self.size.to_vec(),
             notes: note.notes.clone(),
             import_note: note.import_note.clone(),
-            weld_ms: self.weld_ms,
+            weld_ms: f64::from_bits(self.weld_ms.load(Ordering::Relaxed)),
         }
     }
 
     /// Interleaved position xyz + normal xyz (`f32`, 24-byte vertex), three vertices per face in the
     /// model frame, the normal being the face normal repeated at each vertex.
     pub fn mesh(&self) -> Arc<GpuBuffer> {
-        let t = &self.topo;
+        let t = self.topology();
         let mut buf = GpuBuffer::zeroed(t.n_faces * 3 * 24, 24, (t.n_faces * 3) as u32);
         let out = buf.as_mut_slice();
         for f in 0..t.n_faces {
@@ -520,7 +582,7 @@ impl Part {
     pub fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError> {
         crate::crash::guarded("analyze", || {
             let started = std::time::Instant::now();
-            let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
+            let a = analyze(self.topology(), threshold(threshold_deg)?, &rot9(&rot)?);
             let analyze_ms = started.elapsed().as_secs_f64() * 1e3;
             Ok(AnalysisSummary {
                 over_area: a.over_area,
@@ -541,9 +603,14 @@ impl Part {
         crate::crash::guarded("islands", || {
             let rot = rot9(&rot)?;
             let cfg = sf_engine::config::Config::default();
-            let a = analyze(&self.topo, threshold(threshold_deg)?, &rot);
-            let found =
-                sf_engine::islands::find_islands(&self.topo, &a, &rot, &Default::default(), &cfg);
+            let a = analyze(self.topology(), threshold(threshold_deg)?, &rot);
+            let found = sf_engine::islands::find_islands(
+                self.topology(),
+                &a,
+                &rot,
+                &Default::default(),
+                &cfg,
+            );
             Ok(found
                 .into_iter()
                 .map(|i| Island {
@@ -563,8 +630,8 @@ impl Part {
         rot: Vec<f64>,
     ) -> Result<Arc<GpuBuffer>, FfiError> {
         crate::crash::guarded("face flags", || {
-            let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
-            let flags: Vec<u8> = (0..self.topo.n_faces)
+            let a = analyze(self.topology(), threshold(threshold_deg)?, &rot9(&rot)?);
+            let flags: Vec<u8> = (0..self.n_faces)
                 .map(|f| {
                     u8::from(a.over[f] != 0)
                         | (u8::from(a.kept[f] != 0) << 1)
@@ -1049,25 +1116,28 @@ pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>
             1 => return Ok(parts.into_iter().next().unwrap()),
             _ => {}
         }
-        let positions: Vec<f64> = parts
-            .iter()
-            .flat_map(|p| p.topo.pos.iter().copied())
-            .collect();
+        let mut positions: Vec<f64> = Vec::with_capacity(parts.iter().map(|p| p.n_faces * 9).sum());
+        for p in &parts {
+            p.with_positions(|pos| positions.extend_from_slice(pos));
+        }
         let cut_items: Vec<MergeItem> = parts
             .iter()
             .map(|p| MergeItem {
                 colors: p.colors.as_ref(),
-                positions_len: p.topo.pos.len(),
+                positions_len: p.n_faces * 9,
             })
             .collect();
         let colors = merge_colors(&cut_items);
         let slicer = if parts.iter().any(|p| p.slicer.is_some()) {
             // the uncut positions and colours of each object: its slicer's, or its own when it had no extras
-            let uncut: Vec<(&[f64], Option<&PartColors>)> = parts
+            let uncut: Vec<(Cow<[f64]>, Option<&PartColors>)> = parts
                 .iter()
                 .map(|p| match &p.slicer {
-                    Some(s) => (s.positions.as_slice(), s.colors.as_ref()),
-                    None => (p.topo.pos.as_slice(), p.colors.as_ref()),
+                    Some(s) => (Cow::Borrowed(s.positions.as_slice()), s.colors.as_ref()),
+                    None => (
+                        Cow::Owned(p.with_positions(<[f64]>::to_vec)),
+                        p.colors.as_ref(),
+                    ),
                 })
                 .collect();
             let items: Vec<MergeItem> = uncut
@@ -1103,7 +1173,7 @@ pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>
         meta.session = SessionNote::None;
         let total = (object_count as usize).max(parts.len());
         let stem = parts[0].stem.clone();
-        Ok(Arc::new(Part::new(
+        let merged = Part::new(
             stem.clone(),
             stem,
             positions,
@@ -1112,7 +1182,10 @@ pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>
             meta,
             total,
             parts.len(),
-        )))
+        );
+        // welded here, off the main thread: the merged part is shown at once
+        merged.topology();
+        Ok(Arc::new(merged))
     })
 }
 
