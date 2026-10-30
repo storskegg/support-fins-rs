@@ -154,6 +154,7 @@ final class BuildModel {
     static func message(_ err: FfiError) -> String {
         switch err {
         case .Io(let message), .Format(let message), .Engine(let message): return message
+        case .LimitExceeded(_, _, _, let message): return message
         case .Cancelled: return JS.t("The build was cancelled.")
         }
     }
