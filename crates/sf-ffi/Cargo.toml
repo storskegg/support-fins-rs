@@ -23,6 +23,7 @@ sf-cut.workspace = true
 sf-cli = { workspace = true, default-features = false }
 sf-step = { workspace = true, default-features = false }
 serde_json.workspace = true
+rustc-demangle.workspace = true
 uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]

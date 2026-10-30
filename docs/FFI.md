@@ -531,6 +531,42 @@ Nothing is sent over the network; reports are files in a folder Swift names (`~/
   removes every local symbol, i.e. all Rust frames. `app/project.yml` therefore sets `STRIP_STYLE: debugging` (only debug symbols go).
   To symbolicate a MetricKit address later: `atos -o "Support Fins.app.dSYM/Contents/Resources/DWARF/Support Fins" -arch arm64 -l <load address> <address>`.
 
+### Native crashes (fix plan 1E; `app/SupportFinsCore/Sources/SFCrashCapture`, `NativeCrash.swift`)
+
+A crash the panic hook cannot see (a fatal signal in Swift, Objective-C, C++ or Rust code, an uncaught NSException, a Swift
+runtime trap) is captured by C handlers in the SupportFinsCore package, outside the Rust library.
+
+- **`NativeCrashCapture.install(dir:appVersion:)`** (C `sfcc_install`) at launch: `sigaction` with `SA_SIGINFO | SA_ONSTACK` for
+  SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT and SIGTRAP (on a 256 KB `sigaltstack` with a guard page, for the main thread), and
+  `NSSetUncaughtExceptionHandler`. Both chain to the handler that was there before. Ahead of time it prepares the dump's path
+  (`<dir>/native-<unix time>-<pid>.sfdump`), a reserve file descriptor, and the image table (`_dyld_register_func_for_add_image`,
+  plus dyld itself: path, UUID, load address, `__TEXT` size).
+- **`NativeCrashCapture.setContext(breadcrumbs:settingsJSON:)`** (C `sfcc_set_context`): the breadcrumbs and settings as JSON,
+  copied into the spare half of a double buffer. `CrashReporter` calls it on every breadcrumb and settings change.
+- **The signal handler** is async-signal-safe: `open`, `write`, `close`, `getpid`, `time`, `sigaction`, `raise`, `sleep`, plus
+  `vm_read_overwrite` (a Mach call: no lock, no allocation) for every stack read, and `pthread_self` (a thread-register read).
+  No malloc, stdio, locks, Swift or Objective-C. It writes the signal, `si_code`, the fault address, whether it is the main
+  thread, pc/lr/fp/sp, a frame-pointer walk (at most 256 frames; each read checked, the chain must climb), the images and the
+  context. It then calls the previous handler, restores `SIG_DFL` and lets the signal take its default action: a hardware fault
+  re-runs the instruction on return, a sent signal is raised again. The system's report and the exit status are unchanged.
+  Only the crashing thread is recorded: suspending and reading the other threads is not done (not safely possible here).
+- **The uncaught-exception handler** (ordinary context) writes the name, reason and `callStackReturnAddresses`; the SIGABRT the
+  runtime raises next appends its own section to the same dump.
+- **The next launch** (`NativeCrashImport`, app): `NativeCrashDump.parse`, `NativeSymbolizer` (dladdr against this launch's image
+  with the same UUID, else the image file's `LC_SYMTAB` when it is on disk with that UUID, else image + offset), demangling
+  (Swift `swift_demangle`, C++ `__cxa_demangle`, Rust **`crash_demangle(symbol) -> String?`**, rustc-demangle, legacy and v0), and
+  `NativeCrashReport.make`. The report is `crash-native-<time>.json`/`.txt` with the breadcrumbs and settings; it replaces the
+  marker's `crash-session-*` report for that run. A SIGABRT whose stack runs through the Rust panic machinery joins the newest
+  `crash-rust-*` report of the 2 minutes before it (`native` in its JSON, the stacks at the end of its text). A MetricKit crash
+  diagnostic whose window holds a native report's crash time (and whose signal matches) gets `alsoCapturedNatively: <stem>`.
+- **Tests:** under XCTest, and in a DEBUG run with `-SFCrashDir` (the UI tests), the raw dumps go into
+  `<temp>/sf-native-crash/<run>/` (`SF_CRASH_RUN`, else the launch time and pid), printed to stderr at install; nothing converts
+  them and they never raise the banner. `just app-test` passes `TEST_RUNNER_SF_CRASH_RUN` and `tools/gate/native_dumps.py`
+  fails the step on any dump, printing its stack (atos).
+- **Proof:** `sf-crash-probe` (an executable target of the package, never in the app) crashes on purpose for each signal and an
+  uncaught NSException; `NativeCrashTests` runs it as a child process (a command-line tool: no crash dialog, but macOS still
+  writes `sf-crash-probe-*.ips` in DiagnosticReports) and checks the signal, the dump and the crashing function's name.
+
 ## Wave 2 (October 2026): STEP out of process (X-01)
 
 OpenCascade dereferences null or loops forever on some malformed STEP files (101 and 5 of the 106 files in
