@@ -1,5 +1,6 @@
 import SwiftUI
 import Viewer
+import simd
 
 extension ToolbarSlot {
     static let section = ToolbarSlot(
@@ -37,7 +38,34 @@ final class SectionFeature: Feature {
     }
 
     /// A new part: the old part's cut means nothing on it (`resetPartState`, `ui/part.js:157`).
-    func partWillShow() { setOn(false) }
+    func partWillShow() {
+        leaving = model?.tool.heldCut
+        setOn(false)
+    }
+
+    func partDidShow(_ parts: [LoadedPart]) { leaving = nil }
+
+    /// The cut a part change just switched off, until the new part is on show: Add model parks the model on show from
+    /// `partWillShow` too (`PlatesFeature`, after this feature's), and its cut goes with it (`addSlot` -> `park`).
+    private var leaving: simd_float4x4?
+
+    /// A model parked on its plate (`park`, `ui/models.js:68`) keeps its cut, where it sits on the part, or nothing
+    /// when the cut is off (`sectionState`); the part goes off the page and the cut with it (`stashPart` ->
+    /// `resetPartState` -> `setSection(false)`, `ui/part.js:157`).
+    private struct Kept { var inPart: simd_float4x4 }
+    func modelState() -> Any? {
+        let kept = (model?.tool.heldCut ?? leaving).map(Kept.init)
+        leaving = nil
+        setOn(false)
+        return kept
+    }
+
+    /// The model is on show again (`unpark`, `ui/models.js:104`): its cut back on, where it was on the part
+    /// (`restoreSection`). Its popover stays as it is, as `setSection(true)` leaves it.
+    func restoreModelState(_ state: Any) {
+        guard let kept = state as? Kept else { return }
+        model?.tool.restore(kept.inPart)
+    }
 
     static func menus(_ f: SectionFeature?) -> [MenuSection] {
         let model = f?.model
