@@ -6,7 +6,8 @@ import Viewer
 /// (a cube) for tests and previews.
 @MainActor
 protocol PartLoading {
-    func load(url: URL?, device: MTLDevice) async throws -> [LoadedPart]
+    /// `allowLarge`: load past the "Load anyway?" limits (`load_parts_with`); a file over one throws `FfiError.LimitExceeded`.
+    func load(url: URL?, device: MTLDevice, allowLarge: Bool) async throws -> [LoadedPart]
 }
 
 struct LoadedPart {
@@ -15,7 +16,7 @@ struct LoadedPart {
 }
 
 struct GeneratedLoader: PartLoading {
-    func load(url: URL?, device: MTLDevice) async throws -> [LoadedPart] {
+    func load(url: URL?, device: MTLDevice, allowLarge: Bool) async throws -> [LoadedPart] {
         [LoadedPart(name: url?.lastPathComponent ?? JS.t("Cube"), mesh: GeneratedMesh.cube(edge: 40, device: device))]
     }
 }

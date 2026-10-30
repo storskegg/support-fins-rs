@@ -56,6 +56,12 @@ impl Part {
         self.note().pending.is_some()
     }
 
+    /// The 3MF carried a session that could not be read (damaged, or nested deeper than the JSON limit): the
+    /// part loaded with defaults. The JS ignores such a session silently; the app tells the user.
+    pub fn session_unreadable(&self) -> bool {
+        self.note().session_unreadable
+    }
+
     /// Restore the file's session onto this part (`restoreSession`, called by `afterLoad`, `web/ui/io.js:370-390`),
     /// once, as the part arrives; `beside`: it was added to a plate of models, whose fin settings it takes. The
     /// part's import note says what came of it. A part with no session (or one already restored) is left as it

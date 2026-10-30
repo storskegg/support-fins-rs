@@ -1,3 +1,4 @@
+import Metal
 import Observation
 import SupportFinsCore
 import SwiftUI
@@ -64,7 +65,8 @@ final class ViewerModel {
         loadingURL = url
         defer { isLoading = false; loadingURL = nil }
         do {
-            let parts = try await loader.load(url: url, device: controller.renderer.device)
+            let parts = try await loadAsking(url: url, device: controller.renderer.device)
+            guard let parts else { addingModel = false; return }     // Cancel at "Load anyway?": nothing loads
             guard !parts.isEmpty else { addingModel = false; status = JS.t("The file has no mesh."); return }
             // a plate of several goes to the picker; cancelling it keeps whatever is on show (`io.js:200-205`)
             guard parts.count > 1 else { show(parts, url: url); return }
@@ -84,6 +86,39 @@ final class ViewerModel {
             addingModel = false
             status = ReadFailure.text(of: error, reading: url?.lastPathComponent)
         }
+    }
+
+    /// The "Load anyway?" question on show (an alert on the window), while a file over a load limit waits for the answer.
+    var limitPrompt: LoadLimitPrompt?
+    @ObservationIgnored private var limitAnswer: CheckedContinuation<Bool, Never>?
+
+    /// Loads the file; one over a limit (`FfiError.LimitExceeded`) asks "Load anyway?" and, on yes, loads again with
+    /// `allowLarge`. `nil` when the user cancelled. The prompt is per file: a caller loading several files in turn
+    /// (`PlatesFeature.loadFiles`) awaits this, so Cancel skips only that file.
+    private func loadAsking(url: URL?, device: MTLDevice) async throws -> [LoadedPart]? {
+        do {
+            return try await loader.load(url: url, device: device, allowLarge: false)
+        } catch let error as FfiError {
+            guard let prompt = LoadLimitPrompt(error, name: url?.lastPathComponent) else { throw error }
+            guard await ask(prompt) else { return nil }
+            return try await loader.load(url: url, device: device, allowLarge: true)
+        }
+    }
+
+    private func ask(_ prompt: LoadLimitPrompt) async -> Bool {
+        answerLimitPrompt(false)        // one question at a time
+        return await withCheckedContinuation { c in
+            limitAnswer = c
+            limitPrompt = prompt
+        }
+    }
+
+    /// The alert's buttons (and its dismissal): Load anyway, or Cancel. A second answer is ignored.
+    func answerLimitPrompt(_ loadAnyway: Bool) {
+        limitPrompt = nil
+        let c = limitAnswer
+        limitAnswer = nil
+        c?.resume(returning: loadAnyway)
     }
 
     /// "Merge N & load": the chosen objects as one part (`merge_parts`; `mergeObjectPositions`, `ui/io.js:120`).

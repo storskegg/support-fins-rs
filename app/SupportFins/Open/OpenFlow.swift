@@ -21,6 +21,15 @@ private struct OpenFlowModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(item: $model.picker) { ObjectPickerSheet(model: $0) }
+            // a file over a load limit: Cancel is the default (Return and Esc), Load anyway must be chosen
+            .alert(model.limitPrompt?.title() ?? "", isPresented: Binding(
+                get: { model.limitPrompt != nil },
+                set: { if !$0 { model.answerLimitPrompt(false) } }
+            ), presenting: model.limitPrompt) { _ in
+                Button("Cancel", role: .cancel) { model.answerLimitPrompt(false) }
+                    .keyboardShortcut(.defaultAction)
+                Button("Load anyway") { model.answerLimitPrompt(true) }
+            } message: { Text($0.message()) }
             .dropDestination(for: URL.self) { urls, _ in dropped(urls) }
     }
 

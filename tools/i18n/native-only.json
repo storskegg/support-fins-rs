@@ -470,5 +470,61 @@
     "pt": "Relatar um problema",
     "ar": "الإبلاغ عن مشكلة",
     "nl": "Een probleem melden"
+  },
+  "Load this file anyway?": {
+    "why": "the \"Load anyway?\" alert of a file over a load limit (docs/FFI.md \"Load limits\"; the web has no limits). Agent translation, to be checked by a native speaker -- title",
+    "de": "Diese Datei trotzdem laden?",
+    "zh": "仍要加载此文件吗？",
+    "pt": "Carregar este arquivo mesmo assim?",
+    "ar": "هل تريد تحميل هذا الملف على أي حال؟",
+    "nl": "Dit bestand toch laden?"
+  },
+  "Load {name} anyway?": {
+    "why": "the \"Load anyway?\" alert of a file over a load limit (docs/FFI.md \"Load limits\"; the web has no limits). Agent translation, to be checked by a native speaker -- title",
+    "de": "{name} trotzdem laden?",
+    "zh": "仍要加载 {name} 吗？",
+    "pt": "Carregar {name} mesmo assim?",
+    "ar": "هل تريد تحميل {name} على أي حال؟",
+    "nl": "{name} toch laden?"
+  },
+  "Load anyway": {
+    "why": "the \"Load anyway?\" alert of a file over a load limit (docs/FFI.md \"Load limits\"; the web has no limits). Agent translation, to be checked by a native speaker -- the button (Cancel is the default)",
+    "de": "Trotzdem laden",
+    "zh": "仍然加载",
+    "pt": "Carregar mesmo assim",
+    "ar": "تحميل على أي حال",
+    "nl": "Toch laden"
+  },
+  "This file expands to {count} triangles, which may need about {memory} of memory.": {
+    "why": "the \"Load anyway?\" alert of a file over a load limit (docs/FFI.md \"Load limits\"; the web has no limits). Agent translation, to be checked by a native speaker -- the triangle limit",
+    "de": "Diese Datei wird zu {count} Dreiecken, was etwa {memory} Arbeitsspeicher benötigen kann.",
+    "zh": "此文件会展开为 {count} 个三角形，可能需要约 {memory} 内存。",
+    "pt": "Este arquivo se expande para {count} triângulos, o que pode exigir cerca de {memory} de memória.",
+    "ar": "يتوسع هذا الملف إلى {count} مثلث، وقد يحتاج إلى حوالي {memory} من الذاكرة.",
+    "nl": "Dit bestand breidt uit tot {count} driehoeken, wat ongeveer {memory} geheugen kan vragen."
+  },
+  "This file unpacks to {size} (the limit is {limit}).": {
+    "why": "the \"Load anyway?\" alert of a file over a load limit (docs/FFI.md \"Load limits\"; the web has no limits). Agent translation, to be checked by a native speaker -- the unpacked-size limit",
+    "de": "Diese Datei wird auf {size} entpackt (die Grenze liegt bei {limit}).",
+    "zh": "此文件解压后为 {size}（上限为 {limit}）。",
+    "pt": "Este arquivo se descompacta para {size} (o limite é {limit}).",
+    "ar": "عند فك ضغط هذا الملف يصبح حجمه {size} (الحد الأقصى {limit}).",
+    "nl": "Dit bestand pakt uit tot {size} (de limiet is {limit})."
+  },
+  "This model is {size} across (the limit is {limit}).": {
+    "why": "the \"Load anyway?\" alert of a file over a load limit (docs/FFI.md \"Load limits\"; the web has no limits). Agent translation, to be checked by a native speaker -- the size limit",
+    "de": "Dieses Modell ist {size} breit (die Grenze liegt bei {limit}).",
+    "zh": "此模型最宽处为 {size}（上限为 {limit}）。",
+    "pt": "Este modelo tem {size} de largura (o limite é {limit}).",
+    "ar": "يبلغ عرض هذا النموذج {size} (الحد الأقصى {limit}).",
+    "nl": "Dit model is {size} breed (de limiet is {limit})."
+  },
+  "The settings saved in this file couldn't be read; defaults are used.": {
+    "why": "status note when a 3MF's saved session is too deep or damaged to read. Agent translation, to be checked by a native speaker",
+    "de": "Die in dieser Datei gespeicherten Einstellungen konnten nicht gelesen werden; es gelten die Standardwerte.",
+    "zh": "无法读取此文件中保存的设置，将使用默认值。",
+    "pt": "Não foi possível ler as configurações salvas neste arquivo; os padrões serão usados.",
+    "ar": "تعذّرت قراءة الإعدادات المحفوظة في هذا الملف؛ سيتم استخدام الإعدادات الافتراضية.",
+    "nl": "De in dit bestand opgeslagen instellingen konden niet worden gelezen; de standaardwaarden worden gebruikt."
   }
 }

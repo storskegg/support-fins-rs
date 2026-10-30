@@ -93,10 +93,10 @@ struct CoreLoader: PartLoading {
     struct NoFile: LocalizedError { var errorDescription: String? { "Open an STL, 3MF, STEP or OBJ file." } }
     struct Unreadable: LocalizedError { var errorDescription: String? { JS.t("The file's mesh could not be shared with the GPU.") } }
 
-    func load(url: URL?, device: MTLDevice) async throws -> [LoadedPart] {
+    func load(url: URL?, device: MTLDevice, allowLarge: Bool) async throws -> [LoadedPart] {
         guard let url else { throw NoFile() }
         let path = url.path(percentEncoded: false)
-        let parts = try await Task.detached(priority: .userInitiated) { try loadParts(path: path) }.value
+        let parts = try await Task.detached(priority: .userInitiated) { try loadPartsWith(path: path, options: LoadOptions(allowLarge: allowLarge)) }.value
         return try parts.map { part in
             guard let core = CorePart(part: part, device: device) else { throw Unreadable() }
             return LoadedPart(name: core.info.name, mesh: core)

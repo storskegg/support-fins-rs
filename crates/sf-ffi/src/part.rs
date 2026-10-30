@@ -247,6 +247,8 @@ pub(crate) struct NoteState {
     notes: Vec<String>,
     pub(crate) import_note: String,
     pub(crate) pending: Option<sf_io::json::Json>,
+    /// the 3MF carried a session that could not be read (the part loaded without it)
+    pub(crate) session_unreadable: bool,
 }
 
 impl NoteState {
@@ -258,6 +260,7 @@ impl NoteState {
             notes: Vec::new(),
             import_note: String::new(),
             pending: None,
+            session_unreadable: false,
         };
         n.render(name);
         n
@@ -323,6 +326,12 @@ impl Part {
     /// A 3MF's session, to be restored once the part is on show (`pendingSession`, `web/ui/io.js:287`).
     fn with_session(self, session: sf_io::json::Json) -> Part {
         self.note.lock().unwrap().pending = Some(session);
+        self
+    }
+
+    /// The 3MF's session could not be read: the part has none (`Part::session_unreadable`).
+    fn with_unreadable_session(self) -> Part {
+        self.note.lock().unwrap().session_unreadable = true;
         self
     }
 
@@ -433,6 +442,7 @@ impl Part {
                 notes: Vec::new(),
                 import_note: String::new(),
                 pending: None,
+                session_unreadable: false,
             }
         };
         note.meta.session = SessionNote::None;
@@ -812,6 +822,7 @@ fn load_parts_on_this_thread(
     // a 3MF this app or the site exported carries a session: its part loads, and the supports come back from the
     // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
     let mut own: Option<(usize, sf_io::json::Json)> = None;
+    let mut session_unreadable = false;
     if lower.ends_with(".stl") {
         parts.push((
             stem(&path),
@@ -828,6 +839,7 @@ fn load_parts_on_this_thread(
         let m = read_three_mf_unmerged_with(&bytes, opts)?;
         drop(bytes);
         let mut objects = m.objects;
+        session_unreadable = m.session_unreadable;
         if let Some(session) = m.session
             && let Some(i) = sf_io::session::part_object_of(&objects)
         {
@@ -897,6 +909,7 @@ fn load_parts_on_this_thread(
             );
             Arc::new(match &own {
                 Some((_, session)) => part.with_session(session.clone()),
+                None if session_unreadable => part.with_unreadable_session(),
                 None => part,
             })
         })
