@@ -463,7 +463,7 @@ fn scaled_part_is_the_box_scaled_about_its_centre() {
         (lo, hi)
     };
     let (lo, hi) = lo_hi(&p);
-    let s = p.scaled(2.5);
+    let s = p.scaled(2.5).unwrap();
     let (slo, shi) = lo_hi(&s);
     for k in 0..3 {
         let c = (lo[k] + hi[k]) / 2.0;
@@ -480,31 +480,34 @@ fn scaled_part_is_the_box_scaled_about_its_centre() {
 #[test]
 fn scaling_from_the_base_never_compounds() {
     let p = load("sphere");
-    let twice = p.scaled(2.0).scaled(0.5);
-    let back = p.scaled(1.0);
+    let twice = p.scaled(2.0).unwrap().scaled(0.5).unwrap();
+    let back = p.scaled(1.0).unwrap();
     for (a, b) in twice.info().size.iter().zip(back.info().size.iter()) {
         assert!((a - b).abs() < 1e-3);
     }
     // the app keeps the base and rescales it: 150 % then 100 % is the base again
-    assert_eq!(p.scaled(1.0).topology().pos, p.topology().pos);
+    assert_eq!(p.scaled(1.0).unwrap().topology().pos, p.topology().pos);
 }
 
 #[test]
 fn percent_text_is_the_fields_wording() {
     use sf_ffi::{scale_from_percent_text, scale_percent_text};
-    assert_eq!(scale_from_percent_text("150".into()), Some(1.5));
-    assert_eq!(scale_from_percent_text(" 5 ".into()), Some(0.1));
-    assert_eq!(scale_from_percent_text("5000".into()), Some(10.0));
-    assert_eq!(scale_from_percent_text("33.333".into()), Some(0.3333));
-    assert_eq!(scale_from_percent_text("".into()), None);
-    assert_eq!(scale_from_percent_text("abc".into()), None);
-    assert_eq!(scale_from_percent_text("-3".into()), None);
-    assert_eq!(scale_from_percent_text("1e2".into()), Some(1.0));
-    assert_eq!(scale_percent_text(1.0), "100");
-    assert_eq!(scale_percent_text(1.5), "150");
-    assert_eq!(scale_percent_text(0.3333), "33.33");
-    assert_eq!(scale_percent_text(0.125), "12.5");
-    assert_eq!(scale_percent_text(10.0), "1000");
+    assert_eq!(scale_from_percent_text("150".into()).unwrap(), Some(1.5));
+    assert_eq!(scale_from_percent_text(" 5 ".into()).unwrap(), Some(0.1));
+    assert_eq!(scale_from_percent_text("5000".into()).unwrap(), Some(10.0));
+    assert_eq!(
+        scale_from_percent_text("33.333".into()).unwrap(),
+        Some(0.3333)
+    );
+    assert_eq!(scale_from_percent_text("".into()).unwrap(), None);
+    assert_eq!(scale_from_percent_text("abc".into()).unwrap(), None);
+    assert_eq!(scale_from_percent_text("-3".into()).unwrap(), None);
+    assert_eq!(scale_from_percent_text("1e2".into()).unwrap(), Some(1.0));
+    assert_eq!(scale_percent_text(1.0).unwrap(), "100");
+    assert_eq!(scale_percent_text(1.5).unwrap(), "150");
+    assert_eq!(scale_percent_text(0.3333).unwrap(), "33.33");
+    assert_eq!(scale_percent_text(0.125).unwrap(), "12.5");
+    assert_eq!(scale_percent_text(10.0).unwrap(), "1000");
 }
 
 // STEP (web/step.js, web/ui/io.js parseStep): a one-body file is one part named from the file's own name for the

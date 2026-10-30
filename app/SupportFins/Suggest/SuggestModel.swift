@@ -65,10 +65,16 @@ final class SuggestModel {
         state = .ranking
         picked = nil
         progress = nil
-        wanted = suggester.suggestWide(
-            thresholdDeg: thresholdDegrees, optsJson: optionsJSON, tunablesJson: tunablesJSON,
-            context: SuggestContext(currentBore: UInt64(max(0, currentBore)), density: density),
-            density: Self.searchDensity, listener: sink)
+        do {
+            wanted = try suggester.suggestWide(
+                thresholdDeg: thresholdDegrees, optsJson: optionsJSON, tunablesJson: tunablesJSON,
+                context: SuggestContext(currentBore: UInt64(max(0, currentBore)), density: density),
+                density: Self.searchDensity, listener: sink)
+        } catch {
+            // the engine refused the request (or its worker is gone): say so where a failed ranking says it
+            wanted = nil
+            state = .failed(error.localizedDescription)
+        }
     }
 
     /// A click on row `index`: turn the part to its pose (one undo step once `PartSession` holds the pose).

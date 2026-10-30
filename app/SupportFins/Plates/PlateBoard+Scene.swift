@@ -80,8 +80,10 @@ extension PlateBoard {
         if let c = m.footprintCache, c.key == key { return c.grid }
         let o = key.offset
         let cells = try? footprintOfPart(part: part, rot: key.pose, offset: [Double(o.x), Double(o.y), Double(o.z)])
-        let added = wanted.flatMap { footprintOfBuildWithDrawn(build: $0, drawn: drawn, removed: key.removed) }
-        let grid = footprintUnion(a: cells, b: added)
+        // a model the engine cannot measure (a vertex off the plate) takes no cells: it cannot clash, and the Volume
+        // line already says it hangs off
+        let added = wanted.flatMap { try? footprintOfBuildWithDrawn(build: $0, drawn: drawn, removed: key.removed) }
+        let grid = try? footprintUnion(a: cells, b: added)
         m.footprintCache = (key, grid)
         return grid
     }
@@ -92,7 +94,7 @@ extension PlateBoard {
         let p = plate ?? self.plate
         return p.models.compactMap { m in
             guard m.stash != nil, !skipping.contains(where: { $0 === m }) else { return nil }
-            return footprint(of: m)?.placed(x: m.xy.x, y: m.xy.y)
+            return footprint(of: m).flatMap { try? $0.placed(x: m.xy.x, y: m.xy.y) }
         }
     }
 }

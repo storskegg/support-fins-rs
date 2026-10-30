@@ -15,6 +15,7 @@ final class ScaleFeature: Feature {
 
     init(host: ViewerModel) {
         self.host = host
+        model.onFailure = { [weak host] message in host?.status = message }
         model.apply = { [weak host] part in
             guard let host, let controller = host.controller,
                   let core = CorePart(part: part, device: controller.renderer.device) else { return }

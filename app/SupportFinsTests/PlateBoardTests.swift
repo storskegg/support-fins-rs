@@ -41,7 +41,7 @@ struct PlateBoardTests {
         let live = board.plate.liveSlot
         let a = try #require(board.footprint(of: first)).placed(x: first.xy.x, y: first.xy.y)
         let b = try #require(board.footprint(of: live)).placed(x: live.xy.x, y: live.xy.y)
-        #expect(a.dilate(r: PlateBoard.gap).sharedCount(other: b) == 0, "first \(first.xy) second \(live.xy)")
+        #expect(try a.dilate(r: PlateBoard.gap).sharedCount(other: b) == 0, "first \(first.xy) second \(live.xy)")
         // the viewer draws the parked one, beside the live one at the origin
         let scene = try #require(model.controller?.renderer.plateScene)
         #expect(scene.parked.count == 1 && board.parkedSlots.count == 1 && board.parkedSlots[0] === first)

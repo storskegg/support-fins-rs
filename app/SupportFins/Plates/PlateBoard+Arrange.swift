@@ -20,8 +20,10 @@ extension PlateBoard {
     /// The cells any two of the plate's models share, in plate mm (`checkOverlap`).
     func computeClash() -> [SIMD2<Int64>] {
         guard hasLive, plate.models.count > 1 else { return [] }
-        let placed = footprints().map { $0.grid.placed(x: $0.slot.xy.x, y: $0.slot.xy.y) }
-        let flat = footprintClashCells(placed: placed)
+        // no clash shown when the engine refuses (a model far off the plate): a missing warning is the safe default,
+        // and the Volume line already says it hangs off
+        guard let placed = try? footprints().map({ try $0.grid.placed(x: $0.slot.xy.x, y: $0.slot.xy.y) }),
+              let flat = try? footprintClashCells(placed: placed) else { return [] }
         return stride(from: 0, to: flat.count - 1, by: 2).map { SIMD2(flat[$0], flat[$0 + 1]) }
     }
 
@@ -50,7 +52,13 @@ extension PlateBoard {
         }
         let fps = footprints()
         guard fps.count >= 2, let v = host?.controller?.volume else { return }
-        let at = footprintArrange(grids: fps.map(\.grid), bx: Double(v.x), by: Double(v.y), gap: Self.gap)
+        let at: [Double]
+        do {
+            at = try footprintArrange(grids: fps.map(\.grid), bx: Double(v.x), by: Double(v.y), gap: Self.gap)
+        } catch {
+            host?.status = error.localizedDescription
+            return
+        }
         let moves = fps.enumerated().compactMap { k, f -> (slot: ModelSlot, xy: SIMD2<Double>)? in
             let xy = SIMD2(at[2 * k], at[2 * k + 1])
             return f.slot.xy == xy ? nil : (f.slot, xy)

@@ -160,19 +160,19 @@ fn dir_file(name: &str) -> String {
 fn file_names_are_the_pages() {
     // exportName(`${base}-${stem}`, ext, { nozzle, layerHeight }): ui/export.js plateName
     assert_eq!(
-        export_file_name("bracket".into(), ExportKind::Stl, 0.4, 0.2),
+        export_file_name("bracket".into(), ExportKind::Stl, 0.4, 0.2).unwrap(),
         "bracket-fins-0.4nozzle-0.2layer.stl"
     );
     assert_eq!(
-        export_file_name("bracket".into(), ExportKind::ThreeMf, 0.6, 0.24),
+        export_file_name("bracket".into(), ExportKind::ThreeMf, 0.6, 0.24).unwrap(),
         "bracket-fins-0.6nozzle-0.24layer.3mf"
     );
     assert_eq!(
-        export_file_name("bracket".into(), ExportKind::FinsOnly, 0.4, 0.2),
+        export_file_name("bracket".into(), ExportKind::FinsOnly, 0.4, 0.2).unwrap(),
         "bracket-fins-only-0.4nozzle-0.2layer.stl"
     );
     assert_eq!(
-        export_file_name("x".into(), ExportKind::Stl, f64::NAN, 0.0),
+        export_file_name("x".into(), ExportKind::Stl, f64::NAN, 0.0).unwrap(),
         "x-fins.stl",
         "a setting that is not positive is left out"
     );

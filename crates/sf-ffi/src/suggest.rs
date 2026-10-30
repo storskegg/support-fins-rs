@@ -217,6 +217,9 @@ fn rot9(r: &[f64; 9]) -> Vec<f64> {
     r.to_vec()
 }
 
+/// The largest wide-search multiplier of the candidate budget accepted.
+const MAX_DENSITY: f64 = 100.0;
+
 fn dir3(v: &[f64], what: &str) -> Result<[f64; 3], FfiError> {
     let d: [f64; 3] = v
         .try_into()
@@ -230,13 +233,15 @@ fn dir3(v: &[f64], what: &str) -> Result<[f64; 3], FfiError> {
 /// `loadAlignment` for a load direction in the seated print frame (world +Z is the build axis).
 #[uniffi::export]
 pub fn load_alignment(dir_world: Vec<f64>) -> Result<Option<LoadAlignment>, FfiError> {
-    let d = dir3(&dir_world, "dir_world")?;
-    Ok(engine_load_alignment(d).map(|a| LoadAlignment {
-        cross: a.cross,
-        quality: a.quality.as_str().into(),
-        text: a.text.into(),
-        can_suggest: a.quality.as_str() != "good",
-    }))
+    crate::crash::guarded("load alignment", || {
+        let d = dir3(&dir_world, "dir_world")?;
+        Ok(engine_load_alignment(d).map(|a| LoadAlignment {
+            cross: a.cross,
+            quality: a.quality.as_str().into(),
+            text: a.text.into(),
+            can_suggest: a.quality.as_str() != "good",
+        }))
+    })
 }
 
 impl Part {
@@ -277,6 +282,14 @@ impl Part {
     ) -> Result<Option<SuggestResult>, FfiError> {
         if !threshold_deg.is_finite() {
             return Err(engine("threshold must be a finite number of degrees"));
+        }
+        // the wide search scales its candidate budget by this: 10 is the app's, and a corrupt value would never end
+        if let Some(d) = density
+            && !(d > 0.0 && d <= MAX_DENSITY)
+        {
+            return Err(engine(format!(
+                "density must be a number above 0 and at most {MAX_DENSITY}"
+            )));
         }
         // `opts_json` is the build's (`FinSettings.optionsJSON()`): the page's request extras (`tallRibs`,
         // `curvedWalls`, Draw's `mode`, the sway extras) are taken out as the build takes them. They are not
@@ -411,7 +424,9 @@ impl Part {
         tunables_json: String,
         context: SuggestContext,
     ) -> Result<SuggestResult, FfiError> {
-        self.rank_poses(threshold_deg, &opts_json, &tunables_json, &context)
+        crate::crash::guarded("suggest", || {
+            self.rank_poses(threshold_deg, &opts_json, &tunables_json, &context)
+        })
     }
 
     /// The wide search: [`Part::suggest_orientations`] over `density` times the web's candidate
@@ -425,17 +440,19 @@ impl Part {
         context: SuggestContext,
         density: f64,
     ) -> Result<SuggestResult, FfiError> {
-        Ok(self
-            .rank_poses_with(
-                threshold_deg,
-                &opts_json,
-                &tunables_json,
-                &context,
-                Some(density),
-                &|| false,
-                None,
-            )?
-            .expect("never cancelled"))
+        crate::crash::guarded("suggest wide", || {
+            Ok(self
+                .rank_poses_with(
+                    threshold_deg,
+                    &opts_json,
+                    &tunables_json,
+                    &context,
+                    Some(density),
+                    &|| false,
+                    None,
+                )?
+                .expect("never cancelled"))
+        })
     }
 
     /// The strongest printable pose for a load. `dir_local`: the load in the part's own frame;
@@ -446,7 +463,9 @@ impl Part {
         dir_world: Vec<f64>,
         threshold_deg: f64,
     ) -> Result<StrengthAdvice, FfiError> {
-        self.strength_advice(&dir_local, &dir_world, threshold_deg)
+        crate::crash::guarded("strength", || {
+            self.strength_advice(&dir_local, &dir_world, threshold_deg)
+        })
     }
 }
 
@@ -524,10 +543,13 @@ impl Suggester {
                             // one sent" and the send one step, so the listener sees them in order.
                             let sent = Mutex::new(0.0_f64);
                             let report = |f: f64| {
-                                let mut last = sent.lock().unwrap();
+                                // (a panicking callback is caught inside the lock, and a poisoned lock is still usable)
+                                let mut last = sent.lock().unwrap_or_else(|e| e.into_inner());
                                 if f > *last && latest.load(Ordering::SeqCst) == job.generation {
                                     *last = f;
-                                    job.listener.progress(job.generation, f);
+                                    crate::crash::listener_call(|| {
+                                        job.listener.progress(job.generation, f);
+                                    });
                                 }
                             };
                             part.rank_poses_with(
@@ -559,14 +581,19 @@ impl Suggester {
                                     as Delivery
                             }),
                     }))
-                    .unwrap_or_else(|_| Err(engine("the engine panicked")));
+                    .unwrap_or_else(|p| Err(crate::crash::panic_error(p)));
                     if latest.load(Ordering::SeqCst) != job.generation {
                         continue;
                     }
+                    // a panicking callback must not end this thread: the next ranking still has to land
                     match done {
-                        Ok(deliver) => deliver(job.generation, job.listener.as_ref()),
-                        Err(e) => job.listener.failed(job.generation, e),
-                    }
+                        Ok(deliver) => crate::crash::listener_call(|| {
+                            deliver(job.generation, job.listener.as_ref());
+                        }),
+                        Err(e) => crate::crash::listener_call(|| {
+                            job.listener.failed(job.generation, e);
+                        }),
+                    };
                 }
             })
             .expect("spawn the suggest worker");
@@ -581,17 +608,19 @@ impl Suggester {
         tunables_json: String,
         context: SuggestContext,
         listener: Box<dyn SuggestListener>,
-    ) -> u64 {
-        self.submit(
-            Work::Rank {
-                threshold_deg,
-                opts_json,
-                tunables_json,
-                context,
-                density: None,
-            },
-            listener,
-        )
+    ) -> Result<u64, FfiError> {
+        crate::crash::guarded("queue suggest", || {
+            self.submit(
+                Work::Rank {
+                    threshold_deg,
+                    opts_json,
+                    tunables_json,
+                    context,
+                    density: None,
+                },
+                listener,
+            )
+        })
     }
 
     /// Queue the wide search ([`Part::suggest_orientations_wide`]); returns its generation. A newer
@@ -604,17 +633,19 @@ impl Suggester {
         context: SuggestContext,
         density: f64,
         listener: Box<dyn SuggestListener>,
-    ) -> u64 {
-        self.submit(
-            Work::Rank {
-                threshold_deg,
-                opts_json,
-                tunables_json,
-                context,
-                density: Some(density),
-            },
-            listener,
-        )
+    ) -> Result<u64, FfiError> {
+        crate::crash::guarded("queue suggest", || {
+            self.submit(
+                Work::Rank {
+                    threshold_deg,
+                    opts_json,
+                    tunables_json,
+                    context,
+                    density: Some(density),
+                },
+                listener,
+            )
+        })
     }
 
     /// Queue a strength-pose search; returns its generation.
@@ -624,29 +655,33 @@ impl Suggester {
         dir_world: Vec<f64>,
         threshold_deg: f64,
         listener: Box<dyn SuggestListener>,
-    ) -> u64 {
-        self.submit(
-            Work::Strength {
-                dir_local,
-                dir_world,
-                threshold_deg,
-            },
-            listener,
-        )
+    ) -> Result<u64, FfiError> {
+        crate::crash::guarded("queue strength", || {
+            self.submit(
+                Work::Strength {
+                    dir_local,
+                    dir_world,
+                    threshold_deg,
+                },
+                listener,
+            )
+        })
     }
 }
 
 type Delivery = Box<dyn FnOnce(u64, &dyn SuggestListener)>;
 
 impl Suggester {
-    fn submit(&self, work: Work, listener: Box<dyn SuggestListener>) -> u64 {
+    fn submit(&self, work: Work, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError> {
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        let _ = self.jobs.send(Job {
-            generation,
-            work,
-            listener,
-        });
-        generation
+        self.jobs
+            .send(Job {
+                generation,
+                work,
+                listener,
+            })
+            .map_err(|_| engine("the suggest worker has stopped"))?;
+        Ok(generation)
     }
 }
 

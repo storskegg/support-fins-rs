@@ -52,7 +52,9 @@ extension PlateBoard {
         if models.count == 1 { models[0].session = sessions[0] }
         let base = ExportModel.base(of: first)
         let stem = models.count == 1 ? base : "\(base)-and-\(models.count - 1)-more"
-        let name = exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.nozzle, layerHeight: settings.settings.layerHeight)
+        // a suggested name only: the plain one when the engine refuses
+        let name = (try? exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.nozzle, layerHeight: settings.settings.layerHeight))
+            ?? "\(stem)-fins.3mf"
         return PlateWrite(models: models, fileName: name)
     }
 

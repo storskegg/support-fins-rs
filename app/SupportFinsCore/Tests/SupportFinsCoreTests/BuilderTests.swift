@@ -45,7 +45,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("lbracket")).first)
     let builder = Builder(part: part)
     let collector = Collector()
-    let generation = builder.build(rot: rotation(35, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: collector)
+    let generation = try builder.build(rot: rotation(35, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: collector)
     #expect(generation == 1)
 
     var delivered: BuildResult?
@@ -80,8 +80,8 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let builder = Builder(part: part)
     let first = Collector(), second = Collector()
-    let g1 = builder.build(rot: rotation(30, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: first)
-    let g2 = builder.build(rot: rotation(30, 0, 0), optsJson: #"{"mode":"full"}"#, tunablesJson: "{}", listener: second)
+    let g1 = try builder.build(rot: rotation(30, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: first)
+    let g2 = try builder.build(rot: rotation(30, 0, 0), optsJson: #"{"mode":"full"}"#, tunablesJson: "{}", listener: second)
     #expect(g2 == g1 + 1)
 
     var latest: UInt64?
@@ -103,9 +103,9 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("torus")).first)
     let builder = Builder(part: part)
     let dropped = Collector(), kept = Collector()
-    _ = builder.build(rot: rotation(45, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: dropped)
+    _ = try builder.build(rot: rotation(45, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: dropped)
     builder.cancel()
-    let g = builder.build(rot: rotation(45, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: kept)
+    let g = try builder.build(rot: rotation(45, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: kept)
     var arrived: UInt64?
     for await event in kept.stream {
         if case .done(let gen, _) = event { arrived = gen }
@@ -123,7 +123,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("cube")).first)
     let builder = Builder(part: part)
     let collector = Collector()
-    let g = builder.build(rot: rotation(0, 0, 0), optsJson: #"{"mode":"bogus"}"#, tunablesJson: "{}", listener: collector)
+    let g = try builder.build(rot: rotation(0, 0, 0), optsJson: #"{"mode":"bogus"}"#, tunablesJson: "{}", listener: collector)
     for await event in collector.stream {
         guard case .failed(let fg, let error) = event else { Issue.record("expected a failure"); return }
         #expect(fg == g)
@@ -136,7 +136,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let builder = Builder(part: part)
     let collector = Collector()
-    _ = builder.build(rot: rotation(0, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: collector)
+    _ = try builder.build(rot: rotation(0, 0, 0), optsJson: "{}", tunablesJson: "{}", listener: collector)
     var built: BuildResult?
     for await event in collector.stream {
         if case .done(_, let r) = event { built = r }
@@ -157,7 +157,7 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let rot = rotation(30, 0, 0)
     func fins(optsJson: String, tunablesJson: String) async throws -> (UInt32, Data) {
         let collector = Collector()
-        _ = Builder(part: part).build(rot: rot, optsJson: optsJson, tunablesJson: tunablesJson, listener: collector)
+        _ = try Builder(part: part).build(rot: rot, optsJson: optsJson, tunablesJson: tunablesJson, listener: collector)
         for await event in collector.stream {
             guard case .done(_, let result) = event else { Issue.record("the build failed"); break }
             let fins = result.fins()

@@ -14,6 +14,8 @@ final class ScaleModel {
     @ObservationIgnored private(set) var base: Part?
     /// Reloads the part on show at the new size (the window's `reshow`).
     @ObservationIgnored var apply: ((Part) -> Void)?
+    /// Called with the engine's message when it refuses a rescale (the part on show stays as it is).
+    @ObservationIgnored var onFailure: ((String) -> Void)?
     /// Bumped by each request, so a slow rescale that is overtaken is dropped.
     @ObservationIgnored private var generation = 0
     /// This model's own reload is going through `partDidShow`: it is not a new part.
@@ -22,7 +24,11 @@ final class ScaleModel {
     var hasPart: Bool { base != nil }
     var isScaled: Bool { scale != 1 }
     /// The field's text (`+(scale * 100).toFixed(2)`, `render`).
-    var fieldText: String { scalePercentText(factor: scale) }
+    var fieldText: String {
+        // `scale` is always one the field itself produced (10-1000 %) or 1, which the engine cannot refuse; the
+        // 100 % text is the right default for the impossible case
+        (try? scalePercentText(factor: scale)) ?? "100"
+    }
     /// `#scale-now`: the badge's suffix, empty at 100 %.
     var badgeSuffix: String { scale == 1 ? "" : " \(fieldText)%" }
 
@@ -51,7 +57,9 @@ final class ScaleModel {
     /// Returns the text the field should show.
     @discardableResult
     func commit(text: String) -> String {
-        if let s = scaleFromPercentText(text: text) { setScale(s) }
+        // junk is nil, and so is a text the engine refuses (it never does for text): either way the field shows the
+        // scale that holds
+        if let s = try? scaleFromPercentText(text: text) { setScale(s) }
         return fieldText
     }
 
@@ -65,7 +73,14 @@ final class ScaleModel {
         let mine = generation
         Task { @MainActor in
             // the weld is the engine's work: off the main actor
-            let part = s == 1 ? base : await Task.detached(priority: .userInitiated) { base.scaled(factor: s) }.value
+            let part: Part
+            do {
+                part = s == 1 ? base : try await Task.detached(priority: .userInitiated) { try base.scaled(factor: s) }.value
+            } catch {
+                guard mine == generation else { return }
+                onFailure?(error.localizedDescription)
+                return
+            }
             guard mine == generation else { return }
             rescaling = true
             apply?(part)

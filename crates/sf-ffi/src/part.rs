@@ -62,15 +62,19 @@ pub struct PartInfo {
 /// clamped and rounded to the 2 decimals the field shows, or `None` for junk, empty (`Number('')` is 0) or a
 /// non-positive value, where the field shows the scale that holds again.
 #[uniffi::export]
-pub fn scale_from_percent_text(text: String) -> Option<f64> {
-    scale_from_percent(jsnum::string_to_number(&text))
+pub fn scale_from_percent_text(text: String) -> Result<Option<f64>, FfiError> {
+    crate::crash::guarded_value("scale text", || {
+        scale_from_percent(jsnum::string_to_number(&text))
+    })
 }
 
 /// The percent field's text for a scale (`+(scale * 100).toFixed(2)` as a number, `web/ui/scale.js:30`): "150",
 /// "33.33", "12.5".
 #[uniffi::export]
-pub fn scale_percent_text(factor: f64) -> String {
-    jsnum::to_js_string(jsnum::string_to_number(&jsnum::to_fixed(factor * 100.0, 2)))
+pub fn scale_percent_text(factor: f64) -> Result<String, FfiError> {
+    crate::crash::guarded_value("scale text", || {
+        jsnum::to_js_string(jsnum::string_to_number(&jsnum::to_fixed(factor * 100.0, 2)))
+    })
 }
 
 /// `analyze`'s numbers (web/overhangs.js `analyze`), for the readout.
@@ -268,13 +272,13 @@ impl Part {
 
     /// A 3MF's session, to be restored once the part is on show (`pendingSession`, `web/ui/io.js:287`).
     fn with_session(self, session: sf_io::json::Json) -> Part {
-        self.note.lock().unwrap().pending = Some(session);
+        self.note.lock().unwrap_or_else(|e| e.into_inner()).pending = Some(session);
         self
     }
 
     /// See `NoteState`.
     pub(crate) fn note(&self) -> std::sync::MutexGuard<'_, NoteState> {
-        self.note.lock().unwrap()
+        self.note.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// The part's topology, for the build and the tests.
@@ -312,8 +316,21 @@ pub(crate) fn rot9(rot: &[f64]) -> Result<[f64; 9], FfiError> {
             message: "rot must be finite".into(),
         });
     }
+    // a rotation's entries lie in [-1, 1]; a pose far outside that scales the part until the grids the engine
+    // allocates for it are larger than memory (an allocation failure aborts instead of unwinding)
+    if r.iter().any(|v| v.abs() > MAX_ROT_ENTRY) {
+        return Err(FfiError::Engine {
+            message: format!("rot must be a rotation: entries within {MAX_ROT_ENTRY} of zero"),
+        });
+    }
     Ok(r)
 }
+
+/// The largest entry a pose matrix may have (a rotation's are within 1; this leaves room for rounding).
+const MAX_ROT_ENTRY: f64 = 2.0;
+
+/// The largest scale factor `scaled` takes (the field's own range is 0.1 to 10).
+const MAX_SCALE: f64 = 1000.0;
 
 fn threshold(deg: f64) -> Result<f64, FfiError> {
     if deg.is_finite() {
@@ -336,62 +353,70 @@ impl Part {
     /// the file frame, as the load does, so that last translation is not made.) A slicer's own parts are scaled
     /// from the uncentred file frame, `scaleAbout(positions, s, centre)`, one rounding, as `scale.js:56-58` does;
     /// the colours, the notes and the name are the part's.
-    pub fn scaled(&self, factor: f64) -> Arc<Part> {
-        let (lo, hi) = bbox(&self.topo.pos);
-        let c = [
-            (lo[0] + hi[0]) / 2.0,
-            (lo[1] + hi[1]) / 2.0,
-            (lo[2] + hi[2]) / 2.0,
-        ];
-        let centred: Vec<f64> = self
-            .topo
-            .pos
-            .iter()
-            .enumerate()
-            .map(|(i, p)| ((p - c[i % 3]) as f32) as f64)
-            .collect();
-        let positions = scale_about(&centred, factor, [0.0; 3], c);
-        let slicer = self.slicer.as_ref().map(|sl| Slicer {
-            positions: scale_about(&sl.positions, factor, c, c),
-            colors: sl.colors.clone(),
-            extras: sl
-                .extras
-                .iter()
-                .map(|e| {
-                    let mut e = e.clone();
-                    e.positions = scale_about(&e.positions, factor, c, c);
-                    e
-                })
-                .collect(),
-        });
-        let size = bbox_size(&positions);
-        let started = std::time::Instant::now();
-        let topo = build_topology(positions);
-        let weld_ms = started.elapsed().as_secs_f64() * 1e3;
-        // `forgetSessionNote` (`web/ui/io.js:90-96`, called by `setScale`): the supports a saved session brought
-        // back are gone with the rescale, so the note no longer says they were restored
-        let mut note = {
-            let n = self.note();
-            NoteState {
-                meta: n.meta.clone(),
-                objects_len: n.objects_len,
-                chosen_len: n.chosen_len,
-                notes: Vec::new(),
-                import_note: String::new(),
-                pending: None,
+    pub fn scaled(&self, factor: f64) -> Result<Arc<Part>, FfiError> {
+        crate::crash::guarded("scale", || {
+            // the field clamps to 10-1000 %; a factor far past that (or not a number) only makes a mesh of infinities
+            if !(factor.is_finite() && factor > 0.0 && factor <= MAX_SCALE) {
+                return Err(FfiError::Engine {
+                    message: format!("scale must be a number above 0 and at most {MAX_SCALE}"),
+                });
             }
-        };
-        note.meta.session = SessionNote::None;
-        note.render(&self.name);
-        Arc::new(Part {
-            name: self.name.clone(),
-            stem: self.stem.clone(),
-            slicer: slicer.map(Arc::new),
-            colors: self.colors.clone(),
-            topo: Arc::new(topo),
-            size,
-            note: Mutex::new(note),
-            weld_ms,
+            let (lo, hi) = bbox(&self.topo.pos);
+            let c = [
+                (lo[0] + hi[0]) / 2.0,
+                (lo[1] + hi[1]) / 2.0,
+                (lo[2] + hi[2]) / 2.0,
+            ];
+            let centred: Vec<f64> = self
+                .topo
+                .pos
+                .iter()
+                .enumerate()
+                .map(|(i, p)| ((p - c[i % 3]) as f32) as f64)
+                .collect();
+            let positions = scale_about(&centred, factor, [0.0; 3], c);
+            let slicer = self.slicer.as_ref().map(|sl| Slicer {
+                positions: scale_about(&sl.positions, factor, c, c),
+                colors: sl.colors.clone(),
+                extras: sl
+                    .extras
+                    .iter()
+                    .map(|e| {
+                        let mut e = e.clone();
+                        e.positions = scale_about(&e.positions, factor, c, c);
+                        e
+                    })
+                    .collect(),
+            });
+            let size = bbox_size(&positions);
+            let started = std::time::Instant::now();
+            let topo = build_topology(positions);
+            let weld_ms = started.elapsed().as_secs_f64() * 1e3;
+            // `forgetSessionNote` (`web/ui/io.js:90-96`, called by `setScale`): the supports a saved session brought
+            // back are gone with the rescale, so the note no longer says they were restored
+            let mut note = {
+                let n = self.note();
+                NoteState {
+                    meta: n.meta.clone(),
+                    objects_len: n.objects_len,
+                    chosen_len: n.chosen_len,
+                    notes: Vec::new(),
+                    import_note: String::new(),
+                    pending: None,
+                }
+            };
+            note.meta.session = SessionNote::None;
+            note.render(&self.name);
+            Ok(Arc::new(Part {
+                name: self.name.clone(),
+                stem: self.stem.clone(),
+                slicer: slicer.map(Arc::new),
+                colors: self.colors.clone(),
+                topo: Arc::new(topo),
+                size,
+                note: Mutex::new(note),
+                weld_ms,
+            }))
         })
     }
 
@@ -429,40 +454,42 @@ impl Part {
 
     /// `rot`: nine numbers, column-major (the engine's `Rot3`).
     pub fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError> {
-        let _op = crate::crash::operation("analyze");
-        let started = std::time::Instant::now();
-        let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
-        let analyze_ms = started.elapsed().as_secs_f64() * 1e3;
-        Ok(AnalysisSummary {
-            over_area: a.over_area,
-            bed_area: a.bed_area,
-            over_face_count: a.over_face_count as u64,
-            region_count: a.regions.len() as u64,
-            raw_region_count: a.raw_region_count as u64,
-            analyze_ms,
-            offset: vec![a.offset.x, a.offset.y, a.offset.z],
-            size: vec![a.size.x, a.size.y, a.size.z],
+        crate::crash::guarded("analyze", || {
+            let started = std::time::Instant::now();
+            let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
+            let analyze_ms = started.elapsed().as_secs_f64() * 1e3;
+            Ok(AnalysisSummary {
+                over_area: a.over_area,
+                bed_area: a.bed_area,
+                over_face_count: a.over_face_count as u64,
+                region_count: a.regions.len() as u64,
+                raw_region_count: a.raw_region_count as u64,
+                analyze_ms,
+                offset: vec![a.offset.x, a.offset.y, a.offset.z],
+                size: vec![a.size.x, a.size.y, a.size.z],
+            })
         })
     }
 
     /// The spots whose first layer starts in midair in this pose (`findIslands`, `web/ui/islands.js`
     /// `updateIslands`): no face there is red, so the readout counts them and the viewer marks them.
     pub fn islands(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Vec<Island>, FfiError> {
-        let _op = crate::crash::operation("islands");
-        let rot = rot9(&rot)?;
-        let cfg = sf_engine::config::Config::default();
-        let a = analyze(&self.topo, threshold(threshold_deg)?, &rot);
-        let found =
-            sf_engine::islands::find_islands(&self.topo, &a, &rot, &Default::default(), &cfg);
-        Ok(found
-            .into_iter()
-            .map(|i| Island {
-                x: i.x,
-                y: i.y,
-                z: i.z,
-                points: i.points.iter().flatten().copied().collect(),
-            })
-            .collect())
+        crate::crash::guarded("islands", || {
+            let rot = rot9(&rot)?;
+            let cfg = sf_engine::config::Config::default();
+            let a = analyze(&self.topo, threshold(threshold_deg)?, &rot);
+            let found =
+                sf_engine::islands::find_islands(&self.topo, &a, &rot, &Default::default(), &cfg);
+            Ok(found
+                .into_iter()
+                .map(|i| Island {
+                    x: i.x,
+                    y: i.y,
+                    z: i.z,
+                    points: i.points.iter().flatten().copied().collect(),
+                })
+                .collect())
+        })
     }
 
     /// One byte per face: bit 0 `over`, bit 1 `kept`, bit 2 `on_bed`.
@@ -471,19 +498,21 @@ impl Part {
         threshold_deg: f64,
         rot: Vec<f64>,
     ) -> Result<Arc<GpuBuffer>, FfiError> {
-        let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
-        let flags: Vec<u8> = (0..self.topo.n_faces)
-            .map(|f| {
-                u8::from(a.over[f] != 0)
-                    | (u8::from(a.kept[f] != 0) << 1)
-                    | (u8::from(a.on_bed[f] != 0) << 2)
-            })
-            .collect();
-        Ok(Arc::new(GpuBuffer::from_bytes(
-            &flags,
-            1,
-            flags.len() as u32,
-        )))
+        crate::crash::guarded("face flags", || {
+            let a = analyze(&self.topo, threshold(threshold_deg)?, &rot9(&rot)?);
+            let flags: Vec<u8> = (0..self.topo.n_faces)
+                .map(|f| {
+                    u8::from(a.over[f] != 0)
+                        | (u8::from(a.kept[f] != 0) << 1)
+                        | (u8::from(a.on_bed[f] != 0) << 2)
+                })
+                .collect();
+            Ok(Arc::new(GpuBuffer::from_bytes(
+                &flags,
+                1,
+                flags.len() as u32,
+            )))
+        })
     }
 }
 
@@ -717,99 +746,100 @@ fn cut_object(o: ThreeMfObject) -> Loaded {
 /// (`web/ui/io.js`), through `sf-cut`; `PartInfo.notes` says what was cut and why anything was not.
 #[uniffi::export]
 pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
-    let _op = crate::crash::operation("load model");
-    let bytes = std::fs::read(&path).map_err(|e| FfiError::Io {
-        message: format!("{path}: {e}"),
-    })?;
-    let format = |message: String| FfiError::Format { message };
-    let lower = path.to_ascii_lowercase();
-    let mut parts: Vec<Loaded> = Vec::new();
-    // a 3MF this app or the site exported carries a session: its part loads, and the supports come back from the
-    // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
-    let mut own: Option<(usize, sf_io::json::Json)> = None;
-    if lower.ends_with(".stl") {
-        parts.push((
-            stem(&path),
-            read_stl(&bytes).map_err(|e| format(e.0))?,
-            None,
-            None,
-            ImportMeta::new(Kind::Stl),
-        ));
-    } else if lower.ends_with(".obj") {
-        for o in read_obj(&bytes).map_err(format)?.objects {
-            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Obj)));
-        }
-    } else if lower.ends_with(".3mf") {
-        let m = read_three_mf_unmerged(&bytes).map_err(format)?;
-        drop(bytes);
-        let mut objects = m.objects;
-        if let Some(session) = m.session
-            && let Some(i) = sf_io::session::part_object_of(&objects)
-        {
-            own = Some((objects.len(), session));
-            objects = vec![objects.swap_remove(i)];
-        }
-        let (skipped, unit) = (m.skipped, m.unit);
-        let file = |mut meta: ImportMeta| {
-            meta.skipped = skipped;
-            meta.unit.clone_from(&unit);
-            meta
-        };
-        if objects.is_empty() {
+    crate::crash::guarded("load model", || {
+        let bytes = std::fs::read(&path).map_err(|e| FfiError::Io {
+            message: format!("{path}: {e}"),
+        })?;
+        let format = |message: String| FfiError::Format { message };
+        let lower = path.to_ascii_lowercase();
+        let mut parts: Vec<Loaded> = Vec::new();
+        // a 3MF this app or the site exported carries a session: its part loads, and the supports come back from the
+        // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
+        let mut own: Option<(usize, sf_io::json::Json)> = None;
+        if lower.ends_with(".stl") {
             parts.push((
                 stem(&path),
-                m.positions,
+                read_stl(&bytes).map_err(|e| format(e.0))?,
                 None,
                 None,
-                file(ImportMeta::new(Kind::ThreeMf)),
+                ImportMeta::new(Kind::Stl),
             ));
-        } else {
-            parts.extend(
-                objects
-                    .into_iter()
-                    .map(cut_object)
-                    .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
-            );
-        }
-    } else if lower.ends_with(".step") || lower.ends_with(".stp") || sf_step::is_step(&bytes) {
-        // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
-        for o in sf_step::read_step(&bytes).map_err(format)? {
-            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Step)));
-        }
-    } else {
-        return Err(format("reads .stl, .3mf, .obj and .step only".into()));
-    }
-    parts.retain(|(_, p, _, _, _)| !p.is_empty());
-    if parts.is_empty() {
-        return Err(format("no triangles in the file".into()));
-    }
-    let base = stem(&path);
-    let objects_len = own.as_ref().map_or(parts.len(), |(n, _)| *n);
-    Ok(parts
-        .into_iter()
-        .enumerate()
-        .map(|(i, (name, pos, slicer, colors, meta))| {
-            let name = if name.is_empty() {
-                format!("{base} {}", i + 1)
-            } else {
-                name
+        } else if lower.ends_with(".obj") {
+            for o in read_obj(&bytes).map_err(format)?.objects {
+                parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Obj)));
+            }
+        } else if lower.ends_with(".3mf") {
+            let m = read_three_mf_unmerged(&bytes).map_err(format)?;
+            drop(bytes);
+            let mut objects = m.objects;
+            if let Some(session) = m.session
+                && let Some(i) = sf_io::session::part_object_of(&objects)
+            {
+                own = Some((objects.len(), session));
+                objects = vec![objects.swap_remove(i)];
+            }
+            let (skipped, unit) = (m.skipped, m.unit);
+            let file = |mut meta: ImportMeta| {
+                meta.skipped = skipped;
+                meta.unit.clone_from(&unit);
+                meta
             };
-            let part = Part::new(
-                name,
-                base.clone(),
-                pos,
-                slicer,
-                colors,
-                meta,
-                objects_len,
-                1,
-            );
-            Arc::new(match &own {
-                Some((_, session)) => part.with_session(session.clone()),
-                None => part,
+            if objects.is_empty() {
+                parts.push((
+                    stem(&path),
+                    m.positions,
+                    None,
+                    None,
+                    file(ImportMeta::new(Kind::ThreeMf)),
+                ));
+            } else {
+                parts.extend(
+                    objects
+                        .into_iter()
+                        .map(cut_object)
+                        .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
+                );
+            }
+        } else if lower.ends_with(".step") || lower.ends_with(".stp") || sf_step::is_step(&bytes) {
+            // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
+            for o in sf_step::read_step(&bytes).map_err(format)? {
+                parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Step)));
+            }
+        } else {
+            return Err(format("reads .stl, .3mf, .obj and .step only".into()));
+        }
+        parts.retain(|(_, p, _, _, _)| !p.is_empty());
+        if parts.is_empty() {
+            return Err(format("no triangles in the file".into()));
+        }
+        let base = stem(&path);
+        let objects_len = own.as_ref().map_or(parts.len(), |(n, _)| *n);
+        Ok(parts
+            .into_iter()
+            .enumerate()
+            .map(|(i, (name, pos, slicer, colors, meta))| {
+                let name = if name.is_empty() {
+                    format!("{base} {}", i + 1)
+                } else {
+                    name
+                };
+                let part = Part::new(
+                    name,
+                    base.clone(),
+                    pos,
+                    slicer,
+                    colors,
+                    meta,
+                    objects_len,
+                    1,
+                );
+                Arc::new(match &own {
+                    Some((_, session)) => part.with_session(session.clone()),
+                    None => part,
+                })
             })
-        })
-        .collect())
+            .collect())
+    })
 }
 
 /// Several picked objects as one part (the picker's "Merge N & load", `web/ui/io.js:140-200`, then
@@ -821,80 +851,81 @@ pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
 /// line (`io.js:34`, `:267`), `TOTAL` being the file's object count, which a `Part` does not know, so the caller passes it. One part comes back as itself.
 #[uniffi::export]
 pub fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError> {
-    let _op = crate::crash::operation("merge parts");
-    match parts.len() {
-        0 => {
-            return Err(FfiError::Engine {
-                message: "nothing to merge".into(),
-            });
+    crate::crash::guarded("merge parts", || {
+        match parts.len() {
+            0 => {
+                return Err(FfiError::Engine {
+                    message: "nothing to merge".into(),
+                });
+            }
+            1 => return Ok(parts.into_iter().next().unwrap()),
+            _ => {}
         }
-        1 => return Ok(parts.into_iter().next().unwrap()),
-        _ => {}
-    }
-    let positions: Vec<f64> = parts
-        .iter()
-        .flat_map(|p| p.topo.pos.iter().copied())
-        .collect();
-    let cut_items: Vec<MergeItem> = parts
-        .iter()
-        .map(|p| MergeItem {
-            colors: p.colors.as_ref(),
-            positions_len: p.topo.pos.len(),
-        })
-        .collect();
-    let colors = merge_colors(&cut_items);
-    let slicer = if parts.iter().any(|p| p.slicer.is_some()) {
-        // the uncut positions and colours of each object: its slicer's, or its own when it had no extras
-        let uncut: Vec<(&[f64], Option<&PartColors>)> = parts
+        let positions: Vec<f64> = parts
             .iter()
-            .map(|p| match &p.slicer {
-                Some(s) => (s.positions.as_slice(), s.colors.as_ref()),
-                None => (p.topo.pos.as_slice(), p.colors.as_ref()),
+            .flat_map(|p| p.topo.pos.iter().copied())
+            .collect();
+        let cut_items: Vec<MergeItem> = parts
+            .iter()
+            .map(|p| MergeItem {
+                colors: p.colors.as_ref(),
+                positions_len: p.topo.pos.len(),
             })
             .collect();
-        let items: Vec<MergeItem> = uncut
-            .iter()
-            .map(|(pos, c)| MergeItem {
-                colors: *c,
-                positions_len: pos.len(),
+        let colors = merge_colors(&cut_items);
+        let slicer = if parts.iter().any(|p| p.slicer.is_some()) {
+            // the uncut positions and colours of each object: its slicer's, or its own when it had no extras
+            let uncut: Vec<(&[f64], Option<&PartColors>)> = parts
+                .iter()
+                .map(|p| match &p.slicer {
+                    Some(s) => (s.positions.as_slice(), s.colors.as_ref()),
+                    None => (p.topo.pos.as_slice(), p.colors.as_ref()),
+                })
+                .collect();
+            let items: Vec<MergeItem> = uncut
+                .iter()
+                .map(|(pos, c)| MergeItem {
+                    colors: *c,
+                    positions_len: pos.len(),
+                })
+                .collect();
+            Some(Slicer {
+                positions: uncut
+                    .iter()
+                    .flat_map(|(pos, _)| pos.iter().copied())
+                    .collect(),
+                colors: merge_colors(&items),
+                extras: parts
+                    .iter()
+                    .filter_map(|p| p.slicer.as_ref())
+                    .flat_map(|s| s.extras.iter().cloned())
+                    .collect(),
             })
-            .collect();
-        Some(Slicer {
-            positions: uncut
-                .iter()
-                .flat_map(|(pos, _)| pos.iter().copied())
-                .collect(),
-            colors: merge_colors(&items),
-            extras: parts
-                .iter()
-                .filter_map(|p| p.slicer.as_ref())
-                .flat_map(|s| s.extras.iter().cloned())
-                .collect(),
-        })
-    } else {
-        None
-    };
-    // the tallies of `cutChosen` (io.js:288-311): sums, the first reason, the first object's meshes
-    let metas: Vec<ImportMeta> = parts.iter().map(|p| p.note().meta.clone()).collect();
-    let mut meta = metas[0].clone();
-    meta.cut = metas.iter().map(|m| m.cut).sum();
-    meta.uncut = metas.iter().map(|m| m.uncut).sum();
-    meta.why = metas.iter().find_map(|m| m.why);
-    meta.extras = metas.iter().map(|m| m.extras).sum();
-    // a saved session belongs to the one part it was exported with: a merge of several has none
-    meta.session = SessionNote::None;
-    let total = (object_count as usize).max(parts.len());
-    let stem = parts[0].stem.clone();
-    Ok(Arc::new(Part::new(
-        stem.clone(),
-        stem,
-        positions,
-        slicer,
-        colors,
-        meta,
-        total,
-        parts.len(),
-    )))
+        } else {
+            None
+        };
+        // the tallies of `cutChosen` (io.js:288-311): sums, the first reason, the first object's meshes
+        let metas: Vec<ImportMeta> = parts.iter().map(|p| p.note().meta.clone()).collect();
+        let mut meta = metas[0].clone();
+        meta.cut = metas.iter().map(|m| m.cut).sum();
+        meta.uncut = metas.iter().map(|m| m.uncut).sum();
+        meta.why = metas.iter().find_map(|m| m.why);
+        meta.extras = metas.iter().map(|m| m.extras).sum();
+        // a saved session belongs to the one part it was exported with: a merge of several has none
+        meta.session = SessionNote::None;
+        let total = (object_count as usize).max(parts.len());
+        let stem = parts[0].stem.clone();
+        Ok(Arc::new(Part::new(
+            stem.clone(),
+            stem,
+            positions,
+            slicer,
+            colors,
+            meta,
+            total,
+            parts.len(),
+        )))
+    })
 }
 
 #[cfg(test)]

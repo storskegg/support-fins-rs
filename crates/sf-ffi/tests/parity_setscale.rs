@@ -22,9 +22,11 @@ fn scaled_matches_the_pages_set_scale_exactly() {
         let (Value::Str(model), Value::Str(pct)) = (&c.args[0], &c.args[1]) else {
             panic!("{}: args", c.id)
         };
-        let s = scale_from_percent_text(pct.clone()).expect("a valid percent");
+        let s = scale_from_percent_text(pct.clone())
+            .unwrap()
+            .expect("a valid percent");
         let part = load_parts(path(model)).unwrap().remove(0);
-        let got = part.scaled(s);
+        let got = part.scaled(s).unwrap();
         let Some(Value::F32(want)) = &c.out else {
             panic!("{}: out", c.id)
         };

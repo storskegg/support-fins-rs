@@ -22,7 +22,8 @@ extension FinSettings {
 
     /// `sessionForm()` (`ui/history.js:76`): every field's value, as the field would hold it.
     var sessionForm: [(id: String, value: SessionValue)] {
-        func n(_ x: Double) -> SessionValue { .text(jsNumberText(x: x)) }
+        // the engine's number text never refuses a number; Swift's own text is the fallback for the impossible case
+        func n(_ x: Double) -> SessionValue { .text((try? jsNumberText(x: x)) ?? "\(x)") }
         return Self.sessionIDs.map { id in
             switch id {
             case "thr": (id, n(threshold))

@@ -87,7 +87,7 @@ struct MoveModelTests {
         drag(tool, .live, from: .zero, to: SIMD2(other.xy.x - live.xy.x, other.xy.y - live.xy.y))
         let a = try #require(board.footprint(of: live)).placed(x: live.xy.x, y: live.xy.y)
         let b = try #require(board.footprint(of: other)).placed(x: other.xy.x, y: other.xy.y)
-        #expect(a.sharedCount(other: b) == 0, "no shared cell: \(live.xy) vs \(other.xy)")
+        #expect(try a.sharedCount(other: b) == 0, "no shared cell: \(live.xy) vs \(other.xy)")
         #expect(live.xy != other.xy)
     }
 

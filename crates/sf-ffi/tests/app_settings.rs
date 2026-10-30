@@ -150,7 +150,8 @@ fn every_variant_builds_through_every_build_entry() {
         // Builder.build, the worker the app uses
         let b = Builder::new(part.clone());
         let (l, rx) = channel();
-        b.build(rot.to_vec(), f.options.clone(), f.tunables.clone(), l);
+        b.build(rot.to_vec(), f.options.clone(), f.tunables.clone(), l)
+            .unwrap();
         match wait(&rx, n) {
             Ev::Built(w) => assert_eq!(w.summary_json(), r.summary_json(), "{n}: Builder.build"),
             Ev::Failed(e) => panic!("{n}: Builder.build: {e}"),
@@ -176,14 +177,16 @@ fn every_variant_ranks_through_every_suggest_entry() {
         // Suggester, the worker the app uses
         let s = Suggester::new(part.clone());
         let (l, rx) = channel();
-        s.suggest(45.0, f.options.clone(), f.tunables.clone(), ctx(), l);
+        s.suggest(45.0, f.options.clone(), f.tunables.clone(), ctx(), l)
+            .unwrap();
         match wait(&rx, n) {
             Ev::Suggested(r) => assert_eq!(r.rows.len(), a.rows.len(), "{n}: Suggester.suggest"),
             Ev::Failed(e) => panic!("{n}: Suggester.suggest: {e}"),
             Ev::Built(_) => unreachable!(),
         }
         let (l, rx) = channel();
-        s.suggest_wide(45.0, f.options.clone(), f.tunables.clone(), ctx(), 1.0, l);
+        s.suggest_wide(45.0, f.options.clone(), f.tunables.clone(), ctx(), 1.0, l)
+            .unwrap();
         match wait(&rx, n) {
             Ev::Suggested(_) => {}
             Ev::Failed(e) => panic!("{n}: Suggester.suggest_wide: {e}"),
@@ -235,7 +238,7 @@ fn every_variant_draws_exports_and_restores() {
         // the session the file carries restores onto the part, with the settings the app wrote
         let back = load_parts(path).unwrap().remove(0);
         assert!(back.has_session(), "{n}: the 3MF carries the session");
-        let r = back.restore_session(false);
+        let r = back.restore_session(false).unwrap();
         assert_eq!(r.why, None, "{n}: restore_session");
         assert!(!r.form.is_empty(), "{n}: the form came back");
         // plates: one model with its session, then the zip of plates
@@ -332,7 +335,7 @@ fn tunables_outside_the_ranges_the_ui_clamps_to_are_refused() {
         );
         let b = Builder::new(part.clone());
         let (l, rx) = channel();
-        b.build(rot.to_vec(), d.options.clone(), t, l);
+        b.build(rot.to_vec(), d.options.clone(), t, l).unwrap();
         assert!(
             matches!(wait(&rx, &what), Ev::Failed(_)),
             "Builder.build accepted {what}"

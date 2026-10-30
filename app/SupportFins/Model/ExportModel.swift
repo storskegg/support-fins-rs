@@ -136,7 +136,8 @@ final class ExportModel {
     /// The suggested file name: `part-fins-0.4nozzle-0.2layer.stl` (`export_file_name`, `ui/export.js` `plateName`).
     func fileName(for format: ExportFormat) -> String? {
         guard let s = source() else { return nil }
-        return exportFileName(base: Self.base(of: s.partName), kind: format.kind, nozzle: s.nozzle, layerHeight: s.layerHeight)
+        // a suggestion only: no suggested name (the save panel then starts empty) when the engine refuses
+        return try? exportFileName(base: Self.base(of: s.partName), kind: format.kind, nozzle: s.nozzle, layerHeight: s.layerHeight)
     }
 
     /// The part's name without its mesh extension, or `part` (`ui/export.js:63`).

@@ -43,8 +43,10 @@ final class ReportModel {
         guard let host, let report = current() else { return nil }
         let outcomes = host.features[DrawFeature.self]?.model.outcomes ?? [:]
         let drawn = host.session.drawnWalls.filter { outcomes[$0.id]?.ok == true }.count
-        let text = report.url(site: Self.site, when: Self.today, drawn: UInt32(drawn),
-                              removed: UInt32(host.session.removedFins.count))
+        // no link when the engine refuses the call (it does not for a date and two counts); `current()` already
+        // answers nil the same way when it cannot make the report
+        guard let text = try? report.url(site: Self.site, when: Self.today, drawn: UInt32(drawn),
+                                         removed: UInt32(host.session.removedFins.count)) else { return nil }
         return URL(string: text)
     }
 

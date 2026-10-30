@@ -34,32 +34,33 @@ pub fn build_report(
     opts_json: String,
     tunables_json: String,
 ) -> Result<Arc<BuildReport>, FfiError> {
-    let _op = crate::crash::operation("report");
-    let options = match parse(&opts_json) {
-        Some(j @ Json::Obj(_)) => j,
-        _ => return Err(engine("options must be a JSON object of options.json keys")),
-    };
-    let tunables = if tunables_json.trim().is_empty() {
-        Json::Obj(vec![])
-    } else {
-        match parse(&tunables_json) {
-            Some(j @ Json::Obj(_)) => {
-                crate::builder::check_tunable_ranges(&j)?;
-                j
+    crate::crash::guarded("report", || {
+        let options = match parse(&opts_json) {
+            Some(j @ Json::Obj(_)) => j,
+            _ => return Err(engine("options must be a JSON object of options.json keys")),
+        };
+        let tunables = if tunables_json.trim().is_empty() {
+            Json::Obj(vec![])
+        } else {
+            match parse(&tunables_json) {
+                Some(j @ Json::Obj(_)) => {
+                    crate::builder::check_tunable_ranges(&j)?;
+                    j
+                }
+                _ => return Err(engine("tunables must be a JSON object")),
             }
-            _ => return Err(engine("tunables must be a JSON object")),
-        }
-    };
-    let (topo, threshold, rot) = result.report_inputs();
-    // `part.geometry.boundingBox`: the Float32 positions
-    let pos: Vec<f64> = topo.pos.iter().map(|&v| (v as f32) as f64).collect();
-    let (lo, hi) = box_of(&pos);
-    let size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-    let opts = web_fin_opts(&options, &tunables);
-    let rep = report_settings(threshold, &rot, &opts, scale, size, topo.n_faces);
-    let res = analyze(topo, threshold, &rot);
-    let cov = report_coverage(result.built(), &res);
-    Ok(Arc::new(BuildReport { rep, cov }))
+        };
+        let (topo, threshold, rot) = result.report_inputs();
+        // `part.geometry.boundingBox`: the Float32 positions
+        let pos: Vec<f64> = topo.pos.iter().map(|&v| (v as f32) as f64).collect();
+        let (lo, hi) = box_of(&pos);
+        let size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+        let opts = web_fin_opts(&options, &tunables);
+        let rep = report_settings(threshold, &rot, &opts, scale, size, topo.n_faces);
+        let res = analyze(topo, threshold, &rot);
+        let cov = report_coverage(result.built(), &res);
+        Ok(Arc::new(BuildReport { rep, cov }))
+    })
 }
 
 #[uniffi::export]
@@ -71,16 +72,24 @@ impl BuildReport {
 
     /// The new-issue link (`reportUrl`). `site` is where the report came from, `when` the date (`YYYY-MM-DD`),
     /// `drawn` the walls drawn by hand that were built, `removed` the fins removed by hand.
-    pub fn url(&self, site: String, when: String, drawn: u32, removed: u32) -> String {
-        report_url(
-            &self.rep,
-            &self.cov,
-            &UrlOpts {
-                where_: site,
-                when,
-                drawn: f64::from(drawn),
-                removed: f64::from(removed),
-            },
-        )
+    pub fn url(
+        &self,
+        site: String,
+        when: String,
+        drawn: u32,
+        removed: u32,
+    ) -> Result<String, FfiError> {
+        crate::crash::guarded_value("report url", || {
+            report_url(
+                &self.rep,
+                &self.cov,
+                &UrlOpts {
+                    where_: site,
+                    when,
+                    drawn: f64::from(drawn),
+                    removed: f64::from(removed),
+                },
+            )
+        })
     }
 }

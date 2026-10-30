@@ -198,7 +198,7 @@ struct SessionTests {
         let core = try #require(model.session.parts.first)
         #expect(note(model).contains("restored 4"))
         let device = try #require(model.controller?.renderer.device)
-        let scaled = try #require(CorePart(part: core.part.scaled(factor: 1.5), device: device))
+        let scaled = try #require(CorePart(part: try core.part.scaled(factor: 1.5), device: device))
         model.reshow(scaled)
         #expect(!note(model).contains("restored") && model.session.drawnWalls.isEmpty, "\(note(model))")
     }

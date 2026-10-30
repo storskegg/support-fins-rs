@@ -217,7 +217,9 @@ final class PlateBoard {
         let o = seatingOffset(bounds: part.bounds, rotation: matrix_identity_float3x3)
         let grid = try? footprintOfPart(part: part.part, rot: PoseAccess.identity, offset: [Double(o.x), Double(o.y), Double(o.z)])
         let v = controller.volume
-        let at = footprintSpot(others: placedFootprints(skipping: []), grid: grid, bx: Double(v.x), by: Double(v.y), gap: Self.gap)
+        // the bed's centre when the engine refuses: a place that always exists, and the model can be moved from it
+        guard let at = try? footprintSpot(others: placedFootprints(skipping: []), grid: grid, bx: Double(v.x), by: Double(v.y), gap: Self.gap),
+              at.count == 2 else { return .zero }
         return SIMD2(at[0], at[1])
     }
 
@@ -293,14 +295,15 @@ final class PlateBoard {
         guard let v = host?.controller?.volume else { plate.models += slots; return }
         for m in slots {
             let grid = footprint(of: m)
-            let near = grid?.placed(x: m.xy.x, y: m.xy.y).dilate(r: Self.gap)
+            // an engine refusal reads as "no clash": the model goes back where it stood
+            let near = grid.flatMap { try? $0.placed(x: m.xy.x, y: m.xy.y).dilate(r: Self.gap) }
             let clash = near.map { near in
                 plate.models.contains { o in
-                    o.stash != nil && (footprint(of: o).map { $0.placed(x: o.xy.x, y: o.xy.y).sharedCount(other: near) > 0 } ?? false)
+                    o.stash != nil && (footprint(of: o).flatMap { try? $0.placed(x: o.xy.x, y: o.xy.y).sharedCount(other: near) }.map { $0 > 0 } ?? false)
                 }
             } ?? false
-            if clash {
-                let at = footprintSpot(others: placedFootprints(skipping: [m], in: plate), grid: grid, bx: Double(v.x), by: Double(v.y), gap: Self.gap)
+            if clash, let at = try? footprintSpot(others: placedFootprints(skipping: [m], in: plate), grid: grid, bx: Double(v.x), by: Double(v.y), gap: Self.gap),
+               at.count == 2 {
                 m.xy = SIMD2(at[0], at[1])
             }
             plate.models.append(m)

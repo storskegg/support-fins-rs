@@ -96,8 +96,9 @@ final class MoveModel {
     /// plate's bed (`over`, `plateUnder`, `ui/move.js:170-174`, `ui/platerow.js`).
     private func over(_ xy: SIMD2<Double>, on board: PlateBoard) -> (plate: Int, xy: SIMD2<Double>)? {
         guard let v = host?.controller?.volume else { return nil }
-        let r = plateUnder(x: xy.x, y: xy.y, active: UInt64(board.active), count: UInt64(board.plates.count), pitch: board.pitch,
-                           bx: Double(v.x), by: Double(v.y))
+        // an engine refusal reads as "over no plate": the model is not handed to another plate on a guess
+        guard let r = try? plateUnder(x: xy.x, y: xy.y, active: UInt64(board.active), count: UInt64(board.plates.count),
+                                      pitch: board.pitch, bx: Double(v.x), by: Double(v.y)) else { return nil }
         return r.count == 3 ? (Int(r[0]), SIMD2(r[1], r[2])) : nil
     }
 
@@ -112,11 +113,16 @@ final class MoveModel {
     /// `dragStep` with `clashAt` as the probe: the others stand where they stand.
     private func step(_ slot: ModelSlot, to: SIMD2<Double>, on board: PlateBoard) -> SIMD2<Double> {
         guard let grid = board.footprint(of: slot) else { return to }
-        let others = board.plate.models.compactMap { o in
-            o === slot ? nil : board.footprint(of: o)?.placed(x: o.xy.x, y: o.xy.y)
+        do {
+            let others = try board.plate.models.compactMap { o in
+                try o === slot ? nil : board.footprint(of: o)?.placed(x: o.xy.x, y: o.xy.y)
+            }
+            let r = try footprintDragStep(at: [slot.xy.x, slot.xy.y], to: [to.x, to.y], grid: grid, others: others)
+            return SIMD2(r[0], r[1])
+        } catch {
+            // the engine refused (a position far off the plate): the model stays where it is rather than jump
+            return slot.xy
         }
-        let r = footprintDragStep(at: [slot.xy.x, slot.xy.y], to: [to.x, to.y], grid: grid, others: others)
-        return SIMD2(r[0], r[1])
     }
 
     /// Put `slot` at `xy`. The live one shifts the world the other way and the camera with it (`placeLive`); a parked

@@ -22,6 +22,6 @@ enum CrashArchive {
             names.append(entryName("model", model))
             datas.append(try Data(contentsOf: model))
         }
-        return Data(crashZip(names: names, datas: datas))
+        return Data(try crashZip(names: names, datas: datas))
     }
 }

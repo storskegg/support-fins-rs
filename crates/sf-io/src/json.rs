@@ -197,10 +197,16 @@ fn write_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
+/// How deeply arrays and objects may nest. The parser recurses, so unbounded nesting in a hostile file (a 3MF's
+/// session) would overflow the stack, which is a crash no `catch_unwind` can catch. Real documents here nest under
+/// ten deep; V8's own `JSON.parse` also gives up on deep input (with a `RangeError`, where this returns `None`).
+pub const MAX_DEPTH: usize = 256;
+
 struct P<'a> {
     t: &'a str,
     s: &'a [u8],
     i: usize,
+    depth: usize,
 }
 
 impl P<'_> {
@@ -211,6 +217,16 @@ impl P<'_> {
     }
 
     fn value(&mut self) -> Result<Json, ()> {
+        if self.depth >= MAX_DEPTH {
+            return Err(());
+        }
+        self.depth += 1;
+        let v = self.value_at_depth();
+        self.depth -= 1;
+        v
+    }
+
+    fn value_at_depth(&mut self) -> Result<Json, ()> {
         self.ws();
         match self.s.get(self.i).copied().ok_or(())? {
             b'{' => {
@@ -402,8 +418,29 @@ pub fn parse(text: &str) -> Option<Json> {
         t: text,
         s: text.as_bytes(),
         i: 0,
+        depth: 0,
     };
     let v = p.value().ok()?;
     p.ws();
     if p.i == p.s.len() { Some(v) } else { None }
+}
+
+#[cfg(test)]
+mod depth_tests {
+    use super::*;
+
+    #[test]
+    fn nesting_up_to_the_limit_parses_and_deeper_is_refused_not_a_stack_overflow() {
+        let nest = |n: usize| format!("{}{}", "[".repeat(n), "]".repeat(n));
+        assert!(parse(&nest(MAX_DEPTH)).is_some());
+        assert!(parse(&nest(MAX_DEPTH + 1)).is_none());
+        // a hostile file's session: a million levels would overflow the stack of any thread
+        assert!(parse(&nest(1_000_000)).is_none());
+        assert!(parse(&"[".repeat(1_000_000)).is_none());
+        let objs = format!("{}1{}", "{\"a\":".repeat(100_000), "}".repeat(100_000));
+        assert!(parse(&objs).is_none());
+        // siblings do not count as depth
+        let wide = format!("[{}]", vec!["[1]"; 10_000].join(","));
+        assert!(parse(&wide).is_some());
+    }
 }
