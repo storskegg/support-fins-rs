@@ -34,16 +34,20 @@ extension DrawModel {
         return current ? ExportModel.Drawn(sweep: sweep, pending: false) : ExportModel.Drawn(sweep: nil, pending: true)
     }
 
-    /// The live model's walls for a plate export, now: the landed sweep when it is of the walls and the pose on show,
-    /// else stood here (an export does not wait on the background sweep). Nil when none are shown.
-    func sweepNow() -> DrawnSweep? {
-        guard session.finsOn, drawShown, !session.drawnWalls.isEmpty, let core = session.parts.first else { return nil }
-        if sweepCurrent && sweptIDs == session.drawnWalls.map(\.id) { return sweep }
+    /// The live model's walls for a plate export: the landed sweep when it is of the walls and the pose on show, else a
+    /// recipe the export stands off the main thread (it does not wait on the background sweep). None when none are shown.
+    func sweepNow() -> DrawnSource {
+        guard session.finsOn, drawShown, !session.drawnWalls.isEmpty, let core = session.parts.first else { return .none }
+        if sweepCurrent && sweptIDs == session.drawnWalls.map(\.id) { return sweep.map { .ready($0) } ?? .none }
         let s = session.settings
-        guard let kit = try? DrawKit(part: core.part, rot: session.pose.columnMajor, thresholdDeg: s.threshold,
-                                     settingsJson: s.drawSettingsJSON(), tunablesJson: s.tunablesJSON()) else { return nil }
+        let part = core.part, rot = session.pose.columnMajor, threshold = s.threshold
+        let settings = s.drawSettingsJSON(), tunables = s.tunablesJSON()
         let auto = autoLike ? host?.wiring?.build?.latest : nil
         let ids = auto == nil ? [] : (host?.wiring?.build?.matchedRemovals(of: session.removedFins).keys.sorted().map { UInt64($0) } ?? [])
-        return try? kit.sweep(wallsJson: session.drawnWalls.json, autoBuild: auto, removed: ids)
+        let json = session.drawnWalls.json
+        return .stand {
+            guard let kit = try? DrawKit(part: part, rot: rot, thresholdDeg: threshold, settingsJson: settings, tunablesJson: tunables) else { return nil }
+            return try? kit.sweep(wallsJson: json, autoBuild: auto, removed: ids)
+        }
     }
 }

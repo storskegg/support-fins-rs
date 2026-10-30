@@ -122,7 +122,7 @@ struct PlateExportTests {
         #expect(off.allSatisfy { $0.build == nil && $0.removed.isEmpty })
         let out = try dir().appending(path: "off.3mf")
         let w = try #require(board.plateWrite(0))
-        #expect(board.writePlate(w, to: out) == out && board.exportError == nil)
+        #expect(await board.writePlate(w, to: out) == out && board.exportError == nil)
     }
 
     @Test func allPlatesIsOneZipOfEachPlatesThreeMF() async throws {
@@ -234,11 +234,17 @@ struct PlateExportTests {
         #expect(w.models[1].drawn == nil)
         // the file holds it: the same plate without the wall is smaller
         let out = try dir()
-        let with = try #require(board.writePlate(w, to: out.appending(path: "with.3mf")), "\(board.exportError ?? "")")
+        let with = try #require(await board.writePlate(w, to: out.appending(path: "with.3mf")), "\(board.exportError ?? "")")
         var bare = w
         bare.models[0].drawn = nil
-        let without = try #require(board.writePlate(bare, to: out.appending(path: "without.3mf")))
+        let without = try #require(await board.writePlate(bare, to: out.appending(path: "without.3mf")))
         let a = try Data(contentsOf: with).count, b = try Data(contentsOf: without).count
         #expect(a > b, "with the wall \(a) bytes, without \(b)")
+        // the export stands the walls off the main thread: the deferred write holds a recipe, and what it writes is the same file
+        let lazy = try #require(board.plateWrite(0, deferStanding: true))
+        #expect(lazy.resolved().models[0].drawn != nil)
+        let lazyFile = try #require(await board.writePlate(lazy, to: out.appending(path: "lazy.3mf")), "\(board.exportError ?? "")")
+        let eager = try #require(await board.writePlate(w, to: out.appending(path: "eager.3mf")))
+        #expect(try Data(contentsOf: lazyFile) == Data(contentsOf: eager), "byte-identical")
     }
 }

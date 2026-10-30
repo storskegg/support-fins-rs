@@ -69,12 +69,16 @@ final class ParkedWalls {
 
     /// The walls stood for `s` under `settings` now, for an export (`plateGeometry` stands them as it writes): the
     /// background sweep when it is of this request, else stood here.
-    func sweepNow(for s: ParkedModel, settings: FinSettings) -> DrawnSweep? {
+    func sweepNow(for s: ParkedModel, settings: FinSettings) -> DrawnSource {
         let (key, auto) = request(for: s, settings: settings)
-        if let done, done.key == key { return done.sweep }
-        guard let kit = try? DrawKit(part: s.part.part, rot: key.pose, thresholdDeg: key.threshold, settingsJson: key.settings,
-                                     tunablesJson: key.tunables) else { return nil }
-        return try? kit.sweep(wallsJson: walls.json, autoBuild: auto, removed: key.removed)
+        if let done, done.key == key { return done.sweep.map { .ready($0) } ?? .none }
+        // stood off the main thread by the export (everything it reads is copied here)
+        let part = s.part.part, json = walls.json
+        return .stand {
+            guard let kit = try? DrawKit(part: part, rot: key.pose, thresholdDeg: key.threshold, settingsJson: key.settings,
+                                         tunablesJson: key.tunables) else { return nil }
+            return try? kit.sweep(wallsJson: json, autoBuild: auto, removed: key.removed)
+        }
     }
 }
 
@@ -89,12 +93,12 @@ extension DrawFeature {
 
     /// The walls a plate export writes for model `m` (`PlateBoard.drawn`, `plateGeometry`), in print space about its own
     /// spot: the live model's sweep, or a parked one's stood for its pose under its plate's settings. Nil without walls.
-    func exportDrawn(_ m: ModelSlot, board: PlateBoard) -> DrawnSweep? {
+    func exportDrawn(_ m: ModelSlot, board: PlateBoard) -> DrawnSource {
         if m === board.plate.liveSlot { return model.sweepNow() }
         guard let s = m.stash, let p = s.featureStates[ObjectIdentifier(DrawFeature.self)] as? ParkedWalls, !p.walls.isEmpty,
-              let i = board.plates.firstIndex(where: { $0.models.contains { $0 === m } }) else { return nil }
+              let i = board.plates.firstIndex(where: { $0.models.contains { $0 === m } }) else { return .none }
         let ps = board.plateSettings(i)
-        return ps.finsOn ? p.sweepNow(for: s, settings: ps.settings) : nil
+        return ps.finsOn ? p.sweepNow(for: s, settings: ps.settings) : .none
     }
 
     /// The hand-placed walls of model `m` of the plate (`gs[0].session()`'s `walls`): the live model's are the window's, a

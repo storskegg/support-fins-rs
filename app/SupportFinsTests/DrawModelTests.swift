@@ -110,7 +110,7 @@ struct DrawModelTests {
         try await eventually("the sweep") { draw.sweepCurrent }
         #expect(exporter.availability.enabled.contains(.finsOnly))
         let dir = try Scratch.directory()
-        let file = try #require(exporter.write(.finsOnly, to: dir.appending(path: "fins.stl")), "\(exporter.error ?? "")")
+        let file = try #require(await exporter.write(.finsOnly, to: dir.appending(path: "fins.stl")), "\(exporter.error ?? "")")
         let size = try #require(try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int)
         let triangles = (size - 84) / 50
         // the wall's triangles, then the pad's (a T on its stem needs none)
