@@ -823,7 +823,7 @@ pub fn load_step_parts_with(
     let opts = IoLoadOptions {
         allow_large: options.allow_large,
     };
-    finish_parts(&path, parts, None, &opts)
+    finish_parts(&path, parts, None, false, &opts)
 }
 
 /// `parseStep` (web/ui/io.js:313-350): the kernel's read (`Ok(None)` is `success: false`) -> the objects.
@@ -942,15 +942,16 @@ fn load_parts_on_this_thread(
     } else {
         return Err(format("reads .stl, .3mf, .obj and .step only".into()));
     }
-    finish_parts(&path, parts, own, opts)
+    finish_parts(&path, parts, own, session_unreadable, opts)
 }
 
 /// The loaded objects as `Part`s: empty ones dropped, unnamed ones named after the file, a saved session (`own`: the
-/// file's object count and the session) put on its part.
+/// file's object count and the session) put on its part; `session_unreadable`: the 3MF's session could not be read.
 fn finish_parts(
     path: &str,
     mut parts: Vec<Loaded>,
     own: Option<(usize, sf_io::json::Json)>,
+    session_unreadable: bool,
     opts: &IoLoadOptions,
 ) -> Result<Vec<Arc<Part>>, FfiError> {
     parts.retain(|(_, p, _, _, _)| !p.is_empty());
