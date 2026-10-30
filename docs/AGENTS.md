@@ -61,7 +61,7 @@ you start a ticket, and again whenever a review sends you back.
    **stop and ask** in a comment on your issue (`gh issue comment <n> --repo storskegg/support-fins-rs`).
    Don't work around it.
 3. Before opening the PR, and again before you report back, run `just gate` in your worktree. It
-   runs every gate a PR needs (fmt, clippy with `-D warnings`, every test, the deno tests,
+   runs every gate a PR needs (fmt, clippy with `-D warnings`, every test, rustdoc with `-D warnings`, the deno tests,
    `cli-parity`, and the app gates, always: app tests, UI-test build, i18n check, and the Swift warnings against
    `tools/gate/swift-warnings.baseline`, because the engine crates are the app's engine) and prints one summary
    table. It must exit 0. Paste the table in the PR. A new Swift warning fails it: fix it (the baseline only shrinks;

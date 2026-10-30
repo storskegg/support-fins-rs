@@ -141,8 +141,8 @@ pub fn tilted_block_soup(
 }
 
 /// The soup `holedPlateTopo` builds (tests/_util.js:70-91, lines 71-89; the `buildTopology`
-/// wrapper is M1): a wide thin plate x[-X,X] y[-Y,Y] z[0,TH] with a rectangular bore
-/// x[-hx,hx] y[-hy,hy] punched through Z, as a watertight frame slab. Stored in a
+/// wrapper is M1): a wide thin plate `x[-X,X] y[-Y,Y] z[0,TH]` with a rectangular bore
+/// `x[-hx,hx] y[-hy,hy]` punched through Z, as a watertight frame slab. Stored in a
 /// `Float32Array`, so each value rounds to f32.
 pub fn holed_plate_soup(x: f64, y: f64, th: f64, hx: f64, hy: f64) -> Vec<f64> {
     type V = [f64; 3];

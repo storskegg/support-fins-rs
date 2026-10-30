@@ -140,7 +140,7 @@ fn push_solid(local: &[V4], out: &mut Vec<V4>) {
     }
 }
 
-/// `extrudeRing` (web/fins/wedges.js:84-97): extrude a planar ring (a list of [x,y,z]) by +/-
+/// `extrudeRing` (web/fins/wedges.js:84-97): extrude a planar ring (a list of `[x,y,z]`) by +/-
 /// half along the horizontal uDir.
 fn extrude_ring(ring: &[[f64; 3]], u_dir: Xy, half: f64, out: &mut Vec<V4>) {
     let n = ring.len();
@@ -822,7 +822,7 @@ pub fn build_perp_fins(
 
 /// Port of `propServesPatch` (web/fins/wedges.js:420-440): does a prop wall already stand under
 /// this patch's footprint? Decided in space, not by face index: a prop `line` is a centreline of
-/// [x,y,z] points, and the patch's world footprint is the xy bbox of its four (u,t) corners. If
+/// `[x,y,z]` points, and the patch's world footprint is the xy bbox of its four (u,t) corners. If
 /// any prop point lands in that box (plus a small margin) the patch is already served and a wedge
 /// would just double it.
 pub fn prop_serves_patch(p: &Patch, props: &[PropRecord], cfg: &Config) -> bool {

@@ -16,7 +16,7 @@ pub fn load_model(name: &str) -> Topology {
     build_topology(load_model_soup(name))
 }
 
-/// The topology of a `tests/fixtures` STL (see [`load_fixture_soup`]).
+/// The topology of a `tests/fixtures` STL (see [`load_fixture_soup`](crate::load_fixture_soup)).
 pub fn load_fixture_topo(name: &str) -> Topology {
     build_topology(crate::load_fixture_soup(name))
 }

@@ -3,7 +3,7 @@
 
     just gate [--no-app] [--only NAME[,NAME...]]
 
-Always: fmt, clippy, test (cargo test --workspace), deno (the oracle library tests), cli-parity, and the app gates:
+Always: fmt, clippy, test (cargo test --workspace), doc (rustdoc, warnings are errors), deno (the oracle library tests), cli-parity, and the app gates:
 app-core (regenerate the Swift bindings, swift test), app-project (XcodeGen), app-test (the viewer package's `swift test`,
 then the app's xcodebuild tests; takes the machine lock), app-uibuild (compile the UI tests without running them, so one
 that does not compile cannot reach review), swift-warnings (the app's compiler warnings against
@@ -30,6 +30,8 @@ BASE = [
     ("fmt", ["cargo", "fmt", "--all", "--check"]),
     ("clippy", ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]),
     ("test", ["cargo", "test", "--workspace"]),
+    # rustdoc warnings are errors (`just doc`: broken intra-doc links, unclosed HTML tags), private items included
+    ("doc", ["just", "doc"]),
     # licences, bans and sources (deny.toml); the Acknowledgements file matches what Cargo.lock ships (tools/licenses)
     ("deny", ["cargo", "deny", "check"]),
     ("licenses", ["python3", "tools/licenses/gen.py", "--check"]),

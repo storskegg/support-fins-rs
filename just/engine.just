@@ -8,8 +8,13 @@ check:
     cargo test --workspace
     deno test --allow-read --allow-write --allow-run=git,zstd --allow-env parity/oracle/lib/
 
+# rustdoc over the workspace, private items included, with every warning an error (broken intra-doc links, unclosed
+# HTML tags: write `<mesh>` and `[x,y,z]` in backticks). A gate step.
+doc:
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items -q
+
 # Every gate a PR needs, one summary table, non-zero exit on any failure: fmt, clippy, cargo test --workspace, the deno
-# tests, cli-parity, and always the app gates (app-core, app-project, app-test, app-uibuild, swift-warnings, i18n-check): the
+# tests, rustdoc (`just doc`), cli-parity, and always the app gates (app-core, app-project, app-test, app-uibuild, swift-warnings, i18n-check): the
 # engine crates are the app's engine. Run it before reporting. `--no-app` (loud, not a full gate) / `--only fmt,clippy` to
 # choose. Not app-uitest: only the orchestrator runs that.
 gate *args:
