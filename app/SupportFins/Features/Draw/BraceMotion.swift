@@ -63,7 +63,6 @@ final class BraceMotion {
     /// False in a test: no frame loop, `advance(ms:)` is stepped by hand.
     @ObservationIgnored var runsLoop = true
 
-    var isEmpty: Bool { ghosts.isEmpty }
     var graceActive: Bool { graceLeft != nil }
 
     /// `showBrace`: show the brace `mesh` (height `h` mm); nil `mesh` = this spot is refused.

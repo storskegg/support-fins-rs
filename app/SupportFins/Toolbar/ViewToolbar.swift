@@ -39,7 +39,7 @@ private struct ToolbarButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label { Text(title) + Text(detail) } icon: { Image(systemName: systemImage) }
+            Label { Text("\(Text(title))\(Text(detail))") } icon: { Image(systemName: systemImage) }
                 .labelStyle(.titleAndIcon)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(lit ? AnyShapeStyle(.tint.opacity(0.25)) : AnyShapeStyle(.clear), in: .capsule)

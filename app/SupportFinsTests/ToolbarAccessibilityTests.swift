@@ -27,7 +27,9 @@ struct ToolbarAccessibilityTests {
 
     @Test func theScaleBadgeSaysItsPercentInItsLabel() async throws {
         // SwiftUI builds its accessibility tree only for a client that asks (VoiceOver, XCUITest): ask as one
-        NSApp.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+        // (the informal setter by selector: its typed form is deprecated, and the NSAccessibility protocol has no setter for it)
+        _ = NSApp.perform(NSSelectorFromString("accessibilitySetValue:forAttribute:"), with: true as NSNumber,
+                          with: "AXEnhancedUserInterface" as NSString)
         let r = ToolbarRegistry()
         r.declare([.rotate, .scale])
         var suffix = ""

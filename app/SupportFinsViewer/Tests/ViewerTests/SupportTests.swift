@@ -70,12 +70,6 @@ struct SupportRenderTests {
         return ViewerRenderer.pixels(of: r.renderOffscreen(width: size, height: size))
     }
 
-    func count(_ px: [UInt8], _ test: (Int, Int, Int) -> Bool) -> Int {
-        var n = 0
-        for i in stride(from: 0, to: px.count, by: 4) where test(Int(px[i + 2]), Int(px[i + 1]), Int(px[i])) { n += 1 }
-        return n
-    }
-
     // lit colours stay in the hue of the flat colour (web finMaterial / padMaterial / the crest)
     func isFin(_ r: Int, _ g: Int, _ b: Int) -> Bool { g > 120 && g > r + 40 && g > b + 30 }
     func isPad(_ r: Int, _ g: Int, _ b: Int) -> Bool { r > 150 && r > g + 15 && g > b + 50 }

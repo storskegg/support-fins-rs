@@ -13,14 +13,6 @@ import Viewer
 @Suite("End to end")
 struct EndToEndTests {
     /// Waits (a few seconds at most) for `condition`.
-    private func eventually(_ what: String, _ condition: () -> Bool) async throws {
-        for _ in 0..<1000 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("timed out: \(what)")
-    }
-
     @Test func openBuildReadRebuildAndExport() async throws {
         // open a part through the window's model and the engine's loader
         let model = ViewerModel()

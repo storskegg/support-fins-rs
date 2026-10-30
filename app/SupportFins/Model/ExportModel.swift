@@ -26,7 +26,6 @@ enum ExportFormat: CaseIterable, Sendable {
         }
     }
 
-    var fileExtension: String { self == .threeMF ? "3mf" : "stl" }
     var contentType: UTType { self == .threeMF ? UTType(filenameExtension: "3mf") ?? .data : .stl }
     /// The engine's name for the file (`export_file_name`).
     var kind: ExportKind {

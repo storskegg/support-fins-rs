@@ -1,5 +1,4 @@
 import Foundation
-import SupportFinsCore
 
 /// The text of a failed read: the web's alert, `Could not read ${file.name}:\n${err.message}` (`ui/io.js:407`). The
 /// prefix is translated (`tools/i18n/native-only.json`; the web's alert is English only), the message is the engine's
