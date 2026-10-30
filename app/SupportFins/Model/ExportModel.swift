@@ -92,6 +92,8 @@ final class ExportModel {
     private(set) var lastWritten: URL?
 
     @ObservationIgnored let build: BuildModel
+    /// The write in progress, off the main thread (docs/audit-2026-10/concurrency.md C-03).
+    let job = ExportJob()
     @ObservationIgnored private let source: @MainActor () -> Source?
     @ObservationIgnored private let finsOn: @MainActor () -> Bool
     @ObservationIgnored private let panel: any SavePanel
@@ -105,6 +107,8 @@ final class ExportModel {
         var pending: Bool
     }
     @ObservationIgnored var drawn: @MainActor () -> Drawn = { Drawn(sweep: nil, pending: false) }
+
+    deinit { job.cancelWithoutWaiting() }
 
     init(build: BuildModel, finsOn: @escaping @MainActor () -> Bool, source: @escaping @MainActor () -> Source?,
          removed: @escaping @MainActor () -> Set<FinKey> = { [] },
@@ -120,7 +124,7 @@ final class ExportModel {
     /// out (the old fins under the new settings' name). With the fins off STL and 3MF write the part alone; Fins
     /// only needs fins.
     var availability: Availability {
-        guard source() != nil else { return Availability(enabled: [], note: nil) }
+        guard source() != nil, !job.isRunning else { return Availability(enabled: [], note: nil) }
         guard finsOn() else {
             return Availability(enabled: [.stl, .threeMF],
                                 note: JS.t("No fins yet: STL and 3MF write the part alone. Click Add fins first."))
@@ -148,12 +152,12 @@ final class ExportModel {
 
     /// Asks where, then writes. Returns the file written, or nil when cancelled or failed (`error` says why).
     @discardableResult
-    func run(_ format: ExportFormat) -> URL? {
+    func run(_ format: ExportFormat) async -> URL? {
         guard availability.enabled.contains(format), let name = fileName(for: format),
               let url = panel.url(suggesting: name, type: format.contentType) else { return nil }
         lastFormat = format
         CrashReporter.note("export: \(format)")
-        return write(format, to: url)
+        return await write(format, to: url)
     }
 
     /// The engine's `export` options for `format` (docs/FFI.md): the fins off writes the part alone from the
@@ -179,17 +183,23 @@ final class ExportModel {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// Writes `format` to `url` (the extension picks STL or 3MF in the engine, so it must match).
+    /// Writes `format` to `url` (the extension picks STL or 3MF in the engine, so it must match). The inputs are
+    /// snapshotted here; the engine runs on a background task (`job`, with progress and Cancel) and the file appears only
+    /// when it is whole. Returns nil when cancelled or failed (`error` says why).
     @discardableResult
-    func write(_ format: ExportFormat, to url: URL) -> URL? {
+    func write(_ format: ExportFormat, to url: URL) async -> URL? {
         error = nil
-        guard let s = source(), let options = optionsJSON(for: format) else { return nil }
+        guard !job.isRunning, let s = source(), let options = optionsJSON(for: format) else { return nil }
         // fins on: the build; off: the part alone, no build
         let builds: [BuildResult] = finsOn() ? build.latest.map { [$0] } ?? [] : []
         if finsOn() && builds.isEmpty { return nil }
+        let drawn = finsOn() ? drawn().sweep : nil
+        let part = s.part
         do {
-            try exportWithDrawn(path: url.path(percentEncoded: false), parts: [s.part], builds: builds,
-                                drawn: finsOn() ? drawn().sweep : nil, optionsJson: options)
+            let wrote = try await job.run(title: format.label, to: url) { path in
+                try exportWithDrawn(path: path, parts: [part], builds: builds, drawn: drawn, optionsJson: options)
+            }
+            guard wrote else { return nil }
             lastWritten = url
             return url
         } catch let e as FfiError {

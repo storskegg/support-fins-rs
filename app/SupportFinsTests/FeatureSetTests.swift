@@ -152,7 +152,7 @@ struct FeatureSetTests {
 
     @Test func theWindowsOverlaysStackAsTheyAlwaysHave() throws {
         let model = ViewerModel()
-        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "clash-banner", "plate-toast", "brace-tip", "crash-banner"]
+        var expected = ["empty-state", "plate-labels", "status", "build-spinner", "lay-face-hint", "view-cube-and-toolbar", "plate-tabs", "clash-banner", "plate-toast", "export-progress", "brace-tip", "crash-banner"]
         #if DEBUG
         expected.insert("frame-time", at: 0)
         #endif

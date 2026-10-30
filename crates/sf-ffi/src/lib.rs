@@ -22,7 +22,8 @@ pub use builder::{
     export_with_drawn,
 };
 pub use crash::{
-    crash_breadcrumb, crash_breadcrumbs, crash_reports_start, crash_set_settings, crash_zip,
+    crash_breadcrumb, crash_breadcrumbs, crash_demangle, crash_reports_start, crash_set_settings,
+    crash_zip,
 };
 pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
 pub use footprint::{

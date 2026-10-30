@@ -215,7 +215,7 @@ final class DrawModel {
         if mode == .off { motion.drop() }
         host?.wiring?.exporter?.drawn = { [weak self] in self?.exportDrawn ?? ExportModel.Drawn(sweep: nil, pending: false) }
         if let board = host?.features[PlatesFeature.self]?.board, let draw = host?.features[DrawFeature.self] {
-            board.drawn = { [weak draw, weak board] m in board.flatMap { draw?.exportDrawn(m, board: $0) } }
+            board.drawn = { [weak draw, weak board] m in board.flatMap { draw?.exportDrawn(m, board: $0) } ?? .none }
             board.walls = { [weak draw, weak board] m in board.flatMap { draw?.wallsOf(m, board: $0) } ?? [] }
         }
         ensureKit()

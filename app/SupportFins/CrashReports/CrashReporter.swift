@@ -10,7 +10,15 @@ import SupportFinsCore
 ///   run did not end normally, and a report is written from the saved breadcrumbs;
 /// - writes the MetricKit crash and hang diagnostics the system delivers on a later launch;
 /// - tells the window whether to show the banner (a marker, or a report newer than the last Dismiss);
-/// - prunes the folder at launch (20 reports or 30 days).
+/// - prunes the folder at launch (20 reports or 30 days);
+/// - installs the native crash handlers (1E, SupportFinsCore's `NativeCrashCapture`): a fatal signal or an uncaught
+///   NSException writes a raw dump with the crashing thread's stack, the images and the latest breadcrumbs and settings
+///   at the moment of the crash, and the next launch turns it into a report (`NativeCrashImport`).
+///
+/// Tests never write into the user's folder and never raise the banner from a native dump: a unit-test host and a
+/// UI-test run (DEBUG `-SFCrashDir`) write their raw dumps into a per-run folder in the process's own temporary
+/// directory (`nativeTestFolder`), printed to stderr at install, and nothing converts them; `just app-test` fails when
+/// one appears (tools/gate/native_dumps.py).
 ///
 /// Nothing is sent anywhere; no network API is used.
 @MainActor
@@ -24,6 +32,8 @@ final class CrashReporter {
     @ObservationIgnored private var started = false
     @ObservationIgnored private var saveScheduled = false
     @ObservationIgnored private var subscriber: MetricsSubscriber?
+    /// The native handlers are installed in this process (by any reporter, or the test-host capture).
+    private static var nativeInstalled = false
 
     /// The last run did not end normally (the marker was there at launch).
     private(set) var closedUnexpectedly = false
@@ -51,6 +61,38 @@ final class CrashReporter {
         return environment["XCTestConfigurationFilePath"] == nil
     }
 
+    /// Where a test's raw native dumps go: `<temp>/sf-native-crash/<run>/` in the process's own temporary directory
+    /// (the app's sandbox container for the app and its unit-test host). `<run>` is `SF_CRASH_RUN` when set (`just
+    /// app-test` passes it as `TEST_RUNNER_SF_CRASH_RUN`), else the launch time and pid. Nil outside tests.
+    static func nativeTestFolder(environment: [String: String], defaults: UserDefaults = .standard) -> URL? {
+        var testing = environment["XCTestConfigurationFilePath"] != nil
+        #if DEBUG
+        if defaults.string(forKey: "SFCrashDir") != nil { testing = true }
+        #endif
+        guard testing else { return nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        let run = environment["SF_CRASH_RUN"].map { $0.split(separator: "/").filter { $0 != ".." }.joined(separator: "_") }
+            ?? "\(f.string(from: Date()))-\(getpid())"
+        return FileManager.default.temporaryDirectory.appending(path: "sf-native-crash/\(run)", directoryHint: .isDirectory)
+    }
+
+    /// A unit-test host (the reporter does not start there): only the native handlers, into the run's test folder.
+    static func startTestCapture(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        guard let dir = nativeTestFolder(environment: environment) else { return }
+        installNative(dir: dir, testing: true)
+        shared.pushNativeContext()
+    }
+
+    private static func installNative(dir: URL, testing: Bool) {
+        guard NativeCrashCapture.install(dir: dir, appVersion: appVersion) else { return }
+        nativeInstalled = true
+        if testing {
+            FileHandle.standardError.write(Data("Support Fins: native crash dumps of this test run go to \(dir.path)\n".utf8))
+        }
+    }
+
     /// Call once at launch. `register` is false in tests that only exercise the logic.
     func start(register: Bool = true) {
         guard !started else { return }
@@ -68,11 +110,16 @@ final class CrashReporter {
         #endif
         folder.create()
         folder.prune()
-        if folder.markerExists { recordUnexpectedExit() }
+        // the raw dumps of a native crash first: one of them is the report of the run the marker speaks of
+        let imported = NativeCrashImport.run(folder: folder, fallback: savedSession())
+        if folder.markerExists { recordUnexpectedExit(writeReport: imported.isEmpty) }
         folder.writeMarker()
         breadcrumbs.replace(with: [])
         guard register else { refresh(); return }
         crashReportsStart(dir: folder.url.path, appVersion: Self.appVersion, settingsJson: settingsJSON)
+        let testDir = Self.nativeTestFolder(environment: ProcessInfo.processInfo.environment)
+        Self.installNative(dir: testDir ?? folder.url, testing: testDir != nil)
+        pushNativeContext()
         let sub = MetricsSubscriber { [weak self] items in Task { @MainActor in self?.record(metrics: items) } }
         subscriber = sub
         MXMetricManager.shared.add(sub)
@@ -101,7 +148,14 @@ final class CrashReporter {
     func note(_ text: String) {
         breadcrumbs.add(text)
         if started { crashBreadcrumb(text: text) }
+        pushNativeContext()
         scheduleSave()
+    }
+
+    /// The breadcrumbs and settings a native crash writes, preserialized for the handler.
+    private func pushNativeContext() {
+        guard Self.nativeInstalled else { return }
+        NativeCrashCapture.setContext(breadcrumbs: breadcrumbs.lines, settingsJSON: settingsJSON)
     }
 
     /// The options and tunables texts of the build now in force: they go into every report.
@@ -112,6 +166,7 @@ final class CrashReporter {
         guard json != settingsJSON else { return }
         settingsJSON = json
         if started { crashSetSettings(settingsJson: json) }
+        pushNativeContext()
         scheduleSave()
     }
 
@@ -146,12 +201,14 @@ final class CrashReporter {
     }
 
     /// The marker was there at launch: keep the last run's breadcrumbs and write a report from them. MetricKit's
-    /// diagnostics for the same crash arrive later, if at all, and carry the same breadcrumbs.
-    private func recordUnexpectedExit(now: Date = Date()) {
+    /// diagnostics for the same crash arrive later, if at all, and carry the same breadcrumbs. `writeReport` is false
+    /// when a native dump of that run became its report already.
+    private func recordUnexpectedExit(writeReport: Bool = true, now: Date = Date()) {
         closedUnexpectedly = true
         let saved = savedSession()
         try? FileManager.default.removeItem(at: folder.crashedBreadcrumbsURL)
         try? FileManager.default.moveItem(at: folder.breadcrumbsURL, to: folder.crashedBreadcrumbsURL)
+        guard writeReport else { return }
         let iso = ISO8601DateFormatter()
         let started = folder.markerDate().map(iso.string(from:)) ?? "unknown"
         let json: [String: Any] = [
@@ -193,12 +250,18 @@ final class CrashReporter {
         let iso = ISO8601DateFormatter()
         for item in items {
             let diagnostic = (try? JSONSerialization.jsonObject(with: item.json)) ?? NSNull()
-            let json: [String: Any] = [
+            var json: [String: Any] = [
                 "kind": "metrickit-\(item.kind)", "time": iso.string(from: now), "appVersion": Self.appVersion,
                 "engineVersion": engineVersion(), "os": ProcessInfo.processInfo.operatingSystemVersionString,
                 "breadcrumbs": crumbs, "settings": settings, "diagnostic": diagnostic,
             ]
-            folder.write(kind: "metrickit-\(item.kind)", json: json, text: Self.text(title: "MetricKit \(item.kind) diagnostic", json: json, crumbs: crumbs), now: now)
+            var title = "MetricKit \(item.kind) diagnostic"
+            // the same crash, captured natively at the time: say so (this copy came a launch or more later)
+            if item.kind == "crash", let native = NativeCrashImport.nativeReport(in: folder, begin: item.begin, end: item.end, signal: item.signal) {
+                json["alsoCapturedNatively"] = native
+                title += " (also captured natively: \(native))"
+            }
+            folder.write(kind: "metrickit-\(item.kind)", json: json, text: Self.text(title: title, json: json, crumbs: crumbs), now: now)
         }
         refresh()
     }
@@ -257,6 +320,10 @@ final class MetricsSubscriber: NSObject, MXMetricManagerSubscriber, @unchecked S
     struct Item: Sendable {
         let kind: String
         let json: Data
+        /// The payload's time window and the crash's signal (crash diagnostics): to match a native report.
+        var begin: Date? = nil
+        var end: Date? = nil
+        var signal: Int? = nil
     }
 
     private let deliver: @Sendable ([Item]) -> Void
@@ -266,7 +333,9 @@ final class MetricsSubscriber: NSObject, MXMetricManagerSubscriber, @unchecked S
     func didReceive(_ payloads: [MXDiagnosticPayload]) {
         var items: [Item] = []
         for p in payloads {
-            items += (p.crashDiagnostics ?? []).map { Item(kind: "crash", json: $0.jsonRepresentation()) }
+            items += (p.crashDiagnostics ?? []).map {
+                Item(kind: "crash", json: $0.jsonRepresentation(), begin: p.timeStampBegin, end: p.timeStampEnd, signal: $0.signal?.intValue)
+            }
             items += (p.hangDiagnostics ?? []).map { Item(kind: "hang", json: $0.jsonRepresentation()) }
         }
         deliver(items)

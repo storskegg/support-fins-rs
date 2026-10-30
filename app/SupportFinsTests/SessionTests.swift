@@ -205,10 +205,10 @@ struct SessionTests {
 
     // MARK: native -> native, and the plate's export
 
-    func exported(_ model: ViewerModel, to name: String) throws -> URL {
+    func exported(_ model: ViewerModel, to name: String) async throws -> URL {
         model.session.finsOn = false      // the part alone: the session is what is under test
         let url = try Scratch.file(name)
-        let wrote = try #require(model.wiring?.exporter?.write(.threeMF, to: url), "\(model.wiring?.exporter?.error ?? "")")
+        let wrote = try #require(await model.wiring?.exporter?.write(.threeMF, to: url), "\(model.wiring?.exporter?.error ?? "")")
         return wrote
     }
 
@@ -218,7 +218,7 @@ struct SessionTests {
         model.session.settings.layerHeight = 0.16
         model.session.settings.bedPad = .light
         model.session.removedFins = [FinKey(raw: "prop:1.5,2,3:4:0.5"), FinKey(raw: "wedge:0,0,0:1:0")]
-        let url = try exported(model, to: "round-trip.3mf")
+        let url = try await exported(model, to: "round-trip.3mf")
         let back = try await open(url)
         let a = model.session, b = back.session
         #expect(b.settings.gap == 0.3 && b.settings.layerHeight == 0.16 && b.settings.bedPad == .light && b.settings.mode == .draw)

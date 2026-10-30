@@ -110,13 +110,13 @@ final class ExportModelTests {
         _ = build
     }
 
-    @Test func theFinsOffWritesThePartAloneWithNoBuild() throws {
+    @Test func theFinsOffWritesThePartAloneWithNoBuild() async throws {
         let part = try tShape()
         let (model, _) = rig(part, finsOn: false)
-        let stl = try #require(model.write(.stl, to: tmp("alone.stl")))
+        let stl = try #require(await model.write(.stl, to: tmp("alone.stl")))
         let size = try #require(try FileManager.default.attributesOfItem(atPath: stl.path)[.size] as? Int)
         #expect(size == 84 + 50 * Int(part.info().triangles))
-        let mf = try #require(model.write(.threeMF, to: tmp("alone.3mf")))
+        let mf = try #require(await model.write(.threeMF, to: tmp("alone.3mf")))
         #expect(try Data(contentsOf: mf).prefix(4) == Data([0x50, 0x4b, 0x03, 0x04]))
         #expect(model.error == nil)
     }
@@ -132,8 +132,8 @@ final class ExportModelTests {
         let (cut, cutBuild) = rig(part, removed: [gone])
         cutBuild.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await cutBuild.settled()
-        let a = try #require(plain.write(.finsOnly, to: tmp("all-fins.stl")))
-        let b = try #require(cut.write(.finsOnly, to: tmp("cut-fins.stl")))
+        let a = try #require(await plain.write(.finsOnly, to: tmp("all-fins.stl")))
+        let b = try #require(await cut.write(.finsOnly, to: tmp("cut-fins.stl")))
         let sa = try #require(try FileManager.default.attributesOfItem(atPath: a.path)[.size] as? Int)
         let sb = try #require(try FileManager.default.attributesOfItem(atPath: b.path)[.size] as? Int)
         #expect(sb < sa, "a fin fewer (\(result.fins().count()) fin vertices before)")
@@ -162,20 +162,20 @@ final class ExportModelTests {
         let result = try #require(build.latest)
         let finTris = Int(result.fins().count() + result.pad().count()) / 3
 
-        let stl = try #require(model.write(.stl, to: tmp("a.stl")))
+        let stl = try #require(await model.write(.stl, to: tmp("a.stl")))
         let size = try #require(try FileManager.default.attributesOfItem(atPath: stl.path)[.size] as? Int)
         #expect(size == 84 + 50 * (Int(part.info().triangles) + finTris), "part + fins, merged")
 
-        let fins = try #require(model.write(.finsOnly, to: tmp("b.stl")))
+        let fins = try #require(await model.write(.finsOnly, to: tmp("b.stl")))
         let finsSize = try #require(try FileManager.default.attributesOfItem(atPath: fins.path)[.size] as? Int)
         #expect(finsSize == 84 + 50 * finTris)
 
         // the same request writes the same bytes
-        let again = try #require(model.write(.stl, to: tmp("a2.stl")))
+        let again = try #require(await model.write(.stl, to: tmp("a2.stl")))
         #expect(try Data(contentsOf: stl) == Data(contentsOf: again))
 
         // the 3MF is a zip
-        let mf = try #require(model.write(.threeMF, to: tmp("c.3mf")))
+        let mf = try #require(await model.write(.threeMF, to: tmp("c.3mf")))
         #expect(try Data(contentsOf: mf).prefix(4) == Data([0x50, 0x4b, 0x03, 0x04]))
         #expect(model.error == nil && model.lastWritten == mf)
     }
@@ -185,11 +185,11 @@ final class ExportModelTests {
         let (model, build) = rig(try tShape())
         build.build(rotation: tilt(30), optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await build.settled()
-        let url = try #require(model.write(.finsOnly, to: tmp("posed.stl")))
+        let url = try #require(await model.write(.finsOnly, to: tmp("posed.stl")))
         #expect(model.error == nil)
         let size = try #require(try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int)
         #expect(size > 84 && (size - 84) % 50 == 0)
-        #expect(model.write(.stl, to: tmp("posed-ok.stl")) != nil && model.error == nil)
+        #expect(await model.write(.stl, to: tmp("posed-ok.stl")) != nil && model.error == nil)
     }
 
     @Test func runAsksWhereAndDoesNothingOnCancel() async throws {
@@ -198,17 +198,17 @@ final class ExportModelTests {
         let cancelled = rig(part, panel: StubPanel(answer: nil))
         cancelled.1.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await cancelled.1.settled()
-        #expect(cancelled.0.run(.threeMF) == nil && cancelled.0.lastFormat == .stl)
+        #expect(await cancelled.0.run(.threeMF) == nil && cancelled.0.lastFormat == .stl)
         #expect(StubPanel.asked.last?.0 == "bracket-fins-0.4nozzle-0.2layer.3mf" && StubPanel.asked.last?.1.preferredFilenameExtension == "3mf")
 
         let target = tmp("run.stl")
         let ok = rig(part, panel: StubPanel(answer: target))
         ok.1.build(rotation: identity, optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
         await ok.1.settled()
-        #expect(ok.0.run(.finsOnly) == target && ok.0.lastFormat == .finsOnly)
+        #expect(await ok.0.run(.finsOnly) == target && ok.0.lastFormat == .finsOnly)
         // a format that is not offered never reaches the panel
         let before = StubPanel.asked.count
         let none = rig(part, panel: StubPanel(answer: target))
-        #expect(none.0.run(.stl) == nil && StubPanel.asked.count == before)
+        #expect(await none.0.run(.stl) == nil && StubPanel.asked.count == before)
     }
 }
