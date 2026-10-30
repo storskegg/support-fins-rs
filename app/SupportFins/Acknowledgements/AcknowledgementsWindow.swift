@@ -53,6 +53,8 @@ private struct NoticesTextView: NSViewRepresentable {
         view.textContainerInset = NSSize(width: 8, height: 8)
         view.string = text
         view.setAccessibilityLabel(JS.t("Acknowledgements"))
+        // on the text view itself, not on a container (a container identifier hides what is inside it)
+        view.setAccessibilityIdentifier("acknowledgements-text")
         return scroll
     }
 
