@@ -1,4 +1,4 @@
-//! `Builder.build(rot, opts_json, tunables_json)` against the page's own build path: parity/oracle/ffibuild.js
+//! `Builder.build(rot, opts_json, tunables_json).unwrap()` against the page's own build path: parity/oracle/ffibuild.js
 //! runs `buildFins` as web/finworker.js runs it, with the `finOpts()`-shaped request and tunables the page
 //! sends, and records the counts, a hash of the triangles and the per-fin records. The FFI build must give
 //! the same numbers, records and triangles, exactly.

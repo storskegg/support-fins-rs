@@ -47,10 +47,16 @@ fn flag(j: &Json, key: &str) -> Result<bool, FfiError> {
     }
 }
 
+/// Print-space points (and rays) are bounded: a wall's tines and stations grow with its length, so a corrupt
+/// file's 1e300 would never finish. The bed is a few hundred mm.
+const MAX_COORD: f64 = 100_000.0;
+
 fn v3(v: &[f64], what: &str) -> Result<[f64; 3], FfiError> {
     match v {
-        [x, y, z] if v.iter().all(|c| c.is_finite()) => Ok([*x, *y, *z]),
-        _ => Err(engine(format!("{what} must be three finite numbers"))),
+        [x, y, z] if v.iter().all(|c| c.is_finite() && c.abs() <= MAX_COORD) => Ok([*x, *y, *z]),
+        _ => Err(engine(format!(
+            "{what} must be three finite numbers within {MAX_COORD} mm"
+        ))),
     }
 }
 
@@ -174,35 +180,37 @@ impl DrawKit {
         settings_json: String,
         tunables_json: String,
     ) -> Result<Arc<DrawKit>, FfiError> {
-        let rot = rot9(&rot)?;
-        if !threshold_deg.is_finite() {
-            return Err(engine("threshold must be a number"));
-        }
-        let settings = parse_settings(&settings_json)?;
-        let tunables = if tunables_json.trim().is_empty() {
-            None
-        } else {
-            match parse(&tunables_json) {
-                Some(j @ Json::Obj(_)) => {
-                    crate::builder::check_tunable_ranges(&j)?;
-                    Some(sf_io::fins_opts::tunables_from_json(&j))
-                }
-                _ => return Err(engine("tunables must be a JSON object")),
+        crate::crash::guarded("draw kit", || {
+            let rot = rot9(&rot)?;
+            if !threshold_deg.is_finite() {
+                return Err(engine("threshold must be a number"));
             }
-        };
-        let mut cfg = Config::default();
-        apply_tunables(&mut cfg, tunables.as_ref());
-        let topo = part.topology().clone();
-        let analysis = analyze(&topo, threshold_deg, &rot);
-        let tris = Arc::new(Tris::new(print_triangles(&topo, &rot, &analysis.offset)));
-        Ok(Arc::new(DrawKit {
-            part,
-            rot,
-            analysis,
-            tris,
-            cfg,
-            settings,
-        }))
+            let settings = parse_settings(&settings_json)?;
+            let tunables = if tunables_json.trim().is_empty() {
+                None
+            } else {
+                match parse(&tunables_json) {
+                    Some(j @ Json::Obj(_)) => {
+                        crate::builder::check_tunable_ranges(&j)?;
+                        Some(sf_io::fins_opts::tunables_from_json(&j))
+                    }
+                    _ => return Err(engine("tunables must be a JSON object")),
+                }
+            };
+            let mut cfg = Config::default();
+            apply_tunables(&mut cfg, tunables.as_ref());
+            let topo = part.topology().clone();
+            let analysis = analyze(&topo, threshold_deg, &rot);
+            let tris = Arc::new(Tris::new(print_triangles(&topo, &rot, &analysis.offset)));
+            Ok(Arc::new(DrawKit {
+                part,
+                rot,
+                analysis,
+                tris,
+                cfg,
+                settings,
+            }))
+        })
     }
 
     /// The seating offset: the part draws at `rot * p + offset`.
@@ -213,12 +221,16 @@ impl DrawKit {
 
     /// The part's frame to print space (`part.localToWorld`).
     pub fn local_to_world(&self, p: Vec<f64>) -> Result<Vec<f64>, FfiError> {
-        Ok(to_world(&self.rot, &self.analysis.offset, v3(&p, "point")?).to_vec())
+        crate::crash::guarded("draw point", || {
+            Ok(to_world(&self.rot, &self.analysis.offset, v3(&p, "point")?).to_vec())
+        })
     }
 
     /// Print space to the part's frame (`part.worldToLocal`).
     pub fn world_to_local(&self, p: Vec<f64>) -> Result<Vec<f64>, FfiError> {
-        Ok(to_local(&self.rot, &self.analysis.offset, v3(&p, "point")?).to_vec())
+        crate::crash::guarded("draw point", || {
+            Ok(to_local(&self.rot, &self.analysis.offset, v3(&p, "point")?).to_vec())
+        })
     }
 
     /// Where the pointer ray meets face `face` (the id pass's pick): `None` when it misses that
@@ -229,31 +241,35 @@ impl DrawKit {
         origin: Vec<f64>,
         dir: Vec<f64>,
     ) -> Result<Option<SurfaceSpot>, FfiError> {
-        let (o, d) = (v3(&origin, "origin")?, v3(&dir, "dir")?);
-        let topo = self.part.topology();
-        let Some(h) = surface_hit(topo, &self.rot, &self.analysis.offset, face as usize, o, d)
-        else {
-            return Ok(None);
-        };
-        let f = face as usize * 3;
-        let r = &self.rot;
-        let n = &topo.nrm;
-        let normal = vec![
-            r[0] * n[f] + r[3] * n[f + 1] + r[6] * n[f + 2],
-            r[1] * n[f] + r[4] * n[f + 1] + r[7] * n[f + 2],
-            r[2] * n[f] + r[5] * n[f + 1] + r[8] * n[f + 2],
-        ];
-        Ok(Some(SurfaceSpot {
-            point: h.point.to_vec(),
-            normal,
-            distance: h.distance,
-        }))
+        crate::crash::guarded("draw surface hit", || {
+            let (o, d) = (v3(&origin, "origin")?, v3(&dir, "dir")?);
+            let topo = self.part.topology();
+            let Some(h) = surface_hit(topo, &self.rot, &self.analysis.offset, face as usize, o, d)
+            else {
+                return Ok(None);
+            };
+            let f = face as usize * 3;
+            let r = &self.rot;
+            let n = &topo.nrm;
+            let normal = vec![
+                r[0] * n[f] + r[3] * n[f + 1] + r[6] * n[f + 2],
+                r[1] * n[f] + r[4] * n[f + 1] + r[7] * n[f + 2],
+                r[2] * n[f] + r[5] * n[f + 1] + r[8] * n[f + 2],
+            ];
+            Ok(Some(SurfaceSpot {
+                point: h.point.to_vec(),
+                normal,
+                distance: h.distance,
+            }))
+        })
     }
 
     /// `faceIsUpright`: a click on this face stands a sway brace (with Sway braces on).
-    pub fn face_takes_brace(&self, face: u64) -> bool {
-        (face as usize) < self.part.topology().n_faces
-            && face_takes_brace(self.part.topology(), &self.rot, face as usize, &self.cfg)
+    pub fn face_takes_brace(&self, face: u64) -> Result<bool, FfiError> {
+        crate::crash::guarded_value("draw face", || {
+            (face as usize) < self.part.topology().n_faces
+                && face_takes_brace(self.part.topology(), &self.rot, face as usize, &self.cfg)
+        })
     }
 
     /// The live ghost of the wall in progress (`updatePreview`'s `drawnWall`): the page's `braceTall`
@@ -264,15 +280,16 @@ impl DrawKit {
         b: Vec<f64>,
         m: Option<Vec<f64>>,
     ) -> Result<Arc<DrawnGhost>, FfiError> {
-        let _op = crate::crash::operation("draw wall ghost");
-        let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
-        let m = m.map(|m| v3(&m, "m")).transpose()?;
-        let opts = DrawOpts {
-            brace_tall: self.settings.brace_tall,
-            through: m,
-            ..Default::default()
-        };
-        Ok(self.wall(a, b, &opts, true))
+        crate::crash::guarded("draw wall ghost", || {
+            let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
+            let m = m.map(|m| v3(&m, "m")).transpose()?;
+            let opts = DrawOpts {
+                brace_tall: self.settings.brace_tall,
+                through: m,
+                ..Default::default()
+            };
+            Ok(self.wall(a, b, &opts, true))
+        })
     }
 
     /// `placeWall`'s check (web/ui/walls.js:437-444): the wall as `drawnWall` builds it with no options
@@ -284,19 +301,20 @@ impl DrawKit {
         b: Vec<f64>,
         m: Option<Vec<f64>>,
     ) -> Result<Arc<DrawnGhost>, FfiError> {
-        let _op = crate::crash::operation("draw wall check");
-        let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
-        let m = m.map(|m| v3(&m, "m")).transpose()?;
-        // (with the topology, so a wall the rebuild will refuse for its ends against a side wall
-        // is refused here, not listed as failed)
-        let opts = DrawOpts {
-            through: m,
-            topo: Some(self.part.topology()),
-            rot: Some(self.rot),
-            offset: Some(self.analysis.offset),
-            ..Default::default()
-        };
-        Ok(self.wall(a, b, &opts, false))
+        crate::crash::guarded("draw wall check", || {
+            let (a, b) = (v3(&a, "a")?, v3(&b, "b")?);
+            let m = m.map(|m| v3(&m, "m")).transpose()?;
+            // (with the topology, so a wall the rebuild will refuse for its ends against a side wall
+            // is refused here, not listed as failed)
+            let opts = DrawOpts {
+                through: m,
+                topo: Some(self.part.topology()),
+                rot: Some(self.rot),
+                offset: Some(self.analysis.offset),
+                ..Default::default()
+            };
+            Ok(self.wall(a, b, &opts, false))
+        })
     }
 
     /// Re-stand `walls_json` (the part's frame, see docs/FFI.md) for this pose and settings
@@ -308,21 +326,22 @@ impl DrawKit {
         auto_build: Option<Arc<BuildResult>>,
         removed: Vec<u64>,
     ) -> Result<Arc<DrawnSweep>, FfiError> {
-        let _op = crate::crash::operation("draw sweep");
-        let walls = parse_walls(&walls_json)?;
-        let gone: HashSet<usize> = removed.iter().map(|&i| i as usize).collect();
-        let sweep = sweep_drawn(
-            self.part.topology(),
-            &self.analysis,
-            &self.rot,
-            &self.tris,
-            &walls,
-            &self.settings,
-            auto_build.as_ref().map(|b| b.built()),
-            &gone,
-            &self.cfg,
-        );
-        Ok(Arc::new(DrawnSweep { sweep }))
+        crate::crash::guarded("draw sweep", || {
+            let walls = parse_walls(&walls_json)?;
+            let gone: HashSet<usize> = removed.iter().map(|&i| i as usize).collect();
+            let sweep = sweep_drawn(
+                self.part.topology(),
+                &self.analysis,
+                &self.rot,
+                &self.tris,
+                &walls,
+                &self.settings,
+                auto_build.as_ref().map(|b| b.built()),
+                &gone,
+                &self.cfg,
+            );
+            Ok(Arc::new(DrawnSweep { sweep }))
+        })
     }
 
     /// The brace a click at print-space `point` on `face` stands (`braceAt`). `sweep` holds the hand
@@ -335,35 +354,36 @@ impl DrawKit {
         auto_build: Option<Arc<BuildResult>>,
         removed: Vec<u64>,
     ) -> Result<Arc<BraceSpot>, FfiError> {
-        let _op = crate::crash::operation("draw brace");
-        let p = v3(&point, "point")?;
-        if face as usize >= self.part.topology().n_faces {
-            return Err(engine("face is out of range"));
-        }
-        let gone: HashSet<usize> = removed.iter().map(|&i| i as usize).collect();
-        let avoid: AutoAvoid = auto_supports(auto_build.as_ref().map(|b| b.built()), &gone);
-        let drawn: Vec<SwayRib> = sweep.as_ref().map_or(Vec::new(), |s| {
-            s.sweep
-                .walls
-                .iter()
-                .filter_map(|w| match (&w.info, w.ok) {
-                    (HandInfo::Brace(r), true) => Some((**r).clone()),
-                    _ => None,
-                })
-                .collect()
-        });
-        let spot = brace_at(
-            self.part.topology(),
-            &self.analysis,
-            &self.rot,
-            face as usize,
-            p,
-            &self.settings,
-            &drawn,
-            &avoid,
-            &self.cfg,
-        );
-        Ok(Arc::new(BraceSpot { spot }))
+        crate::crash::guarded("draw brace", || {
+            let p = v3(&point, "point")?;
+            if face as usize >= self.part.topology().n_faces {
+                return Err(engine("face is out of range"));
+            }
+            let gone: HashSet<usize> = removed.iter().map(|&i| i as usize).collect();
+            let avoid: AutoAvoid = auto_supports(auto_build.as_ref().map(|b| b.built()), &gone);
+            let drawn: Vec<SwayRib> = sweep.as_ref().map_or(Vec::new(), |s| {
+                s.sweep
+                    .walls
+                    .iter()
+                    .filter_map(|w| match (&w.info, w.ok) {
+                        (HandInfo::Brace(r), true) => Some((**r).clone()),
+                        _ => None,
+                    })
+                    .collect()
+            });
+            let spot = brace_at(
+                self.part.topology(),
+                &self.analysis,
+                &self.rot,
+                face as usize,
+                p,
+                &self.settings,
+                &drawn,
+                &avoid,
+                &self.cfg,
+            );
+            Ok(Arc::new(BraceSpot { spot }))
+        })
     }
 }
 
@@ -474,13 +494,15 @@ impl DrawnSweep {
         part_distance: Option<f64>,
         keep: Option<Vec<f64>>,
     ) -> Result<Option<u64>, FfiError> {
-        let (o, d) = (v3(&origin, "origin")?, v3(&dir, "dir")?);
-        let keep = match keep {
-            Some(k) if k.len() == 4 => Some([k[0], k[1], k[2], k[3]]),
-            Some(_) => return Err(engine("keep must be four numbers".to_string())),
-            None => None,
-        };
-        Ok(pick_support(&self.sweep, o, d, part_distance, keep).map(|i| i as u64))
+        crate::crash::guarded("draw pick", || {
+            let (o, d) = (v3(&origin, "origin")?, v3(&dir, "dir")?);
+            let keep = match keep {
+                Some(k) if k.len() == 4 => Some([k[0], k[1], k[2], k[3]]),
+                Some(_) => return Err(engine("keep must be four numbers".to_string())),
+                None => None,
+            };
+            Ok(pick_support(&self.sweep, o, d, part_distance, keep).map(|i| i as u64))
+        })
     }
 
     /// What the built supports add to the plate, for the fit check and the grams receipt (`activeAdded`):
@@ -501,11 +523,13 @@ impl DrawnSweep {
     }
 
     /// The triangles of wall `index` alone (the selection's highlight).
-    pub fn wall_triangles(&self, index: u64) -> Arc<GpuBuffer> {
-        match self.sweep.walls.get(index as usize) {
-            Some(w) => f32_soup(&self.sweep.tris[w.tri_start * 3..w.tri_end * 3]),
-            None => f32_soup(&[]),
-        }
+    pub fn wall_triangles(&self, index: u64) -> Result<Arc<GpuBuffer>, FfiError> {
+        crate::crash::guarded_value("draw wall triangles", || {
+            match self.sweep.walls.get(index as usize) {
+                Some(w) => f32_soup(&self.sweep.tris[w.tri_start * 3..w.tri_end * 3]),
+                None => f32_soup(&[]),
+            }
+        })
     }
 }
 
@@ -559,6 +583,8 @@ impl BraceSpot {
 /// curve in progress, `arcPoints`); `[a, b]` when the three are in line.
 #[uniffi::export]
 pub fn arc_band(a: Vec<f64>, b: Vec<f64>, m: Vec<f64>) -> Result<Vec<f64>, FfiError> {
-    let pts = arc_points(v3(&a, "a")?, v3(&b, "b")?, v3(&m, "m")?);
-    Ok(pts.into_iter().flatten().collect())
+    crate::crash::guarded("draw arc", || {
+        let pts = arc_points(v3(&a, "a")?, v3(&b, "b")?, v3(&m, "m")?);
+        Ok(pts.into_iter().flatten().collect())
+    })
 }

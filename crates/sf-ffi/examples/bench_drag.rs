@@ -59,12 +59,14 @@ fn drag(name: &str, path: String, deg: (f64, f64), land_after: Option<Duration>,
     let mut newest = 0usize;
     let mut event_at: Vec<Instant> = vec![];
     let begin = |idx: usize, running: &mut Option<(u64, usize, Instant)>, started: &mut Vec<_>| {
-        let g = builder.build(
-            rot_at(pose(idx)),
-            "{}".into(),
-            "{}".into(),
-            Box::new(L(Mutex::new(tx.clone()))),
-        );
+        let g = builder
+            .build(
+                rot_at(pose(idx)),
+                "{}".into(),
+                "{}".into(),
+                Box::new(L(Mutex::new(tx.clone()))),
+            )
+            .unwrap();
         let r = (g, idx, Instant::now());
         *running = Some(r);
         started.push(r);

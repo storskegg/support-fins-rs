@@ -62,12 +62,14 @@ fn num(v: &Json, k: &str) -> f64 {
 fn a_build_is_delivered_on_the_worker_thread_with_its_generation() {
     let b = Builder::new(load("lbracket"));
     let (l, rx) = listener();
-    let g = b.build(
-        rotation_matrix([35.0, 0.0, 0.0]).to_vec(),
-        common::options(),
-        common::tunables(),
-        l,
-    );
+    let g = b
+        .build(
+            rotation_matrix([35.0, 0.0, 0.0]).to_vec(),
+            common::options(),
+            common::tunables(),
+            l,
+        )
+        .unwrap();
     assert_eq!(g, 1);
     let Event::Done(gen_, r) = wait(&rx) else {
         panic!("failed")
@@ -86,8 +88,12 @@ fn a_stale_generation_is_dropped_never_delivered() {
     let rot = rotation_matrix([30.0, 0.0, 0.0]).to_vec();
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = b.build(rot.clone(), common::options(), common::tunables(), l1);
-    let g2 = b.build(rot, "{\"mode\":\"full\"}".into(), common::tunables(), l2);
+    let g1 = b
+        .build(rot.clone(), common::options(), common::tunables(), l1)
+        .unwrap();
+    let g2 = b
+        .build(rot, "{\"mode\":\"full\"}".into(), common::tunables(), l2)
+        .unwrap();
     assert_eq!((g1, g2), (1, 2));
     let Event::Done(g, _) = wait(&rx2) else {
         panic!("failed")
@@ -112,7 +118,7 @@ fn bad_options_and_poses_are_reported_as_engine_errors_with_their_generation() {
         (vec![1.0; 8], "{}"),
     ] {
         let (l, rx) = listener();
-        let g = b.build(rot, opts.into(), "{}".into(), l);
+        let g = b.build(rot, opts.into(), "{}".into(), l).unwrap();
         match wait(&rx) {
             Event::Failed(fg, FfiError::Engine { message }) => {
                 assert_eq!(fg, g);
@@ -238,10 +244,13 @@ fn a_newer_build_cancels_the_one_in_flight_and_cancel_drops_everything() {
     let rot = rotation_matrix([45.0, 0.0, 0.0]).to_vec();
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    b.build(rot.clone(), common::options(), common::tunables(), l1);
+    b.build(rot.clone(), common::options(), common::tunables(), l1)
+        .unwrap();
     // let the first one start, then supersede it
     std::thread::sleep(Duration::from_millis(3));
-    let g2 = b.build(rot.clone(), common::options(), common::tunables(), l2);
+    let g2 = b
+        .build(rot.clone(), common::options(), common::tunables(), l2)
+        .unwrap();
     let Event::Done(g, _) = wait(&rx2) else {
         panic!("failed")
     };
@@ -253,14 +262,17 @@ fn a_newer_build_cancels_the_one_in_flight_and_cancel_drops_everything() {
     // cancel(): the build in flight is dropped, a later build is unaffected
     let (l3, rx3) = listener();
     let (l4, rx4) = listener();
-    b.build(rot.clone(), common::options(), common::tunables(), l3);
+    b.build(rot.clone(), common::options(), common::tunables(), l3)
+        .unwrap();
     std::thread::sleep(Duration::from_millis(3));
     b.cancel();
     assert!(matches!(
         rx3.recv_timeout(Duration::from_millis(500)),
         Err(mpsc::RecvTimeoutError::Disconnected)
     ));
-    let g4 = b.build(rot, common::options(), common::tunables(), l4);
+    let g4 = b
+        .build(rot, common::options(), common::tunables(), l4)
+        .unwrap();
     let Event::Done(g, r) = wait(&rx4) else {
         panic!("failed")
     };

@@ -79,8 +79,8 @@ fn a_scaled_part_builds_the_same_fins_in_the_file_frame_as_recentred() {
             .unwrap()
             .remove(0);
         for pct in ["37.5", "150", "250"] {
-            let s = scale_from_percent_text(pct.into()).unwrap();
-            let scaled = part.scaled(s);
+            let s = scale_from_percent_text(pct.into()).unwrap().unwrap();
+            let scaled = part.scaled(s).unwrap();
             let again = recentred(&scaled, &format!("{model}{pct}"));
             let (n, digest) = shape(&scaled);
             built += n;

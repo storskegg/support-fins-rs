@@ -310,10 +310,10 @@ fn a_session_nested_200000_deep_is_an_unreadable_session_not_a_crash() {
     });
     let parts = r.unwrap();
     assert_eq!(parts[0].info().triangles, 1);
-    assert!(parts[0].restore_session(false).walls.is_empty());
+    assert!(parts[0].restore_session(false).unwrap().walls.is_empty());
     assert!(
         parts[0].session_unreadable(),
-        "the host is told the session was dropped"
+        \"the host is told the session was dropped\"
     );
     assert!(took < Duration::from_secs(1), "{took:?}");
 }

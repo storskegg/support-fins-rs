@@ -24,6 +24,24 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   never a partial one. A finished job whose generation is stale is still dropped without being
   delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
   build is byte-identical to one that was never cancellable.
+- **Input-taking exports throw (X-11, C-06).** A Rust panic in a non-throwing export reaches the generated Swift as a
+  `try!`, which traps and kills the app. So **every export that takes data derived from a file or the user** (JSON, text,
+  numbers, coordinates, indices, vectors, paths, bytes, or an object built from them) returns `Result<_, FfiError>`, and
+  its body runs under `crash::guarded(operation, ..)` (`crates/sf-ffi/src/crash.rs`): the operation name is set for the
+  crash report, and a panic becomes `FfiError::Engine("internal error: <message>")` (the panic hook of the crash dumps
+  still writes its report first). The app handles the throw where it already shows failures (the status line, a model's
+  `error`, a failed ranking) and uses `try?` only where a default is right, with the reason beside it. These stay
+  non-throwing: crash-report plumbing that must never fail, and the pure getters of an object already built (listed
+  with the reason for each in `GETTERS` in `crates/sf-ffi/tests/hostile.rs`, which also scans `src/` so a new export
+  that is neither throwing nor listed fails the test). A new export is `Result` unless it is one of those.
+  Numeric inputs are range-checked at the door (a rotation's entries within 2, a scale 0..1000, a plate coordinate
+  within 4000 mm, a gap within 1000 cells, a wide-search density 0..100, print-space points within 100000 mm): a value
+  far past anything real would otherwise allocate without bound, and an allocation failure aborts instead of unwinding.
+  `sf_io::json::parse` refuses deep nesting (`limits::MAX_JSON_DEPTH`; a hostile 3MF session could otherwise overflow the stack).
+- **Listener callbacks never kill a worker.** `BuildListener` / `SuggestListener` are called from the `sf-build` /
+  `sf-suggest` threads inside `crash::listener_call`, which catches a panic (UniFFI panics when the Swift side reports an
+  unexpected error from a callback), leaves its report to the crash hook, and lets the worker serve the next job.
+  `Builder::build` / `Suggester::*` return an error instead of dropping the job if the worker is gone.
 - **Errors** are a UniFFI error enum (`FfiError::{Io, Format, Engine, Cancelled, LimitExceeded}`) carrying the JS-identical
   message where one exists. `LimitExceeded` is the one a host answers rather than shows: see "Load limits".
 
@@ -43,21 +61,21 @@ fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiE
 fn load_parts_with(path: String, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError>;  // load_parts with the load options ("Load limits" below); load_parts is load_parts_with(path, LoadOptions { allow_large: false })
 fn load_step_parts_with(path: String, kernel: Vec<u8>, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError>;  // load_step_parts with the load options: the STEP's parts get the same limits as load_parts_with (finite coordinates; a part over 2 m is LimitExceeded unless allow_large)
 fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; note "merged N of TOTAL objects into one part" (TOTAL = object_count, the file's); one part returns itself
-fn scale_from_percent_text(text: String) -> Option<f64>;  // M6: scaleFromPercent(Number(text)): 10-1000 % clamped, rounded to the field's 2 decimals; None for junk, empty or <= 0
-fn scale_percent_text(factor: f64) -> String;               // M6: the field's text, +(factor * 100).toFixed(2) as JS prints it ("150", "33.33")
+fn scale_from_percent_text(text: String) -> Result<Option<f64>, FfiError>;  // M6: scaleFromPercent(Number(text)): 10-1000 % clamped, rounded to the field's 2 decimals; None for junk, empty or <= 0
+fn scale_percent_text(factor: f64) -> Result<String, FfiError>;             // M6: the field's text, +(factor * 100).toFixed(2) as JS prints it ("150", "33.33")
 impl Part {
   fn info(&self) -> PartInfo;
   fn mesh(&self) -> Arc<GpuBuffer>;                          // interleaved position+normal, f32, model frame
-  fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> AnalysisSummary;   // rot: 9, column-major
-  fn face_flags(&self, threshold_deg: f64, rot: Vec<f64>) -> Arc<GpuBuffer>; // u8 per face: over/kept/on_bed bits
-  fn scaled(&self, factor: f64) -> Arc<Part>;                // M6 Scale (ui/scale.js setScale): uniform scale about the box centre with the page's two f32 roundings (centred `f32(p - c)`, then `f32(c + s * centred)`; exact vs the oracle `parity/oracle/setscale.js`), welded afresh; slicer parts scale with it, colours/notes/name kept. Call it on the part as loaded (never on a scaled one: no compounding)
+  fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError>;   // rot: 9, column-major
+  fn face_flags(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Arc<GpuBuffer>, FfiError>; // u8 per face: over/kept/on_bed bits
+  fn scaled(&self, factor: f64) -> Result<Arc<Part>, FfiError>;                // M6 Scale (ui/scale.js setScale): uniform scale about the box centre with the page's two f32 roundings (centred `f32(p - c)`, then `f32(c + s * centred)`; exact vs the oracle `parity/oracle/setscale.js`), welded afresh; slicer parts scale with it, colours/notes/name kept. Call it on the part as loaded (never on a scaled one: no compounding)
 }
 #[derive(uniffi::Record)] struct AnalysisSummary { over_area: f64, bed_area: f64, over_face_count: u64, region_count: u64, offset: Vec<f64>, size: Vec<f64> }
 
 // M4b:
 #[uniffi::export(callback_interface)] trait BuildListener: Send + Sync { fn done(&self, generation: u64, result: Arc<BuildResult>); fn failed(&self, generation: u64, err: FfiError); }
 #[derive(uniffi::Object)] struct Builder;                    // one per part; owns the generation counter + worker
-impl Builder { fn new(part: Arc<Part>) -> Arc<Self>; fn build(&self, rot: Vec<f64>, opts_json: String, tunables_json: String, listener: Box<dyn BuildListener>) -> u64; fn cancel(&self); }
+impl Builder { fn new(part: Arc<Part>) -> Arc<Self>; fn build(&self, rot: Vec<f64>, opts_json: String, tunables_json: String, listener: Box<dyn BuildListener>) -> Result<u64, FfiError>; fn cancel(&self); }
 #[derive(uniffi::Object)] struct BuildResult;                // FinsBuilt + the seated part
 impl BuildResult { fn fins(&self) -> Arc<GpuBuffer>; fn pad(&self) -> Arc<GpuBuffer>; fn summary_json(&self) -> String; fn records_json(&self) -> String; }
 fn export(path: String, parts: Vec<Arc<Part>>, builds: Vec<Arc<BuildResult>>, options_json: String) -> Result<(), FfiError>; // STL/3MF as the CLI writes them
@@ -129,7 +147,7 @@ by the same code the CLI uses. The page's settings form and the CLI flags theref
   the part, the part's paint, title `{name}`), with no session yet (sessions in the 3MF are M7). The triangles are the
   build's own `f64` values, not the `f32` the CLI rounds to, so a CLI-path build exports facet normals the CLI's file does not
   have; the app's builds (with `tunables_json`) are the page's, which is what this follows.
-- **`export_file_name(base, kind, nozzle, layer_height) -> String`** is the name the page suggests
+- **`export_file_name(base, kind, nozzle, layer_height) -> Result<String, FfiError>`** is the name the page suggests
   (`ui/export.js` `plateName`, `exportName`): `{base}-fins-0.4nozzle-0.2layer.stl`, `...3mf`, `{base}-fins-only-...stl`;
   a setting that is not positive is left out. `kind` is `ExportKind::{Stl, ThreeMf, FinsOnly}`.
 
@@ -247,9 +265,9 @@ impl Part { fn suggest_strength_pose(&self, dir_local: Vec<f64>, dir_world: Vec<
 #[derive(uniffi::Object)] struct Suggester;                  // one per part, one worker
 impl Suggester {
     fn new(part: Arc<Part>) -> Arc<Self>;
-    fn suggest(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> u64;
-    fn suggest_wide(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, density: f64, listener: Box<dyn SuggestListener>) -> u64;
-    fn strength(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64, listener: Box<dyn SuggestListener>) -> u64;
+    fn suggest(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError>;
+    fn suggest_wide(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, density: f64, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError>;
+    fn strength(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError>;
 }
 // Scoring runs on Rayon's global pool (candidates in parallel, results collected in candidate order, so the ranking and its
 // tie-breaks equal the serial run). A newer request stops an older ranking between candidates; the older one is never delivered.
@@ -324,7 +342,7 @@ impl DrawKit {
     fn local_to_world(&self, p: Vec<f64>) -> Result<Vec<f64>, FfiError>;   // part.localToWorld
     fn world_to_local(&self, p: Vec<f64>) -> Result<Vec<f64>, FfiError>;   // part.worldToLocal
     fn surface_hit(&self, face: u64, origin: Vec<f64>, dir: Vec<f64>) -> Result<Option<SurfaceSpot>, FfiError>;
-    fn face_takes_brace(&self, face: u64) -> bool;                // faceIsUpright
+    fn face_takes_brace(&self, face: u64) -> Result<bool, FfiError>;              // faceIsUpright
     fn ghost(&self, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>) -> Result<Arc<DrawnGhost>, FfiError>;
     fn check_wall(&self, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>) -> Result<Arc<DrawnGhost>, FfiError>;
     fn sweep(&self, walls_json: String, auto_build: Option<Arc<BuildResult>>, removed: Vec<u64>) -> Result<Arc<DrawnSweep>, FfiError>;
@@ -377,22 +395,22 @@ impl Footprint {
   fn bounds(&self) -> Vec<i64>;                              // x0, y0, w, h in cells of `cell_size()` mm
   fn cell_size(&self) -> i64;                                // a cell's side in mm: 1, or more past CELL_BUDGET (4M cells, ~2 m square); a coarse cell is set when anything touches it, and `shared` / `clash` cells are then those cells' corners in mm
   fn area(&self) -> u64;                                     // cells set (mm²)
-  fn placed(&self, x: f64, y: f64) -> Arc<Footprint>;        // `placed`: standing at (x, y); off the mm grid it widens
-  fn shared(&self, other: Arc<Footprint>) -> Vec<i64>;       // `shared`: the cells both cover, flat x, y pairs
-  fn shared_count(&self, other: Arc<Footprint>) -> u64;
-  fn dilate(&self, r: i64) -> Arc<Footprint>;                // `dilate`: grown r cells every way
+  fn placed(&self, x: f64, y: f64) -> Result<Arc<Footprint>, FfiError>;      // `placed`: standing at (x, y); off the mm grid it widens
+  fn shared(&self, other: Arc<Footprint>) -> Result<Vec<i64>, FfiError>;     // `shared`: the cells both cover, flat x, y pairs
+  fn shared_count(&self, other: Arc<Footprint>) -> Result<u64, FfiError>;
+  fn dilate(&self, r: i64) -> Result<Arc<Footprint>, FfiError>;              // `dilate`: grown r cells every way
 }
 fn footprint_of_part(part: Arc<Part>, rot: Vec<f64>, offset: Vec<f64>) -> Result<Option<Arc<Footprint>>, FfiError>;
 //   the part's mesh through the pose (9 numbers, column-major) and the seating offset (3 numbers): `partGrid`
-fn footprint_of_build(build: Arc<BuildResult>, removed: Vec<u64>) -> Option<Arc<Footprint>>;
+fn footprint_of_build(build: Arc<BuildResult>, removed: Vec<u64>) -> Result<Option<Arc<Footprint>>, FfiError>;
 //   what the build adds (`rasterize(flat(activeAdded()))`): the fins less the removed record ids, and the pad, f32-rounded
-fn footprint_union(a: Option<Arc<Footprint>>, b: Option<Arc<Footprint>>) -> Option<Arc<Footprint>>;
-fn footprint_spot(others: Vec<Arc<Footprint>>, grid: Option<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Vec<f64>;
+fn footprint_union(a: Option<Arc<Footprint>>, b: Option<Arc<Footprint>>) -> Result<Option<Arc<Footprint>>, FfiError>;
+fn footprint_spot(others: Vec<Arc<Footprint>>, grid: Option<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Result<Vec<f64>, FfiError>;
 //   `spot` (ui/models.js): where a model goes on a bx x by bed, gap mm clear of `others` (placed): the free spot nearest
 //   the centre, else past the others' right edge. Two numbers.
-fn footprint_clash_cells(placed: Vec<Arc<Footprint>>) -> Vec<i64>;   // the cells any two share (`checkOverlap`), x, y pairs
-fn plate_under(x: f64, y: f64, active: u64, count: u64, pitch: f64, bx: f64, by: f64) -> Vec<f64>;   // `plateUnder`: [plate, x, y] or []
-fn footprint_drag_step(at: Vec<f64>, to: Vec<f64>, grid: Arc<Footprint>, others: Vec<Arc<Footprint>>) -> Vec<f64>;
+fn footprint_clash_cells(placed: Vec<Arc<Footprint>>) -> Result<Vec<i64>, FfiError>;   // the cells any two share (`checkOverlap`), x, y pairs
+fn plate_under(x: f64, y: f64, active: u64, count: u64, pitch: f64, bx: f64, by: f64) -> Result<Vec<f64>, FfiError>;   // `plateUnder`: [plate, x, y] or []
+fn footprint_drag_step(at: Vec<f64>, to: Vec<f64>, grid: Arc<Footprint>, others: Vec<Arc<Footprint>>) -> Result<Vec<f64>, FfiError>;
 //   Move's step (`dragStep` with `clashAt` as the probe): where the model with footprint `grid` goes from `at` when the pointer asks for `to`,
 //   `others` placed where they stand; the clash is the cells shared with them. Never into a worse clash; stops at the edge, slides along it. Two numbers.
 ```
@@ -411,7 +429,7 @@ puts them in, as the page's `activeAdded()` does.
 #[derive(uniffi::Record)] struct PlateFile { name: String, models: Vec<PlateModel> }
 fn export_plate(path: String, models: Vec<PlateModel>, options_json: String) -> Result<(), FfiError>;
 fn export_plates(path: String, plates: Vec<PlateFile>, options_json: String) -> Result<(), FfiError>;
-fn footprint_arrange(grids: Vec<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Vec<f64>;   // flat x, y per footprint
+fn footprint_arrange(grids: Vec<Arc<Footprint>>, bx: f64, by: f64, gap: i64) -> Result<Vec<f64>, FfiError>;   // flat x, y per footprint
 ```
 
 `export_plate` writes a plate of several models as one 3MF (`FORMATS['export-3mf']` over `plateGeometry`, `ui/export.js`, through
@@ -432,7 +450,7 @@ spots, a model with no room in a row past the bed's right edge).
 #[uniffi::export] fn build_report(result: &BuildResult, scale: f64, opts_json: String, tunables_json: String) -> Result<Arc<BuildReport>, FfiError>;
 impl BuildReport {
   fn settings_json(&self) -> String;                                    // JSON.stringify(rep, null, 2): what Copy settings copies
-  fn url(&self, site: String, when: String, drawn: u32, removed: u32) -> String;   // reportUrl: the prefilled GitHub issue link
+  fn url(&self, site: String, when: String, drawn: u32, removed: u32) -> Result<String, FfiError>;   // reportUrl: the prefilled GitHub issue link
 }
 ```
 
@@ -457,13 +475,13 @@ opens the web's, both ways. The maths is `sf_io::session` (a port of session.js:
 // reading
 impl Part {
   fn has_session(&self) -> bool;                              // the 3MF this part came from carried a session still to be restored
-  fn restore_session(&self, beside: bool) -> SessionRestore;  // once, as the part arrives (afterLoad); a second call, or a part with none: why "none"
+  fn restore_session(&self, beside: bool) -> Result<SessionRestore, FfiError>;  // once, as the part arrives (afterLoad); a second call, or a part with none: why "none"
 }
 #[derive(uniffi::Record)] struct SessionRestore { why: Option<String> /* "changed" | "unreadable" | "none"; None: restored */,
     walls: Vec<SessionWall>, removed: Vec<String>, fin_mode: Option<String>, fins_visible: Option<bool>, form: Vec<SessionField>, import_note: String }
 #[derive(uniffi::Record)] struct SessionWall { sway: bool, a: Vec<f64>, b: Vec<f64>, m: Option<Vec<f64>>, face: u64, capped: bool }
 #[derive(uniffi::Record)] struct SessionField { id: String, flag: Option<bool>, text: Option<String> }
-fn js_number_text(x: f64) -> String;                          // String(x): a number setting as the page's field holds it
+fn js_number_text(x: f64) -> Result<String, FfiError>;                          // String(x): a number setting as the page's field holds it
 ```
 
 - **`load_parts`** returns just the part of a file that carries a session and whose objects are the part and its "<name> supports"

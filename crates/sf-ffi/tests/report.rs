@@ -85,12 +85,14 @@ fn the_report_is_the_pages_byte_for_byte() {
             "{name}: settings"
         );
         for u in arr(field(case, "urls")) {
-            let url = report.url(
-                text(field(u, "site")).to_string(),
-                text(field(u, "when")).to_string(),
-                num(field(u, "drawn")) as u32,
-                num(field(u, "removed")) as u32,
-            );
+            let url = report
+                .url(
+                    text(field(u, "site")).to_string(),
+                    text(field(u, "when")).to_string(),
+                    num(field(u, "drawn")) as u32,
+                    num(field(u, "removed")) as u32,
+                )
+                .unwrap();
             assert_eq!(url, text(field(u, "url")), "{name}: link");
         }
     }

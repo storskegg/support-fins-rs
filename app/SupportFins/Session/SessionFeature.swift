@@ -1,4 +1,5 @@
 import SwiftUI
+import SupportFinsCore
 
 /// Sessions (`web/ui/session.js`, `afterLoad` in `web/ui/io.js`): a 3MF this app or the site exported carries the
 /// supports drawn by hand, the fin mode and the settings. When the file's part arrives they are restored, and the
@@ -20,7 +21,14 @@ final class SessionFeature: Feature {
         // added to a plate of models: they keep the plate's settings (`beside`, `ui/models.js`); the board has already
         // given this model its slot
         let beside = (host.features[PlatesFeature.self]?.board.modelCount ?? 1) > 1
-        let restored = core.part.restoreSession(beside: beside)
+        let restored: SessionRestore
+        do {
+            restored = try core.part.restoreSession(beside: beside)
+        } catch {
+            // the session of the file could not be restored: the part stays as loaded, and the read says why
+            host.status = ReadFailure.text(of: error, reading: core.info.name)
+            return
+        }
         core.refreshInfo()
         guard restored.why == nil else { return }
         SessionFile.apply(restored, to: host.session)

@@ -159,3 +159,15 @@ func analyzeMatchesTheEngine(pose: Pose) throws {
     #expect(throws: FfiError.self) { try part.analyze(thresholdDeg: 45, rot: [1, 0, 0]) }
     #expect(throws: FfiError.self) { try part.faceFlags(thresholdDeg: .nan, rot: [1, 0, 0, 0, 1, 0, 0, 0, 1]) }
 }
+
+/// X-11: an export that takes input from the user or a file throws a Swift error for a value it cannot take, where it
+/// used to be a non-throwing call (a panic there would have been a `try!` trap that kills the app).
+@Test func inputTakingExportsThrowInsteadOfTrapping() throws {
+    let part = try #require(try loadParts(path: try modelPath("lbracket")).first)
+    #expect(throws: FfiError.self) { _ = try part.scaled(factor: .nan) }
+    #expect(throws: FfiError.self) { _ = try part.scaled(factor: 1e300) }
+    #expect(throws: FfiError.self) { _ = try part.analyze(thresholdDeg: 45, rot: [1e300, 0, 0, 0, 1, 0, 0, 0, 1]) }
+    let grid = try #require(try footprintOfPart(part: part, rot: [1, 0, 0, 0, 1, 0, 0, 0, 1], offset: [0, 0, 0]))
+    #expect(throws: FfiError.self) { _ = try footprintDragStep(at: [], to: [], grid: grid, others: []) }
+    #expect(try scaleFromPercentText(text: "abc") == nil)
+}

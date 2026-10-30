@@ -439,8 +439,12 @@ fn a_suggestion_is_delivered_on_the_worker_and_a_stale_one_is_dropped() {
     let s = Suggester::new(part.clone());
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = s.suggest(45.0, common::options(), common::tunables(), ctx(), l1);
-    let g2 = s.suggest(45.0, common::options(), common::tunables(), ctx(), l2);
+    let g1 = s
+        .suggest(45.0, common::options(), common::tunables(), ctx(), l1)
+        .unwrap();
+    let g2 = s
+        .suggest(45.0, common::options(), common::tunables(), ctx(), l2)
+        .unwrap();
     assert_eq!((g1, g2), (1, 2));
     let Event::Suggested(g, r) = next_event(&rx2, Duration::from_secs(60)) else {
         panic!("not a suggestion")
@@ -464,8 +468,12 @@ fn a_ranking_reports_progress_after_every_pose_climbing_to_1() {
         let s = Suggester::new(part.clone());
         let (l, rx) = listener();
         let g = match density {
-            None => s.suggest(45.0, common::options(), common::tunables(), ctx(), l),
-            Some(d) => s.suggest_wide(45.0, common::options(), common::tunables(), ctx(), d, l),
+            None => s
+                .suggest(45.0, common::options(), common::tunables(), ctx(), l)
+                .unwrap(),
+            Some(d) => s
+                .suggest_wide(45.0, common::options(), common::tunables(), ctx(), d, l)
+                .unwrap(),
         };
         let mut seen = vec![];
         loop {
@@ -535,8 +543,12 @@ fn a_stale_wide_search_stops_early_and_the_newer_one_is_delivered() {
     let s = Suggester::new(part.clone());
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
-    let g1 = s.suggest_wide(45.0, common::options(), common::tunables(), ctx(), 10.0, l1);
-    let g2 = s.suggest_wide(45.0, common::options(), common::tunables(), ctx(), 10.0, l2);
+    let g1 = s
+        .suggest_wide(45.0, common::options(), common::tunables(), ctx(), 10.0, l1)
+        .unwrap();
+    let g2 = s
+        .suggest_wide(45.0, common::options(), common::tunables(), ctx(), 10.0, l2)
+        .unwrap();
     assert_eq!((g1, g2), (1, 2));
     let Event::Suggested(g, _) = next_event(&rx2, Duration::from_secs(120)) else {
         panic!("not a suggestion")
@@ -563,7 +575,9 @@ fn strength_and_failures_arrive_through_the_same_listener() {
     let part = load("lbracket");
     let s = Suggester::new(part.clone());
     let (l, rx) = listener();
-    let g = s.strength(vec![0.0, 0.0, 1.0], vec![0.0, 0.0, 1.0], 45.0, l);
+    let g = s
+        .strength(vec![0.0, 0.0, 1.0], vec![0.0, 0.0, 1.0], 45.0, l)
+        .unwrap();
     let Event::Strength(got_g, a) = rx.recv_timeout(Duration::from_secs(60)).unwrap() else {
         panic!("not strength")
     };
@@ -574,7 +588,9 @@ fn strength_and_failures_arrive_through_the_same_listener() {
             .unwrap()
     );
     let (l, rx) = listener();
-    let g = s.suggest(45.0, "{\"mode\":\"bogus\"}".into(), "{}".into(), ctx(), l);
+    let g = s
+        .suggest(45.0, "{\"mode\":\"bogus\"}".into(), "{}".into(), ctx(), l)
+        .unwrap();
     let Event::Failed(fg, FfiError::Engine { .. }) =
         rx.recv_timeout(Duration::from_secs(60)).unwrap()
     else {
