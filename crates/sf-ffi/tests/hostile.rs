@@ -157,6 +157,27 @@ fn paths() -> Vec<String> {
     v
 }
 
+/// Paths to write to: none that exist, none relative (a relative path would leave a file in the crate folder), none a
+/// system file. Writing must fail with an error or land in `/dev/null`.
+fn write_paths() -> Vec<String> {
+    let mut v: Vec<String> = [
+        "",
+        "/",
+        "//",
+        "\u{0}",
+        "a\u{0}b.stl",
+        "/nonexistent/dir/file.stl",
+        "/dev/null",
+        "/dev/null/x.3mf",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    v.push(format!("/{}.stl", "a".repeat(5000)));
+    v.push(std::env::temp_dir().to_string_lossy().into_owned());
+    v
+}
+
 fn floats() -> Vec<f64> {
     vec![
         0.0,
@@ -998,7 +1019,7 @@ fn report_and_export_exports_take_anything() {
     // export / export_with_drawn: paths, options, counts
     let out = scratch("out").to_string_lossy().into_owned();
     let good_path = |ext: &str| format!("{out}.{ext}");
-    for p in paths() {
+    for p in write_paths() {
         chk(
             "export",
             export(
