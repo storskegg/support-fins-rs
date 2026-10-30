@@ -6,7 +6,9 @@ use std::time::Instant;
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let path = args.next().expect("usage: limits_probe <file> [--allow-large]");
+    let path = args
+        .next()
+        .expect("usage: limits_probe <file> [--allow-large]");
     let allow_large = args.next().as_deref() == Some("--allow-large");
     let t = Instant::now();
     let r = std::thread::Builder::new()
@@ -27,7 +29,9 @@ fn main() {
             estimate,
             limit,
             message,
-        })) => println!("LIMIT {kind:?} estimate {estimate:e} limit {limit:e} ({message}), {took:.2?}"),
+        })) => {
+            println!("LIMIT {kind:?} estimate {estimate:e} limit {limit:e} ({message}), {took:.2?}")
+        }
         Ok(Err(e)) => println!("error: {e}, {took:.2?}"),
     }
 }

@@ -189,7 +189,7 @@ pub fn check_finite(positions: &[f64], what: &str) -> Result<(), String> {
 pub fn largest_dimension(positions: &[f64]) -> f64 {
     let mut lo = [f64::INFINITY; 3];
     let mut hi = [f64::NEG_INFINITY; 3];
-    for p in positions.chunks_exact(3) {
+    for p in positions.as_chunks::<3>().0 {
         for k in 0..3 {
             lo[k] = lo[k].min(p[k]);
             hi[k] = hi[k].max(p[k]);
