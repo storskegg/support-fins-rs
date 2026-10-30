@@ -655,3 +655,34 @@ fn the_summary_carries_the_readout_data() {
             .all(|p| p.get("inBore").is_none_or(|b| matches!(b, Json::Bool(_))))
     );
 }
+
+// C-04: cancel checks never change a result, and a stop request returns no result
+#[test]
+fn a_strength_search_that_is_never_stopped_equals_the_plain_one_and_a_stopped_one_returns_nothing()
+{
+    for name in ["lbracket", "sphere", "torus"] {
+        let part = load(name);
+        let (l, w) = ([1.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+        let plain = part.strength_advice(&l, &w, 45.0).unwrap();
+        assert_eq!(
+            part.strength_advice_with(&l, &w, 45.0, &|| false).unwrap(),
+            Some(plain),
+            "{name}"
+        );
+        assert_eq!(
+            part.strength_advice_with(&l, &w, 45.0, &|| true).unwrap(),
+            None,
+            "{name}"
+        );
+        assert_eq!(
+            orient::wide_candidate_downs_cancellable(part.topology(), 10.0, &|| false),
+            Some(orient::wide_candidate_downs(part.topology(), 10.0)),
+            "{name}"
+        );
+        assert_eq!(
+            orient::wide_candidate_downs_cancellable(part.topology(), 10.0, &|| true),
+            None,
+            "{name}"
+        );
+    }
+}

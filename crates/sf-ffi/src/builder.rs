@@ -592,6 +592,14 @@ impl Builder {
     }
 }
 
+impl Drop for Builder {
+    /// A dropped Builder (window closed, parked model discarded) abandons the build in flight and
+    /// any queued one, instead of letting the worker finish them for nobody.
+    fn drop(&mut self) {
+        self.cancel();
+    }
+}
+
 /// What `export` writes. `ExportKind` names the file the way the page does (`exportName`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
 pub enum ExportKind {
