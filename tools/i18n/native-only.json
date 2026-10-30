@@ -582,5 +582,13 @@
     "pt": "Mostrar relatórios de falha",
     "ar": "إظهار تقارير الأعطال",
     "nl": "Crashrapporten tonen"
+  },
+  "Exporting": {
+    "why": "the progress card while an export writes in the background (\"Exporting 3MF\" with a Cancel button). Agent translation, to be checked by a native speaker",
+    "de": "Exportiere",
+    "zh": "正在导出",
+    "pt": "Exportando",
+    "ar": "جارٍ التصدير",
+    "nl": "Exporteren"
   }
 }

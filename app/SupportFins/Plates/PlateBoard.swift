@@ -49,9 +49,11 @@ final class PlateBoard {
     var arranging = false
     /// The hand-placed walls drawn for a model, in print space about its own spot (Draw): what an export writes with
     /// its fins. The Draw feature sets it; no walls until it does.
-    @ObservationIgnored var drawn: (ModelSlot) -> DrawnSweep? = { _ in nil }
+    @ObservationIgnored var drawn: (ModelSlot) -> DrawnSource = { _ in .none }
     /// The hand-placed walls of a model, in its own frame, for the session a plate of one model writes (Draw sets it).
     @ObservationIgnored var walls: (ModelSlot) -> [DrawnWall] = { _ in [] }
+    /// The plate export (or Export all plates) in progress, off the main thread (C-03).
+    let exportJob = ExportJob()
     /// Why the last plate export failed (the engine's message), or nil.
     var exportError: String?
     /// Where an export asks for its file (a stub in tests).
@@ -83,6 +85,8 @@ final class PlateBoard {
         var xy: SIMD2<Double>
         var timer: Task<Void, Never>
     }
+
+    deinit { exportJob.cancelWithoutWaiting() }
 
     init(host: ViewerModel) {
         self.host = host

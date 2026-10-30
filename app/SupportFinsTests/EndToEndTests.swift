@@ -54,7 +54,7 @@ struct EndToEndTests {
         let dir = try Scratch.directory()
         let exporter = try #require(wiring.exporter)
         let name = try #require(exporter.fileName(for: .stl))
-        let written = try #require(exporter.write(.stl, to: dir.appending(path: name)), "\(exporter.error ?? "")")
+        let written = try #require(await exporter.write(.stl, to: dir.appending(path: name)), "\(exporter.error ?? "")")
         let size = try #require(try FileManager.default.attributesOfItem(atPath: written.path)[.size] as? Int)
         #expect(size > 84 && (size - 84) % 50 == 0, "a binary STL with triangles: \(size) bytes")
         Scratch.remove(dir)
