@@ -90,7 +90,6 @@ final class ExportJobTests {
         let job = ExportJob()
         let target = dir.appending(path: "c.stl")
         try Data("old".utf8).write(to: target)
-        struct Boom: Error {}
         await #expect(throws: Boom.self) {
             _ = try await job.run(title: "STL", to: target) { path in
                 try Data("partial".utf8).write(to: URL(fileURLWithPath: path))
@@ -118,7 +117,6 @@ final class ExportJobTests {
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
         let job = ExportJob()
         // a failing export leaves the old file as it was
-        struct Boom: Error {}
         await #expect(throws: Boom.self) { _ = try await job.run(title: "3MF", to: target) { path in
             try Data("partial".utf8).write(to: URL(fileURLWithPath: path)); throw Boom() } }
         #expect(try Data(contentsOf: target) == Data("old".utf8))
@@ -215,6 +213,33 @@ final class ExportJobTests {
         try exportWithDrawn(path: direct.path(percentEncoded: false), parts: [part], builds: [], drawn: nil, optionsJson: options)
         print("EXPORT-STALL the same export called on the main thread (before): blocked \(Int((ContinuousClock.now - blocked) / .milliseconds(1))) ms")
         #expect(try sha(url) == sha(direct), "byte-identical to the synchronous call")
+    }
+
+    struct Boom: Error {}
+
+    // MARK: AtomicWrite (audit X-09)
+
+    @Test func atomicWriteReplacesWholeAndAFailedWriteKeepsTheOldFile() throws {
+        let target = dir.appending(path: "c.stl")
+        try Data("old".utf8).write(to: target)
+        try AtomicWrite.write(Data("new contents".utf8), to: target)
+        #expect(try Data(contentsOf: target) == Data("new contents".utf8))
+        #expect(throws: Boom.self) {
+            _ = try AtomicWrite.write(to: target) { path in
+                try Data("half".utf8).write(to: URL(fileURLWithPath: path))
+                throw Boom()
+            }
+        }
+        #expect(try Data(contentsOf: target) == Data("new contents".utf8), "a failed write leaves the old file")
+        #expect(names() == ["c.stl"], Comment(rawValue: "\(names())"))
+    }
+
+    @Test func atomicCopyOfAMissingSourceKeepsTheOldFileAndWritesNothingElse() throws {
+        let target = dir.appending(path: "d.stl")
+        try Data("keep".utf8).write(to: target)
+        #expect(throws: (any Error).self) { try AtomicWrite.copy(from: dir.appending(path: "no-such"), to: target) }
+        #expect(try Data(contentsOf: target) == Data("keep".utf8))
+        #expect(names() == ["d.stl"], Comment(rawValue: "\(names())"))
     }
 }
 

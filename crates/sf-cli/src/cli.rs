@@ -11,8 +11,10 @@ use sf_engine::types::Xyz;
 use sf_io::json::Json;
 use sf_io::limits::{LoadOptions, ReadError, check_dimension, check_finite};
 use sf_io::obj::read_obj_with;
-use sf_io::stl::{read_stl_with, write_binary_stl};
-use sf_io::threemf::{ExtraPart, PartKind, ThreeMfOpts, read_three_mf_with, write_three_mf};
+use sf_io::stl::{read_stl_with, write_binary_stl_checked};
+use sf_io::threemf::{
+    ExtraPart, PartKind, ThreeMfOpts, read_three_mf_with, write_three_mf_checked,
+};
 use sf_io::zip::unzip_with;
 
 use crate::entry::{
@@ -805,7 +807,7 @@ pub fn fin_file(
         read.slicer.as_ref(),
         args.rot.map(rotation_matrix),
     );
-    io.write(&output, &blob)?;
+    io.write(&output, &blob?)?;
     let report = report_line(&r.stats);
     Ok(file_result(input, Some(output), report, &r.stats))
 }
@@ -825,7 +827,7 @@ pub fn output_bytes(
     three_mf_out: bool,
     slicer: Option<&(Vec<f64>, Vec<sf_io::threemf::ReadExtra>)>,
     rot: Option<[f64; 9]>,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, String> {
     let tri64: Vec<f64> = tris.iter().map(|&v| v as f64).collect();
     let fins = triples(
         &tri64,
@@ -838,13 +840,13 @@ pub fn output_bytes(
     let at = [off.x, off.y, off.z];
     let part = triples(posed, at);
     if fins_only {
-        write_binary_stl(&fins, &format!("{name} fins"))
+        write_binary_stl_checked(&fins, &format!("{name} fins"))
     } else if three_mf_out {
         three_mf(&part, &fins, name, slicer, rot, at)
     } else {
         let mut both = part;
         both.extend(fins);
-        write_binary_stl(&both, name)
+        write_binary_stl_checked(&both, name)
     }
 }
 
@@ -883,12 +885,12 @@ fn three_mf(
     slicer: Option<&(Vec<f64>, Vec<sf_io::threemf::ReadExtra>)>,
     rot: Option<[f64; 9]>,
     at: [f64; 3],
-) -> Vec<u8> {
+) -> Result<Vec<u8>, String> {
     let Some((positions, extras)) = slicer else {
-        return write_three_mf(part, fins, name, &ThreeMfOpts::default());
+        return write_three_mf_checked(part, fins, name, &ThreeMfOpts::default());
     };
     let placed = |flat: &[f64]| triples(&pose_matrix(flat, rot), at);
-    write_three_mf(
+    write_three_mf_checked(
         &placed(positions),
         fins,
         name,

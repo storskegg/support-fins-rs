@@ -32,7 +32,7 @@ use crate::limits::{
 use crate::obj::ObjBbox;
 use crate::paintcode::{FilamentPainter, Paint};
 use crate::text::{decode, is_js_space, js_trim};
-use crate::zip::{ZipData, ZipFile, unzip_with, zip_store};
+use crate::zip::{ZipData, ZipFile, unzip_with, zip_store_checked};
 use indexmap::{IndexMap, IndexSet};
 use sf_engine::jsnum;
 use std::collections::HashMap;
@@ -869,6 +869,16 @@ pub fn write_three_mf(
     name: &str,
     opts: &ThreeMfOpts,
 ) -> Vec<u8> {
+    write_three_mf_checked(part_tris, fin_tris, name, opts).expect("write_three_mf")
+}
+
+/// `write_three_mf`, or the message of the ZIP32 limit it passes.
+pub fn write_three_mf_checked(
+    part_tris: &[[f64; 3]],
+    fin_tris: &[[f64; 3]],
+    name: &str,
+    opts: &ThreeMfOpts,
+) -> Result<Vec<u8>, String> {
     let model = Model {
         part_tris: part_tris.to_vec(),
         fin_tris: fin_tris.to_vec(),
@@ -877,7 +887,7 @@ pub fn write_three_mf(
         colors: opts.colors.clone(),
         extras: opts.extras.clone(),
     };
-    write_plate_3mf(&[model], name, opts.separate, opts.session.as_ref(), None)
+    write_plate_3mf_checked(&[model], name, opts.separate, opts.session.as_ref(), None)
 }
 
 /// Port of `writePlate3MF` (web/threemf.js:314-326): several models on one plate in one 3MF,
@@ -887,6 +897,8 @@ pub fn write_three_mf(
 /// (`bed_shift`) -- or, given the `bed` the models were placed on (print space's origin its
 /// centre), each where it stands on it. `title` defaults in JS to `models[0]?.name ?? 'Support
 /// Fins'`: callers pass it explicitly.
+///
+/// Panics past the ZIP32 limits; see [`write_plate_3mf_checked`].
 pub fn write_plate_3mf(
     models: &[Model],
     title: &str,
@@ -894,6 +906,17 @@ pub fn write_plate_3mf(
     session: Option<&Json>,
     bed: Option<Bed>,
 ) -> Vec<u8> {
+    write_plate_3mf_checked(models, title, separate, session, bed).expect("write_plate_3mf")
+}
+
+/// `write_plate_3mf`, or the message of the ZIP32 limit the package passes (over 4 GB; audit S-11).
+pub fn write_plate_3mf_checked(
+    models: &[Model],
+    title: &str,
+    separate: bool,
+    session: Option<&Json>,
+    bed: Option<Bed>,
+) -> Result<Vec<u8>, String> {
     let (xml, configs) = model_xml(models, title, separate, bed);
     let t = |name: &str, data: String| ZipFile {
         name: name.to_string(),
@@ -910,7 +933,7 @@ pub fn write_plate_3mf(
     if let Some(s) = session {
         entries.push(t(SESSION_PART, s.stringify()));
     }
-    zip_store(&entries)
+    zip_store_checked(&entries)
 }
 
 // ---------------------------------------------------------------- 3MF reader

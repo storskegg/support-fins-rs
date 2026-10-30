@@ -175,7 +175,31 @@ fn scan_vertex(text: &str, i: usize) -> Option<(usize, [&str; 3])> {
 ///
 /// Layout: 80-byte header, uint32 count, then per triangle 12 little-endian float32 (normal,
 /// then three vertices) and a uint16 attribute word.
+///
+/// Panics where [`write_binary_stl_checked`] refuses (over u32::MAX triangles).
 pub fn write_binary_stl(tris: &[[f64; 3]], name: &str) -> Vec<u8> {
+    write_binary_stl_checked(tris, name).expect("write_binary_stl: past the STL limit")
+}
+
+/// `write_binary_stl`, or a sentence when the triangle count does not fit the file's uint32 (audit S-11; the JS
+/// writes a wrong count there). Below the limit the bytes are `write_binary_stl`'s.
+pub fn write_binary_stl_checked(tris: &[[f64; 3]], name: &str) -> Result<Vec<u8>, String> {
+    stl_count_check(tris.len() / 3)?;
+    Ok(write_binary_stl_body(tris, name))
+}
+
+/// The binary STL's uint32 triangle count: an error sentence when `count` does not fit it.
+pub fn stl_count_check(count: usize) -> Result<(), String> {
+    if count as u64 > u64::from(u32::MAX) {
+        return Err(format!(
+            "The model has {count} triangles; a binary STL holds at most {}.",
+            u32::MAX
+        ));
+    }
+    Ok(())
+}
+
+fn write_binary_stl_body(tris: &[[f64; 3]], name: &str) -> Vec<u8> {
     let count = tris.len() / 3;
     let mut buf = vec![0u8; HEADER + 4 + count * PER_TRI];
 

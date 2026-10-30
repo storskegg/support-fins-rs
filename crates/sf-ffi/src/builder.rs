@@ -22,8 +22,8 @@ use sf_engine::overhangs::analyze;
 use sf_engine::prop::crest::split_interface;
 use sf_engine::types::{IDENTITY3, Xyz};
 use sf_io::json::{Json, parse};
-use sf_io::stl::write_binary_stl;
-use sf_io::threemf::{Bed, ExtraPart, Model, write_plate_3mf};
+use sf_io::stl::write_binary_stl_checked;
+use sf_io::threemf::{Bed, ExtraPart, Model, write_plate_3mf_checked};
 
 use crate::gpu::GpuBuffer;
 use crate::part::{FfiError, Part, rot9};
@@ -844,13 +844,8 @@ fn plate_3mf_bytes(models: &[PlateModel], bed: Option<Bed>) -> Result<Vec<u8>, F
             ));
         }
     }
-    Ok(write_plate_3mf(
-        &written,
-        first.part.stem(),
-        true,
-        session.as_ref(),
-        bed,
-    ))
+    write_plate_3mf_checked(&written, first.part.stem(), true, session.as_ref(), bed)
+        .map_err(engine)
 }
 
 /// `sessionOf(partTris, model)` (`ui/export.js` `modelGeometry`): the session of a model written posed `rot`
@@ -904,14 +899,20 @@ pub fn export_plates(
 ) -> Result<(), FfiError> {
     crate::crash::guarded("export plates", || {
         let bed = plate_bed(&options_json)?;
+        // the names come from the models' object names, which a file chooses: safe entry names (audit X-08)
+        let names: Vec<String> = plates.iter().map(|p| p.name.clone()).collect();
+        let names = sf_io::zip::safe_entry_names(&names);
         let mut files = Vec::with_capacity(plates.len());
-        for p in &plates {
+        for (p, name) in plates.iter().zip(names) {
             files.push(sf_io::zip::ZipFile {
-                name: p.name.clone(),
+                name,
                 data: sf_io::zip::ZipData::Bytes(plate_3mf_bytes(&p.models, bed)?),
             });
         }
-        write_file(&path, sf_io::zip::zip_store(&files))
+        write_file(
+            &path,
+            sf_io::zip::zip_store_checked(&files).map_err(engine)?,
+        )
     })
 }
 
@@ -1051,13 +1052,14 @@ fn export_impl(
             .session
             .as_ref()
             .map(|s| session_json(part, rot, offset, s));
-        write_plate_3mf(&[model], name, true, session.as_ref(), bed)
+        write_plate_3mf_checked(&[model], name, true, session.as_ref(), bed).map_err(engine)?
     } else if o.fins_only {
-        write_binary_stl(&xyz4(&added, [0.0, 0.0]), &format!("{name} fins"))
+        write_binary_stl_checked(&xyz4(&added, [0.0, 0.0]), &format!("{name} fins"))
+            .map_err(engine)?
     } else {
         let mut tris = print(&topo.pos);
         tris.extend(xyz4(&added, [0.0, 0.0]));
-        write_binary_stl(&tris, name)
+        write_binary_stl_checked(&tris, name).map_err(engine)?
     };
     std::fs::write(path, bytes).map_err(|e| FfiError::Io {
         message: format!("{path}: {e}"),

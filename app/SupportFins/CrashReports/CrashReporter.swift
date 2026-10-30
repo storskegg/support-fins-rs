@@ -310,7 +310,7 @@ final class CrashReporter {
         guard panel.runModal() == .OK, let out = panel.url else { return }
         let extras = [folder.crashedBreadcrumbsURL].filter { FileManager.default.fileExists(atPath: $0.path) }
         if let data = try? CrashArchive.make(reports: bannerFiles, extras: extras, model: box.state == .on ? model : nil) {
-            try? data.write(to: out)
+            try? AtomicWrite.write(data, to: out)
         }
     }
 }
