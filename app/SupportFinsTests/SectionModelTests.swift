@@ -125,4 +125,57 @@ struct SectionModelTests {
         tool.aimAtView()
         #expect(host.session.pose == pose && !host.session.canUndo)    // view only: not undoable, not in the pose
     }
+
+    // MARK: a parked model keeps its cut (`sectionState` / `restoreSection`, `ui/models.js:68,104`)
+
+    /// A window with a model on show and its plate board (`PlateBoardTests`), the cut on and moved off its aim.
+    func cutPlate(_ name: String) async throws -> (ViewerModel, PlateBoard, SectionTool, simd_float4x4) {
+        let (host, board) = try await PlateBoardTests().window(name: name)
+        let tool = try #require(host.controller?.section)
+        host.toolbar.toggle(.section)
+        tool.flip()
+        tool.scrollPush(3)
+        let held = try #require(tool.heldCut)
+        return (host, board, tool, held)
+    }
+
+    @Test func aPlateLeftWithTheCutOnHasItBackWhereItWasOnTheModel() async throws {
+        let (host, board, tool, held) = try await cutPlate("cut-a")
+        let plane = tool.plane
+        board.addPlate()
+        // parking takes the part off the page, and the cut with it (`stashPart` -> `resetPartState` -> `setSection(false)`)
+        #expect(!tool.isOn && host.toolbar.open == nil)
+        await host.load(url: try PlateBoardTests().stl("cut-b", slab: 20))
+        #expect(!tool.isOn, "the other plate's model has no cut")
+        board.switchPlate(0)
+        #expect(tool.isOn && tool.heldCut == held)
+        #expect(simd_distance(tool.plane.position, plane.position) < 1e-4 && simd_distance(tool.plane.normal, plane.normal) < 1e-5)
+        // switched on as `setSection(true)` does: the badge lit, its popover not opened
+        #expect(host.toolbar.badges[.section]?.isLit() == true && host.toolbar.open == nil)
+        board.switchPlate(1)
+        #expect(!tool.isOn)
+        board.switchPlate(0)
+        #expect(tool.isOn && tool.heldCut == held, "parked again with the cut it came back with")
+    }
+
+    @Test func aPlateLeftWithTheCutOffComesBackWithItOff() async throws {
+        let (host, board, tool, _) = try await cutPlate("cut-off-a")
+        tool.setOn(false)
+        board.addPlate()
+        await host.load(url: try PlateBoardTests().stl("cut-off-b", slab: 20))
+        host.toolbar.toggle(.section)
+        #expect(tool.isOn)
+        board.switchPlate(0)
+        #expect(!tool.isOn && tool.heldCut == nil)
+    }
+
+    @Test func aModelSwappedOutOnItsPlateKeepsItsCut() async throws {
+        let (host, board, tool, held) = try await cutPlate("cut-swap-a")
+        try await PlateBoardTests().add(host, "cut-swap-b")
+        #expect(board.plate.live == 1 && !tool.isOn)
+        board.swap(to: 0)
+        #expect(board.plate.live == 0 && tool.isOn && tool.heldCut == held)
+        board.swap(to: 1)
+        #expect(!tool.isOn)
+    }
 }
