@@ -22,8 +22,8 @@ use std::borrow::Cow;
 
 use crate::jsnum;
 
-/// The most cells a grid takes (4 MB). A grid that would take more is built from coarser cells.
-pub const CELL_BUDGET: i64 = 4_000_000;
+/// The most cells a grid takes (4.2 MB). A grid that would take more is built from coarser cells.
+pub const CELL_BUDGET: i64 = 4_200_000;
 
 /// A vertex further out than this (1e9 m) is not a place a model stands: its triangle covers nothing.
 const FAR: f64 = 1e12;
