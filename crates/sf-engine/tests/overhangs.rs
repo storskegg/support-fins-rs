@@ -225,20 +225,17 @@ fn regions_are_sorted_by_area_descending() {
     pos.extend(
         cuboid(4.0, 4.0, 1.0)
             .chunks(3)
-            .flat_map(|p| [p[0] - 1.5, p[1] - 1.5, p[2] + 5.0])
-            .collect::<Vec<_>>(),
+            .flat_map(|p| [p[0] - 1.5, p[1] - 1.5, p[2] + 5.0]),
     );
     pos.extend(
         cuboid(1.0, 1.0, 5.0)
             .chunks(3)
-            .flat_map(|p| [p[0] + 50.0, p[1], p[2]])
-            .collect::<Vec<_>>(),
+            .flat_map(|p| [p[0] + 50.0, p[1], p[2]]),
     );
     pos.extend(
         cuboid(6.0, 6.0, 1.0)
             .chunks(3)
-            .flat_map(|p| [p[0] + 47.5, p[1] - 2.5, p[2] + 5.0])
-            .collect::<Vec<_>>(),
+            .flat_map(|p| [p[0] + 47.5, p[1] - 2.5, p[2] + 5.0]),
     );
     let t = build_topology(pos);
     let a = analyze(&t, 45.0, &IDENTITY3);

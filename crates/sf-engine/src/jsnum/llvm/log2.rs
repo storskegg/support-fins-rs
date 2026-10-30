@@ -1,7 +1,7 @@
 //! Port of LLVM libc `math::log2` (src/__support/math/log2.h, revision 9309c117), as V8 15.0.245
 //! calls it from `v8::base::ieee754::log2` (src/base/ieee754.cc:228). FMA, accurate pass.
 
-use super::fputil::*;
+use super::fputil::{DD, F128, exact_add, fma, polyeval, quick_add, quick_mul, quick_mult};
 use super::log_rr::{LogRR, log_range_reduction};
 use super::tables_common::{LOG_COEFFS, RD};
 use super::tables_log2::{LOG_R1, LOG2_STEP_1, LOG2_STEP_2, LOG2_STEP_3, LOG2_STEP_4};

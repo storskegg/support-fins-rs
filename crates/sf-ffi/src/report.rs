@@ -35,9 +35,8 @@ pub fn build_report(
     tunables_json: String,
 ) -> Result<Arc<BuildReport>, FfiError> {
     crate::crash::guarded("report", || {
-        let options = match parse(&opts_json) {
-            Some(j @ Json::Obj(_)) => j,
-            _ => return Err(engine("options must be a JSON object of options.json keys")),
+        let Some(options @ Json::Obj(_)) = parse(&opts_json) else {
+            return Err(engine("options must be a JSON object of options.json keys"));
         };
         let tunables = if tunables_json.trim().is_empty() {
             Json::Obj(vec![])

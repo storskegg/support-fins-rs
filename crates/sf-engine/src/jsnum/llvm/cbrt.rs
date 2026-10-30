@@ -1,7 +1,9 @@
 //! Port of LLVM libc `math::cbrt` (src/__support/math/cbrt.h, revision 9309c117), as V8 15.0.245
 //! calls it from `v8::base::ieee754::cbrt` (src/base/ieee754.cc:233). FMA, accurate pass.
 
-use super::fputil::*;
+use super::fputil::{
+    DD, F128, exact_add, exact_mult, fma, polyeval, quick_add, quick_mul, quick_mult_d,
+};
 
 const REL_ERROR: f64 = 4.440892098500626e-16; // 0x1.0p-51
 

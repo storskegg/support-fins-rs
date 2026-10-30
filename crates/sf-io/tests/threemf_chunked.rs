@@ -51,7 +51,7 @@ fn generate(r: &mut Lcg, bad: bool) -> String {
     if r.below(3) == 0 {
         s.push_str("<m:colorgroup id=\"6\"><m:color color=\"#123456FF\"/></m:colorgroup>\n");
     }
-    for o in 0..1 + r.below(4) {
+    for o in 0..=r.below(4) {
         let pid = match r.below(4) {
             0 => " pid=\"5\" pindex=\"1\"".to_string(),
             1 => " pid=\"6\"".to_string(),
@@ -114,7 +114,7 @@ fn generate(r: &mut Lcg, bad: bool) -> String {
         s.push_str(&format!("</{p}triangles>\n</{p}mesh>\n</{p}object>\n"));
     }
     s.push_str(&format!("</{p}resources>\n<{p}build>\n"));
-    for i in 0..1 + r.below(3) {
+    for i in 0..=r.below(3) {
         s.push_str(&format!(
             "<{p}item objectid=\"{}\" transform=\"{}\"/>\n",
             1 + i,

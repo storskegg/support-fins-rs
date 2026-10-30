@@ -51,7 +51,9 @@ fn torus(u: usize, v: usize) -> Vec<f64> {
         for j in 0..v {
             let (p00, p10, p01, p11) = (pt(i, j), pt(i + 1, j), pt(i, j + 1), pt(i + 1, j + 1));
             for t in [[p00, p10, p11], [p00, p11, p01]] {
-                t.iter().for_each(|p| out.extend_from_slice(p));
+                for p in &t {
+                    out.extend_from_slice(p);
+                }
             }
         }
     }

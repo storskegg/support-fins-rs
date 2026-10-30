@@ -140,8 +140,14 @@ fn every_variant_builds_through_every_build_entry() {
         let n = &f.name;
         let r = build_part(&part, &rot, &f.options, &f.tunables)
             .unwrap_or_else(|e| panic!("{n}: build_part: {e}"));
-        let c = build_part_cancellable(&part, &rot, &f.options, &f.tunables, &Default::default())
-            .unwrap_or_else(|e| panic!("{n}: build_part_cancellable: {e}"));
+        let c = build_part_cancellable(
+            &part,
+            &rot,
+            &f.options,
+            &f.tunables,
+            &sf_engine::cancel::Cancel::default(),
+        )
+        .unwrap_or_else(|e| panic!("{n}: build_part_cancellable: {e}"));
         assert_eq!(
             r.summary_json(),
             c.summary_json(),

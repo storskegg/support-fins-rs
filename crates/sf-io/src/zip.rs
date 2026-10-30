@@ -203,7 +203,7 @@ fn zip_store_unchecked(files: &[ZipFile]) -> Vec<u8> {
     let mut out = vec![0u8; local_size + central_size + 22];
     let mut o = 0;
 
-    for e in entries.iter_mut() {
+    for e in &mut entries {
         e.offset = o;
         put32(&mut out, o, 0x04034b50); // local file header signature
         put16(&mut out, o + 4, 20); // version needed to extract

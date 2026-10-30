@@ -30,7 +30,9 @@ fn main() {
             limit,
             message,
         })) => {
-            println!("LIMIT {kind:?} estimate {estimate:e} limit {limit:e} ({message}), {took:.2?}")
+            println!(
+                "LIMIT {kind:?} estimate {estimate:e} limit {limit:e} ({message}), {took:.2?}"
+            );
         }
         Ok(Err(e)) => println!("error: {e}, {took:.2?}"),
     }

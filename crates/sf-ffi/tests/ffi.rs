@@ -502,7 +502,7 @@ fn percent_text_is_the_fields_wording() {
         scale_from_percent_text("33.333".into()).unwrap(),
         Some(0.3333)
     );
-    assert_eq!(scale_from_percent_text("".into()).unwrap(), None);
+    assert_eq!(scale_from_percent_text(String::new()).unwrap(), None);
     assert_eq!(scale_from_percent_text("abc".into()).unwrap(), None);
     assert_eq!(scale_from_percent_text("-3".into()).unwrap(), None);
     assert_eq!(scale_from_percent_text("1e2".into()).unwrap(), Some(1.0));

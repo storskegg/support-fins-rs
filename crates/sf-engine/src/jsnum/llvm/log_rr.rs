@@ -1,7 +1,7 @@
 //! Port of LLVM libc `log_range_reduction` (src/__support/math/log_range_reduction.h), the
 //! 128-bit range reduction shared by the accurate passes of `log`, `log2` and `log10`.
 
-use super::fputil::*;
+use super::fputil::{F128, quick_add};
 use super::tables_common::{S2, S3, S4};
 
 /// `LogRR`: the four step tables of one logarithm.

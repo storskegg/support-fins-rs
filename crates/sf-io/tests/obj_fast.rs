@@ -102,7 +102,7 @@ fn generate(r: &mut Lcg, corrupt: bool) -> String {
         }
     }
     if corrupt {
-        for _ in 0..1 + r.below(2) {
+        for _ in 0..=r.below(2) {
             let at = r.below(lines.len() as u64) as usize;
             let bad = match r.below(12) {
                 0 => "v 1 2".to_string(),

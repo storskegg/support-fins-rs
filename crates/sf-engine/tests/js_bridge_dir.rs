@@ -26,8 +26,8 @@ fn runs(tris: Vec<f64>) -> Vec<char> {
             let xs: Vec<f64> = q.line.iter().map(|p| p[0]).collect();
             let ys: Vec<f64> = q.line.iter().map(|p| p[1]).collect();
             let span = |v: &[f64]| {
-                v.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
-                    - v.iter().cloned().fold(f64::INFINITY, f64::min)
+                v.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                    - v.iter().copied().fold(f64::INFINITY, f64::min)
             };
             if span(&xs) >= span(&ys) { 'x' } else { 'y' }
         })
@@ -37,8 +37,7 @@ fn runs(tris: Vec<f64>) -> Vec<char> {
 fn all(rs: &[char], axis: char, what: &str) {
     assert!(
         !rs.is_empty() && rs.iter().all(|&r| r == axis),
-        "{what}: walls run {:?}, expected all along {axis}",
-        rs
+        "{what}: walls run {rs:?}, expected all along {axis}"
     );
 }
 

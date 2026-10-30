@@ -113,7 +113,7 @@ fn guarded_turns_a_panic_into_an_internal_error_and_names_the_operation() {
     assert_eq!(crash::current_operation(), "", "the operation is restored");
     match r {
         Err(FfiError::Engine { message }) => {
-            assert_eq!(message, "internal error: probe panic: index 9 out of range")
+            assert_eq!(message, "internal error: probe panic: index 9 out of range");
         }
         other => panic!("{other:?}"),
     }

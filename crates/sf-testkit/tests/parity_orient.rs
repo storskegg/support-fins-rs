@@ -49,9 +49,9 @@ fn load_alignment_replays() {
     for c in &cases {
         let a = load_alignment(p3(&c.args[0]));
         if a.is_some() {
-            some += 1
+            some += 1;
         } else {
-            none += 1
+            none += 1;
         }
         check("loadAlignment", c, &align_value(a), &Tol::Exact);
     }

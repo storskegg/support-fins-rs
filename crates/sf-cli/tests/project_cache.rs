@@ -97,9 +97,9 @@ fn records(root: &Path) -> Vec<PathBuf> {
             for e in rd.flatten() {
                 let q = e.path();
                 if q.is_dir() && !fs::symlink_metadata(&q).unwrap().file_type().is_symlink() {
-                    walk(&q, out)
+                    walk(&q, out);
                 } else if q.to_string_lossy().ends_with(".cache") {
-                    out.push(q)
+                    out.push(q);
                 }
             }
         }

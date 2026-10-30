@@ -421,7 +421,6 @@ pub struct StrutPatch {
 ///
 /// `strutPatches(topo, rot, groups, seated, step, region, regionTris)`
 /// (web/prop/lattice.js:197-224).
-#[allow(clippy::too_many_arguments)]
 pub fn strut_patches(
     topo: &Topology,
     rot: &Rot3,

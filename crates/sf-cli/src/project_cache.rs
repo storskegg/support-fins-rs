@@ -298,7 +298,7 @@ impl CacheStore for DiskCache {
         DiskCache::save(self, number, g)
     }
     fn finish(&self, warn: &dyn Fn(&str)) {
-        DiskCache::finish(self, warn)
+        DiskCache::finish(self, warn);
     }
 }
 

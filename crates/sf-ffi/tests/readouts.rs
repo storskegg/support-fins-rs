@@ -42,9 +42,8 @@ fn n(v: f64) -> Json {
 
 /// The engine's own build of the page's request, for comparison: the same call `build_part` makes.
 fn engine(part: &Part, rot: &[f64; 9], dialog: &str, extras: &PageRequest) -> FinsBuilt {
-    let kv = match parse(dialog).unwrap() {
-        Json::Obj(kv) => kv,
-        _ => unreachable!(),
+    let Json::Obj(kv) = parse(dialog).unwrap() else {
+        unreachable!()
     };
     let req = engine_request(&options_from_dialog(&kv).unwrap(), Some(extras)).unwrap();
     let a = analyze(part.topology(), req.threshold, rot);
@@ -312,7 +311,7 @@ fn islands_equal_the_engine_and_the_card_is_the_pages_text() {
             part.topology(),
             &a,
             &rot,
-            &Default::default(),
+            &sf_engine::islands::IslandOpts::default(),
             &Config::default(),
         );
         let got = part.islands(45.0, rot.to_vec()).unwrap();

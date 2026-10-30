@@ -151,8 +151,8 @@ fn short_walls_props_ranges_index_the_merged_triangles_compare_js_reads_them() {
             .expect("the prop of this fin");
         assert!(f.tri_ranges == p.tri_ranges, "prop and fin ranges agree");
         let xs: Vec<f64> = p.line.iter().map(|q| q[0]).collect();
-        let lo = xs.iter().cloned().fold(f64::INFINITY, f64::min) - 3.0;
-        let hi = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max) + 3.0;
+        let lo = xs.iter().copied().fold(f64::INFINITY, f64::min) - 3.0;
+        let hi = xs.iter().copied().fold(f64::NEG_INFINITY, f64::max) + 3.0;
         for [a, e] in &p.tri_ranges {
             for i in *a..*e {
                 assert!(

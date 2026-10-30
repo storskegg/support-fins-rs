@@ -99,7 +99,7 @@ fn tags(html: &str) -> Vec<(usize, &str)> {
             .is_none_or(|c| !is_word(c));
         let Some(e) = html[a..].find('>') else { break };
         if boundary {
-            out.push((a, &html[a..a + e + 1]));
+            out.push((a, &html[a..=(a + e)]));
         }
         from = a + e + 1;
     }
@@ -250,7 +250,9 @@ fn options_json_is_well_formed() {
         );
         if let Some(si) = x.get("showIf") {
             let list = arr(si);
-            list.iter().for_each(|c| check_cond(&s, &key, c));
+            for c in list {
+                check_cond(&s, &key, c);
+            }
         }
         if x.get("hostSupplied").is_some() {
             assert!(
@@ -749,8 +751,8 @@ fn dialog_defaults_build_exactly_the_engine_defaults() {
         !a.is_empty() && a == e,
         "lbracket: dialog defaults differ from engine defaults"
     );
-    let mut on = defaults.clone();
-    for (k, v) in on.iter_mut() {
+    let mut on = defaults;
+    for (k, v) in &mut on {
         if k == "sway.on" {
             *v = Json::Bool(true);
         }

@@ -98,7 +98,6 @@ fn rounded_feet_corner_arcs_remain_inside_a_convex_foot_including_skewed_and_sho
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_cfg(
     topo: &Arc<Topology>,
     rot: &Rot3,
@@ -208,7 +207,10 @@ fn rounded_feet_keep_contacts_clearance_and_ownership_off_restores_legacy() {
             claims.iter().all(|&n| n == 1),
             "{name}: unowned or multiply-owned foot geometry"
         );
-        assert!(build(&topo, &rot, false, all(), sway).triangles == ordinary.triangles);
+        assert_eq!(
+            build(&topo, &rot, false, all(), sway).triangles,
+            ordinary.triangles
+        );
         // `fins.applyTunables(null)`: null settings retain no rounded feet
         let mut cfg = Config::default();
         apply_tunables(
@@ -284,7 +286,7 @@ fn rounded_feet_upstream_nozzle_scaling_and_full_sway_depth_preserve_contacts_an
         };
         let (ordinary, rounded) = (make(false), make(true));
         assert!(rounded.sway.as_ref().unwrap().count >= 2);
-        assert!(contacts(&rounded.triangles) == contacts(&ordinary.triangles));
+        assert_eq!(contacts(&rounded.triangles), contacts(&ordinary.triangles));
         let (body, iface) = split_interface(&rounded.triangles);
         assert!(
             is_closed(&xyz(&body))
@@ -293,7 +295,7 @@ fn rounded_feet_upstream_nozzle_scaling_and_full_sway_depth_preserve_contacts_an
                 && is_oriented(&xyz(&iface))
         );
         let probe: Vec<[f64; 3]> = body.iter().map(|v| [v[0], v[1], v[2].max(0.001)]).collect();
-        assert!(inside_count(&topo, &ID, &result.offset, &probe) == 0);
+        assert_eq!(inside_count(&topo, &ID, &result.offset, &probe), 0);
         for f in rounded
             .fins
             .iter()

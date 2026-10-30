@@ -196,7 +196,7 @@ fn report_a_scaled_part_replays_at_its_scale_another_file_is_refused() {
     );
     match replay(&raw, &with_key(&page.rep, "scale", Json::Num(1.0))) {
         Replay::Why(w) => assert!(w.contains("the part is"), "wrong size not refused: {w}"),
-        _ => panic!("wrong size not refused"),
+        Replay::Built { .. } => panic!("wrong size not refused"),
     }
     assert!(
         matches!(replay(&stl("arch"), &page.rep), Replay::Why(_)),
@@ -204,7 +204,7 @@ fn report_a_scaled_part_replays_at_its_scale_another_file_is_refused() {
     );
     match replay(&raw, &with_key(&page.rep, "v", Json::Num(99.0))) {
         Replay::Why(w) => assert!(w.contains("version"), "unknown version not refused: {w}"),
-        _ => panic!("unknown version not refused"),
+        Replay::Built { .. } => panic!("unknown version not refused"),
     }
 }
 

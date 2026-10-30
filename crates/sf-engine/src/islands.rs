@@ -574,7 +574,7 @@ pub fn find_islands(
             });
         }
     }
-    for o in out.iter_mut() {
+    for o in &mut out {
         let mut sx = 0.0f64;
         for pt in &o.points {
             sx += pt[0];

@@ -45,8 +45,8 @@ pub extern "C" fn sf_step_xpc_exit_on_crash() {
             let mut sa: libc::sigaction = std::mem::zeroed();
             sa.sa_sigaction = on_fault as *const () as libc::sighandler_t;
             sa.sa_flags = libc::SA_ONSTACK | libc::SA_RESETHAND;
-            libc::sigemptyset(&mut sa.sa_mask);
-            libc::sigaction(sig, &sa, std::ptr::null_mut());
+            libc::sigemptyset(&raw mut sa.sa_mask);
+            libc::sigaction(sig, &raw const sa, std::ptr::null_mut());
         }
     }
 }

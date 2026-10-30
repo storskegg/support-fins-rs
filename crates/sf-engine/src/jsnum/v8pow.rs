@@ -32,10 +32,9 @@ pub(super) fn v8_pow(mut x: f64, y: f64) -> f64 {
         // x ** 0.5   ==>  sqrt(x), except if x is -Infinity
         if x.is_infinite() {
             return f64::INFINITY;
-        } else {
-            // Note the +0 so that we get +0 for -0**0.5 rather than -0.
-            return (x + 0.0).sqrt();
         }
+        // Note the +0 so that we get +0 for -0**0.5 rather than -0.
+        return (x + 0.0).sqrt();
     }
 
     // v8_flags.use_std_math_pow (default true): std::pow, the platform C library's pow.

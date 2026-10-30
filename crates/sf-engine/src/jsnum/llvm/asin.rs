@@ -2,7 +2,10 @@
 //! `asin_utils.h`, revision 9309c117, as V8 15.0.245 calls them from
 //! `v8::base::ieee754::{asin,acos}` (src/base/ieee754.cc:122, 80). FMA, accurate pass.
 
-use super::fputil::*;
+use super::fputil::{
+    DD, F128, exact_add, exact_mult, fma, nearest_integer, polyeval_f128, quick_add, quick_mul,
+    quick_mult,
+};
 use super::tables_trig::{ASIN_COEFFS, ASIN_COEFFS_F128};
 
 const PI: DD = DD::new(1.2246467991473532e-16, 3.141592653589793); // 0x1.1a62633145c07p-53, 0x1.921fb54442d18p1

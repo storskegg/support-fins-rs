@@ -84,11 +84,11 @@ fn the_dialog_is_validated_strictly() {
             .layer_height,
         Some(0.3)
     );
-    assert!(
+    assert_eq!(
         options_from_dialog(&d(&[("nozzle", s("0.8"))]))
             .unwrap()
-            .nozzle
-            == Some(0.8)
+            .nozzle,
+        Some(0.8)
     );
     assert_eq!(
         options_from_dialog(&d(&[("nozzle", n(3.0))])).unwrap_err(),

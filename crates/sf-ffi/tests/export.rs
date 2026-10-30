@@ -129,7 +129,7 @@ fn the_options_are_checked_and_the_page_refusals_hold() {
     assert!(run("a.stl", "{}", vec![]).is_err(), "fins on needs a build");
     assert!(run("a.stl", "{\"finsOnly\":true,\"fins\":false}", vec![]).is_err());
     // Fins only takes a posed build: the fins are written where the part prints (the CLI would refuse)
-    assert!(run("fins.stl", "{\"finsOnly\":true}", vec![build.clone()]).is_ok());
+    assert!(run("fins.stl", "{\"finsOnly\":true}", vec![build]).is_ok());
     // a part with nothing to support has no fins to write
     let cube = part_of(&parse("{\"model\":\"cube\"}").unwrap());
     let flat = Arc::new(

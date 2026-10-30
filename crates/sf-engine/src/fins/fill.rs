@@ -694,7 +694,6 @@ fn candidate_lines(
 /// Port of `lineAt` (web/fins/fill.js:240-270): one candidate: the line along (ux, uy) at
 /// across-offset `off`, over the red within R of it, split at plan gaps over `bridge` with the
 /// heaviest run kept.
-#[allow(clippy::too_many_arguments)]
 fn line_at(
     pts: &[Pt],
     across: &[(f64, usize)],
@@ -1428,7 +1427,7 @@ fn brace_fill(
                     if j != k {
                         let mut hit = false;
                         grid_of(j, &mut |g| {
-                            hit = g.hits(t, cfg.prop.side_clear, shared, None)
+                            hit = g.hits(t, cfg.prop.side_clear, shared, None);
                         });
                         if hit {
                             return false;
@@ -1754,7 +1753,6 @@ impl Fill<'_> {
 
     /// `tryLines(cands)`: the first of `cands` that builds, keeps off every support and holds new
     /// red: `Built`; `Cap`; `Aims` (this group's tries are used up); or `NoneBuilt`.
-    #[allow(clippy::too_many_arguments)]
     fn try_lines(
         &mut self,
         cands: &[Cand],

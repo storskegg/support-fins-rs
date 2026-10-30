@@ -676,7 +676,7 @@ fn plate_summaries_include_nonprintable_and_empty_plates_without_reading_meshes_
         .map(|s| s.to_string())
         .collect();
     let r = run_raw(
-        &[("part.3mf", source.clone())],
+        &[("part.3mf", source)],
         &argv,
         Overrides {
             no_project_io: true,
@@ -1346,7 +1346,7 @@ fn zip_corruption_rejected_and_replacement_deletion_retains_opaque_members() {
         !replaced.entries.contains_key("Metadata/plate_1.gcode"),
         "delete"
     );
-    let mut corrupt = source.clone();
+    let mut corrupt = source;
     corrupt[zip.entries[SETTINGS].start] ^= 255;
     assert!(
         ProjectZip::new(&corrupt).unwrap().read(SETTINGS).is_err(),

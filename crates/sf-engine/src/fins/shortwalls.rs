@@ -75,7 +75,6 @@ pub struct ShortWalls {
 /// `served_regions` and `wedge_tris` left bare. `existing` is every support triangle already built
 /// (vertex list). Returns the kept walls: triangles, props with triRanges into those triangles,
 /// the regions they serve and their tines.
-#[allow(clippy::too_many_arguments)]
 pub fn last_resort_walls(
     topo: &Topology,
     result: &Analysis,

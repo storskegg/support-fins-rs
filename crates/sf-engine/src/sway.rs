@@ -896,7 +896,8 @@ pub fn build_sway_rib(
     let mut level_heights: Vec<f64> = Vec::new();
     let add = |v: f64, set: &mut Vec<f64>| {
         // a Set: SameValueZero, so +0 and -0 are one value
-        if !set.contains(&v) && !(v.is_nan() && set.iter().any(|x| x.is_nan())) {
+        let nan_already = v.is_nan() && set.iter().any(|x| x.is_nan());
+        if !set.contains(&v) && !nan_already {
             set.push(v);
         }
     };

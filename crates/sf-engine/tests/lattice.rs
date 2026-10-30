@@ -154,7 +154,7 @@ fn round_struts_take_the_tube_route_and_race_their_split_patches_when_small() {
     assert!(!tubes.is_empty(), "round struts route as tubes");
     for p in tubes {
         assert!(p.axis.is_none());
-        assert!(p.reach.as_ref().unwrap().v.len() == p.faces.len() * 9);
+        assert_eq!(p.reach.as_ref().unwrap().v.len(), p.faces.len() * 9);
         // a small tube (under tubeMinArea) is raced against its split patches
         let small = p.area < cfg.prop.tube_min_area;
         assert_eq!(p.small_tube.as_ref().unwrap().is_some(), small);

@@ -96,7 +96,6 @@ fn build_grid(topo: &Topology) -> &InsideGrid {
 
 /// `bucketYZ` (web/inside.js:64-97): NY x NZ cells over [minY, maxY] x [minZ, maxZ], as CSR,
 /// each cell's faces ascending.
-#[allow(clippy::too_many_arguments)]
 fn bucket_yz(
     pos: &[f64],
     n_faces: usize,
@@ -399,7 +398,7 @@ fn with_seen<R>(n_faces: usize, n_stamps: usize, f: impl FnOnce(&mut [i32], &mut
             seen.resize(n_faces, 0);
         }
         if *stamp as i64 + n_stamps as i64 >= i32::MAX as i64 {
-            seen.iter_mut().for_each(|s| *s = 0);
+            seen.fill(0);
             *stamp = 0;
         }
         f(seen, stamp)
@@ -416,7 +415,7 @@ pub fn release_scratch() {
             if let Ok(mut c) = cell.try_borrow_mut() {
                 *c = (Vec::new(), 0);
             }
-        })
+        });
     };
     rayon::broadcast(|_| free());
     free();

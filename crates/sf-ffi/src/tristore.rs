@@ -41,7 +41,10 @@ pub(crate) struct TriStore {
 impl TriStore {
     pub(crate) fn new(fins: &[V4], pad: &[V4]) -> TriStore {
         let mut seen: HashMap<[u64; 4], u32, BuildHasherDefault<Mix>> =
-            HashMap::with_capacity_and_hasher((fins.len() + pad.len()) / 4, Default::default());
+            HashMap::with_capacity_and_hasher(
+                (fins.len() + pad.len()) / 4,
+                BuildHasherDefault::default(),
+            );
         let mut verts: Vec<V4> = Vec::new();
         let mut idx = Vec::with_capacity(fins.len() + pad.len());
         for v in fins.iter().chain(pad) {

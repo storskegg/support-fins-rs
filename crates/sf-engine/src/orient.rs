@@ -40,7 +40,6 @@ type V3 = [f64; 3];
 
 /// Port of `rotFromTo` (web/orient.js:28-62): column-major (THREE.Matrix3.elements) rotation
 /// taking unit `a` onto unit `b`.
-#[allow(clippy::many_single_char_names)]
 pub fn rot_from_to(a: V3, b: V3) -> Rot3 {
     let cx = a[1] * b[2] - a[2] * b[1];
     let cy = a[2] * b[0] - a[0] * b[2];
@@ -670,7 +669,7 @@ fn rank_downs(
     match (built.first(), built.get(1)) {
         (None, _) => confidence = Confidence::None,
         (Some(best), _) if best.seating == Some(SeatingKind::Point) => {
-            confidence = Confidence::None
+            confidence = Confidence::None;
         }
         (Some(best), Some(second)) => {
             let sep = (second.score - best.score) / jsnum::max(1.0, best.score);

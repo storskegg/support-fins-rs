@@ -192,7 +192,7 @@ fn sway_grip_from_keeps_tines_off_below_that_height() {
     let s = build_sway_braces(&topo, &res, &ID, &o, &cfg);
     let zs: Vec<f64> = tine_boxes(&s.triangles).iter().map(|b| b.lo[2]).collect();
     assert!(!zs.is_empty(), "no tines at all");
-    let min = zs.iter().cloned().fold(f64::INFINITY, f64::min);
+    let min = zs.iter().copied().fold(f64::INFINITY, f64::min);
     assert!(
         min >= 80.0 - LAYER,
         "a tine at {min:.1}mm, below the 80mm start"

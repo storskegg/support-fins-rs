@@ -99,7 +99,7 @@ fn drag(name: &str, path: String, deg: (f64, f64), land_after: Option<Duration>,
             next += 1;
             match running {
                 Some((_, _, since)) if land_after.is_some_and(|l| since.elapsed() >= l) => {
-                    pending = true
+                    pending = true;
                 }
                 _ => begin(newest, &mut running, &mut started),
             }

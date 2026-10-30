@@ -223,7 +223,7 @@ fn curved_in_full_coverage_the_curves_stay_only_within_curved_full_slack_of_the_
         &spiral,
         |o| {
             full(o);
-            o.curved_walls = Some(true)
+            o.curved_walls = Some(true);
         },
         &IDENTITY3,
     );
@@ -243,7 +243,7 @@ fn curved_in_full_coverage_the_curves_stay_only_within_curved_full_slack_of_the_
         &torus,
         |o| {
             full(o);
-            o.curved_walls = Some(true)
+            o.curved_walls = Some(true);
         },
         &rot_x(30.0),
     );

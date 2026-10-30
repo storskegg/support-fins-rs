@@ -333,7 +333,7 @@ fn wall_json() -> String {
 /// A hang is a failure too: abort the run if a test takes this long.
 fn watchdog() {
     std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_secs(1500));
+        std::thread::sleep(Duration::from_mins(25));
         eprintln!("hostile: still running after 25 minutes -- an export hangs on hostile input");
         std::process::exit(3);
     });
@@ -373,7 +373,7 @@ fn build_once(b: &Builder, rot: Vec<f64>, opts: String, tun: String) {
                 panic!("Builder::build: a panic was caught in the worker: {message}\n  for {what}")
             }
             Ok(Event::Failed(_)) => {}
-            Err(_) => panic!("Builder::build: no result for {what}"),
+            Err(e) => panic!("Builder::build: no result for {what} ({e})"),
         }
     }
 }
@@ -409,7 +409,7 @@ fn settle(name: &str, queued: Option<u64>, rx: mpsc::Receiver<SEvent>) {
                 panic!("{name}: a panic was caught in the worker: {message}")
             }
             Ok(SEvent::Failed(_)) => {}
-            Err(_) => panic!("{name}: no result for a hostile request"),
+            Err(e) => panic!("{name}: no result for a hostile request ({e})"),
         }
     }
 }
@@ -723,7 +723,7 @@ fn footprint_exports_take_anything() {
         footprint_clash_cells(vec![far, small.clone(), fp.clone()]),
     );
     chk("Footprint::shared", fp.shared(small.clone()));
-    chk("Footprint::shared_count", fp.shared_count(small.clone()));
+    chk("Footprint::shared_count", fp.shared_count(small));
     // getters
     fp.bounds();
     fp.area();
@@ -757,7 +757,7 @@ fn drawing_exports_take_anything() {
             DrawKit::new(part.clone(), ID.to_vec(), 45.0, set.clone(), s),
         );
     }
-    let kit = DrawKit::new(part.clone(), ID.to_vec(), 45.0, set.clone(), tun.clone()).unwrap();
+    let kit = DrawKit::new(part.clone(), ID.to_vec(), 45.0, set, tun).unwrap();
     let auto = build_of(&part);
     let v3s = vecs(3);
     for p in &v3s {
@@ -865,7 +865,7 @@ fn drawing_exports_take_anything() {
     }
     chk(
         "footprint_of_build_with_drawn",
-        footprint_of_build_with_drawn(auto.clone(), Some(sweep.clone()), vec![]),
+        footprint_of_build_with_drawn(auto, Some(sweep.clone()), vec![]),
     );
     // the getters of the drawn objects work on whatever the kit made
     sweep.triangles();
@@ -888,7 +888,7 @@ fn wall_json_obj() -> String {
 
 fn builder_takes_anything() {
     let part = load("lbracket");
-    let b = Builder::new(part.clone());
+    let b = Builder::new(part);
     let opts = common::options();
     let tun = common::tunables();
     for rot in vecs(9) {
@@ -1002,7 +1002,7 @@ fn suggest_exports_take_anything() {
         settle("Suggester::suggest_wide", q, rx);
     }
     // contexts: densities and bore counts that make no sense
-    let sg = Suggester::new(part.clone());
+    let sg = Suggester::new(part);
     for f in floats() {
         for n in [0, u64::MAX] {
             let (l, rx) = sink();
@@ -1050,7 +1050,7 @@ fn report_and_export_exports_take_anything() {
     for s in strings().into_iter().chain(corrupted(&tun)) {
         chk("build_report", build_report(&build, 1.0, opts.clone(), s));
     }
-    let rep = build_report(&build, 1.0, opts.clone(), tun.clone()).unwrap();
+    let rep = build_report(&build, 1.0, opts, tun.clone()).unwrap();
     rep.settings_json();
     for s in strings().into_iter().take(20) {
         for (d, r) in [(0, 0), (u32::MAX, u32::MAX), (1, 0)] {

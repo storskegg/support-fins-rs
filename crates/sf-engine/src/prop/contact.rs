@@ -152,7 +152,7 @@ pub fn contact_line(
     // bucket only chose where the wall should stand; the z it happened to carry
     // belongs to whichever point in that cross-slice was lowest, which is usually
     // somewhere else entirely.
-    for p in line.iter_mut() {
+    for p in &mut line {
         if let Some(zz) = surface_z_at(tris, p[0], p[1]) {
             *p = [p[0], p[1], zz];
         }

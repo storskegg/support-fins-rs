@@ -316,7 +316,7 @@ fn nozzle_a_hosts_own_size_is_used_as_is_what_the_engine_cant_scale_to_is_refuse
         Json::Bool(true),
         Json::Arr(vec![]),
         Json::Obj(vec![]),
-        Json::Str("".into()),
+        Json::Str(String::new()),
         Json::Str(" ".into()),
         Json::Str("0.8mm".into()),
         Json::Num(0.0),

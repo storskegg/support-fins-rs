@@ -76,7 +76,6 @@ impl Default for BraceConfig {
 
 /// Port of `ribHitsPart` (web/prop/brace.js:46-60): does part surface come within sideClear of
 /// the box u0..u1 x -w..w x z0..z1(u) (rib frame: u out from the stem, v across it)?
-#[allow(clippy::too_many_arguments)]
 fn rib_hits_part(
     tris: &Tris,
     o: [f64; 2],
@@ -114,7 +113,6 @@ fn rib_hits_part(
 /// the stem's centre) in unit plan direction `d`: `stem` is the rib's height there, `reach` how
 /// far out it lands. Its triangles, or `None` when the part is in the way. JS's `th` default is
 /// `PROP.th`: callers pass it explicitly.
-#[allow(clippy::too_many_arguments)]
 fn rib(
     tris: &Tris,
     o: [f64; 2],
@@ -220,7 +218,6 @@ pub struct CrossRib {
 /// ordinary wall ribs keep PROP.th. Returns the rib it built, or `None` when nothing fitted.
 ///
 /// JS defaults: `clear = () => true`, `rise = BRACE.rise`, `th = PROP.th`; callers pass them.
-#[allow(clippy::too_many_arguments)]
 pub fn brace_cross_rib(
     out: &mut Vec<V4>,
     tris: &Tris,
@@ -284,7 +281,6 @@ pub struct BraceKinds {
 /// (stations `[x, y, z]`, z the part above) and whose bottom at station i is `floor_z(i)`.
 /// Appends the ribs' triangles to `out` and returns how many were built (0 when the wall is
 /// stocky enough or nothing fits). JS default `clear = () => true`: callers pass it.
-#[allow(clippy::too_many_arguments)]
 pub fn brace_wall(
     top: &[[f64; 3]],
     floor_z: impl Fn(usize) -> f64,

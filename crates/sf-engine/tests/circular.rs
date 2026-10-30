@@ -136,7 +136,7 @@ fn regions_are_found_per_region_index_and_cached_by_content() {
     assert_eq!(rc, ra + 1.0, "the reach follows footMax");
     // a different pose is a different key
     let rot = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
-    let mut moved = res.clone();
+    let mut moved = res;
     moved.offset.x += 1.0;
     let d = circular_regions(&topo, &moved, &rot, &cache, &cfg2);
     assert!(!Arc::ptr_eq(&c, &d));

@@ -261,7 +261,7 @@ mod tests {
             .iter()
             .map(|p| [p[0], p[1], p[2] + (p[0] * p[0] + p[1] * p[1]).sqrt() - 14.2])
             .collect();
-        let mut steep = tilted.clone();
+        let mut steep = tilted;
         steep[0][2] += 5.0;
         assert!(arc_line(&steep, &tris, 1.0, &cfg).is_none());
         // a radius smaller than the probes' reach

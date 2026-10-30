@@ -1276,7 +1276,7 @@ fn build_fins_core(
             tried: res.a.regions.len(),
         },
         patch_count: 0,
-        patch_stats: Default::default(),
+        patch_stats: PatchStats::default(),
         tines: built.tines,
         served_regions: built.served_regions.clone(),
         // regions minus SERVED REGIONS, not minus the prop count: a region can yield several walls

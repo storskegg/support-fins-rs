@@ -1,7 +1,7 @@
 //! Port of LLVM libc `math::log10` (src/__support/math/log10.h, revision 9309c117), as V8 15.0.245
 //! calls it from `v8::base::ieee754::log10` (src/base/ieee754.cc:229). FMA, accurate pass.
 
-use super::fputil::*;
+use super::fputil::{DD, F128, exact_add, fma, polyeval, quick_add, quick_mul, quick_mult};
 use super::log_rr::{LogRR, log_range_reduction};
 use super::tables_common::{LOG_COEFFS, LOG_R_DD, RD};
 use super::tables_log10::{LOG10_STEP_1, LOG10_STEP_2, LOG10_STEP_3, LOG10_STEP_4};

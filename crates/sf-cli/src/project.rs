@@ -50,7 +50,7 @@ fn enabled(v: Option<&Json>) -> bool {
 /// `positive(v)` (project.js:20).
 fn positive(v: Option<&Json>) -> bool {
     match v {
-        None | Some(Json::Null) | Some(Json::Bool(_)) => false,
+        None | Some(Json::Null | Json::Bool(_)) => false,
         Some(v) => {
             let s = v.to_js_string();
             if crate::js_trim(&s).is_empty() {
@@ -368,7 +368,6 @@ struct Plan<'a, 'b> {
     negative_count: usize,
 }
 
-#[allow(clippy::too_many_lines)]
 fn process_project(
     input: &str,
     args: &Args,
@@ -521,7 +520,7 @@ fn process_project(
             object,
             instance,
             name,
-            printable: !matches!(item.attr_exact("printable"), Some("0") | Some("false")),
+            printable: !matches!(item.attr_exact("printable"), Some("0" | "false")),
         });
     }
     for item in &items {
@@ -1280,7 +1279,7 @@ fn process_project(
         };
         let node = xml_tree(&text)?;
         let base = if name.contains("/_rels/") {
-            &name[..name.rfind("/_rels/").unwrap() + 1]
+            &name[..=name.rfind("/_rels/").unwrap()]
         } else {
             ""
         };

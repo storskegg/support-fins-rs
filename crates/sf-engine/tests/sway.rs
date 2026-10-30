@@ -177,7 +177,7 @@ fn the_interface_filament_tags_the_tines_and_round_feet_change_the_foot() {
     );
     assert!(round.triangles.len() > plain.triangles.len());
     // 'vertical' tines turn round feet off
-    let mut vertical = cfg.clone();
+    let mut vertical = cfg;
     vertical.prop.tine_dir = sf_engine::prop::config::TineDir::Vertical;
     let v = build_sway_braces(
         &topo,

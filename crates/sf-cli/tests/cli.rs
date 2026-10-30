@@ -713,7 +713,7 @@ fn cli_a_3mf_input_reads_one_with_several_objects_asks_which() {
     );
 
     // A plate of two objects: refused without --object, finned with it.
-    let two = plate_3mf(&[cube.clone(), block(40.0, 60.0, 0.0, 20.0, 0.0, 20.0)]);
+    let two = plate_3mf(&[cube, block(40.0, 60.0, 0.0, 20.0, 0.0, 20.0)]);
     let refused = cli_with(&["plate.3mf"], vec![("plate.3mf", two.clone())]);
     assert!(
         refused.code == 1

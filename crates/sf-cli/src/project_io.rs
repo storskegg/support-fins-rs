@@ -141,14 +141,13 @@ pub fn write_atomically(path: &str, bytes: &[u8]) -> std::io::Result<()> {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let temp = dir.join(format!(".{name}.sfexport-{}.tmp", std::process::id()));
-    let mut f = match std::fs::OpenOptions::new()
+    let Ok(mut f) = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
         .open(&temp)
-    {
-        Ok(f) => f,
-        Err(_) => return std::fs::write(target, bytes),
+    else {
+        return std::fs::write(target, bytes);
     };
     let done = f
         .write_all(bytes)

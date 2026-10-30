@@ -310,10 +310,8 @@ fn runs(line: &[Option<[f64; 3]>]) -> Vec<Track> {
     for p in line {
         if let Some(p) = p {
             cur.push(*p);
-        } else {
-            if !cur.is_empty() {
-                out.push(std::mem::take(&mut cur));
-            }
+        } else if !cur.is_empty() {
+            out.push(std::mem::take(&mut cur));
         }
     }
     if !cur.is_empty() {

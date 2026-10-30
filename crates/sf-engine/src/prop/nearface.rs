@@ -359,18 +359,18 @@ pub fn nearest_faces(
                     if side {
                         for c in 0.max(c0[2] - r)..=(nz as i64 - 1).min(c0[2] + r) {
                             scan_cell(a as usize, b as usize, c as usize, &mut |f| {
-                                measure(&mut sc, &mut seen, f)
+                                measure(&mut sc, &mut seen, f);
                             });
                         }
                     } else {
                         if c0[2] - r >= 0 {
                             scan_cell(a as usize, b as usize, (c0[2] - r) as usize, &mut |f| {
-                                measure(&mut sc, &mut seen, f)
+                                measure(&mut sc, &mut seen, f);
                             });
                         }
                         if c0[2] + r < nz as i64 {
                             scan_cell(a as usize, b as usize, (c0[2] + r) as usize, &mut |f| {
-                                measure(&mut sc, &mut seen, f)
+                                measure(&mut sc, &mut seen, f);
                             });
                         }
                     }
@@ -484,7 +484,7 @@ mod tests {
             .collect();
         let best = d2
             .iter()
-            .cloned()
+            .copied()
             .fold(f64::INFINITY, |b, d| if d < b { d } else { b });
         if best == f64::INFINITY {
             return vec![];

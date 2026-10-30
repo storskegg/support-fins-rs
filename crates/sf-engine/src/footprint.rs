@@ -394,7 +394,7 @@ pub fn dilate(g: &Grid, r: i64) -> Grid {
             if g.bits[(j * g.w + i) as usize] == 0 {
                 continue;
             }
-            for k in (j * w + i)..(j * w + i + 2 * r + 1) {
+            for k in (j * w + i)..=(j * w + i + 2 * r) {
                 rows[k as usize] = 1;
             }
         }

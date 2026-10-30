@@ -2,7 +2,9 @@
 //! `exp_utils.h` (`ziv_test_denorm`), as V8 15.0.245 calls it from
 //! `v8::base::ieee754::exp` (src/base/ieee754.cc:175). Built with FMA and the accurate pass.
 
-use super::fputil::*;
+use super::fputil::{
+    DD, F128, exact_add, fma, polyeval_dd, polyeval_f128, quick_add, quick_mul, quick_mult,
+};
 use super::tables_exp::{EXP2_MID1, EXP2_MID2};
 
 const LOG2_E: f64 = 1.4426950408889634; // 1.4426950408889634

@@ -95,9 +95,10 @@ impl Solid {
                     assert_eq!(f.len(), tris.len() / 3);
                     f.as_ptr()
                 }),
-                oid.as_ref().map_or(std::ptr::null(), |o| o as *const u32),
-                &mut status,
-                &mut empty,
+                oid.as_ref()
+                    .map_or(std::ptr::null(), std::ptr::from_ref::<u32>),
+                &raw mut status,
+                &raw mut empty,
             )
         };
         if ptr.is_null() {

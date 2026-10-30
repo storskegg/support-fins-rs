@@ -73,7 +73,7 @@ fn export_checks(
     let sway = b.sway.as_ref().unwrap();
     assert!(ifc.len() / 36 == sway.tines, "{what} tags lost");
     let stl = write_binary_stl(&xyz(&b.triangles), "");
-    assert!(read_stl(&stl).unwrap().len() == b.triangles.len() * 3);
+    assert_eq!(read_stl(&stl).unwrap().len(), b.triangles.len() * 3);
     let part: Vec<[f64; 3]> = topo.pos.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
     let data = write_three_mf(
         &part,
@@ -185,7 +185,7 @@ fn sway_depth_metre_high_ownership_interface_clearance_and_stl_3mf_export_remain
         .as_ref()
         .and_then(|s| s.get("form"))
         .and_then(|f| f.get("full-brace-depth"));
-    assert!(form == Some(&Json::Bool(true)));
+    assert_eq!(form, Some(&Json::Bool(true)));
     assert!(
         restored.objects[1].positions.len() == b.triangles.len() * 3,
         "3MF loses support geometry"
@@ -217,7 +217,7 @@ fn sway_cross_metre_high_worker_ownership_contact_material_and_stl_3mf_export() 
         ..Default::default()
     };
     let b = run(&topology, &result, &o); // the worker's reply
-    assert!(b.triangles == run(&topology, &result, &o).triangles);
+    assert_eq!(b.triangles, run(&topology, &result, &o).triangles);
     // the main thread's buildFins left the tunables applied (module state): the Config they build
     let mut cfg = Config::default();
     apply_tunables(&mut cfg, Some(&tun));

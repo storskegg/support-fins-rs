@@ -122,7 +122,7 @@ impl BridgeRace {
         }
         let had = !qs.is_empty();
         for mut q in qs {
-            for r in q.tri_ranges.iter_mut() {
+            for r in &mut q.tri_ranges {
                 *r = shift(*r, sh);
             }
             if let Some(w) = q.wall_range {

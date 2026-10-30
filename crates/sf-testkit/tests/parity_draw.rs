@@ -25,7 +25,7 @@ fn field<'a>(opts: &'a Resolved, key: &str) -> Option<&'a Value> {
 
 fn truthy(v: Option<&Value>) -> bool {
     match v {
-        None | Some(Value::Null) | Some(Value::Bool(false)) => false,
+        None | Some(Value::Null | Value::Bool(false)) => false,
         Some(Value::Num(n)) => *n != 0.0 && !n.is_nan(),
         Some(_) => true,
     }

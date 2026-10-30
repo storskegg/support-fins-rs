@@ -451,7 +451,7 @@ fn scan_chunk(text: &str) -> Chunk {
             "v" => {
                 let mut i = 0;
                 let mut xyz = [0f32; 3];
-                for slot in xyz.iter_mut() {
+                for slot in &mut xyz {
                     let x = next_token(rest, &mut i).map_or(f64::NAN, coord);
                     if !x.is_finite() {
                         c.bad_vertex = Some((this_ln, s.to_string()));
