@@ -19,7 +19,7 @@ path = "uniffi-bindgen.rs"
 sf-engine.workspace = true
 sf-io.workspace = true
 sf-cut.workspace = true
-# without OpenCascade (sf-step's `occt` feature, through sf-cli's): the app reads STEP in its StepReader XPC service
+# without OpenCascade (sf-step's `occt` feature, through sf-cli's): the app reads STEP out of process (StepReader XPC service)
 sf-cli = { workspace = true, default-features = false }
 sf-step = { workspace = true, default-features = false }
 uniffi = { workspace = true, features = ["cli"] }

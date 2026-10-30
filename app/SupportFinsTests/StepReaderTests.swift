@@ -58,7 +58,7 @@ struct StepReaderTests {
         var times: [String] = []
         for f in files {
             let start = ContinuousClock.now
-            let parts = try await CoreLoader.parts(at: f.path(percentEncoded: false))
+            let parts = try await CoreLoader.parts(at: f.path(percentEncoded: false), stepTimeout: .seconds(20))
             times.append("\(f.lastPathComponent) \(ContinuousClock.now - start)")
             let got = parts.map { ($0.info().name, $0.info().triangles, Self.fnv($0)) }
             let want = try #require(Self.expected[f.lastPathComponent])
@@ -70,7 +70,8 @@ struct StepReaderTests {
     }
 
     /// The 104 mutants that crashed the app and the audit's two repros: each is an error, and this process lives on.
-    /// 101 make OpenCascade fault (the service exits), 5 make it loop until the timeout ends the read and the service.
+    /// 101 make OpenCascade fault (its `step-read` exits), 5 make it loop until the timeout ends the read (the service
+    /// kills that `step-read`).
     @Test("every file that crashed the app is an error now")
     func filesThatCrashedTheApp() async throws {
         let files = try Self.files(in: "segv")
@@ -88,8 +89,9 @@ struct StepReaderTests {
             }
         }
         print("StepReaderTests: \(reasons)")
-        #expect(reasons[.connection, default: 0] >= 100)
-        #expect(reasons.values.reduce(0, +) == 106)
+        #expect(reasons[.crashed] == 101)
+        #expect(reasons[.timeout] == 5)
+        #expect(reasons[.connection] == nil)
         // and the service comes back for the next file
         let sphere = resources.appending(path: "step-fixtures/sphere.step").path(percentEncoded: false)
         #expect(try await CoreLoader.parts(at: sphere).count == 1)
@@ -103,8 +105,10 @@ struct StepReaderTests {
         #expect(model.status == "Could not read step_segv_loft.step:\nCouldn't read this STEP file")
         #expect(!model.hasPart)
         let de = try #require(L10n.Language("de"))
-        #expect(ReadFailure.text(of: StepReader.Failure(reason: .connection), reading: "a.step", in: de)
-            == "a.step konnte nicht gelesen werden:\nDiese STEP-Datei konnte nicht gelesen werden")
+        #expect(ReadFailure.text(of: StepReader.Failure(reason: .crashed), reading: "a.step", in: de)
+            == "a.step konnte nicht gelesen werden:\nCouldn't read this STEP file")
+        // the message follows the app's language (English here); in German:
+        #expect(JS.t("Couldn't read this STEP file", in: de) == "Diese STEP-Datei konnte nicht gelesen werden")
     }
 
     @Test("a cancelled read ends at once, and the next read works")

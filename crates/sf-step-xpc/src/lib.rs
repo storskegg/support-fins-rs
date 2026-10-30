@@ -1,10 +1,11 @@
 //! The STEP reader the app runs out of its own process (X-01): `sf-step` with OpenCascade, behind the C API
-//! (`include/sf_step_xpc/sf_step_xpc.h`) that the `StepReader` XPC service (`app/StepReader`) calls.
+//! (`include/sf_step_xpc/sf_step_xpc.h`) of `step-read` (`app/StepRead`), the process the app's StepReader XPC service
+//! starts for each file.
 //!
-//! OpenCascade dereferences null on some malformed files (104 of 325 small mutations of the parity fixtures). In the
-//! app that killed every window; in the service it ends one process, the app sees the connection drop and says it
-//! could not read the file. [`sf_step_xpc_exit_on_crash`] makes that end a plain exit: a crash would leave a crash
-//! report per bad file. Not a port: the web reads STEP in a worker, and its WASM survives these files.
+//! OpenCascade dereferences null, or loops forever, on some malformed files (`tests/segv`). In the app that killed every
+//! window; in `step-read` it ends (or hangs, until the service kills it) one process, and the app says it could not read
+//! the file. [`sf_step_xpc_exit_on_crash`] makes a fault a plain exit: a crash would leave a crash report per bad file.
+//! Not a port: the web reads STEP in a worker, and its WASM survives these files.
 
 #![allow(unsafe_code)]
 

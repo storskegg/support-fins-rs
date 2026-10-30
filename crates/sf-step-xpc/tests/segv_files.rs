@@ -3,8 +3,8 @@
 //! number set to an extreme, a `#ref` changed, a line dropped, duplicated or cut, a self reference), and the audit's two
 //! minimal repros (`step_segv_loft.step`: `loft.step` without `#131 = VECTOR(...)`; `step_segv_unresolved_ref.step`).
 //!
-//! Each one is read in a child process, as the StepReader XPC service reads it: with `sf_step_xpc_exit_on_crash`
-//! first. The child must end with an exit status, never killed by a signal (which is a crash, and a crash report):
+//! Each one is read in a child process, as the StepReader XPC service reads it (in a `step-read` process): with
+//! `sf_step_xpc_exit_on_crash` first. The child must end with an exit status, never killed by a signal (which is a crash, and a crash report):
 //! either 0, having written a result the app decodes, or 128 + the signal when OpenCascade faulted. The app's own
 //! side of that (the dropped connection becomes "Couldn't read this STEP file") is `StepReaderTests` in the app.
 

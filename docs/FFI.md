@@ -447,21 +447,22 @@ OpenCascade dereferences null or loops forever on some malformed STEP files (101
 `crates/sf-step-xpc/tests/segv`), which killed the app. The app no longer links it: `sf-ffi` depends on `sf-step` (and `sf-cli`)
 without the `occt` feature, and `just swift-bindings` fails if OpenCascade gets into `libsf_ffi.a` anyway.
 
-- **The StepReader XPC service** (`app/StepReader`, embedded in `Contents/XPCServices`, sandboxed with no other entitlement) links
-  `crates/sf-step-xpc`: `sf-step` with OpenCascade (statically, inside the service) behind a C API
-  (`include/sf_step_xpc/sf_step_xpc.h`): `sf_step_xpc_read(bytes)` returns `sf_step::wire` bytes. Its protocol
-  (`app/Shared/StepReading.swift`) takes the file's bytes and replies with those bytes.
-- **A fault** (SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGTRAP) ends the service with exit status 128 + the signal
-  (`sf_step_xpc_exit_on_crash`, on an alternate signal stack, so a stack overflow too): no crash report, no dialog. The reader's
-  thread is sf-step's 256 MiB one, with an alternate signal stack.
+- **The StepReader XPC service** (`app/StepReader`, in `Contents/XPCServices`, sandboxed with no other entitlement) does not
+  link OpenCascade either. For each read it starts `step-read` (`app/StepRead`, in the service's `Contents/MacOS`, sandboxed
+  with `inherit`: the service's sandbox, which reaches nothing but the service's container): the file's bytes and the
+  `sf_step::wire` result go through two files in the service's temporary directory, removed after the read.
+  `step-read` links `crates/sf-step-xpc`, `sf-step` with OpenCascade (statically) behind a C API
+  (`include/sf_step_xpc/sf_step_xpc.h`). The service replies with `StepReadReply` (`app/Shared/StepReading.swift`):
+  `step-read`'s exit status and, on 0, its bytes. The service itself stays up: launchd relaunches a service that exited soon
+  after launch only after a 10 s penalty, which the next file would wait out (measured when the service ran OpenCascade
+  itself and exited on a fault).
+- **A fault** (SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGTRAP) ends `step-read` with exit status 128 + the signal
+  (`sf_step_xpc_exit_on_crash`, on an alternate signal stack, so a stack overflow too): no crash report, no dialog.
 - **The app** (`CoreLoader.parts(at:)`): `reads_as_step`, then `StepReader.read` (a connection per read, a 120 s timeout,
-  cancellable), then `load_step_parts`. A connection that is interrupted or invalidated (the service crashed or exited), a
-  timeout, or a proxy error is `StepReader.Failure`: "Couldn't read this STEP file" (translated), after the usual
-  `Could not read <name>:`. When the app stops waiting for a read in flight (timeout, cancel, the app quits) the service exits,
-  since OpenCascade may be in an endless loop. The app has one service process reading one file at a time, so a dropped
-  connection is tried once more in a fresh process (a read queued behind a crashing file then succeeds; the crashing file
-  crashes it again in milliseconds).
-- **OpenCascade's output** (`*** ERR StepReaderData : ...`) goes to the service's log (subsystem
-  `com.storskegg.SupportFins.StepReader`, category `OpenCascade`), not the app's stdout (X-13).
+  cancellable), then `load_step_parts`. A `step-read` that did not exit 0, a connection that is interrupted or invalidated, a
+  proxy error or the timeout is `StepReader.Failure`: "Couldn't read this STEP file" (translated), after the usual
+  `Could not read <name>:`. When the app stops waiting (timeout, cancel, quitting) it invalidates the connection and the service
+  kills that connection's `step-read`, since OpenCascade may be in an endless loop.
+- **OpenCascade's output** (`*** ERR StepReaderData : ...`) goes to the log (subsystem `com.storskegg.SupportFins.StepReader`,
+  category `OpenCascade`), not the app's stdout (X-13), nor `step-read`'s result.
 - **The CLI** still links OpenCascade and reads STEP in process (`sf-cli`'s default `occt` feature): a crash ends only the CLI.
-

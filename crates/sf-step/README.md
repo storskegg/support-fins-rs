@@ -25,8 +25,8 @@ fail loudly rather than pass vacuously.
 
 OpenCascade dereferences null, or loops forever, on some malformed files (`crates/sf-step-xpc/tests/segv`). The app therefore
 never runs it: `sf-ffi` uses this crate without the `occt` feature (`is_step`, `step_objects` and `wire` only), and the app's
-StepReader XPC service (`app/StepReader`) links `crates/sf-step-xpc`, this crate with OpenCascade behind a C API. The service
-sends the kernel's result back as `wire` bytes; `step_objects` checks every index in it. The CLI keeps the `occt` feature and
+StepReader XPC service (`app/StepReader`) starts a `step-read` process per file (`app/StepRead`), which links
+`crates/sf-step-xpc`, this crate with OpenCascade behind a C API. It sends the kernel's result back as `wire` bytes; `step_objects` checks every index in it. The CLI keeps the `occt` feature and
 reads in process.
 
 ## The one `unsafe`
@@ -36,8 +36,8 @@ file's bytes, and Rust copies everything it keeps out of the shim's result befor
 
 ## Licence
 
-OpenCascade is LGPL-2.1 with the OCCT exception; it is linked statically into the StepReader XPC service (and the CLI), no
-longer into the app itself. Dynamic linking (a `libsf_occt.dylib` made from the same static libraries, embedded in the service)
+OpenCascade is LGPL-2.1 with the OCCT exception; it is linked statically into `step-read` (and the CLI), no
+longer into the app itself. Dynamic linking (a `libsf_occt.dylib` made from the same static libraries, embedded beside `step-read`)
 waits for a signing identity: the hardened runtime's library validation refuses an ad-hoc signed library ("mapping process and
 mapped file (non-platform) have different Team IDs"), and turning validation off would be an extra entitlement on the process
 that parses untrusted files. Its licence texts are in

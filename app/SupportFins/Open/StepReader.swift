@@ -1,34 +1,24 @@
 import Foundation
 
-/// Reads STEP files in the app's StepReader XPC service (X-01): OpenCascade crashes on some malformed files, and in the
-/// app that killed every window. The service sends back `sf_step::wire` bytes, which `load_step_parts` decodes. A
-/// service that crashed, was interrupted or invalidated, or did not answer within `timeout` is `Failure`: "Couldn't
-/// read this STEP file", after the `Could not read <name>:` prefix (`ReadFailure`). A cancelled task cancels the read:
-/// the service exits when the app stops waiting for a read in flight (`app/StepReader/main.swift`).
+/// Reads STEP files in the app's StepReader XPC service (X-01): OpenCascade crashes or loops forever on some malformed
+/// files, and in the app that killed every window. The service runs each read in a `step-read` process of its own and
+/// sends back `sf_step::wire` bytes, which `load_step_parts` decodes. A read that crashed `step-read`, a connection that
+/// was interrupted or invalidated, and a read that did not end within `timeout` are `Failure`: "Couldn't read this STEP
+/// file", after the `Could not read <name>:` prefix (`ReadFailure`). A cancelled task cancels the read. When the app
+/// stops waiting (timeout, cancel) the connection is invalidated, and the service kills that read's `step-read`.
 enum StepReader {
     /// How long a read may take. The parity fixtures take 40 ms; a big assembly takes seconds; some malformed files make
     /// OpenCascade loop forever.
     static let timeout: Duration = .seconds(120)
 
     struct Failure: LocalizedError, Equatable {
-        enum Reason: Equatable { case connection, timeout }
+        enum Reason: Equatable { case crashed, connection, timeout }
         let reason: Reason
         var errorDescription: String? { JS.t("Couldn't read this STEP file") }
     }
 
-    /// The service's read of a STEP file's bytes. The app has one service process, which reads one file at a time: a
-    /// file that crashes it (or a read another window gave up on) also drops the connections of the reads waiting
-    /// behind it. So a dropped connection is tried once more, in a fresh process; a file that crashes OpenCascade
-    /// crashes it again (in milliseconds), and that is the failure.
+    /// The service's read of a STEP file's bytes.
     static func read(_ file: Data, timeout: Duration = timeout) async throws -> Data {
-        do {
-            return try await readOnce(file, timeout: timeout)
-        } catch let failure as Failure where failure.reason == .connection {
-            return try await readOnce(file, timeout: timeout)
-        }
-    }
-
-    private static func readOnce(_ file: Data, timeout: Duration) async throws -> Data {
         let call = Call()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -50,7 +40,7 @@ enum StepReader {
 
         func start(_ file: Data, timeout: Duration, continuation: CheckedContinuation<Data, Error>) {
             let connection = NSXPCConnection(serviceName: StepReaderService.name)
-            connection.remoteObjectInterface = NSXPCInterface(with: StepReading.self)
+            connection.remoteObjectInterface = StepReaderService.interface()
             connection.interruptionHandler = { [self] in finish(.failure(Failure(reason: .connection))) }
             connection.invalidationHandler = { [self] in finish(.failure(Failure(reason: .connection))) }
             let timer = DispatchWorkItem { [self] in finish(.failure(Failure(reason: .timeout))) }
@@ -74,7 +64,13 @@ enum StepReader {
             }
             let seconds = Double(timeout.components.seconds) + Double(timeout.components.attoseconds) * 1e-18
             DispatchQueue.global().asyncAfter(deadline: .now() + seconds, execute: timer)
-            reader.read(file) { [self] bytes in finish(.success(bytes)) }
+            reader.read(file) { [self] reply in
+                if reply.status == 0, let bytes = reply.bytes {
+                    finish(.success(bytes))
+                } else {
+                    finish(.failure(Failure(reason: .crashed)))
+                }
+            }
         }
 
         func finish(_ result: Result<Data, Error>) {

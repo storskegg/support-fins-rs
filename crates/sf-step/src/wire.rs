@@ -1,5 +1,5 @@
-//! The kernel's result as bytes, for the trip from the app's STEP reader process (the `StepReader` XPC service,
-//! `crates/sf-step-xpc`) back to the app (`sf-ffi`'s `load_step_parts`). Not a port: the web posts the result from its
+//! The kernel's result as bytes, for the trip from the app's STEP reader process (`step-read`, which the StepReader
+//! XPC service starts; `crates/sf-step-xpc`) back to the app (`sf-ffi`'s `load_step_parts`). Not a port: the web posts the result from its
 //! worker as a structured clone; this is that message.
 //!
 //! The reader runs OpenCascade on a hostile file, so the app decodes what comes back as untrusted: every count is

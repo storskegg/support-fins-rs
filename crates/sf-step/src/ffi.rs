@@ -44,7 +44,7 @@ impl Drop for Handle {
 /// not enough for a big assembly. The web does the same in effect: one worker, one read at a time.
 ///
 /// The thread has an alternate signal stack ([`AltStack`]): a process that handles SIGSEGV (the app's STEP reader,
-/// `sf-step-xpc`) can then handle a fault that is a stack overflow too.
+/// `step-read`, `sf-step-xpc`) can then handle a fault that is a stack overflow too.
 pub fn read(bytes: &[u8], lin: f64, ang: f64) -> Option<RawResult> {
     static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
@@ -65,7 +65,7 @@ pub fn read(bytes: &[u8], lin: f64, ang: f64) -> Option<RawResult> {
 /// An alternate signal stack for the current thread while it lives (`sigaltstack`). A signal handler installed with
 /// `SA_ONSTACK` runs on it, so it still runs when the fault is the thread running out of its own stack. Without a
 /// handler it changes nothing. Rust's runtime sets one up only for threads of a Rust `main`, not when the crate is a
-/// static library in another program (the XPC service).
+/// static library in another program (`step-read`).
 struct AltStack {
     _mem: Box<[u8]>,
 }

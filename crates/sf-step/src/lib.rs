@@ -11,8 +11,8 @@
 //! Without OpenCascade at build time (`--cfg no_occt`, see build.rs) [`read_step`] returns
 //! [`NOT_AVAILABLE`] and [`is_step`] still works. The `occt` feature (on by default) is what links OpenCascade: the
 //! app's engine (`sf-ffi`) turns it off and never runs the kernel in the app's process. A malformed file can crash
-//! OpenCascade (X-01), so the app reads STEP in its `StepReader` XPC service (`crates/sf-step-xpc`), which sends the
-//! kernel's result back as bytes ([`wire`]), and only [`step_objects`] runs in the app.
+//! OpenCascade (X-01), so the app reads STEP out of process (its StepReader XPC service runs `step-read`,
+//! `crates/sf-step-xpc`), which sends the kernel's result back as bytes ([`wire`]), and only [`step_objects`] runs in the app.
 
 /// Port of `STEP_PARAMS.linearDeflection` (web/step.js:29-34): 0.01 mm chord error, absolute.
 pub const STEP_LINEAR_DEFLECTION: f64 = 0.01;

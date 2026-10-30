@@ -100,20 +100,35 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: ["step", "stp"]
               public.mime-type: ["model/step"]
-  # The STEP reader (X-01): OpenCascade (crates/sf-step-xpc, built by `just swift-bindings` into
-  # StepReader/sf_step_xpc.xcframework) runs in this XPC service, out of the app's process: a malformed file that crashes
-  # it ends this process, and the app says it could not read the file. Sandboxed, no other entitlement.
+  # The STEP reader (X-01), out of the app's process: this XPC service (sandboxed, no other entitlement) starts a
+  # `step-read` (below) per file and kills it when the app stops waiting. It does not link OpenCascade itself.
   StepReader:
     type: xpc-service
     platform: macOS
     sources:
       - path: StepReader
-        excludes:
-          - "*.xcframework"
       - path: Shared
     dependencies:
-      - framework: StepReader/sf_step_xpc.xcframework
-        embed: false
+      # in Contents/MacOS; signed below
+      - target: StepRead
+        embed: true
+        codeSign: false
+        copy:
+          destination: executables
+    # step-read must carry exactly app-sandbox + inherit: a sandbox-inheriting child with any other entitlement traps in its
+    # sandbox setup at launch (a crash report each time). Xcode's own signing adds get-task-allow, and test-runner exceptions
+    # when building for testing, so it is signed here; then the service's bundle is signed again over it, keeping its own
+    # entitlements and flags.
+    postBuildScripts:
+      - name: Sign step-read
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          id="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+          codesign --force --sign "$id" --options runtime --timestamp=none \
+            --entitlements "${SRCROOT}/StepRead/step-read.entitlements" "${TARGET_BUILD_DIR}/${EXECUTABLE_FOLDER_PATH}/step-read"
+          codesign --force --sign "$id" --timestamp=none --preserve-metadata=identifier,entitlements,flags \
+            "${TARGET_BUILD_DIR}/${WRAPPER_NAME}"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFins.StepReader
@@ -121,15 +136,39 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_ENTITLEMENTS: StepReader/StepReader.entitlements
-        DEAD_CODE_STRIPPING: YES
-        # OpenCascade and the shim are C++
-        OTHER_LDFLAGS: ["-lc++"]
+        # the Sign step-read script writes into the bundle
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
     info:
       path: StepReader/Info.plist
       properties:
         CFBundleDisplayName: Support Fins STEP Reader
         XPCService:
           ServiceType: Application
+  # One STEP read with OpenCascade (crates/sf-step-xpc, built by `just swift-bindings` into
+  # StepRead/sf_step_xpc.xcframework, static): `step-read <file> <result>`, both in the service's temporary directory. A
+  # fault ends it with an exit status (no crash report). Inherits the service's sandbox.
+  StepRead:
+    type: tool
+    platform: macOS
+    sources:
+      - path: StepRead
+        excludes:
+          - "*.xcframework"
+    dependencies:
+      - framework: StepRead/sf_step_xpc.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_NAME: step-read
+        PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFins.StepReader.step-read
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: StepRead/step-read.entitlements
+        # re-signed with exactly its entitlements by the StepReader target (Sign step-read)
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+        DEAD_CODE_STRIPPING: YES
+        SKIP_INSTALL: YES
+        # OpenCascade and the shim are C++
+        OTHER_LDFLAGS: ["-lc++"]
   SupportFinsTests:
     type: bundle.unit-test
     platform: macOS

@@ -1,4 +1,5 @@
-// The C API of crates/sf-step-xpc (in a folder of its own: the XCFramework copies it beside sf_ffiFFI's module map): the STEP reader the app runs in its StepReader XPC service (X-01).
+// The C API of crates/sf-step-xpc (in a folder of its own: the XCFramework copies it beside sf_ffiFFI's module map): the STEP reader the app runs out of process (X-01): step-read
+// (app/StepRead), which the StepReader XPC service starts for each file.
 #pragma once
 #include <stddef.h>
 #include <stdint.h>

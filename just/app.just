@@ -32,15 +32,15 @@ swift-bindings:
     fi
     # The StepReader XPC service's library (crates/sf-step-xpc): sf-step with OpenCascade, behind include/sf_step_xpc.h.
     cargo build --release -p sf-step-xpc --target aarch64-apple-darwin
-    rm -rf app/StepReader/sf_step_xpc.xcframework
+    rm -rf app/StepRead/sf_step_xpc.xcframework
     xcodebuild -create-xcframework -library target/aarch64-apple-darwin/release/libsf_step_xpc.a \
-        -headers crates/sf-step-xpc/include -output app/StepReader/sf_step_xpc.xcframework
+        -headers crates/sf-step-xpc/include -output app/StepRead/sf_step_xpc.xcframework
 
 # Generate the Swift bindings only when they are missing (a fresh clone), for recipes that need them but not a rebuild.
 _bindings-present:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ ! -f app/SupportFinsCore/Sources/SupportFinsCore/sf_ffi.swift ] || [ ! -d app/SupportFinsCore/sf_ffiFFI.xcframework ] || [ ! -d app/StepReader/sf_step_xpc.xcframework ]; then
+    if [ ! -f app/SupportFinsCore/Sources/SupportFinsCore/sf_ffi.swift ] || [ ! -d app/SupportFinsCore/sf_ffiFFI.xcframework ] || [ ! -d app/StepRead/sf_step_xpc.xcframework ]; then
         just swift-bindings
     fi
 
