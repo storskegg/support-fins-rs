@@ -30,6 +30,7 @@ struct BuildSpinner: View {
         .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
         .transition(.opacity)
+        .accessibilityElement(children: .combine)
         .accessibilityLabel("generating supports…")
         .accessibilityIdentifier("build-spinner")
     }

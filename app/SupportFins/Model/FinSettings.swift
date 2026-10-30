@@ -207,9 +207,10 @@ struct FinSettings: Codable, Equatable, Sendable {
         return "{" + o.map { "\"\($0.0)\":\($0.1)" }.joined(separator: ",") + "}"
     }
 
-    /// A finite double as JSON (`1.0` as `1`), the shortest text that reads back as the same value.
+    /// A double as JSON (`1.0` as `1`; a non-finite one as `0`), the shortest text that reads back as the same value.
     private static func number(_ v: Double) -> String {
-        precondition(v.isFinite, "a setting is not a finite number")
+        // a NaN or infinity (a cleared field, a corrupt default) is not JSON; the engine clamps every value, so 0 stands in (S-10)
+        guard v.isFinite else { return "0" }
         if v == v.rounded(), abs(v) < 1e15 { return String(Int64(v)) }
         return "\(v)"
     }

@@ -60,14 +60,15 @@ private struct SlotButton: View {
                       enabled: badge != nil && (badge?.isEnabled() ?? true), detail: badge?.detail() ?? "", lit: registry.open == slot || (badge?.isLit() ?? false)) {
             registry.toggle(slot)
         }
+        .accessibilityIdentifier("toolbar-\(slot.id)")
+        // the identifier and value belong to the button: before the overlay, so the flash text does not inherit them (S-08)
+        .modifier(OnOffValue(state: (badge?.toggle ?? badge?.tool).map { $0.isOn() ? "on" : "off" }))
         .overlay(alignment: .top) {
             if let f = registry.flash, f.slot == slot {
                 Text(f.text).font(.caption.monospacedDigit()).padding(.horizontal, 6).padding(.vertical, 2)
                     .glassEffect(.regular, in: .capsule).offset(y: -30).allowsHitTesting(false)
             }
         }
-        .accessibilityIdentifier("toolbar-\(slot.id)")
-        .modifier(OnOffValue(state: (badge?.toggle ?? badge?.tool).map { $0.isOn() ? "on" : "off" }))
         .popover(isPresented: Binding(get: { registry.open == slot && badge != nil },
                                       set: { if !$0, registry.open == slot { registry.open = nil } }),
                  arrowEdge: .top) {

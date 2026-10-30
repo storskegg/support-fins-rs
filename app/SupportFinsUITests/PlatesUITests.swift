@@ -121,5 +121,13 @@ final class PlatesUITests: PartWindowUITestCase {
         XCTAssertTrue(arrange.waitForExistence(timeout: 10), "Arrange with two models")
         arrange.click()
         XCTAssertTrue(element("toolbar-arrange").exists)
+        // the banner's own Arrange button (its border overlay used to swallow the click, like the crash banner's): when
+        // the models clash the button is there, can be clicked, and the banner goes once they are packed apart
+        let clash = element("clash-arrange")
+        if clash.waitForExistence(timeout: 3) {
+            XCTAssertTrue(clash.isHittable, "the clash banner's Arrange can be clicked")
+            clash.click()
+            waitFor("the clash is arranged away", timeout: 20) { !clash.exists }
+        }
     }
 }

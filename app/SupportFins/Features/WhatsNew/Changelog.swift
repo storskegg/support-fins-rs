@@ -32,11 +32,20 @@ struct Changelog: Decodable, Equatable, Sendable {
 
     static let none = Changelog(version: "", releases: [])
 
-    /// The bundled list. The `SFChangelogFixture` default (a launch argument, `-SFChangelogFixture <path>`) names another
-    /// file to read instead: the UI tests use it, since the real list is empty until a release is stamped.
+    /// The file a DEBUG launch's `-SFChangelogFixture <path>` names to read instead of the bundled list (the UI tests
+    /// use it, since the real list is empty until a release is stamped). Compiled out of Release builds (X-15): there
+    /// it is always nil, so a Release app never reads a list from a launch argument or a default.
+    static func fixtureURL(defaults: UserDefaults = .standard) -> URL? {
+        #if DEBUG
+        return defaults.string(forKey: "SFChangelogFixture").map { URL(fileURLWithPath: $0) }
+        #else
+        return nil
+        #endif
+    }
+
+    /// The bundled list (or the DEBUG fixture, see `fixtureURL`).
     static let bundled: Changelog = {
-        let fixture = UserDefaults.standard.string(forKey: "SFChangelogFixture").map { URL(fileURLWithPath: $0) }
-        guard let url = fixture ?? Bundle.main.url(forResource: "changelog", withExtension: "json") else { return .none }
+        guard let url = fixtureURL() ?? Bundle.main.url(forResource: "changelog", withExtension: "json") else { return .none }
         return load(url) ?? .none
     }()
 

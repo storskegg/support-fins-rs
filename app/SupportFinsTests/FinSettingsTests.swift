@@ -65,6 +65,19 @@ struct FinSettingsTests {
         }
     }
 
+    /// S-10: a NaN or infinite setting used to trip a `precondition` while serialising; it is now written as 0 and the
+    /// result is still JSON.
+    @Test func aNonFiniteSettingIsWrittenAsZeroInsteadOfTrapping() throws {
+        for bad in [Double.nan, .infinity, -.infinity] {
+            var s = FinSettings()
+            s.swayCrossHeight = bad
+            s.sway = true
+            for text in [s.optionsJSON(), s.tunablesJSON()] {
+                #expect(try JSONSerialization.jsonObject(with: Data(text.utf8)) is [String: Any])
+            }
+        }
+    }
+
     @Test func theDefaultsAreTheWebDefaults() throws {
         let d = FinSettings()
         #expect(d.threshold == 45 && d.nozzle == 0.4 && d.layerHeight == 0.2 && d.gap == 0.2)
