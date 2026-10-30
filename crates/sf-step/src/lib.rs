@@ -9,7 +9,10 @@
 //! triangle soups.
 //!
 //! Without OpenCascade at build time (`--cfg no_occt`, see build.rs) [`read_step`] returns
-//! [`NOT_AVAILABLE`] and [`is_step`] still works.
+//! [`NOT_AVAILABLE`] and [`is_step`] still works. The `occt` feature (on by default) is what links OpenCascade: the
+//! app's engine (`sf-ffi`) turns it off and never runs the kernel in the app's process. A malformed file can crash
+//! OpenCascade (X-01), so the app reads STEP in its `StepReader` XPC service (`crates/sf-step-xpc`), which sends the
+//! kernel's result back as bytes ([`wire`]), and only [`step_objects`] runs in the app.
 
 /// Port of `STEP_PARAMS.linearDeflection` (web/step.js:29-34): 0.01 mm chord error, absolute.
 pub const STEP_LINEAR_DEFLECTION: f64 = 0.01;
@@ -90,6 +93,8 @@ pub struct StepObject {
     pub bbox: Bbox,
 }
 
+pub mod wire;
+
 #[cfg(not(no_occt))]
 #[allow(unsafe_code)]
 mod ffi;
@@ -135,12 +140,27 @@ fn bbox(positions: &[f64]) -> Bbox {
     }
 }
 
-/// `subtreeMeshes` (web/step.js:60-64): every mesh index under a node of the assembly tree.
-fn subtree_meshes(r: &RawResult, node: usize, out: &mut Vec<usize>) {
-    out.extend_from_slice(&r.nodes[node].meshes);
-    for &c in &r.nodes[node].children {
-        subtree_meshes(r, c, out);
+/// What [`step_objects`] says for the kernel's `success: false`, and for a result that is not a tree over its own nodes
+/// and meshes (X-12; the shim never writes one, but the app gets the result from its STEP reader process).
+pub const UNREADABLE: &str = "the CAD kernel could not read this STEP file";
+
+/// `subtreeMeshes` (web/step.js:60-64): every mesh index under a node of the assembly tree, the node's own first, then
+/// each child's in order. Iterative, with `budget` counting the nodes visited: a tree visits each node once at most, so
+/// running out is a cycle (the JS would recurse until the stack overflows). `None` is a malformed tree.
+fn subtree_meshes(
+    r: &RawResult,
+    node: usize,
+    out: &mut Vec<usize>,
+    budget: &mut usize,
+) -> Option<()> {
+    let mut stack = vec![node];
+    while let Some(n) = stack.pop() {
+        *budget = budget.checked_sub(1)?;
+        let n = r.nodes.get(n)?;
+        out.extend_from_slice(&n.meshes);
+        stack.extend(n.children.iter().rev());
     }
+    Some(())
 }
 
 /// Port of `stepObjects` (web/step.js:79-120): the kernel's result -> pickable objects. A `None` result is
@@ -149,29 +169,43 @@ fn subtree_meshes(r: &RawResult, node: usize, out: &mut Vec<usize>) {
 /// What counts as "one object" comes from the assembly tree: walk down through single-child wrapper nodes
 /// (the file root, a lone top-level assembly) to the first level that actually branches, and make each branch
 /// one object with all its meshes merged.
+///
+/// Every index is checked (X-12): a node, child, mesh or vertex index out of range, or a cycle, is [`UNREADABLE`].
 pub fn step_objects(result: Option<&RawResult>) -> Result<Vec<StepObject>, String> {
     let Some(result) = result else {
-        return Err("the CAD kernel could not read this STEP file".into());
+        return Err(UNREADABLE.into());
     };
-    let mut node = 0usize;
-    while result.nodes[node].meshes.is_empty() && result.nodes[node].children.len() == 1 {
-        node = result.nodes[node].children[0];
-    }
-    let groups: Vec<usize> =
-        if !result.nodes[node].meshes.is_empty() || result.nodes[node].children.is_empty() {
-            vec![node] // leaf body, or meshes at this level
-        } else {
-            result.nodes[node].children.clone()
-        };
+    step_objects_checked(result).ok_or_else(|| UNREADABLE.to_string())?
+}
 
+/// [`step_objects`] of a result; `None` when the result is malformed.
+fn step_objects_checked(result: &RawResult) -> Option<Result<Vec<StepObject>, String>> {
+    let at = |i: usize| result.nodes.get(i);
+    let mut node = 0usize;
+    // a wrapper chain longer than the node count is a cycle
+    let mut hops = 0usize;
+    while at(node)?.meshes.is_empty() && at(node)?.children.len() == 1 {
+        node = at(node)?.children[0];
+        hops += 1;
+        if hops > result.nodes.len() {
+            return None;
+        }
+    }
+    let groups: Vec<usize> = if !at(node)?.meshes.is_empty() || at(node)?.children.is_empty() {
+        vec![node] // leaf body, or meshes at this level
+    } else {
+        at(node)?.children.clone()
+    };
+
+    let mut budget = result.nodes.len();
     let mut objects: Vec<StepObject> = Vec::new();
     for g in groups {
         let mut ids = Vec::new();
-        subtree_meshes(result, g, &mut ids);
-        let tris: usize = ids
-            .iter()
-            .map(|&i| result.meshes[i].indices.len() / 3)
-            .sum();
+        subtree_meshes(result, g, &mut ids, &mut budget)?;
+        let mut tris = 0usize;
+        for &i in &ids {
+            tris += result.meshes.get(i)?.indices.len() / 3;
+        }
         if tris == 0 {
             continue;
         }
@@ -182,9 +216,10 @@ pub fn step_objects(result: Option<&RawResult>) -> Result<Vec<StepObject>, Strin
             let p = &result.meshes[i].positions;
             for &idx in &result.meshes[i].indices {
                 let v = idx as usize * 3;
-                positions.push(p[v] as f64);
-                positions.push(p[v + 1] as f64);
-                positions.push(p[v + 2] as f64);
+                let xyz = p.get(v..v + 3)?;
+                positions.push(xyz[0] as f64);
+                positions.push(xyz[1] as f64);
+                positions.push(xyz[2] as f64);
             }
         }
         let name = if !result.nodes[g].name.is_empty() {
@@ -205,9 +240,9 @@ pub fn step_objects(result: Option<&RawResult>) -> Result<Vec<StepObject>, Strin
     }
 
     if objects.is_empty() {
-        return Err("this STEP file contains no solid geometry".into());
+        return Some(Err("this STEP file contains no solid geometry".into()));
     }
-    Ok(objects)
+    Some(Ok(objects))
 }
 
 /// Port of `readStep` (web/step.js:140-152): a STEP file's bytes -> its pickable objects.
@@ -266,6 +301,65 @@ mod tests {
         // the second group has no name: the first mesh's; two meshes merged
         assert_eq!((o[1].name.as_str(), o[1].meshes, o[1].tris), ("m1", 2, 2));
         assert_eq!(o[1].positions.len(), 18);
+    }
+
+    /// X-12: a kernel result that is not a tree over its own nodes and meshes (none of these come out of the shim,
+    /// but the app now gets the result from another process) is an error, never a panic or a hang.
+    #[test]
+    fn step_objects_refuses_a_malformed_result() {
+        let unreadable = UNREADABLE;
+        let mut bad_vertex = mesh("");
+        bad_vertex.indices = vec![0, 1, 3];
+        let bad = [
+            // no root
+            RawResult {
+                nodes: vec![],
+                meshes: vec![],
+            },
+            // a child that is not a node, below a wrapper and at the branching level
+            RawResult {
+                nodes: vec![node("", &[], &[5])],
+                meshes: vec![],
+            },
+            RawResult {
+                nodes: vec![node("", &[], &[1, 9]), node("a", &[0], &[])],
+                meshes: vec![mesh("")],
+            },
+            // a mesh that is not a mesh
+            RawResult {
+                nodes: vec![node("", &[3], &[])],
+                meshes: vec![mesh("")],
+            },
+            // an index past the mesh's vertices
+            RawResult {
+                nodes: vec![node("", &[0], &[])],
+                meshes: vec![bad_vertex],
+            },
+        ];
+        for r in &bad {
+            assert_eq!(step_objects(Some(r)).unwrap_err(), unreadable, "{r:?}");
+        }
+    }
+
+    /// X-12: a cycle in the tree (through the wrappers, or below the branching level) ends with an error.
+    #[test]
+    fn step_objects_refuses_a_cycle() {
+        let unreadable = UNREADABLE;
+        let wrappers = RawResult {
+            nodes: vec![node("", &[], &[1]), node("", &[], &[0])],
+            meshes: vec![],
+        };
+        let below = RawResult {
+            nodes: vec![
+                node("", &[], &[1, 2]),
+                node("a", &[0], &[1]),
+                node("b", &[0], &[]),
+            ],
+            meshes: vec![mesh("")],
+        };
+        for r in [&wrappers, &below] {
+            assert_eq!(step_objects(Some(r)).unwrap_err(), unreadable, "{r:?}");
+        }
     }
 
     #[test]

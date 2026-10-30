@@ -37,7 +37,9 @@ impl GpuBuffer { fn address(&self) -> u64; fn len_bytes(&self) -> u64; fn stride
 
 #[derive(uniffi::Record)] struct PartInfo { name: String, triangles: u64, size: [f64; 3] /* as Vec<f64> */, notes: Vec<String> /* import notes, ui/io.js */, import_note: String /* renderImportNote: "3MF: a; b." / "OBJ: ..." / "STEP: ..." / empty */, weld_ms: f64 }
 #[derive(uniffi::Object)] struct Part;                       // Arc<Topology> + source soup
-fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF / STEP (one Part per object, negative parts cut out as ui/io.js does). STEP (.step/.stp, or any file whose content is "ISO-10303-21;") goes through sf-step: OpenCascade 7.6.1 at 0.01 mm / 0.1 rad as web/step.js, the assembly tree picks the objects (stepObjects), names come from the file, import_note is "STEP: [imported “X” of N objects; ]tessellated at 0.01 mm." A build without OpenCascade fails the load with "STEP import is not available in this build ..."
+fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ / 3MF / STEP (one Part per object, negative parts cut out as ui/io.js does). STEP (.step/.stp, or any file whose content is "ISO-10303-21;") goes through sf-step: OpenCascade 7.6.1 at 0.01 mm / 0.1 rad as web/step.js, the assembly tree picks the objects (stepObjects), names come from the file, import_note is "STEP: [imported “X” of N objects; ]tessellated at 0.01 mm." A build without OpenCascade fails the load with "STEP import is not available in this build ...": the app's own build (sf-step's `occt` feature off, X-01; the app reads STEP with the two functions below)
+fn reads_as_step(path: String) -> Result<bool, FfiError>;  // X-01: whether load_parts would read the file as STEP (not named .stl/.obj/.3mf; named .step/.stp, or its first 64 bytes start "ISO-10303-21;"). Io error when it cannot be read
+fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiError>;  // X-01: the parts of a STEP file from the StepReader XPC service's read (`kernel`: sf_step::wire bytes), the parts load_parts makes of it in process; the bytes are decoded as untrusted (Format "the STEP reader sent back a malformed result"; a tree with an index out of range or a cycle is "the CAD kernel could not read this STEP file")
 fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; note "merged N of TOTAL objects into one part" (TOTAL = object_count, the file's); one part returns itself
 fn scale_from_percent_text(text: String) -> Option<f64>;  // M6: scaleFromPercent(Number(text)): 10-1000 % clamped, rounded to the field's 2 decimals; None for junk, empty or <= 0
 fn scale_percent_text(factor: f64) -> String;               // M6: the field's text, +(factor * 100).toFixed(2) as JS prints it ("150", "33.33")
@@ -438,3 +440,28 @@ fn js_number_text(x: f64) -> String;                          // String(x): a nu
   files (`parity_session.rs`, `session.rs`); `export` writes the page's bytes for the same models; and Deno's real
   `readThreeMF` + `partObjectOf` + `restoreSession` (`parity/cli/session_check.js`, run by `session.rs`) read the files the
   native side wrote to the state they were written from.
+
+## Wave 2 (October 2026): STEP out of process (X-01)
+
+OpenCascade dereferences null or loops forever on some malformed STEP files (101 and 5 of the 106 files in
+`crates/sf-step-xpc/tests/segv`), which killed the app. The app no longer links it: `sf-ffi` depends on `sf-step` (and `sf-cli`)
+without the `occt` feature, and `just swift-bindings` fails if OpenCascade gets into `libsf_ffi.a` anyway.
+
+- **The StepReader XPC service** (`app/StepReader`, embedded in `Contents/XPCServices`, sandboxed with no other entitlement) links
+  `crates/sf-step-xpc`: `sf-step` with OpenCascade (statically, inside the service) behind a C API
+  (`include/sf_step_xpc/sf_step_xpc.h`): `sf_step_xpc_read(bytes)` returns `sf_step::wire` bytes. Its protocol
+  (`app/Shared/StepReading.swift`) takes the file's bytes and replies with those bytes.
+- **A fault** (SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGTRAP) ends the service with exit status 128 + the signal
+  (`sf_step_xpc_exit_on_crash`, on an alternate signal stack, so a stack overflow too): no crash report, no dialog. The reader's
+  thread is sf-step's 256 MiB one, with an alternate signal stack.
+- **The app** (`CoreLoader.parts(at:)`): `reads_as_step`, then `StepReader.read` (a connection per read, a 120 s timeout,
+  cancellable), then `load_step_parts`. A connection that is interrupted or invalidated (the service crashed or exited), a
+  timeout, or a proxy error is `StepReader.Failure`: "Couldn't read this STEP file" (translated), after the usual
+  `Could not read <name>:`. When the app stops waiting for a read in flight (timeout, cancel, the app quits) the service exits,
+  since OpenCascade may be in an endless loop. The app has one service process reading one file at a time, so a dropped
+  connection is tried once more in a fresh process (a read queued behind a crashing file then succeeds; the crashing file
+  crashes it again in milliseconds).
+- **OpenCascade's output** (`*** ERR StepReaderData : ...`) goes to the service's log (subsystem
+  `com.storskegg.SupportFins.StepReader`, category `OpenCascade`), not the app's stdout (X-13).
+- **The CLI** still links OpenCascade and reads STEP in process (`sf-cli`'s default `occt` feature): a crash ends only the CLI.
+

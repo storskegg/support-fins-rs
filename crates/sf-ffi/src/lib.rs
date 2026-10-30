@@ -27,8 +27,8 @@ pub use footprint::{
 };
 pub use gpu::GpuBuffer;
 pub use part::{
-    AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts, merge_parts,
-    scale_from_percent_text, scale_percent_text,
+    AnalysisSummary, FfiError, Island, Part, PartInfo, island_card, load_parts, load_step_parts,
+    merge_parts, reads_as_step, scale_from_percent_text, scale_percent_text,
 };
 pub use report::{BuildReport, build_report};
 pub use session::{SessionField, SessionRestore, SessionWall, js_number_text};

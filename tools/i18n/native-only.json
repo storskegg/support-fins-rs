@@ -7,6 +7,14 @@
     "ar": "تعذّرت قراءة {name}:",
     "nl": "Kan {name} niet lezen:"
   },
+  "Couldn't read this STEP file": {
+    "why": "the status line when the StepReader service crashed, dropped the connection or timed out on a STEP file (X-01; the web's WASM survives these files)",
+    "de": "Diese STEP-Datei konnte nicht gelesen werden",
+    "zh": "无法读取此 STEP 文件",
+    "pt": "Não foi possível ler este arquivo STEP",
+    "ar": "تعذّرت قراءة ملف STEP هذا",
+    "nl": "Kan dit STEP-bestand niet lezen"
+  },
   "3D view": {
     "why": "VoiceOver label of the 3D view (the web draws a canvas without one)",
     "de": "3D-Ansicht",

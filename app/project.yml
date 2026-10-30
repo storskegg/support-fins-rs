@@ -36,6 +36,8 @@ targets:
         excludes:
           - Help
           - Resources/Calibration
+      # the StepReader service's protocol (X-01)
+      - path: Shared
       # the Help Book (built from the web's pages by tools/helpbook), kept whole: the Help Viewer reads the folder as is
       - path: SupportFins/Help/SupportFins.help
         type: folder
@@ -47,6 +49,8 @@ targets:
         product: Viewer
       - package: SupportFinsCore
         product: SupportFinsCore
+      # embedded in Contents/XPCServices: STEP is read there, never in the app (X-01)
+      - target: StepReader
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFins
@@ -96,11 +100,49 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: ["step", "stp"]
               public.mime-type: ["model/step"]
+  # The STEP reader (X-01): OpenCascade (crates/sf-step-xpc, built by `just swift-bindings` into
+  # StepReader/sf_step_xpc.xcframework) runs in this XPC service, out of the app's process: a malformed file that crashes
+  # it ends this process, and the app says it could not read the file. Sandboxed, no other entitlement.
+  StepReader:
+    type: xpc-service
+    platform: macOS
+    sources:
+      - path: StepReader
+        excludes:
+          - "*.xcframework"
+      - path: Shared
+    dependencies:
+      - framework: StepReader/sf_step_xpc.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.storskegg.SupportFins.StepReader
+        PRODUCT_NAME: StepReader
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: StepReader/StepReader.entitlements
+        DEAD_CODE_STRIPPING: YES
+        # OpenCascade and the shim are C++
+        OTHER_LDFLAGS: ["-lc++"]
+    info:
+      path: StepReader/Info.plist
+      properties:
+        CFBundleDisplayName: Support Fins STEP Reader
+        XPCService:
+          ServiceType: Application
   SupportFinsTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - SupportFinsTests
+      # StepReaderTests (X-01): the files that crashed the app, and the parity STEP fixtures (the test host is sandboxed:
+      # it reads them from its bundle)
+      - path: ../crates/sf-step-xpc/tests/segv
+        type: folder
+        buildPhase: resources
+      - path: ../parity/step-fixtures
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: SupportFins
     settings:
@@ -114,6 +156,9 @@ targets:
     platform: macOS
     sources:
       - SupportFinsUITests
+      # StepImportUITests: a STEP file that crashed the app before X-01
+      - path: ../crates/sf-step-xpc/tests/segv/step_segv_loft.step
+        buildPhase: resources
     dependencies:
       - target: SupportFins
     settings:

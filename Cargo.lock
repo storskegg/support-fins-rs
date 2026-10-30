@@ -794,9 +794,18 @@ name = "sf-step"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "libc",
  "parity",
  "sf-engine",
  "sf-testkit",
+]
+
+[[package]]
+name = "sf-step-xpc"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "sf-step",
 ]
 
 [[package]]

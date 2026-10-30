@@ -42,6 +42,9 @@ impl Drop for Handle {
 /// One read at a time, on a thread of its own with a big stack. OpenCascade initialises global tables on first
 /// use (not thread-safe), and the STEP reader and mesher recurse deeply: a GCD or test thread's small stack is
 /// not enough for a big assembly. The web does the same in effect: one worker, one read at a time.
+///
+/// The thread has an alternate signal stack ([`AltStack`]): a process that handles SIGSEGV (the app's STEP reader,
+/// `sf-step-xpc`) can then handle a fault that is a stack overflow too.
 pub fn read(bytes: &[u8], lin: f64, ang: f64) -> Option<RawResult> {
     static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
@@ -49,11 +52,50 @@ pub fn read(bytes: &[u8], lin: f64, ang: f64) -> Option<RawResult> {
         std::thread::Builder::new()
             .name("sf-step".into())
             .stack_size(256 << 20)
-            .spawn_scoped(s, || read_here(bytes, lin, ang))
+            .spawn_scoped(s, || {
+                let _alt = AltStack::new();
+                read_here(bytes, lin, ang)
+            })
             .expect("spawn the STEP reader thread")
             .join()
             .expect("the STEP reader thread panicked")
     })
+}
+
+/// An alternate signal stack for the current thread while it lives (`sigaltstack`). A signal handler installed with
+/// `SA_ONSTACK` runs on it, so it still runs when the fault is the thread running out of its own stack. Without a
+/// handler it changes nothing. Rust's runtime sets one up only for threads of a Rust `main`, not when the crate is a
+/// static library in another program (the XPC service).
+struct AltStack {
+    _mem: Box<[u8]>,
+}
+
+impl AltStack {
+    const SIZE: usize = 256 << 10;
+
+    fn new() -> Self {
+        let mut mem = vec![0u8; Self::SIZE].into_boxed_slice();
+        let ss = libc::stack_t {
+            ss_sp: mem.as_mut_ptr().cast(),
+            ss_size: Self::SIZE,
+            ss_flags: 0,
+        };
+        // SAFETY: `mem` outlives the registration: `drop` unregisters it before the memory goes.
+        unsafe { libc::sigaltstack(&ss, std::ptr::null_mut()) };
+        AltStack { _mem: mem }
+    }
+}
+
+impl Drop for AltStack {
+    fn drop(&mut self) {
+        let ss = libc::stack_t {
+            ss_sp: std::ptr::null_mut(),
+            ss_size: 0,
+            ss_flags: libc::SS_DISABLE,
+        };
+        // SAFETY: turns this thread's alternate stack off.
+        unsafe { libc::sigaltstack(&ss, std::ptr::null_mut()) };
+    }
 }
 
 /// `occt.ReadStepFile` + stepworker.js's typed-array conversion. `None` is `success: false`.

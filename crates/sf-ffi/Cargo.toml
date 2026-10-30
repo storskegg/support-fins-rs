@@ -19,11 +19,14 @@ path = "uniffi-bindgen.rs"
 sf-engine.workspace = true
 sf-io.workspace = true
 sf-cut.workspace = true
-sf-cli.workspace = true
-sf-step.workspace = true
+# without OpenCascade (sf-step's `occt` feature, through sf-cli's): the app reads STEP in its StepReader XPC service
+sf-cli = { workspace = true, default-features = false }
+sf-step = { workspace = true, default-features = false }
 uniffi = { workspace = true, features = ["cli"] }
 
 [dev-dependencies]
+# the tests compare load_step_parts with load_parts reading STEP in process, which needs OpenCascade
+sf-step.workspace = true
 sf-testkit.workspace = true
 parity = { path = "../../parity" }
 

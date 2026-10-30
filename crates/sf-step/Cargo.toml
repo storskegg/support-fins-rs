@@ -8,8 +8,15 @@ license.workspace = true
 publish.workspace = true
 build = "build.rs"
 
+[features]
+default = ["occt"]
+# Link OpenCascade (build.rs) and run the kernel in this process. Off in the app's engine (sf-ffi): the app reads STEP
+# in its StepReader XPC service (crates/sf-step-xpc), and keeps `is_step`, `step_objects` and `wire`.
+occt = ["dep:libc"]
+
 [dependencies]
 sf-engine.workspace = true
+libc = { workspace = true, optional = true }
 
 [build-dependencies]
 cc.workspace = true
