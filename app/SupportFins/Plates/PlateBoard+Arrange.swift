@@ -22,8 +22,14 @@ extension PlateBoard {
         guard hasLive, plate.models.count > 1 else { return [] }
         // no clash shown when the engine refuses (a model far off the plate): a missing warning is the safe default,
         // and the Volume line already says it hangs off
-        guard let placed = try? footprints().map({ try $0.grid.placed(x: $0.slot.xy.x, y: $0.slot.xy.y) }),
-              let flat = try? footprintClashCells(placed: placed) else { return [] }
+        let placed: [Footprint], flat: [Int64]
+        do {
+            placed = try footprints().map { try $0.grid.placed(x: $0.slot.xy.x, y: $0.slot.xy.y) }
+            flat = try footprintClashCells(placed: placed)
+        } catch {
+            host?.status = error.localizedDescription
+            return []
+        }
         return stride(from: 0, to: flat.count - 1, by: 2).map { SIMD2(flat[$0], flat[$0 + 1]) }
     }
 

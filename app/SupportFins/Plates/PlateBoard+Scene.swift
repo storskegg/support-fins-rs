@@ -79,13 +79,22 @@ extension PlateBoard {
         }
         if let c = m.footprintCache, c.key == key { return c.grid }
         let o = key.offset
-        let cells = try? footprintOfPart(part: part, rot: key.pose, offset: [Double(o.x), Double(o.y), Double(o.z)])
-        // a model the engine cannot measure (a vertex off the plate) takes no cells: it cannot clash, and the Volume
-        // line already says it hangs off
-        let added = wanted.flatMap { try? footprintOfBuildWithDrawn(build: $0, drawn: drawn, removed: key.removed) }
-        let grid = try? footprintUnion(a: cells, b: added)
+        // a model the engine cannot measure (wider than the plate limit, or a vertex off the plate) takes no cells, so
+        // it cannot clash: the refusal is said in the status line, once per change (the nil is cached below)
+        let cells = measured { try footprintOfPart(part: part, rot: key.pose, offset: [Double(o.x), Double(o.y), Double(o.z)]) }
+        let added = wanted.flatMap { w in measured { try footprintOfBuildWithDrawn(build: w, drawn: drawn, removed: key.removed) } }
+        let grid = measured { try footprintUnion(a: cells, b: added) }
         m.footprintCache = (key, grid)
         return grid
+    }
+
+    /// A footprint call whose refusal (a model too large to place on a plate, in the engine's words) is shown in the
+    /// status line instead of dropped; nil then.
+    func measured(_ call: () throws -> Footprint?) -> Footprint? {
+        do { return try call() } catch {
+            host?.status = error.localizedDescription
+            return nil
+        }
     }
 
     /// The footprints of the parked models of `plate` standing where they stand, but `skipping`: what a new model

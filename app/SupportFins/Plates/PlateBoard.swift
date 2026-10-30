@@ -218,9 +218,13 @@ final class PlateBoard {
         let grid = try? footprintOfPart(part: part.part, rot: PoseAccess.identity, offset: [Double(o.x), Double(o.y), Double(o.z)])
         let v = controller.volume
         // the bed's centre when the engine refuses: a place that always exists, and the model can be moved from it
-        guard let at = try? footprintSpot(others: placedFootprints(skipping: []), grid: grid, bx: Double(v.x), by: Double(v.y), gap: Self.gap),
-              at.count == 2 else { return .zero }
-        return SIMD2(at[0], at[1])
+        do {
+            let at = try footprintSpot(others: placedFootprints(skipping: []), grid: grid, bx: Double(v.x), by: Double(v.y), gap: Self.gap)
+            return at.count == 2 ? SIMD2(at[0], at[1]) : .zero
+        } catch {
+            host?.status = error.localizedDescription
+            return .zero
+        }
     }
 
     // MARK: Remove model

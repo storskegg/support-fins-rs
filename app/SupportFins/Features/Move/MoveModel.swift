@@ -121,6 +121,7 @@ final class MoveModel {
             return SIMD2(r[0], r[1])
         } catch {
             // the engine refused (a position far off the plate): the model stays where it is rather than jump
+            host?.status = error.localizedDescription
             return slot.xy
         }
     }
