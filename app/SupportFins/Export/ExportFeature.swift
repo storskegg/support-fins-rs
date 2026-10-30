@@ -7,6 +7,13 @@ final class ExportFeature: Feature {
 
     init(host: ViewerModel) { self.host = host }
 
+    /// The progress card while an export writes (it runs off the main thread): which file, and Cancel.
+    var overlays: [WindowOverlay] {
+        [WindowOverlay("export-progress", order: 75, alignment: .top) {
+            ExportProgressCard(jobs: [self.host?.wiring?.exporter?.job, self.host?.features[PlatesFeature.self]?.board.exportJob])
+        }]
+    }
+
     var windowToolbarItems: [WindowToolbarItem] {
         [WindowToolbarItem("export", order: 0) { ExportMenu(model: self.host?.wiring?.exporter, board: self.host?.features[PlatesFeature.self]?.board) }]
     }
@@ -32,7 +39,7 @@ final class ExportFeature: Feature {
                     Task { await board.exportPlate() }
                 }
             }
-            return .item(format.label, help: format.help, enabled: available?.enabled.contains(format) ?? false) { model?.run(format) }
+            return .item(format.label, help: format.help, enabled: available?.enabled.contains(format) ?? false) { Task { await model?.run(format) } }
         }
         if (board?.plates.count ?? 0) > 1, let board {
             entries.append(.item(JS.t("All plates (3MF)"), help: JS.t("Every plate's part and supports, one 3MF each, in one .zip file."),
@@ -47,7 +54,7 @@ final class ExportFeature: Feature {
         if format == .threeMF, (board?.modelCount ?? 0) > 1, let board {
             Task { await board.exportPlate() }
         } else {
-            _ = model?.run(format)
+            Task { await model?.run(format) }
         }
     }
 
@@ -62,5 +69,25 @@ final class ExportFeature: Feature {
                 run(again, model: exporter, board: board)
             },
         ])]
+    }
+}
+
+/// "Exporting 3MF..." with a spinner and Cancel, shown while any of the window's export jobs runs.
+struct ExportProgressCard: View {
+    let jobs: [ExportJob?]
+
+    var body: some View {
+        if let job = jobs.compactMap({ $0 }).first(where: \.isRunning), let title = job.title {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("\(JS.t("Exporting")) \(title)")
+                Button(JS.t("Cancel")) { job.cancel() }
+                    .accessibilityIdentifier("export-cancel")
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .padding(.top, 12)
+            .accessibilityElement(children: .contain)
+        }
     }
 }

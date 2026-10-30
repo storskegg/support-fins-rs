@@ -283,3 +283,20 @@ fn zip_of(names: Vec<String>, datas: Vec<Vec<u8>>) -> Vec<u8> {
         .collect();
     sf_io::zip::zip_store(&files)
 }
+
+/// A Rust symbol's readable name (legacy `_ZN...17h<hash>E` or v0 `_R...`, with or without the leading `_` the
+/// Mach-O symbol table adds), without the hash; `None` when it is not a Rust symbol. The native crash reports
+/// (fix plan 1E) name Rust frames with it.
+#[uniffi::export]
+pub fn crash_demangle(symbol: String) -> Option<String> {
+    let s = symbol.as_str();
+    let s = if s.starts_with("__ZN") || s.starts_with("__R") {
+        &s[1..]
+    } else {
+        s
+    };
+    let d = rustc_demangle::try_demangle(s).ok()?;
+    // a C++ `_ZN` name parses as legacy Rust too: only take it when it carried a Rust hash or was v0
+    let rust = s.starts_with("_R") || format!("{d}") != format!("{d:#}");
+    rust.then(|| format!("{d:#}"))
+}

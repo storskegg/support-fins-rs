@@ -5,6 +5,7 @@
 //! only converts formats and adds no geometry logic.
 #![allow(unsafe_code)]
 
+mod bigblocks;
 mod builder;
 pub mod crash;
 mod draw;
@@ -15,6 +16,7 @@ mod records;
 mod report;
 mod session;
 mod suggest;
+mod tristore;
 
 pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, PlateFile, PlateModel, build_part,
@@ -22,7 +24,8 @@ pub use builder::{
     export_with_drawn,
 };
 pub use crash::{
-    crash_breadcrumb, crash_breadcrumbs, crash_reports_start, crash_set_settings, crash_zip,
+    crash_breadcrumb, crash_breadcrumbs, crash_demangle, crash_reports_start, crash_set_settings,
+    crash_zip,
 };
 pub use draw::{BraceSpot, DrawKit, DrawnGhost, DrawnSweep, SurfaceSpot, arc_band};
 pub use footprint::{
@@ -62,3 +65,10 @@ pub(crate) fn upstream_pin() -> String {
         .unwrap_or("unknown");
     commit[..commit.len().min(7)].to_string()
 }
+
+pub use bigblocks::BigBlocks;
+
+/// The app's allocator (feature `app-alloc`, set by `just app-core`): see [`BigBlocks`].
+#[cfg(feature = "app-alloc")]
+#[global_allocator]
+static ALLOC: BigBlocks = BigBlocks;

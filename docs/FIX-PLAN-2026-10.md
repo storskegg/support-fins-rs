@@ -58,6 +58,25 @@ These four tracks run in parallel. 1B starts once 1A's ViewerModel ownership des
   - The banner appears after a simulated crash marker.
   - No network APIs are used.
 
+**1E. Native crash capture.** A follow-up to 1D: a unit-test host died with SIGSEGV in `-[_NSWindowTransformAnimation dealloc]`
+and nothing was recorded (1D was off under XCTest, and a native crash left only the marker until MetricKit's later copy).
+- C handlers (`app/SupportFinsCore/Sources/SFCrashCapture`), installed at launch: SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT and
+  SIGTRAP through `sigaction` with `SA_ONSTACK` on a `sigaltstack`, strictly async-signal-safe, and an uncaught-NSException handler.
+  Each chains to the handler before it; the signal then takes its default action, so the system's report and exit status stay.
+- The raw dump: the signal, code and fault address, the crashing thread's registers and frame-pointer walk (each read checked),
+  the loaded images (path, UUID, load address, from a table filled ahead of time) and the latest breadcrumbs and settings.
+- The next launch makes it a readable report in the crash folder (`crash-native-*`): frames named via dladdr against images with
+  the same UUID, else the image file's symbol table; Swift, C++ and Rust (`crash_demangle`) names demangled; image + offset
+  otherwise. A Rust panic that aborted joins the panic hook's report (one report); MetricKit's later copy says "also captured natively".
+- Tests: a unit-test host and a UI-test run write raw dumps into `<their temp>/sf-native-crash/<run>/` (printed to stderr), never
+  the user's folder, and never raise the banner. `just app-test` lists any dump written during the run and fails on one.
+- *Accept:*
+  - A command-line probe (`sf-crash-probe`, no crash dialog) crashes for each signal and an uncaught NSException; the test checks
+    it died of that signal and that its dump parses and names the crashing function.
+  - The symbolizer and the next-launch conversion are unit-tested on canned dumps (one report per crash, the Rust panic joined).
+  - A dump left by a unit-test run fails `just app-test` with its stack.
+  - `just gate` passes, with no new Swift warnings.
+
 ## Wave 2: hostile input
 
 **2A. STEP in an XPC helper (Opus).** Finding: X-01 (X-12, X-13 in passing).

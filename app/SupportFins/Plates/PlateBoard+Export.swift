@@ -8,12 +8,30 @@ import Viewer
 /// whole plate, each model its own objects where it stands; Export all plates writes each plate's 3MF in one .zip.
 /// The parked models' fins are kept to the plate's settings (`PlateBoard+Parked`), so nothing is made live to write
 /// them: a model whose fins are not current is built where it is parked.
+/// Where a model's hand-placed walls come from for an export: none, a sweep already stood, or a recipe the export stands
+/// off the main thread (a `DrawKit` analysis and a full sweep, up to a second on a big part).
+enum DrawnSource: Sendable {
+    case none
+    case ready(DrawnSweep)
+    case stand(@Sendable () -> DrawnSweep?)
+}
+
 extension PlateBoard {
     /// A plate's 3MF as `plateGeometry` makes it: the models in the plate's order, and the file's name.
     struct PlateWrite {
         var models: [PlateModel]
         /// `plateName(gs, 'fins', '.3mf')`: the first model's name, `and-N-more` for several, the nozzle and layer height.
         var fileName: String
+        /// Walls still to stand, by index into `models` (`plateWrite(_, deferStanding: true)`): `resolved()` stands them.
+        var stands: [Int: @Sendable () -> DrawnSweep?] = [:]
+
+        /// This write with its walls stood: heavy, so called off the main thread.
+        func resolved() -> PlateWrite {
+            var w = self
+            for (k, stand) in stands { w.models[k].drawn = stand() }
+            w.stands = [:]
+            return w
+        }
     }
 
     /// The plate's settings: the page's for the plate being edited, as parked for another.
@@ -24,12 +42,13 @@ extension PlateBoard {
     }
 
     /// Plate `i`'s models ready to write; nil when it holds none (`plateGeometry`).
-    func plateWrite(_ i: Int) -> PlateWrite? {
+    func plateWrite(_ i: Int, deferStanding: Bool = false) -> PlateWrite? {
         guard plates.indices.contains(i) else { return nil }
         let p = plates[i], settings = plateSettings(i)
         var models: [PlateModel] = []
         var sessions: [String] = []
         var first: String?
+        var stands: [Int: @Sendable () -> DrawnSweep?] = [:]
         for (k, m) in p.models.enumerated() {
             let part: CorePart, build: BuildModel?, pose: Pose, removed: Set<FinKey>
             if i == active && k == p.live {
@@ -44,7 +63,15 @@ extension PlateBoard {
             let ids = result == nil ? [] : (build?.matchedRemovals(of: removed).keys.sorted().map { UInt64($0) } ?? [])
             // a plate of one model carries its session (`session: gs.length === 1 ? gs[0].session() : null`)
             sessions.append(SessionFile.json(settings: settings.settings, finsOn: settings.finsOn, walls: walls(m), removed: removed))
-            models.append(PlateModel(part: part.part, build: result, drawn: result == nil ? nil : drawn(m), pose: pose.columnMajor,
+            var walls: DrawnSweep?
+            if result != nil {
+                switch drawn(m) {
+                case .none: break
+                case .ready(let sweep): walls = sweep
+                case .stand(let stand): if deferStanding { stands[models.count] = stand } else { walls = stand() }
+                }
+            }
+            models.append(PlateModel(part: part.part, build: result, drawn: walls, pose: pose.columnMajor,
                                      threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y, session: nil))
             if first == nil { first = part.info.name }
         }
@@ -55,7 +82,7 @@ extension PlateBoard {
         // a suggested name only: the plain one when the engine refuses
         let name = (try? exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.nozzle, layerHeight: settings.settings.layerHeight))
             ?? "\(stem)-fins.3mf"
-        return PlateWrite(models: models, fileName: name)
+        return PlateWrite(models: models, fileName: name, stands: stands)
     }
 
     /// Wait until plate `i`'s fins are the ones its settings make: the edited plate's from the live build and the
@@ -104,16 +131,26 @@ extension PlateBoard {
         defer { busy = false }
         // the other models' fins, kept to the plate's settings: wait for any still building, then write them as they stand
         _ = await settlePlate(active)
-        guard let w = plateWrite(active), let url = savePanel.url(suggesting: w.fileName, type: ExportFormat.threeMF.contentType) else { return nil }
-        return writePlate(w, to: url)
+        guard let w = plateWrite(active, deferStanding: true), let url = savePanel.url(suggesting: w.fileName, type: ExportFormat.threeMF.contentType) else { return nil }
+        return await writePlate(w, to: url)
     }
 
+    /// Writes the plate on a background task (`exportJob`: progress and Cancel); the file appears only when whole.
     @discardableResult
-    func writePlate(_ w: PlateWrite, to url: URL) -> URL? {
+    func writePlate(_ w: PlateWrite, to url: URL) async -> URL? {
+        let bed = bedOptions
+        return await write(to: url, title: "3MF") { path in
+            try SupportFinsCore.exportPlate(path: path, models: w.resolved().models, optionsJson: bed)
+        } done: { host?.wiring?.exporter?.lastFormat = .threeMF }
+    }
+
+    /// Runs `work` on the export job and turns its outcome into the URL, or nil with `exportError` set (nil too when
+    /// cancelled). The engine's errors are shown by message.
+    private func write(to url: URL, title: String, work: @escaping @Sendable (String) throws -> Void, done: () -> Void = {}) async -> URL? {
         exportError = nil
         do {
-            try SupportFinsCore.exportPlate(path: url.path(percentEncoded: false), models: w.models, optionsJson: bedOptions)
-            host?.wiring?.exporter?.lastFormat = .threeMF
+            guard try await exportJob.run(title: title, to: url, work: work) else { return nil }
+            done()
             return url
         } catch let e as FfiError {
             exportError = BuildModel.message(e)
@@ -133,34 +170,28 @@ extension PlateBoard {
         busy = true
         defer { busy = false }
         for i in plates.indices { _ = await settlePlate(i) }
-        let files = plates.indices.compactMap { i in plateWrite(i).map { (i, $0) } }
+        let files = plates.indices.compactMap { i in plateWrite(i, deferStanding: true).map { (i, $0) } }
         guard let (first, one) = files.first else { return nil }
         if files.count == 1 {
             guard let url = savePanel.url(suggesting: "plate-\(first + 1)-\(one.fileName)", type: ExportFormat.threeMF.contentType) else { return nil }
-            return writeAll(files, to: url)
+            return await writeAll(files, to: url)
         }
         guard let url = savePanel.url(suggesting: "support-fins-plates.zip", type: .zip) else { return nil }
-        return writeAll(files, to: url)
+        return await writeAll(files, to: url)
     }
 
     @discardableResult
-    func writeAll(_ files: [(Int, PlateWrite)], to url: URL) -> URL? {
-        exportError = nil
-        let path = url.path(percentEncoded: false)
-        do {
+    func writeAll(_ files: [(Int, PlateWrite)], to url: URL) async -> URL? {
+        let bed = bedOptions
+        let title = files.count == 1 ? "3MF" : "ZIP"
+        return await write(to: url, title: title) { path in
             if files.count == 1 {
-                try SupportFinsCore.exportPlate(path: path, models: files[0].1.models, optionsJson: bedOptions)
+                try SupportFinsCore.exportPlate(path: path, models: files[0].1.resolved().models, optionsJson: bed)
             } else {
-                try SupportFinsCore.exportPlates(path: path, plates: files.map { PlateFile(name: "plate-\($0.0 + 1)-\($0.1.fileName)", models: $0.1.models) },
-                                 optionsJson: bedOptions)
+                try SupportFinsCore.exportPlates(path: path, plates: files.map { PlateFile(name: "plate-\($0.0 + 1)-\($0.1.fileName)", models: $0.1.resolved().models) },
+                                                 optionsJson: bed)
             }
-            return url
-        } catch let e as FfiError {
-            exportError = BuildModel.message(e)
-        } catch {
-            exportError = error.localizedDescription
         }
-        return nil
     }
 
     /// The plates' files as `exportAll` would write them, for the tests.

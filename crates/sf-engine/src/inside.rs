@@ -406,6 +406,28 @@ fn with_seen<R>(n_faces: usize, n_stamps: usize, f: impl FnOnce(&mut [i32], &mut
     })
 }
 
+/// Free the stamp arrays of every Rayon worker and of this thread (C-11): they are 4 B per face of the largest part
+/// measured, kept per thread across the calls of one build, and otherwise stay for the life of the process
+/// (about 40 MB on a 772k-face part, 400 MB after a 7.7M-face merge). Call it when a build is done. A thread
+/// that is inside a measurement keeps its array (the next call frees it).
+pub fn release_scratch() {
+    let free = || {
+        SEEN.with(|cell| {
+            if let Ok(mut c) = cell.try_borrow_mut() {
+                *c = (Vec::new(), 0);
+            }
+        })
+    };
+    rayon::broadcast(|_| free());
+    free();
+}
+
+/// The bytes the stamp arrays of the Rayon workers and of this thread hold now.
+pub fn scratch_bytes() -> usize {
+    let held = || SEEN.with(|cell| cell.try_borrow().map_or(0, |c| c.0.capacity() * 4));
+    rayon::broadcast(|_| held()).iter().sum::<usize>() + held()
+}
+
 /// The exact minimum clearance between an added solid and the part, or `None` if it is at
 /// least `rMax` everywhere.
 ///
@@ -891,4 +913,25 @@ pub struct Clearance {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// C-11: the stamp arrays are freed on request, on this thread and on every Rayon worker.
+    #[test]
+    fn release_scratch_frees_every_threads_stamp_array() {
+        use rayon::prelude::*;
+        (0..64)
+            .into_par_iter()
+            .for_each(|_| with_seen(50_000, 1, |_, _| ()));
+        with_seen(50_000, 1, |_, _| ());
+        assert!(scratch_bytes() >= 50_000 * 4, "arrays are held after use");
+        release_scratch();
+        assert_eq!(scratch_bytes(), 0);
+        // and they come back when the next measurement needs them
+        with_seen(10, 1, |seen, _| assert!(seen.len() >= 10));
+        release_scratch();
+    }
 }

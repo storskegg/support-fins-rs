@@ -135,3 +135,30 @@ fn a_listener_call_that_panics_is_caught_and_reports_false() {
     assert!(!crash::listener_call(|| panic!("probe panic: callback")));
     assert_eq!(crash::current_operation(), "");
 }
+
+/// Native crash reports (1E) name Rust frames with `crash_demangle`: v0 (the release build's mangling) and legacy,
+/// with the Mach-O `_` or without, and nothing for a C++ or Swift name.
+#[test]
+fn crash_demangle_reads_rust_symbols_only() {
+    use sf_ffi::crash_demangle;
+    // legacy: the hash goes
+    assert_eq!(
+        crash_demangle("_ZN7sf_core5build17h0123456789abcdefE".into()).as_deref(),
+        Some("sf_core::build")
+    );
+    assert_eq!(
+        crash_demangle("__ZN7sf_core5build17h0123456789abcdefE".into()).as_deref(),
+        Some("sf_core::build")
+    );
+    // v0, from this very binary's own mangling of a generic-free function
+    let v0 = "_RNvCs1234_7sf_core5build";
+    assert_eq!(crash_demangle(v0.into()).as_deref(), Some("sf_core::build"));
+    assert_eq!(
+        crash_demangle(format!("_{v0}")).as_deref(),
+        Some("sf_core::build")
+    );
+    // not Rust
+    assert_eq!(crash_demangle("_ZN3foo3barEv".into()), None, "C++");
+    assert_eq!(crash_demangle("$s4main3fooyyF".into()), None, "Swift");
+    assert_eq!(crash_demangle("abort".into()), None);
+}

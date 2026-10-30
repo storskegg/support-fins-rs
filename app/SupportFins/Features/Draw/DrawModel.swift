@@ -67,6 +67,18 @@ final class DrawModel {
     @ObservationIgnored private var ghostTask: Task<Void, Never>?
     @ObservationIgnored private var braceRequest: (face: Int, point: SIMD3<Double>)?
     @ObservationIgnored private var braceTask: Task<Void, Never>?
+    /// The click whose engine call (`checkWall`, `braceAt`) runs off the main thread: tens to hundreds of ms on a dense
+    /// part (finding C-08). What it lands with stays here, on the main actor; the task carries only owned arrays, class
+    /// references and `generation` (see `PendingClick`).
+    @ObservationIgnored private var pendingClick: PendingClick?
+    @ObservationIgnored private var clickTask: Task<Void, Never>?
+    /// Counts the clicks asked and the states that make an answer stale (a Back, an Esc, a new part, a close).
+    @ObservationIgnored private var clickGeneration = 0
+    /// Clicks made while one is being answered: what they mean depends on its answer, so they run after it, in order.
+    @ObservationIgnored private var queuedClicks: [ViewerController.HandPointer] = []
+    /// Bumped when a wall click is answered: a ghost asked before it is of the pointer before it, and must not overwrite
+    /// what the answer says (a curve too tight).
+    @ObservationIgnored private var ghostEpoch = 0
     /// The full brace is built once the cursor rests, not per move (`braceRest`, `web/ui/rest.js`): a new spot is tens of
     /// ms on a big part, and the cursor dot already follows every move.
     @ObservationIgnored private lazy var braceRest = Rest<(face: Int, point: SIMD3<Double>)> { [weak self] q in
@@ -203,7 +215,7 @@ final class DrawModel {
         if mode == .off { motion.drop() }
         host?.wiring?.exporter?.drawn = { [weak self] in self?.exportDrawn ?? ExportModel.Drawn(sweep: nil, pending: false) }
         if let board = host?.features[PlatesFeature.self]?.board, let draw = host?.features[DrawFeature.self] {
-            board.drawn = { [weak draw, weak board] m in board.flatMap { draw?.exportDrawn(m, board: $0) } }
+            board.drawn = { [weak draw, weak board] m in board.flatMap { draw?.exportDrawn(m, board: $0) } ?? .none }
             board.walls = { [weak draw, weak board] m in board.flatMap { draw?.wallsOf(m, board: $0) } ?? [] }
         }
         ensureKit()
@@ -213,6 +225,7 @@ final class DrawModel {
 
     /// The window closed: nothing it started (the kit, a ghost, a brace, the brace motion) goes on.
     func close() {
+        dropClick()
         kitTask?.cancel(); kitTask = nil
         ghostTask?.cancel(); ghostTask = nil
         braceTask?.cancel(); braceTask = nil
@@ -222,6 +235,7 @@ final class DrawModel {
 
     /// A new part: the walls were the old part's.
     func partChanged() {
+        dropClick()
         clearPreview()
         message = ""
         selectedID = nil
@@ -536,10 +550,11 @@ final class DrawModel {
         ghostTask = Task { @MainActor [weak self] in
             while let self, let q = self.ghostRequest {
                 self.ghostRequest = nil
+                let epoch = self.ghostEpoch
                 let r = await Task.detached(priority: .userInitiated) {
                     try? kit.ghost(a: [q.a.x, q.a.y, q.a.z], b: [q.b.x, q.b.y, q.b.z], m: q.m.map { [$0.x, $0.y, $0.z] })
                 }.value
-                guard !Task.isCancelled, self.start != nil, self.controller?.handPicking == .walls, let r else { continue }
+                guard !Task.isCancelled, epoch == self.ghostEpoch, self.start != nil, self.controller?.handPicking == .walls, let r else { continue }
                 self.ghostMesh = r.ok() ? self.mesh(r.triangles()) : nil
                 // a curve says at once why it can't bend that tight; a straight wall in progress keeps its quiet ghost
                 // (its end is not chosen yet)
@@ -565,6 +580,7 @@ final class DrawModel {
 
     /// Drop any wall-in-progress and hide every transient draw visual (`clearPreview`).
     func clearPreview() {
+        dropClick()
         start = nil; end = nil
         started = false
         ghostRequest = nil
@@ -589,6 +605,7 @@ final class DrawModel {
     @discardableResult
     func undoPoint() -> Bool {
         guard start != nil else { return false }
+        dropClick()
         if end != nil {
             end = nil
             ghostRequest = nil
@@ -652,6 +669,13 @@ final class DrawModel {
 
     /// A click: select a placed support, stand a sway brace, or set / commit a wall end (`drawClick`, `braceClick`).
     func pointerClicked(_ p: ViewerController.HandPointer) {
+        guard controller != nil else { return }
+        // the last click's wall or brace is still with the engine: this one runs after its answer, as the web's would
+        if pendingClick != nil { queuedClicks.append(p); return }
+        handleClick(p)
+    }
+
+    private func handleClick(_ p: ViewerController.HandPointer) {
         guard let controller else { return }
         viewHeight = Double(p.size.height)
         let hit = surface(p)
@@ -704,11 +728,88 @@ final class DrawModel {
         return [Double(c.x), Double(c.y), Double(c.z), Double(c.w)]
     }
 
-    /// Commit the wall from `start` to `b` (through `m` for a curve), if it can build (`placeWall`).
+    // MARK: a click's engine call, off the main thread
+
+    /// A wall or brace click the engine is answering. It never crosses into the task: the task gets owned copies of the
+    /// engine's inputs (arrays, class references) and the generation, and hands the answer back to a synchronous main-actor
+    /// method that finds this record. (A Debug build's Task closure that captured a struct holding a `SIMD3<Double>`
+    /// beside other fields aborted in `swift_task_dealloc`: "freed pointer was not the last allocation".)
+    private struct PendingClick {
+        enum Ask {
+            case wall(start: SIMD3<Double>, b: SIMD3<Double>, m: SIMD3<Double>?)
+            case brace(face: Int)
+        }
+        var generation: Int
+        var kit: DrawKit
+        /// The walls the click was made on: an Undo or a placement in between makes its answer stale.
+        var walls: [DrawnWall]
+        var ask: Ask
+    }
+
+    /// Whether a wall or brace click is waiting for the engine (tests await it).
+    var clickPending: Bool { pendingClick != nil }
+
+    private func beginClick(_ kit: DrawKit, _ ask: PendingClick.Ask) -> Int {
+        clickGeneration += 1
+        pendingClick = PendingClick(generation: clickGeneration, kit: kit, walls: session.drawnWalls, ask: ask)
+        return clickGeneration
+    }
+
+    /// A state change that makes the click in flight stale (its answer is dropped when it lands), and the clicks queued
+    /// behind it.
+    private func dropClick() {
+        clickGeneration += 1
+        pendingClick = nil
+        queuedClicks = []
+        clickTask?.cancel(); clickTask = nil
+    }
+
+    /// The click `generation` asked for, if it is still the one waiting and its answer still fits what is on screen: the
+    /// kit it was asked of, the walls it was made on, a pointer mode that takes clicks.
+    private func answered(_ generation: Int) -> PendingClick? {
+        guard let p = pendingClick, p.generation == generation else { return nil }
+        pendingClick = nil
+        clickTask = nil
+        guard p.kit === kit, kitIsCurrent, session.drawnWalls == p.walls, controller?.handPicking != .off else {
+            queuedClicks = []
+            return nil
+        }
+        return p
+    }
+
+    /// The clicks made while one was answered, in order (one may ask the engine again: the rest wait for it).
+    private func replay(_ clicks: [ViewerController.HandPointer]) {
+        var rest = clicks[...]
+        while pendingClick == nil, let p = rest.popFirst() { handleClick(p) }
+        queuedClicks = Array(rest) + queuedClicks
+    }
+
+    /// Commit the wall from `start` to `b` (through `m` for a curve), if it can build (`placeWall`). The check runs off
+    /// the main thread: on a dense part it builds the part's wall index.
     private func placeWall(to b: SIMD3<Double>, through m: SIMD3<Double>?) {
         guard let kit, let s = start else { return }
         let a = world(s)
-        guard let r = try? kit.checkWall(a: [a.x, a.y, a.z], b: [b.x, b.y, b.z], m: m.map { [$0.x, $0.y, $0.z] }) else { return }
+        let pa = [a.x, a.y, a.z], pb = [b.x, b.y, b.z], pm = m.map { [$0.x, $0.y, $0.z] }
+        let generation = beginClick(kit, .wall(start: s, b: b, m: m))
+        clickTask = Task { @MainActor [weak self] in
+            let r = await Task.detached(priority: .userInitiated) { try? kit.checkWall(a: pa, b: pb, m: pm) }.value
+            self?.wallChecked(generation, r)
+        }
+    }
+
+    private func wallChecked(_ generation: Int, _ r: DrawnGhost?) {
+        guard let p = answered(generation), case let .wall(s, b, m) = p.ask else { return }
+        let queued = queuedClicks
+        queuedClicks = []
+        if let r, start == s, controller?.handPicking == .walls {
+            ghostEpoch += 1; ghostRequest = nil
+            landWall(r, s: s, to: b, through: m)
+            refresh()
+        }
+        replay(queued)
+    }
+
+    private func landWall(_ r: DrawnGhost, s: SIMD3<Double>, to b: SIMD3<Double>, through m: SIMD3<Double>?) {
         if !r.ok() {
             // a curve too tight keeps its ends: the next click tries a wider bend
             if m != nil && r.reason().contains("too tight") { showGhostMessage(r.reason()); return }
@@ -723,20 +824,41 @@ final class DrawModel {
         sync()
     }
 
-    /// Stand a sway brace on the upright face the user clicked: the one its preview showed (`placeSway`).
+    /// Stand a sway brace on the upright face the user clicked: the one its preview showed (`placeSway`). The first brace
+    /// on a part builds its triangle index (50 to 300 ms on a big one), so `braceAt` runs off the main thread, with the
+    /// sweep, build and removals of the moment of the click.
     private func placeBrace(_ hit: Surface) {
         braceQueued(nil)
-        guard let kit,
-              let spot = try? kit.braceAt(face: UInt64(hit.face), point: [hit.point.x, hit.point.y, hit.point.z], sweep: sweep,
-                                          autoBuild: session.finsOn && autoLike ? build?.latest : nil, removed: removedIDs()) else { return }
+        guard let kit else { return }
+        let face = UInt64(hit.face), point = [hit.point.x, hit.point.y, hit.point.z]
+        let sweep = sweep, auto = session.finsOn && autoLike ? build?.latest : nil, removed = removedIDs()
+        let generation = beginClick(kit, .brace(face: hit.face))
+        clickTask = Task { @MainActor [weak self] in
+            let spot = await Task.detached(priority: .userInitiated) {
+                try? kit.braceAt(face: face, point: point, sweep: sweep, autoBuild: auto, removed: removed)
+            }.value
+            self?.braceAnswered(generation, spot)
+        }
+    }
+
+    private func braceAnswered(_ generation: Int, _ spot: BraceSpot?) {
+        guard let p = answered(generation), case let .brace(face) = p.ask else { return }
+        let queued = queuedClicks
+        queuedClicks = []
+        if let spot, start == nil { landBrace(spot, face: face) }
+        replay(queued)
+    }
+
+    private func landBrace(_ spot: BraceSpot, face: Int) {
         dropGhost()
         guard spot.ok() else {
             message = JS.t("couldn’t place that brace: {reason}", ["reason": JS.t(spot.reason())])
+            refresh()
             return
         }
         message = ""
         let p = spot.point()
-        let wall = DrawnWall.brace(at: local(SIMD3(p[0], p[1], p[2])), face: hit.face, capped: !spot.full())
+        let wall = DrawnWall.brace(at: local(SIMD3(p[0], p[1], p[2])), face: face, capped: !spot.full())
         session.perform(JS.t("Add Sway Brace")) { session.drawnWalls.append(wall) }
         sync()
     }

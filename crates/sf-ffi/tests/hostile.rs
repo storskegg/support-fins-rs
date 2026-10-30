@@ -463,6 +463,25 @@ fn text_and_number_helpers_take_anything() {
             crash_zip(vec![s.clone(), s], vec![vec![], vec![0; 100]]),
         );
     }
+    // the native crash reports' Rust names: any text, and mangled names cut short or nested deep
+    let mut names: Vec<String> = strings();
+    names.extend(
+        [
+            "_R",
+            "_ZN",
+            "__ZN",
+            "_RNv",
+            "_ZN3fooE",
+            "_RNvCs_",
+            "_ZN17h0123456789abcdefE",
+        ]
+        .map(String::from),
+    );
+    names.push(format!("_R{}", "B".repeat(10_000)));
+    names.push(format!("_ZN{}E", "1a".repeat(10_000)));
+    for n in names {
+        let _ = sf_ffi::crash_demangle(n);
+    }
 }
 
 fn part_exports_take_anything() {
@@ -1297,6 +1316,11 @@ const GETTERS: &[(&str, &str)] = &[
     (
         "crash_breadcrumbs",
         "crash-report plumbing: a copy under a poison-tolerant lock",
+    ),
+    (
+        "crash_demangle",
+        "crash-report plumbing: rustc-demangle on one string, which returns an error, never panics, on any input (its \
+         recursion is bounded); fuzzed below",
     ),
     (
         "island_card",

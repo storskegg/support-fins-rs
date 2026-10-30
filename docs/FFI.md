@@ -59,6 +59,9 @@ fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError>;  // STL / OBJ /
 fn reads_as_step(path: String) -> Result<bool, FfiError>;  // X-01: whether load_parts would read the file as STEP (not named .stl/.obj/.3mf; named .step/.stp, or its first 64 bytes start "ISO-10303-21;"). Io error when it cannot be read
 fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiError>;  // X-01: the parts of a STEP file from the StepReader XPC service's read (`kernel`: sf_step::wire bytes), the parts load_parts makes of it in process; the bytes are decoded as untrusted (Format "the STEP reader sent back a malformed result"; a tree with an index out of range or a cycle is "the CAD kernel could not read this STEP file")
 fn load_parts_with(path: String, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError>;  // load_parts with the load options ("Load limits" below); load_parts is load_parts_with(path, LoadOptions { allow_large: false })
+// C-05: a Part is welded lazily. load_parts reads each object's soup only; `info()` (name, triangles, size) needs no topology and `weld_ms` is 0 until the weld has run. The first call that needs the topology (`mesh`, `analyze`, `face_flags`, `islands`, a build, a draw) welds the part on the calling thread, once (other callers wait). `scaled` and `merge_parts` weld before they return. So a host should call `mesh()` off the main thread before showing a part, and the picker shows only `info()`. Rust-side: `Part::is_welded()`.
+// C-07: `BuildResult::triangles()` (Rust only) now returns a `Vec<f32>` read back out of the `fins` and `pad` buffers; the result keeps no separate f32 copy and no clone of the engine's build.
+// C-11: `build_part` frees the Rayon workers' clearance stamp arrays when it ends (`sf_engine::inside::release_scratch`).
 fn load_step_parts_with(path: String, kernel: Vec<u8>, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError>;  // load_step_parts with the load options: the STEP's parts get the same limits as load_parts_with (finite coordinates; a part over 2 m is LimitExceeded unless allow_large)
 fn merge_parts(parts: Vec<Arc<Part>>, object_count: u64) -> Result<Arc<Part>, FfiError>;  // the picker's "Merge N & load": positions concatenated in the order given (io.js mergeObjectPositions), welded as one soup; colours merged by triangle, slicer parts kept; named after the file; note "merged N of TOTAL objects into one part" (TOTAL = object_count, the file's); one part returns itself
 fn scale_from_percent_text(text: String) -> Result<Option<f64>, FfiError>;  // M6: scaleFromPercent(Number(text)): 10-1000 % clamped, rounded to the field's 2 decimals; None for junk, empty or <= 0
@@ -542,6 +545,42 @@ Nothing is sent over the network; reports are files in a folder Swift names (`~/
   A plain `xcodebuild build` does not strip (`DEPLOYMENT_POSTPROCESSING = NO`), but an Archive does with `STRIP_STYLE = all`, which
   removes every local symbol, i.e. all Rust frames. `app/project.yml` therefore sets `STRIP_STYLE: debugging` (only debug symbols go).
   To symbolicate a MetricKit address later: `atos -o "Support Fins.app.dSYM/Contents/Resources/DWARF/Support Fins" -arch arm64 -l <load address> <address>`.
+
+### Native crashes (fix plan 1E; `app/SupportFinsCore/Sources/SFCrashCapture`, `NativeCrash.swift`)
+
+A crash the panic hook cannot see (a fatal signal in Swift, Objective-C, C++ or Rust code, an uncaught NSException, a Swift
+runtime trap) is captured by C handlers in the SupportFinsCore package, outside the Rust library.
+
+- **`NativeCrashCapture.install(dir:appVersion:)`** (C `sfcc_install`) at launch: `sigaction` with `SA_SIGINFO | SA_ONSTACK` for
+  SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT and SIGTRAP (on a 256 KB `sigaltstack` with a guard page, for the main thread), and
+  `NSSetUncaughtExceptionHandler`. Both chain to the handler that was there before. Ahead of time it prepares the dump's path
+  (`<dir>/native-<unix time>-<pid>.sfdump`), a reserve file descriptor, and the image table (`_dyld_register_func_for_add_image`,
+  plus dyld itself: path, UUID, load address, `__TEXT` size).
+- **`NativeCrashCapture.setContext(breadcrumbs:settingsJSON:)`** (C `sfcc_set_context`): the breadcrumbs and settings as JSON,
+  copied into the spare half of a double buffer. `CrashReporter` calls it on every breadcrumb and settings change.
+- **The signal handler** is async-signal-safe: `open`, `write`, `close`, `getpid`, `time`, `sigaction`, `raise`, `sleep`, plus
+  `vm_read_overwrite` (a Mach call: no lock, no allocation) for every stack read, and `pthread_self` (a thread-register read).
+  No malloc, stdio, locks, Swift or Objective-C. It writes the signal, `si_code`, the fault address, whether it is the main
+  thread, pc/lr/fp/sp, a frame-pointer walk (at most 256 frames; each read checked, the chain must climb), the images and the
+  context. It then calls the previous handler, restores `SIG_DFL` and lets the signal take its default action: a hardware fault
+  re-runs the instruction on return, a sent signal is raised again. The system's report and the exit status are unchanged.
+  Only the crashing thread is recorded: suspending and reading the other threads is not done (not safely possible here).
+- **The uncaught-exception handler** (ordinary context) writes the name, reason and `callStackReturnAddresses`; the SIGABRT the
+  runtime raises next appends its own section to the same dump.
+- **The next launch** (`NativeCrashImport`, app): `NativeCrashDump.parse`, `NativeSymbolizer` (dladdr against this launch's image
+  with the same UUID, else the image file's `LC_SYMTAB` when it is on disk with that UUID, else image + offset), demangling
+  (Swift `swift_demangle`, C++ `__cxa_demangle`, Rust **`crash_demangle(symbol) -> String?`**, rustc-demangle, legacy and v0), and
+  `NativeCrashReport.make`. The report is `crash-native-<time>.json`/`.txt` with the breadcrumbs and settings; it replaces the
+  marker's `crash-session-*` report for that run. A SIGABRT whose stack runs through the Rust panic machinery joins the newest
+  `crash-rust-*` report of the 2 minutes before it (`native` in its JSON, the stacks at the end of its text). A MetricKit crash
+  diagnostic whose window holds a native report's crash time (and whose signal matches) gets `alsoCapturedNatively: <stem>`.
+- **Tests:** under XCTest, and in a DEBUG run with `-SFCrashDir` (the UI tests), the raw dumps go into
+  `<temp>/sf-native-crash/<run>/` (`SF_CRASH_RUN`, else the launch time and pid), printed to stderr at install; nothing converts
+  them and they never raise the banner. `just app-test` passes `TEST_RUNNER_SF_CRASH_RUN` and `tools/gate/native_dumps.py`
+  fails the step on any dump, printing its stack (atos).
+- **Proof:** `sf-crash-probe` (an executable target of the package, never in the app) crashes on purpose for each signal and an
+  uncaught NSException; `NativeCrashTests` runs it as a child process (a command-line tool: no crash dialog, but macOS still
+  writes `sf-crash-probe-*.ips` in DiagnosticReports) and checks the signal, the dump and the crashing function's name.
 
 ## Wave 2 (October 2026): STEP out of process (X-01)
 

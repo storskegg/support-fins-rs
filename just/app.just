@@ -9,7 +9,8 @@ swift-bindings:
     set -euo pipefail
     # the app targets macOS 26: build the Rust and the Manifold C++ for it, not for the SDK's newer default
     export MACOSX_DEPLOYMENT_TARGET=26.0
-    cargo build --release -p sf-ffi --target aarch64-apple-darwin
+    # --features app-alloc: BigBlocks is the app's global allocator (C-05)
+    cargo build --release -p sf-ffi --features app-alloc --target aarch64-apple-darwin
     lib=target/aarch64-apple-darwin/release/libsf_ffi.a
     pkg=app/SupportFinsCore
     gen=target/swift-gen
@@ -52,9 +53,10 @@ app-core: swift-bindings
 app-project:
     xcodegen generate --spec app/project.yml --project app
 
-# The viewer package's tests (camera maths, offscreen renders) and the app's tests.
+# The viewer package's tests (camera maths, offscreen renders) and the app's tests, then a check that no test crashed
+# natively: a native crash dump written during the run fails the step and prints its stack (tools/gate/app_test.sh).
 app-test: app-core app-project
-    tools/lock/lock.py app-test -- bash -ec "swift test -j {{xcode_jobs}} --package-path app/SupportFinsViewer; xcodebuild test -jobs {{xcode_jobs}} -project app/SupportFins.xcodeproj -scheme SupportFins -destination 'platform=macOS'"
+    tools/lock/lock.py app-test -- tools/gate/app_test.sh {{xcode_jobs}}
 
 # Nothing drives the mouse or keyboard, so any agent may run it, and `just gate` does whenever the app gates run: a UI
 # test that does not compile cannot reach review. Its own derived data inside the worktree (`.dd-ui`, gitignored),

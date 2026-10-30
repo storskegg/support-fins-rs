@@ -45,14 +45,15 @@ pub struct BuildResult {
     pad: Arc<GpuBuffer>,
     summary: String,
     records: String,
-    /// fin soup then pad, `f32` as `computeFins` returns it (what an export writes)
-    triangles: Vec<f32>,
     offset: Xyz,
     /// `None` for the identity pose, which the CLI leaves unposed
     rot: Option<[f64; 9]>,
     /// what a re-measure after a removal needs: the build, the part's topology, the overhang threshold and
     /// the tunables the build ran under
     built: sf_engine::fins::build::FinsBuilt,
+    /// `built`'s fin and pad vertices, which it no longer holds (`triangles` and `pad_triangles` are emptied once the
+    /// summary and records are made): deduplicated, bit-exact (C-07)
+    tris: crate::tristore::TriStore,
     topo: Arc<sf_engine::overhangs::Topology>,
     threshold: f64,
     tunables: Option<sf_engine::config::Tunables>,
@@ -96,6 +97,16 @@ impl BuildResult {
         &self.built
     }
 
+    /// The build and where its vertices are, for `sweep_drawn`.
+    pub(crate) fn auto(
+        &self,
+    ) -> (
+        &sf_engine::fins::build::FinsBuilt,
+        &dyn sf_engine::drawn::AutoTris,
+    ) {
+        (&self.built, &self.tris)
+    }
+
     /// What a report needs of the build (`report.rs`): the part's topology, the overhang threshold and the
     /// pose it was built in (`None` for the identity).
     pub(crate) fn report_inputs(&self) -> (&Arc<sf_engine::overhangs::Topology>, f64, [f64; 9]) {
@@ -116,10 +127,10 @@ impl BuildResult {
         let mut added: Vec<sf_engine::types::V4> = Vec::new();
         for f in &kept {
             for &[lo, hi] in &f.tri_ranges {
-                added.extend_from_slice(&self.built.triangles[lo..hi]);
+                added.extend_from_slice(&self.tris.range(lo, hi));
             }
         }
-        added.extend_from_slice(&self.built.pad_triangles);
+        added.extend_from_slice(&self.tris.pad_tris());
         let bare = match &self.built.bare {
             None => Json::Null,
             Some(b) if removed.is_empty() => records::bare_json(b.area, b.total, b.coverage),
@@ -156,7 +167,7 @@ impl BuildResult {
         drawn: &[sf_engine::types::V4],
     ) -> Vec<sf_engine::types::V4> {
         let mut added: Vec<sf_engine::types::V4> = if removed.is_empty() {
-            self.built.triangles.clone()
+            self.tris.fin_tris()
         } else {
             // the kept fins' own triangles, in record order (ui/remove.js `filteredTriangles`)
             self.built
@@ -166,30 +177,44 @@ impl BuildResult {
                 .flat_map(|f| {
                     f.tri_ranges
                         .iter()
-                        .flat_map(|&[lo, hi]| self.built.triangles[lo..hi].iter().copied())
+                        .flat_map(|&[lo, hi]| self.tris.range(lo, hi).into_owned())
                 })
                 .collect()
         };
         added.extend_from_slice(drawn);
-        added.extend_from_slice(&self.built.pad_triangles);
+        added.extend_from_slice(&self.tris.pad_tris());
         added
     }
 
     /// The fin soup then the pad as `computeFins` returns them (`f32`, xyz per vertex): what an export writes.
-    pub fn triangles(&self) -> &[f32] {
-        &self.triangles
+    /// Read back out of the two GPU buffers (C-07: the result keeps one copy of the fins as `f32`).
+    pub fn triangles(&self) -> Vec<f32> {
+        let mut out =
+            Vec::with_capacity((self.fins.as_slice().len() + self.pad.as_slice().len()) / 2);
+        for buf in [&self.fins, &self.pad] {
+            for vertex in buf.as_slice().as_chunks::<24>().0 {
+                out.extend(
+                    vertex[..12]
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .map(|b| f32::from_ne_bytes(*b)),
+                );
+            }
+        }
+        out
     }
 }
 
 /// Interleave a flat `f32` soup (xyz per vertex, three vertices per triangle) with each triangle's
 /// unit normal, the layout of `Part::mesh`.
 pub(crate) fn soup_buffer(tris: &[f32]) -> Arc<GpuBuffer> {
-    let mut out = vec![0f32; tris.len() * 2];
+    let mut buf = GpuBuffer::zeroed(tris.len() * 8, 24, (tris.len() / 3) as u32);
     for (t, o) in tris
         .as_chunks::<9>()
         .0
         .iter()
-        .zip(out.as_chunks_mut::<18>().0.iter_mut())
+        .zip(buf.as_mut_slice().as_chunks_mut::<72>().0)
     {
         let d = |a: usize, b: usize| t[b] as f64 - t[a] as f64;
         let (u, v) = ([d(0, 3), d(1, 4), d(2, 5)], [d(0, 6), d(1, 7), d(2, 8)]);
@@ -206,13 +231,13 @@ pub(crate) fn soup_buffer(tris: &[f32]) -> Arc<GpuBuffer> {
         };
         for k in 0..3 {
             for a in 0..3 {
-                o[k * 6 + a] = t[k * 3 + a];
-                o[k * 6 + 3 + a] = nrm[a] as f32;
+                let at = (k * 6 + a) * 4;
+                o[at..at + 4].copy_from_slice(&t[k * 3 + a].to_ne_bytes());
+                o[at + 12..at + 16].copy_from_slice(&(nrm[a] as f32).to_ne_bytes());
             }
         }
     }
-    let bytes: Vec<u8> = out.iter().flat_map(|f| f.to_ne_bytes()).collect();
-    Arc::new(GpuBuffer::from_bytes(&bytes, 24, (tris.len() / 3) as u32))
+    Arc::new(buf)
 }
 
 fn engine(message: impl Into<String>) -> FfiError {
@@ -378,6 +403,19 @@ pub fn build_part_cancellable(
     tunables_json: &str,
     cancel: &Cancel,
 ) -> Result<BuildResult, FfiError> {
+    let built = build_part_inner(part, rot, opts_json, tunables_json, cancel);
+    // the build's per-thread stamp arrays (4 B per face on every Rayon worker) are done with (C-11)
+    sf_engine::inside::release_scratch();
+    built
+}
+
+fn build_part_inner(
+    part: &Part,
+    rot: &[f64],
+    opts_json: &str,
+    tunables_json: &str,
+    cancel: &Cancel,
+) -> Result<BuildResult, FfiError> {
     let rot = rot9(rot)?;
     let mut page = PageRequest::default();
     let (dialog, extras) = split_options(opts_json, &mut page)?;
@@ -399,14 +437,7 @@ pub fn build_part_cancellable(
             threshold: request.threshold,
             tunables: request.opts.tunables,
         };
-        return Ok(finish(
-            &built,
-            s,
-            &result.triangles,
-            result.offset,
-            rot,
-            ctx,
-        ));
+        return Ok(finish(built, s, &result.triangles, result.offset, rot, ctx));
     }
     page.tunables = tunables.unwrap_or_default();
     let request = engine_request(&options, Some(&page)).map_err(engine)?;
@@ -438,14 +469,7 @@ pub fn build_part_cancellable(
         threshold: request.threshold,
         tunables: request.opts.tunables,
     };
-    Ok(finish(
-        &built,
-        &stats,
-        &triangles,
-        analysis.offset,
-        rot,
-        ctx,
-    ))
+    Ok(finish(built, &stats, &triangles, analysis.offset, rot, ctx))
 }
 
 struct Context {
@@ -455,7 +479,7 @@ struct Context {
 }
 
 fn finish(
-    built: &sf_engine::fins::build::FinsBuilt,
+    mut built: sf_engine::fins::build::FinsBuilt,
     s: &sf_cli::entry::Stats,
     triangles: &[f32],
     offset: Xyz,
@@ -464,15 +488,21 @@ fn finish(
 ) -> BuildResult {
     let fin_floats = (s.fin_triangles + s.sway_triangles) * 9;
     let (fins, pad) = triangles.split_at(fin_floats);
+    let summary = records::summary(&built, s, offset).stringify();
+    let records = records::records(&built).stringify();
+    let tris = crate::tristore::TriStore::new(
+        &std::mem::take(&mut built.triangles),
+        &std::mem::take(&mut built.pad_triangles),
+    );
     BuildResult {
         fins: soup_buffer(fins),
         pad: soup_buffer(pad),
-        summary: records::summary(built, s, offset).stringify(),
-        records: records::records(built).stringify(),
-        triangles: triangles.to_vec(),
+        summary,
+        records,
+        tris,
         offset,
         rot,
-        built: built.clone(),
+        built,
         topo: ctx.topo,
         threshold: ctx.threshold,
         tunables: ctx.tunables,
