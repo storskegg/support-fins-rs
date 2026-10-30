@@ -305,7 +305,7 @@ fn bed_shift(lists: &[&[[f64; 3]]]) -> [f64; 2] {
         f64::NEG_INFINITY,
     );
     for tris in lists {
-        for p in tris.iter() {
+        for p in *tris {
             if p[0] < lx {
                 lx = p[0];
             }
@@ -2018,7 +2018,7 @@ fn add_prusa3_parts(json_text: Option<&str>, parts: &mut RootParts, filaments: &
         Some(Json::Arr(a)) => a,
         _ => &[],
     };
-    let present = |v: Option<&Json>| v.filter(|v| !matches!(v, Json::Null)).is_some();
+    let present = |v: Option<&Json>| v.as_ref().is_some_and(|v| !matches!(v, Json::Null));
     for o in objects {
         if !present(o.get("id")) {
             continue;
@@ -2402,7 +2402,6 @@ fn count_tris(
 /// `fil` is the filament this subtree is on (`Filament`: the build item's object, then a
 /// component's part, then a PrusaSlicer 2 range of the mesh), and the painter gives a triangle's
 /// paint for it (paintcode.js `filamentPainter`).
-#[allow(clippy::too_many_arguments)]
 fn emit_object(
     e: &mut Emit,
     path: &str,

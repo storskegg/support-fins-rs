@@ -559,7 +559,6 @@ fn bucket_outline(outline: &[f64], reach: f64, cfg: &Config) -> IndexMap<i32, Ve
 /// Vertices are shared by identity in JS (`node`, `tipL`, a block's hub): they are kept in an
 /// arena here and the triangle lists hold indices, so `a !== b` degeneracy checks and `folds`
 /// compare indices exactly as JS compares objects.
-#[allow(clippy::too_many_arguments)]
 fn brim_pad(
     part_tris: &Tris,
     contact: &[[f64; 2]],
@@ -1284,7 +1283,7 @@ mod tests {
             cancel: Cancel::new(flag.clone()),
             ..Default::default()
         };
-        let f2 = flag.clone();
+        let f2 = flag;
         let raised = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(30));
             f2.store(true, Ordering::SeqCst);

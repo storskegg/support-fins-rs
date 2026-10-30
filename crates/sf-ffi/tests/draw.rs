@@ -266,7 +266,7 @@ const ID: [f64; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 
 fn block_kit(b: [f64; 6]) -> Arc<DrawKit> {
     let part = part_of(
-        &parse(&format!("{{\"block\":{:?}}}", b)).unwrap(),
+        &parse(&format!("{{\"block\":{b:?}}}")).unwrap(),
         900 + b[5] as usize,
     );
     DrawKit::new(part, ID.to_vec(), 45.0, SETTINGS.into(), common::tunables()).unwrap()
@@ -433,7 +433,7 @@ fn a_click_on_a_drawn_wall_picks_it_unless_the_part_is_in_front() {
     );
     assert!(
         sweep
-            .pick(from.clone(), dir.clone(), None, Some(vec![0.0, 0.0]))
+            .pick(from, dir.clone(), None, Some(vec![0.0, 0.0]))
             .is_err()
     );
     // a ray that misses everything

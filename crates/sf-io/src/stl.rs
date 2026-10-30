@@ -152,7 +152,7 @@ fn scan_vertex(text: &str, i: usize) -> Option<(usize, [&str; 3])> {
     }
     let mut p = i + 6;
     let mut toks = [""; 3];
-    for tok in toks.iter_mut() {
+    for tok in &mut toks {
         let ws = text[p..].len() - text[p..].trim_start_matches(is_js_space).len();
         if ws == 0 {
             return None; // \s+ needs one

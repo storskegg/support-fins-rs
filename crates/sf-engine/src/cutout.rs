@@ -997,7 +997,7 @@ pub fn cut_wall(
     // End posts: the caller's full sections outside the cut span, so the wall's
     // ends stay solid pillars.
     if edges[0] > 0 {
-        ribbon(&full[..edges[0] + 1], out);
+        ribbon(&full[..=edges[0]], out);
     }
     if edges[edges.len() - 1] < st.len() - 1 {
         ribbon(&full[edges[edges.len() - 1]..], out);

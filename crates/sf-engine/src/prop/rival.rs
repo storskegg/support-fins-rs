@@ -141,7 +141,7 @@ impl TubeRivalry<'_> {
         acc.out.extend_from_slice(&t.tris);
         for q in &t.props {
             let mut q = q.clone();
-            for rg in q.tri_ranges.iter_mut() {
+            for rg in &mut q.tri_ranges {
                 *rg = [
                     (rg[0] as isize + shift) as usize,
                     (rg[1] as isize + shift) as usize,

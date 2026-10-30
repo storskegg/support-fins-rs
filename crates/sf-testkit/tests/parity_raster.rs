@@ -264,7 +264,7 @@ fn race_against_matches_js() {
         let normal = pass_of(s.get("normal"), true);
         let second = pass_of(s.get("second"), false);
         let second_cap = s.get("second").get("capLen").num() as usize;
-        let asked: std::cell::RefCell<Vec<Vec<usize>>> = Default::default();
+        let asked = std::cell::RefCell::<Vec<Vec<usize>>>::default();
         let pass = |regions: &IndexSet<usize>| {
             asked.borrow_mut().push(regions.iter().copied().collect());
             if cap_len.is_some() {

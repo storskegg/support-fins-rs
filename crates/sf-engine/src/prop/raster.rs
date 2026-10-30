@@ -406,7 +406,6 @@ fn cap_slice(v: &[TineSeed], r: [usize; 2]) -> Vec<TineSeed> {
 /// placement: `pass(regions)` builds it over the regions `normal` left partly bare, and each
 /// region keeps whichever holds more. `tag` names it on the kept walls (`q[tag]`) and in the
 /// count (`<tag>Regions`). Downhill lines (prop/downhill.js) race through here as 'downhill'.
-#[allow(clippy::too_many_arguments)]
 pub fn race_against(
     topo: &Topology,
     result: &Analysis,
@@ -427,7 +426,6 @@ pub fn race_against(
 
 /// [`race_against`], and the `<tag>Regions` count JS puts on its result: how many regions swapped
 /// (`None` when `normal` came back untouched, where JS's result has no such key).
-#[allow(clippy::too_many_arguments)]
 pub fn race_against_counted(
     topo: &Topology,
     result: &Analysis,
@@ -506,7 +504,7 @@ pub fn race_against_counted(
         cap.truncate(cap_from);
         // ...and each kept wall's `caps` re-pointed into the rebuilt capture, so a second
         // race (downhill, after raster) slices the right tines out of it
-        for q in raced.props.iter_mut() {
+        for q in &mut raced.props {
             let Some(caps) = q.caps else { continue };
             let from = cap.len();
             let src = if tag.get(q) { cap_raster } else { cap_normal };
@@ -668,7 +666,6 @@ fn keepers<'a>(
 /// near any member -- since a line traced across the slivers runs under its neighbours' red,
 /// where their own walls stand. Such a pass only forces curves: a group whose walls don't bend
 /// keeps its `a` walls.
-#[allow(clippy::too_many_arguments)]
 fn race_regions(
     faces: &[OverFace],
     result: &Analysis,

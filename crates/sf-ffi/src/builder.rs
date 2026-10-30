@@ -433,7 +433,10 @@ fn build_part_inner(
     let (dialog, extras) = split_options(opts_json, &mut page)?;
     let options = options_from_dialog(&dialog).map_err(engine)?;
     let tunables = page_tunables(tunables_json)?;
-    let web = extras || tunables.as_ref().is_some_and(|t| *t != Default::default());
+    let web = extras
+        || tunables
+            .as_ref()
+            .is_some_and(|t| *t != sf_engine::config::Tunables::default());
     let rot = (rot != IDENTITY3).then_some(rot);
     if !web {
         let posed = pose_matrix(&part.topology().pos, rot);
@@ -704,9 +707,8 @@ fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
         placed: [0.0, 0.0],
         session: None,
     };
-    let kv = match parse(if text.trim().is_empty() { "{}" } else { text }) {
-        Some(Json::Obj(kv)) => kv,
-        _ => return Err(engine("export options must be a JSON object")),
+    let Some(Json::Obj(kv)) = parse(if text.trim().is_empty() { "{}" } else { text }) else {
+        return Err(engine("export options must be a JSON object"));
     };
     let nums = |v: &Json, n: usize, what: &str| -> Result<Vec<f64>, FfiError> {
         match v {

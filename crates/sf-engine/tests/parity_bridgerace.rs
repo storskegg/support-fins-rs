@@ -236,9 +236,9 @@ fn bridge_race_matches_the_oracle() {
                 .iter()
                 .any(|q| q.caps.is_some() || q.wall_range.is_some())
             {
-                twins_kept += 1
+                twins_kept += 1;
             } else {
-                twins_dropped += 1
+                twins_dropped += 1;
             }
         }
     }

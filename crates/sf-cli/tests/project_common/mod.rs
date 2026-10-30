@@ -568,7 +568,7 @@ impl CacheStore for Wrapped {
         Ok(())
     }
     fn finish(&self, warn: &dyn Fn(&str)) {
-        self.inner.finish(warn)
+        self.inner.finish(warn);
     }
 }
 

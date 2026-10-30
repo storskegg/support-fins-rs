@@ -24,7 +24,10 @@ fn traversal_3mf() -> String {
         t("_rels/.rels", RELS),
         t("3D/3dmodel.model", model),
     ]);
-    let path = dir().join("traversal.3mf");
+    // one file per call: the tests run in parallel, and one rewriting the file while another reads it failed the read
+    static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let path = dir().join(format!("traversal-{n}.3mf"));
     std::fs::write(&path, bytes).unwrap();
     path.to_string_lossy().into_owned()
 }

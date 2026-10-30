@@ -176,7 +176,7 @@ fn report_coverage_replays() {
                 tries: 0,
                 checks: 0,
                 capped: matches!(f.get("capped"), Value::Bool(true)),
-                refused: Default::default(),
+                refused: indexmap::IndexMap::default(),
                 bare_before: 0.0,
                 unserved_area: f.get("unservedArea").num(),
                 unserved_pts: vec![],

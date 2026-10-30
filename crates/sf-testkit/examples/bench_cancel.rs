@@ -155,7 +155,7 @@ fn build_cancelled_at(
             if e >= after {
                 break;
             }
-            if after - e > Duration::from_millis(2) {
+            if after.checked_sub(e).unwrap() > Duration::from_millis(2) {
                 std::thread::sleep(Duration::from_millis(1));
             } else {
                 std::hint::spin_loop();

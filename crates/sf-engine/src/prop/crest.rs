@@ -288,7 +288,6 @@ impl CrestCut {
 ///   made zero-area triangles in each ribbon end cap.
 ///
 /// JS defaults `th = PROP.th`, `tip = PROP.tip`: callers pass them.
-#[allow(clippy::too_many_arguments)]
 pub fn crest_cut(
     crest: &Crest,
     top: f64,

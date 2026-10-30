@@ -129,7 +129,6 @@ pub fn lowest_hit_brute(
 /// first checked against the rib's own (s, u, z) box, cheaply and without allocating; one that
 /// misses it cannot be clipped to anything, so skipping it is exact (the bounds are padded by
 /// EPS so rounding never drops a touching one).
-#[allow(clippy::too_many_arguments)]
 pub fn lowest_hit(
     tris: &Tris,
     fr: &Frame,

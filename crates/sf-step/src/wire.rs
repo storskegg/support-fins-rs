@@ -181,7 +181,7 @@ mod tests {
         RawResult {
             nodes: vec![
                 RawNode {
-                    name: "".into(),
+                    name: String::new(),
                     meshes: vec![],
                     children: vec![1],
                 },

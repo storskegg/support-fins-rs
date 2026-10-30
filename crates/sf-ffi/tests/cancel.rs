@@ -36,7 +36,7 @@ unsafe extern "C" {
 }
 fn cpu_ms() -> f64 {
     let mut r = Rusage::default();
-    unsafe { getrusage(0, &mut r) };
+    unsafe { getrusage(0, &raw mut r) };
     (r.utime.sec + r.stime.sec) as f64 * 1e3 + (r.utime.usec + r.stime.usec) as f64 / 1e3
 }
 /// CPU cores the process burns over `window`.
@@ -206,7 +206,7 @@ fn abandoning_a_search_or_a_build_stops_the_cpu_within_100_ms() {
     let after = cores(WINDOW);
     eprintln!(
         "wide ranking, Suggester dropped: {after:.2} cores from {:?} after the drop",
-        t.elapsed() - WINDOW
+        t.elapsed().checked_sub(WINDOW).unwrap()
     );
     assert!(after < 0.15, "still {after} cores after the drop");
     while let Ok(e) = rx.recv_timeout(Duration::from_millis(300)) {
@@ -285,7 +285,7 @@ fn abandoning_a_search_or_a_build_stops_the_cpu_within_100_ms() {
     }
 
     // dropping the Builder mid-build
-    let b = Builder::new(part.clone());
+    let b = Builder::new(part);
     let (tx, brx) = mpsc::channel();
     b.build(
         vec![1., 0., 0., 0., 1., 0., 0., 0., 1.],

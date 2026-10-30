@@ -7,7 +7,7 @@ use common::*;
 use sf_engine::fins::coverage::*;
 use sf_engine::overhangs::{Analysis, Topology, analyze, build_topology};
 use sf_engine::tris::Tris;
-use sf_engine::types::Rot3;
+use sf_engine::types::{Rot3, Xyz};
 use sf_testkit::parity::{Resolved, resolve_args};
 
 fn replay(file: &str, min: usize, run: impl Fn(&Case) -> Value) {
@@ -184,8 +184,8 @@ fn stub(r: &Resolved) -> Targets {
         over_area: 0.0,
         bed_area: 0.0,
         over_face_count: 0,
-        offset: Default::default(),
-        size: Default::default(),
+        offset: Xyz::default(),
+        size: Xyz::default(),
     };
     Targets {
         analysis,

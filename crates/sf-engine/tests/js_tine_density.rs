@@ -275,9 +275,9 @@ fn emit_tines_edge_biased_a_long_wall_is_denser_at_its_ends_than_its_middle() {
         let g = ys[i] - ys[i - 1];
         let frac = ((ys[i] + ys[i - 1]) / 2.0 - mid).abs() / half_run; // 0 at centre, 1 at an end
         if frac > 0.6 {
-            end_gaps.push(g)
+            end_gaps.push(g);
         } else {
-            mid_gaps.push(g)
+            mid_gaps.push(g);
         }
     }
     let med = |a: &Vec<f64>| {

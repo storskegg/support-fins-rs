@@ -267,7 +267,7 @@ fn the_pages_tunables_reach_the_ranking() {
             .suggest_orientations(45.0, "{}".into(), "{}".into(), ctx())
             .unwrap();
         assert_eq!(
-            part.suggest_orientations(45.0, "{}".into(), "".into(), ctx())
+            part.suggest_orientations(45.0, "{}".into(), String::new(), ctx())
                 .unwrap(),
             plain
         );
@@ -540,7 +540,7 @@ fn the_wide_search_ranks_more_poses_and_density_one_is_the_web_search() {
 #[test]
 fn a_stale_wide_search_stops_early_and_the_newer_one_is_delivered() {
     let part = load("sphere");
-    let s = Suggester::new(part.clone());
+    let s = Suggester::new(part);
     let (l1, rx1) = listener();
     let (l2, rx2) = listener();
     let g1 = s

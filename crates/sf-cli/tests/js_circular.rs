@@ -114,7 +114,7 @@ fn circular_measurements_recover_the_local_radial_profile_and_reject_an_ellipse(
         &CircularCache::new(),
         &Config::default(),
     );
-    assert!(frames.len() == 1);
+    assert_eq!(frames.len(), 1);
     let frame = frames.values().next().unwrap();
     assert_close(frame.inner_radius, 15.0, 1e-5, "inner");
     assert_close(frame.outer_radius, 25.0, 1e-5, "outer");
@@ -253,8 +253,8 @@ fn circular_shared_adapter_agrees_with_browser_engine_and_output_remains_closed(
         &engine_opts("auto"),
     )
     .unwrap();
-    assert!(shared.stats.braces + shared.stats.props == browser.count);
-    assert!(shared.stats.tines == browser.built.tines);
+    assert_eq!(shared.stats.braces + shared.stats.props, browser.count);
+    assert_eq!(shared.stats.tines, browser.built.tines);
     assert!(
         is_closed(
             &browser
@@ -281,8 +281,8 @@ fn circular_two_separated_instances_keep_each_feature_count() {
         Some(pair),
     );
     let single = run();
-    assert!(together.count == 2 * single.count);
-    assert!(together.built.tines == 2 * single.built.tines);
+    assert_eq!(together.count, 2 * single.count);
+    assert_eq!(together.built.tines, 2 * single.built.tines);
 }
 
 // circular.test.js:94
@@ -309,10 +309,11 @@ fn circular_recognised_small_holes_stay_exempt_beside_a_circular_recess() {
                 mixed.stats.small_hole_regions == 1,
                 "the neighbouring bore must stay exempt"
             );
-            assert!(
-                mixed.stats.braces + mixed.stats.props == single.stats.braces + single.stats.props
+            assert_eq!(
+                mixed.stats.braces + mixed.stats.props,
+                single.stats.braces + single.stats.props
             );
-            assert!(mixed.stats.tines == single.stats.tines);
+            assert_eq!(mixed.stats.tines, single.stats.tines);
             // overFaces / smallFaces, as computeFins derives them (fins_entry.js:184-188)
             let (pos, _) = seat_soup(&all).unwrap();
             let topo = Arc::new(build_topology(pos));

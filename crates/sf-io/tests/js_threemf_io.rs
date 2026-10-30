@@ -1377,7 +1377,7 @@ fn threemf_export_negative_part_and_modifier_go_back_out_beside_the_part_the_sup
             ..Default::default()
         }),
         settings_json(&PartSettings {
-            bambu: m.settings.bambu.clone(),
+            bambu: m.settings.bambu,
             ..Default::default()
         })
     );
@@ -2234,7 +2234,7 @@ fn threemf_one_model_output_is_unchanged_golden() {
                 }),
                 ..Default::default()
             }),
-            fins.clone(),
+            fins,
             "6eb7e99f0dad0e54699ce5083007f47c5f16f3cf3a2d7cbb5596060deaa57fd9",
         ),
     ];

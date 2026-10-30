@@ -51,9 +51,9 @@ fn abs_tolerance_rules() {
     let t = Tol::Abs(1e-6);
     assert!(compare(&num(1.0), &num(1.0 + 5e-7), &t).is_ok());
     assert!(compare(&num(1.0), &num(1.0 + 2e-6), &t).is_err());
-    assert!(
-        compare(&num(1.0), &num(1.0 + 1e-6), &Tol::Abs(1e-6)).is_ok()
-            == ((1.0f64 - (1.0 + 1e-6)).abs() <= 1e-6)
+    assert_eq!(
+        compare(&num(1.0), &num(1.0 + 1e-6), &Tol::Abs(1e-6)).is_ok(),
+        ((1.0f64 - (1.0 + 1e-6)).abs() <= 1e-6)
     );
     assert!(compare(&num(f64::NAN), &num(f64::NAN), &t).is_ok());
     assert!(compare(&num(f64::NAN), &num(0.0), &t).is_err());

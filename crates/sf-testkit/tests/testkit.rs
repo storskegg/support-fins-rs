@@ -69,14 +69,14 @@ fn degenerate_edges_are_skipped_by_is_oriented() {
 #[test]
 fn vertex_keys_round_to_a_thousandth_and_merge_minus_zero() {
     let mut b = verts(&block(0.0, 1.0, 0.0, 1.0, 0.0, 1.0));
-    for v in b.iter_mut() {
+    for v in &mut b {
         v[0] += 4e-4 * if v[0] > 0.5 { 1.0 } else { -1.0 }; // stays within a key
     }
     assert!(is_closed(&b));
     assert!(is_oriented(&b));
     // -0 and 0 key alike
     let mut c = verts(&block(0.0, 1.0, 0.0, 1.0, 0.0, 1.0));
-    for v in c.iter_mut() {
+    for v in &mut c {
         if v[2] == 0.0 {
             v[2] = -0.0;
         }
@@ -299,7 +299,7 @@ fn tine_boxes_step_conditions_are_each_required() {
         assert_eq!((r.tines.len(), r.steps.len()), (2, 0));
     }
     // footprint tolerance is 1e-6
-    let mut out = tine.clone();
+    let mut out = tine;
     out.extend(tbox(0.0, 2.0 + 5e-7, 0.0, 2.0, 0.0, 6.0));
     // f32 storage in block() rounds 2+5e-7 to a nearby f32, still within 1e-6
     assert_eq!(tine_boxes(&out).steps.len(), 1);

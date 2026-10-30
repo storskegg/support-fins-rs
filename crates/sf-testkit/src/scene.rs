@@ -118,7 +118,7 @@ pub fn run(scene: &Scene, rot: Option<Rot3>) -> Run {
         let opts = site_opts(material_name, "draw", scene.sway);
         let b = build_fins(&topo, &res, &rot, &opts, &base);
         // buildFins writes its tunables into module state, which the drawn wall then reads
-        let mut cfg = base.clone();
+        let mut cfg = base;
         apply_tunables(&mut cfg, opts.tunables.as_ref());
         let mut ctx = BuildCtx::new(&cfg, Crest::new(None, 0.0, &cfg));
         let seated = seated_part_tris(&topo, &rot, &res.offset);

@@ -41,8 +41,8 @@ fn wall_boxes(tris: Vec<f64>) -> Vec<Wb> {
         .map(|q| {
             let xs: Vec<f64> = q.line.iter().map(|p| p[0] - res.offset.x).collect();
             let ys: Vec<f64> = q.line.iter().map(|p| p[1] - res.offset.y).collect();
-            let mn = |v: &[f64]| v.iter().cloned().fold(f64::INFINITY, f64::min);
-            let mx = |v: &[f64]| v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let mn = |v: &[f64]| v.iter().copied().fold(f64::INFINITY, f64::min);
+            let mx = |v: &[f64]| v.iter().copied().fold(f64::NEG_INFINITY, f64::max);
             Wb {
                 x0: mn(&xs),
                 x1: mx(&xs),
@@ -146,8 +146,8 @@ fn free_edge_the_end_row_moves_out_it_is_not_doubled_a_deck_between_two_posts() 
     }
     let ys = sorted_mid_ys(&ws);
     let gaps: Vec<f64> = ys.windows(2).map(|p| p[1] - p[0]).collect();
-    let mn = gaps.iter().cloned().fold(f64::INFINITY, f64::min);
-    let mx = gaps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let mn = gaps.iter().copied().fold(f64::INFINITY, f64::min);
+    let mx = gaps.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     assert!(mn > 9.0, "two walls {mn:.2} mm apart: {:?}", fmt(&ys));
     assert!(
         mx < 80.0 / 6.0 + 1e-6,
@@ -188,8 +188,8 @@ fn free_edge_one_free_edge_the_walls_cross_the_bridge_out_to_it_the_gaps_stay_wi
         "end rows not flush with the ledge's free ends: {:?}",
         fmt(&ys)
     );
-    let mx = gaps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let mn = gaps.iter().cloned().fold(f64::INFINITY, f64::min);
+    let mx = gaps.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let mn = gaps.iter().copied().fold(f64::INFINITY, f64::min);
     assert!(
         mx <= 12.0 + 1e-6,
         "a {mx:.2} mm gap, wider than the 12 mm pitch: {:?}",

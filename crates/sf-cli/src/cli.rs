@@ -817,7 +817,6 @@ pub fn fin_file(
 /// onto the part as it is in the file (fin - offset); otherwise the part moves to them. `tris` is the
 /// fin soup then the pad, `f32` as `computeFins` returns it. Shared with the app's export (`sf-ffi`),
 /// so a file written there is the file the CLI writes.
-#[allow(clippy::too_many_arguments)]
 pub fn output_bytes(
     name: &str,
     posed: &[f64],

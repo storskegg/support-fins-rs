@@ -632,7 +632,7 @@ impl Part {
                 self.topology(),
                 &a,
                 &rot,
-                &Default::default(),
+                &sf_engine::islands::IslandOpts::default(),
                 &cfg,
             );
             Ok(found
@@ -754,7 +754,7 @@ impl ImportMeta {
                 format!("imported “{chosen_name}” of {objects_len} objects")
             } else {
                 format!("merged {chosen_len} of {objects_len} objects into one part")
-            })
+            });
         };
         match self.kind {
             Kind::Stl => {}

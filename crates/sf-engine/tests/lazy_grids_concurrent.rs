@@ -105,6 +105,6 @@ fn tasks_first_using_the_lazy_grids_on_workers_do_not_deadlock() {
     });
     match rx.recv_timeout(Duration::from_secs(60)) {
         Ok(sum) => assert!(sum.is_finite()),
-        Err(_) => panic!("deadlock: the lazy grids were not built within 60 s"),
+        Err(e) => panic!("deadlock: the lazy grids were not built within 60 s ({e})"),
     }
 }

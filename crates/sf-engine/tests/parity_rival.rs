@@ -220,9 +220,9 @@ fn tube_rivalry_matches_the_oracle() {
             );
         }
         if acc.props.is_empty() {
-            kept_patches += 1
+            kept_patches += 1;
         } else {
-            kept_tube += 1
+            kept_tube += 1;
         }
     }
     assert!(

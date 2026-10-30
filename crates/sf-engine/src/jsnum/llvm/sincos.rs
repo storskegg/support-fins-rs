@@ -4,7 +4,10 @@
 //! `v8::base::ieee754::{fdlibm_sin,fdlibm_cos}` (src/base/ieee754.cc:236-238, 168-170) and `tan` through
 //! `ieee754::tan` (ieee754.cc:243). FMA, accurate pass, full tables.
 
-use super::fputil::*;
+use super::fputil::{
+    DD, F128, dd_div, exact_add, exact_add_slow, exact_mult, fma, nearest_integer, polyeval_f128,
+    quick_add, quick_mul, quick_mult,
+};
 use super::tables_sincos::{
     ONE_TWENTY_EIGHT_OVER_PI, SIN_K_PI_OVER_128, SIN_K_PI_OVER_128_F128, TAN_COEFFS,
 };

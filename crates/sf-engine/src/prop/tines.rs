@@ -202,7 +202,6 @@ const STEP_INSET: f64 = 0.01;
 /// `opts.grip`, if given, gets the lowest tine bottom: the wall's grip height. Not the lowest
 /// emitted vertex -- a wall step under a tine sits lower. `tris` (the seated part soup) is
 /// accepted and ignored, as in JS (callers pass `null`).
-#[allow(clippy::too_many_arguments)]
 pub fn emit_tines(
     line: &[[f64; 3]],
     _tris: Option<&Tris>,

@@ -170,8 +170,8 @@ fn islands_the_stress_models_have_none_bar_lowledge_at_y45_a_45_45_knife_edge() 
         edge.len()
     );
     let ys: Vec<f64> = edge[0].points.iter().map(|p| p[1]).collect();
-    let span = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
-        - ys.iter().cloned().fold(f64::INFINITY, f64::min);
+    let span = ys.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+        - ys.iter().copied().fold(f64::INFINITY, f64::min);
     assert!(
         span > 39.0,
         "the whole 40 mm edge is the target, not its middle"

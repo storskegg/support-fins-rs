@@ -154,7 +154,9 @@ fn build_once(pos: &[f64], rot: &[f64; 9], opts: &FinsOpts, cfg: &Config) -> (f6
         h = (h ^ x.to_bits()).wrapping_mul(0x100000001b3);
     };
     for v in built.triangles.iter().chain(&built.pad_triangles) {
-        v.iter().for_each(|&x| eat(x));
+        for &x in v {
+            eat(x);
+        }
     }
     if let Some(b) = &built.bare {
         eat(b.area);

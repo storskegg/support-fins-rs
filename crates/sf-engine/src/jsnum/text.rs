@@ -125,7 +125,7 @@ impl Big {
 
     fn mul_small(&mut self, m: u32) {
         let mut carry = 0u64;
-        for limb in self.0.iter_mut() {
+        for limb in &mut self.0 {
             let t = *limb as u64 * m as u64 + carry;
             *limb = t as u32;
             carry = t >> 32;

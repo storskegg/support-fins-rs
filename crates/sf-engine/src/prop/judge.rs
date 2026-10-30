@@ -335,7 +335,6 @@ fn densify(line: &[[f64; 3]], step: f64, into: &mut Vec<[f64; 3]>) {
 /// `o`'s edge `p`-`q` (seated; `shared` its offsets, `n` the face across it)? By the face across
 /// it -- or, for a part built of unwelded bodies (a Tinkercad union: a deck laid on a post), by
 /// the part itself just outside the edge and under it.
-#[allow(clippy::too_many_arguments)]
 pub fn attached(
     topo: &Topology,
     result: &Analysis,

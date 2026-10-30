@@ -81,7 +81,7 @@ impl AltStack {
             ss_flags: 0,
         };
         // SAFETY: `mem` outlives the registration: `drop` unregisters it before the memory goes.
-        unsafe { libc::sigaltstack(&ss, std::ptr::null_mut()) };
+        unsafe { libc::sigaltstack(&raw const ss, std::ptr::null_mut()) };
         AltStack { _mem: mem }
     }
 }
@@ -94,7 +94,7 @@ impl Drop for AltStack {
             ss_flags: libc::SS_DISABLE,
         };
         // SAFETY: turns this thread's alternate stack off.
-        unsafe { libc::sigaltstack(&ss, std::ptr::null_mut()) };
+        unsafe { libc::sigaltstack(&raw const ss, std::ptr::null_mut()) };
     }
 }
 

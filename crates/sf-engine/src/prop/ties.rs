@@ -73,7 +73,6 @@ impl Default for TieConfig {
 /// Port of `strutHitsPart` (web/prop/ties.js:38-55): does the part come within sideClear of
 /// the strut from (u0, z0) to (u1, z1) (bottom edge; TIE.thick deep), or sit around it?
 /// Frame: u from `o` along `d`, v across.
-#[allow(clippy::too_many_arguments)]
 fn strut_hits_part(
     tris: &Tris,
     o: [f64; 2],

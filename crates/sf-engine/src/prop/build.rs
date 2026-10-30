@@ -464,7 +464,6 @@ struct Env<'a> {
 /// the tall wall, on every exit path, so it can skip exactly the stations that wall's low tail
 /// covered (`claimed`) and nothing more. `squat_line` is a deep copy taken before the tall
 /// path's settleTop mutates the shared points, so the squat pass sees the contoured line.
-#[allow(clippy::too_many_arguments)]
 fn run_squat(
     env: &Env,
     acc: &mut Acc,
@@ -1132,7 +1131,6 @@ pub(crate) fn build_pass(
 /// `line` (mutated in place, as in JS: `contourTop`, `lowerSag` and `insertFloorStations` work on
 /// it) of `patch`. `lines` is the patch's track list, which a raster track's leftover pieces are
 /// appended to (`rasterRest`). `line_rim` is `line.rim`.
-#[allow(clippy::too_many_arguments)]
 fn place_line(
     env: &Env,
     patch: &Patch,
@@ -1846,7 +1844,7 @@ pub fn build_props(
                 None,
                 ctx,
             ));
-            for q in pass.props.iter_mut() {
+            for q in &mut pass.props {
                 q.downhill = Some(true);
             }
             pass

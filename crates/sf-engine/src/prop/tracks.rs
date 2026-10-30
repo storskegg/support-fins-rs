@@ -357,7 +357,6 @@ pub struct Tracks {
 /// `patchTracks(pts, patchTris, step = PROP.stationStep, support = null,
 /// span = PROP.maxUnsupportedSpan, axis = null, turn = true)` (web/prop/tracks.js:322-420);
 /// callers pass the defaults explicitly.
-#[allow(clippy::too_many_arguments)]
 pub fn patch_tracks(
     pts: &[[f64; 3]],
     patch_tris: &Tris,

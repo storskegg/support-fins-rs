@@ -96,7 +96,7 @@ fn tilted_block() -> (Topology, f64, f64) {
     (topo, y, z)
 }
 
-fn tine_opts<'a>(tines: bool, topo: &'a Topology) -> DrawOpts<'a> {
+fn tine_opts(tines: bool, topo: &Topology) -> DrawOpts<'_> {
     DrawOpts {
         tines,
         topo: Some(topo),
@@ -359,9 +359,7 @@ fn draw_a_squat_plate_wall_takes_tines_from_the_brim_up() {
     // the 45deg block lifted 0.4 mm off the plate, drawn where the underside is ~1.4 mm up: a tine
     // needs a sloped face to reach into (a level underside takes none), and under the edge is open
     // air, so the brim fits both sides
-    let mut pos = tilted_block_topo(-20.0, 20.0, -30.0, 30.0, -6.0, 6.0, 45.0)
-        .pos
-        .clone();
+    let mut pos = tilted_block_topo(-20.0, 20.0, -30.0, 30.0, -6.0, 6.0, 45.0).pos;
     for i in (2..pos.len()).step_by(3) {
         pos[i] = ((pos[i] + 0.4) as f32) as f64;
     }
@@ -534,7 +532,7 @@ fn draw_the_squat_stem_and_the_full_wall_overlap_never_meet_flush() {
 
 /// A model's soup lowered so its minimum z is 0 (`pos[i] -= mz`, stored as a Float32Array).
 fn on_plate(name: &str) -> Vec<f64> {
-    let mut pos = load_model(name).pos.clone();
+    let mut pos = load_model(name).pos;
     let mz = min_of(pos.iter().skip(2).step_by(3).copied());
     for i in (2..pos.len()).step_by(3) {
         pos[i] = ((pos[i] - mz) as f32) as f64;

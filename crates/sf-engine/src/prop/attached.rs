@@ -113,7 +113,6 @@ fn enclosed_column(
 ///
 /// Since upstream `1e8558d` (#119) the outline is also measured, as `station_certified` measures a
 /// plate wall's: `nearestPart` at the wall's centre and both faces, refused when it `welds`.
-#[allow(clippy::too_many_arguments)]
 pub fn clear_between(
     top: &[[f64; 3]],
     floor: &[FloorPt],

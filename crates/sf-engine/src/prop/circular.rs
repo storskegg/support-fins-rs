@@ -447,7 +447,7 @@ pub fn circular_regions(
     cache: &CircularCache,
     cfg: &Config,
 ) -> Arc<IndexMap<usize, CircularFrame>> {
-    let topo_id = topo as *const Topology as usize;
+    let topo_id = std::ptr::from_ref::<Topology>(topo) as usize;
     {
         let slot = cache.entry.lock().unwrap();
         if let Some(c) = slot.as_ref()

@@ -14,8 +14,8 @@ const ID: [f64; 9] = sf_engine::types::IDENTITY3;
 
 fn span(values: impl Iterator<Item = f64>) -> f64 {
     let v: Vec<f64> = values.collect();
-    v.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
-        - v.iter().cloned().fold(f64::INFINITY, f64::min)
+    v.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+        - v.iter().copied().fold(f64::INFINITY, f64::min)
 }
 
 fn pts(t: &[[f64; 4]]) -> Vec<[f64; 3]> {
@@ -80,7 +80,7 @@ fn sway_cross_actual_brace_gauge_and_flange_margin_at_small_large_nozzles_and_wa
                 "cross solids open or reversed"
             );
             let lifted: Vec<[f64; 3]> = ex.iter().map(|v| [v[0], v[1], v[2].max(0.001)]).collect();
-            assert!(inside_count(&topo, &ID, &result.offset, &lifted) == 0);
+            assert_eq!(inside_count(&topo, &ID, &result.offset, &lifted), 0);
             for i in 0..2 {
                 let arm = &r.arms[i];
                 let body = &extra[i * 60..i * 60 + 24];

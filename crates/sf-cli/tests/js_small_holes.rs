@@ -154,7 +154,7 @@ fn small_holes_one_generation_shares_its_classification_without_caching_a_later_
     let topo = topology(circular_bore(&CircularBore::default()));
     let res = analyze(&topo, 45.0, &I);
     let targets = automatic_targets(&topo, &res, &I);
-    assert!(classify_targets(&targets) == targets.coverage_classes);
+    assert_eq!(classify_targets(&targets), targets.coverage_classes);
     assert_eq!(targets.analysis.regions.len(), 0);
     assert!(
         !targets.excluded_support_volumes.is_empty(),

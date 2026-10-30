@@ -687,9 +687,8 @@ pub fn build_perp_fins(
             let Some(dev) = patch_probe(p, uc, t) else {
                 if !contact.is_empty() {
                     break;
-                } else {
-                    continue;
                 }
+                continue;
             };
             let mut w = patch_point(p, dev, uc, t);
             // The blade's top is flat across its width: on a curved face it rides the

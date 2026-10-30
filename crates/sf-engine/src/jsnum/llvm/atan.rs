@@ -3,7 +3,7 @@
 //! `v8::base::ieee754::{atan,atan2}` (src/base/ieee754.cc:164-165). FMA, accurate pass.
 //! Unlike the logarithms these have no 128-bit fallback.
 
-use super::fputil::*;
+use super::fputil::{DD, dd_add, dd_div, exact_add, exact_mult, fma, nearest_integer};
 use super::tables_trig::ATAN_I;
 
 const IS_NEG: [f64; 2] = [1.0, -1.0];

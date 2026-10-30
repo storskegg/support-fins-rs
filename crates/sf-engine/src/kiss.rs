@@ -48,7 +48,6 @@ pub struct KissEnds {
 ///
 /// `kissEnds(topo, rot, offset, x, y, dx, dy, zb, zt, { half, back, reach, contactOffset })`
 /// (web/kiss.js:31-74).
-#[allow(clippy::too_many_arguments)]
 pub fn kiss_ends(
     topo: &Topology,
     rot: &Rot3,

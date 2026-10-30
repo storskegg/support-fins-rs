@@ -33,7 +33,7 @@ pub fn assert_no_init_held() {
         assert!(
             !f.get(),
             "a Rayon join inside a OnceLock init (see lazy.rs); take the `par` flag from get_or_build"
-        )
+        );
     });
 }
 

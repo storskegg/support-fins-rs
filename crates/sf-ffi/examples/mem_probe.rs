@@ -61,7 +61,7 @@ unsafe extern "C" {
 }
 fn peak_mb() -> f64 {
     let mut r = Rusage::default();
-    unsafe { getrusage(0, &mut r) };
+    unsafe { getrusage(0, &raw mut r) };
     r.maxrss as f64 / 1048576.0
 }
 fn rss_mb() -> f64 {
@@ -183,7 +183,7 @@ fn main() {
             if let Some(f) = sf_ffi::footprint_of_build(b.clone(), vec![]).unwrap() {
                 println!("footprint area {} bounds {:?}", f.area(), f.bounds());
             }
-            if let Some(f) = sf_ffi::footprint_of_build(b.clone(), ids).unwrap() {
+            if let Some(f) = sf_ffi::footprint_of_build(b, ids).unwrap() {
                 println!(
                     "footprint(removed) area {} bounds {:?}",
                     f.area(),

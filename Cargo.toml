@@ -35,12 +35,59 @@ rustc-demangle = "0.1.28"
 unsafe_code = "deny"
 
 [workspace.lints.clippy]
-# A port keeps the JS's arithmetic shape; these lints would rewrite it.
-suboptimal_flops = "allow"
+# The pedantic group is on (the gate runs clippy with -D warnings), minus the lints below. Every allow is here, in one
+# place, with its reason; don't scatter `#[allow]`s for these. A lint not listed here is fixed, not allowed.
+pedantic = { level = "warn", priority = -1 }
+
+# --- A port keeps the JS's arithmetic shape (docs/AGENTS.md "Do arithmetic exactly as JS does"): these would rewrite it.
+suboptimal_flops = "allow"        # mul_add and friends change the rounding
+manual_midpoint = "allow"         # f64::midpoint is not `(a + b) / 2`
 manual_range_contains = "allow"
-float_cmp = "allow"
-too_many_arguments = "allow"
-needless_range_loop = "allow"
+float_cmp = "allow"               # JS compares floats with === and <
+needless_range_loop = "allow"     # JS index loops, kept as written
+stable_sort_primitive = "allow"   # never sort_unstable: Array.sort is stable
+# JS numbers are f64 and typed-array stores truncate and wrap: the casts are the port (and jsnum's ToInt32 etc.).
+cast_precision_loss = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+verbose_bit_mask = "allow"        # `x & 1` as the JS writes it
+bool_to_int_with_if = "allow"     # `c ? 1 : 0` as the JS writes it
+
+# --- A port keeps the JS's names, structure and branch order (rules 1 and 9): these would restructure it.
+too_many_arguments = "allow"      # JS parameter lists, and the signatures tickets fixed
+too_many_lines = "allow"          # one JS function, one Rust function
+many_single_char_names = "allow"  # JS names (a, b, c, x, y, z)
+similar_names = "allow"
+unreadable_literal = "allow"      # constants copied digit for digit from the JS and LLVM sources
+if_not_else = "allow"             # JS branch order
+single_match_else = "allow"
+match_same_arms = "allow"         # one arm per JS case
+items_after_statements = "allow"  # JS nested functions stay where the JS declares them
+struct_excessive_bools = "allow"  # JS option objects
+struct_field_names = "allow"      # JS keys
+needless_pass_by_value = "allow"  # fixed port and UniFFI signatures
+trivially_copy_pass_by_ref = "allow"
+ref_option = "allow"
+unnecessary_wraps = "allow"
+unused_self = "allow"
+implicit_hasher = "allow"
+
+# --- Noise for this codebase.
+must_use_candidate = "allow"      # nearly every port function is pure; 300 attributes would say nothing
+missing_errors_doc = "allow"      # the doc comment cites the JS origin and its throw
+missing_panics_doc = "allow"
+doc_markdown = "allow"            # JS and C identifiers in prose; the docs cite them as the JS does
+case_sensitive_file_extension_comparisons = "allow" # every site lowercases first
+format_push_string = "allow"      # `s += &format!(..)` reads better than write! + unwrap
+format_collect = "allow"
+assert_is_empty = "allow"         # `assert!(v.is_empty())` is the clear form
+naive_bytecount = "allow"         # would add a crate for two cold loops
+assigning_clones = "allow"
+redundant_closure_for_method_calls = "allow" # `|e| e.into_inner()` reads better than `std::sync::PoisonError::into_inner`
+map_unwrap_or = "allow"           # `.map(..).unwrap_or_else(|| panic!(..))` reads better than map_or_else
+manual_assert = "allow"           # `if bad { panic!(..) }` mirrors the JS `if (bad) throw`
 
 [profile.test]
 opt-level = 1

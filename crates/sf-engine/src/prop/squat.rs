@@ -184,7 +184,6 @@ pub struct SquatWall {
 /// covers with its low TAIL (withLowTails); those are skipped so the two never stack. Only
 /// stations the built wall really spans are claimed -- a low band next to a BLOCKED tall
 /// station still gets its squat wall.
-#[allow(clippy::too_many_arguments)]
 pub fn build_squat_bed(
     line: &[V3],
     region_tris: &Tris,
