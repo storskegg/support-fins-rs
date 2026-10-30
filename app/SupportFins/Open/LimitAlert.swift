@@ -34,9 +34,6 @@ final class LimitAlertPresenter {
         a.informativeText = prompt.message()
         let cancel = a.addButton(withTitle: JS.t("Cancel"))      // first: Return (the default)
         let anyway = a.addButton(withTitle: JS.t("Load anyway"))
-        // NSAlert gives a button titled "Cancel" Esc in place of Return: set both after the buttons are added (Esc is the monitor below)
-        cancel.keyEquivalent = "\r"
-        anyway.keyEquivalent = ""
         anyway.setAccessibilityIdentifier("load-anyway")
         cancel.setAccessibilityIdentifier("load-cancel")
         alert = a
@@ -52,6 +49,10 @@ final class LimitAlertPresenter {
         a.beginSheetModal(for: window) { [weak self] response in
             MainActor.assumeIsolated { self?.finish(response == .alertSecondButtonReturn) }
         }
+        // NSAlert lays its buttons out when the sheet opens and gives the one titled "Cancel" Esc in place of Return, so
+        // the keys are set after that (Esc is the monitor above)
+        cancel.keyEquivalent = "\r"
+        anyway.keyEquivalent = ""
     }
 
     /// Answers the model, takes the sheet down and forgets the alert; a second call does nothing.
