@@ -44,10 +44,28 @@ struct OpenFlowTests {
         #expect(!picker.canLoad)                       // Load stays off until one is checked
         picker.set(small.id, true)
         picker.load()
-        #expect(model.picker == nil && model.hasPart && model.status == nil)
-        #expect(model.session.parts.count == 1 && model.session.parts[0].info.name == "small")
-        #expect(model.session.parts[0].info.importNote == "OBJ: imported “small” of 3 objects.")
+        // the picked object is welded and meshed off the main thread first (C-05), then shown
+        #expect(await eventually { model.hasPart })
+        #expect(model.picker == nil && model.status == nil)
+        let shown = try #require(model.session.parts.first)
+        #expect(model.session.parts.count == 1 && shown.info.name == "small")
+        #expect(shown.info.importNote == "OBJ: imported “small” of 3 objects.")
         #expect(model.controller?.size == SIMD3<Float>(10, 10, 10))
+    }
+
+    /// C-05: the picker lists the objects without welding or meshing them; the one picked is welded when shown.
+    @Test func thePickerDoesNotWeldTheObjects() async throws {
+        let model = ViewerModel()
+        await model.load(url: try Self.threeObjects())
+        let picker = try #require(model.picker)
+        #expect(picker.entries.count == 3)
+        #expect(!model.hasPart)
+        // a fresh load of the same file: every object is a soup until something asks for its mesh
+        let parts = try await CoreLoader.parts(at: try Self.threeObjects().path(percentEncoded: false))
+        try #require(parts.count == 3)
+        #expect(parts.allSatisfy { $0.info().weldMs == 0 })
+        _ = parts[1].mesh()
+        #expect(parts.map { $0.info().weldMs > 0 } == [false, true, false])
     }
 
     @Test func cancelLeavesTheWindowEmpty() async throws {
