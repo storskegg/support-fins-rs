@@ -527,14 +527,19 @@ impl Builder {
                             &cancel,
                         )
                     }))
-                    .unwrap_or_else(|_| Err(engine("the engine panicked")));
+                    .unwrap_or_else(|p| Err(crate::crash::panic_error(p)));
                     if latest.load(Ordering::SeqCst) != job.generation {
                         continue; // superseded while it ran
                     }
+                    // a panicking callback must not end this thread: the next build still has to land
                     match built {
-                        Ok(r) => job.listener.done(job.generation, Arc::new(r)),
-                        Err(e) => job.listener.failed(job.generation, e),
-                    }
+                        Ok(r) => crate::crash::listener_call(|| {
+                            job.listener.done(job.generation, Arc::new(r));
+                        }),
+                        Err(e) => crate::crash::listener_call(|| {
+                            job.listener.failed(job.generation, e);
+                        }),
+                    };
                 }
             })
             .expect("spawn the build worker");
@@ -552,24 +557,29 @@ impl Builder {
         opts_json: String,
         tunables_json: String,
         listener: Box<dyn BuildListener>,
-    ) -> u64 {
-        let cancel = Arc::new(AtomicBool::new(false));
-        // under the lock, so two racing `build`s cannot each cancel the other's newer flag
-        let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
-        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        // the build in flight is stale now: tell it to stop
-        current.store(true, Ordering::SeqCst);
-        *current = cancel.clone();
-        // the worker only goes away with the Builder, so a send cannot fail while `self` lives
-        let _ = self.jobs.send(Job {
-            generation,
-            cancel,
-            rot,
-            opts_json,
-            tunables_json,
-            listener,
-        });
-        generation
+    ) -> Result<u64, FfiError> {
+        crate::crash::guarded("queue build", || {
+            let cancel = Arc::new(AtomicBool::new(false));
+            // under the lock, so two racing `build`s cannot each cancel the other's newer flag
+            let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
+            let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+            // the build in flight is stale now: tell it to stop
+            current.store(true, Ordering::SeqCst);
+            *current = cancel.clone();
+            // the worker survives a panicking listener (see `listener_call`) and only goes away with the Builder, so a
+            // send cannot fail while `self` lives; if it ever does, say so instead of dropping the build silently
+            self.jobs
+                .send(Job {
+                    generation,
+                    cancel,
+                    rot,
+                    opts_json,
+                    tunables_json,
+                    listener,
+                })
+                .map_err(|_| engine("the build worker has stopped"))?;
+            Ok(generation)
+        })
     }
 
     /// Abandon the build in flight (and any queued one) without starting another: nothing of it is
@@ -597,20 +607,27 @@ pub enum ExportKind {
 /// `{base}-fins-0.4nozzle-0.2layer.stl`, `{base}-fins-...3mf` or `{base}-fins-only-...stl`. A setting that is
 /// not a positive number is left out of the name.
 #[uniffi::export]
-pub fn export_file_name(base: String, kind: ExportKind, nozzle: f64, layer_height: f64) -> String {
-    let (stem, ext) = match kind {
-        ExportKind::Stl => ("fins", ".stl"),
-        ExportKind::ThreeMf => ("fins", ".3mf"),
-        ExportKind::FinsOnly => ("fins-only", ".stl"),
-    };
-    sf_io::exportname::export_name(
-        &format!("{base}-{stem}"),
-        ext,
-        &sf_io::exportname::ExportOpts {
-            nozzle,
-            layer_height,
-        },
-    )
+pub fn export_file_name(
+    base: String,
+    kind: ExportKind,
+    nozzle: f64,
+    layer_height: f64,
+) -> Result<String, FfiError> {
+    crate::crash::guarded_value("export file name", || {
+        let (stem, ext) = match kind {
+            ExportKind::Stl => ("fins", ".stl"),
+            ExportKind::ThreeMf => ("fins", ".3mf"),
+            ExportKind::FinsOnly => ("fins-only", ".stl"),
+        };
+        sf_io::exportname::export_name(
+            &format!("{base}-{stem}"),
+            ext,
+            &sf_io::exportname::ExportOpts {
+                nozzle,
+                layer_height,
+            },
+        )
+    })
 }
 
 struct ExportOptions {
@@ -708,8 +725,9 @@ pub fn export(
     builds: Vec<Arc<BuildResult>>,
     options_json: String,
 ) -> Result<(), FfiError> {
-    let _op = crate::crash::operation("export");
-    export_impl(&path, &parts, &builds, &[], &options_json)
+    crate::crash::guarded("export", || {
+        export_impl(&path, &parts, &builds, &[], &options_json)
+    })
 }
 
 /// [`export`] with the hand-placed supports of Draw (`web/ui/export.js` `activeAdded()`: the auto fins, then the
@@ -722,9 +740,10 @@ pub fn export_with_drawn(
     drawn: Option<Arc<crate::draw::DrawnSweep>>,
     options_json: String,
 ) -> Result<(), FfiError> {
-    let _op = crate::crash::operation("export");
-    let tris = drawn.as_ref().map_or(&[][..], |d| d.tris());
-    export_impl(&path, &parts, &builds, tris, &options_json)
+    crate::crash::guarded("export", || {
+        let tris = drawn.as_ref().map_or(&[][..], |d| d.tris());
+        export_impl(&path, &parts, &builds, tris, &options_json)
+    })
 }
 
 /// One model of a plate to write (`gs` of `plateGeometry`, `ui/export.js`): its part and the build whose fins it
@@ -832,9 +851,10 @@ pub fn export_plate(
     models: Vec<PlateModel>,
     options_json: String,
 ) -> Result<(), FfiError> {
-    let _op = crate::crash::operation("export plate");
-    let bytes = plate_3mf_bytes(&models, plate_bed(&options_json)?)?;
-    write_file(&path, bytes)
+    crate::crash::guarded("export plate", || {
+        let bytes = plate_3mf_bytes(&models, plate_bed(&options_json)?)?;
+        write_file(&path, bytes)
+    })
 }
 
 /// Export all plates (`exportAll`, `ui/plates.js`): each plate's 3MF as `plate.name` in one .zip (`zipStore`).
@@ -844,16 +864,17 @@ pub fn export_plates(
     plates: Vec<PlateFile>,
     options_json: String,
 ) -> Result<(), FfiError> {
-    let _op = crate::crash::operation("export plates");
-    let bed = plate_bed(&options_json)?;
-    let mut files = Vec::with_capacity(plates.len());
-    for p in &plates {
-        files.push(sf_io::zip::ZipFile {
-            name: p.name.clone(),
-            data: sf_io::zip::ZipData::Bytes(plate_3mf_bytes(&p.models, bed)?),
-        });
-    }
-    write_file(&path, sf_io::zip::zip_store(&files))
+    crate::crash::guarded("export plates", || {
+        let bed = plate_bed(&options_json)?;
+        let mut files = Vec::with_capacity(plates.len());
+        for p in &plates {
+            files.push(sf_io::zip::ZipFile {
+                name: p.name.clone(),
+                data: sf_io::zip::ZipData::Bytes(plate_3mf_bytes(&p.models, bed)?),
+            });
+        }
+        write_file(&path, sf_io::zip::zip_store(&files))
+    })
 }
 
 /// The pose, the seating offset and the supports a model is written with (`modelGeometry`, `ui/export.js`): with a

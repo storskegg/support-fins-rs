@@ -66,7 +66,19 @@ final class BuildModel {
         building = true
         CrashReporter.setSettings(options: optionsJSON, tunables: tunablesJSON)
         CrashReporter.note("build requested")
-        let g = builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: tunablesJSON, listener: listener)
+        let g: UInt64
+        do {
+            g = try builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: tunablesJSON, listener: listener)
+        } catch {
+            // the engine refused the request outright (or its worker is gone): a failed build, shown where one shows.
+            // No generation was issued, so the one on record stands and nothing is waited for.
+            self.error = (error as? FfiError).map(Self.message) ?? error.localizedDescription
+            building = false
+            wanted = nil
+            requested = latestRequest
+            resumeWaiters()
+            return generation
+        }
         generation = g
         wanted = g
         wantedRotation = rotation

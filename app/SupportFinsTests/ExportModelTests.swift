@@ -45,16 +45,16 @@ private struct StubPanel: SavePanel {
 @Suite("Export file names")
 struct ExportNameTests {
     // the engine names the files (`export_file_name`); these are crates/sf-io/tests/exportname.rs's vectors
-    @Test func nameCarriesNozzleAndLayer() {
-        #expect(exportFileName(base: "bracket", kind: .threeMf, nozzle: 0.6, layerHeight: 0.24) == "bracket-fins-0.6nozzle-0.24layer.3mf")
-        #expect(exportFileName(base: "p", kind: .stl, nozzle: 2, layerHeight: 0.6) == "p-fins-2nozzle-0.6layer.stl")
-        #expect(exportFileName(base: "p", kind: .finsOnly, nozzle: 0.25, layerHeight: 0.1 + 0.2) == "p-fins-only-0.25nozzle-0.3layer.stl")
-        #expect(exportFileName(base: "p", kind: .threeMf, nozzle: 0.004, layerHeight: 0.005) == "p-fins-0nozzle-0.01layer.3mf")
+    @Test func nameCarriesNozzleAndLayer() throws {
+        #expect(try exportFileName(base: "bracket", kind: .threeMf, nozzle: 0.6, layerHeight: 0.24) == "bracket-fins-0.6nozzle-0.24layer.3mf")
+        #expect(try exportFileName(base: "p", kind: .stl, nozzle: 2, layerHeight: 0.6) == "p-fins-2nozzle-0.6layer.stl")
+        #expect(try exportFileName(base: "p", kind: .finsOnly, nozzle: 0.25, layerHeight: 0.1 + 0.2) == "p-fins-only-0.25nozzle-0.3layer.stl")
+        #expect(try exportFileName(base: "p", kind: .threeMf, nozzle: 0.004, layerHeight: 0.005) == "p-fins-0nozzle-0.01layer.3mf")
     }
 
-    @Test func settingsThatAreNotPositiveNumbersAreLeftOut() {
-        #expect(exportFileName(base: "p", kind: .threeMf, nozzle: 0.4, layerHeight: .nan) == "p-fins-0.4nozzle.3mf")
-        #expect(exportFileName(base: "p", kind: .threeMf, nozzle: 0, layerHeight: -1) == "p-fins.3mf")
+    @Test func settingsThatAreNotPositiveNumbersAreLeftOut() throws {
+        #expect(try exportFileName(base: "p", kind: .threeMf, nozzle: 0.4, layerHeight: .nan) == "p-fins-0.4nozzle.3mf")
+        #expect(try exportFileName(base: "p", kind: .threeMf, nozzle: 0, layerHeight: -1) == "p-fins.3mf")
     }
 
     @Test func baseDropsTheMeshExtension() {

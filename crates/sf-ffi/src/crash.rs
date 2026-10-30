@@ -12,14 +12,17 @@
 //!
 //! Nothing is sent anywhere: the files stay in the folder Swift names.
 
+use std::any::Any;
 use std::backtrace::Backtrace;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
-use std::panic::PanicHookInfo;
+use std::panic::{AssertUnwindSafe, PanicHookInfo, catch_unwind};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, Once};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::part::FfiError;
 
 /// How many breadcrumbs the ring keeps.
 pub const MAX_CRUMBS: usize = 50;
@@ -68,6 +71,49 @@ pub fn operation(name: &'static str) -> OperationGuard {
 /// The operation of this thread now ("" when none).
 pub fn current_operation() -> &'static str {
     OPERATION.with(Cell::get)
+}
+
+/// The text of a caught panic payload (`&str` or `String`; anything else gets a stock phrase).
+fn payload_text(p: &(dyn Any + Send)) -> String {
+    if let Some(s) = p.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = p.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "(non-text panic payload)".to_string()
+    }
+}
+
+/// A caught panic as the error Swift sees: `FfiError::Engine("internal error: <message>")`. The panic hook has
+/// already written its crash report by the time this runs.
+pub fn panic_error(payload: Box<dyn Any + Send>) -> FfiError {
+    FfiError::Engine {
+        message: format!("internal error: {}", payload_text(payload.as_ref())),
+    }
+}
+
+/// The body of every input-taking export (docs/FFI.md, "input-taking exports throw"): sets the operation `op` for
+/// the crash report, runs `f`, and turns a panic into `FfiError::Engine("internal error: ...")`, so a Rust panic
+/// never reaches the generated Swift as a trap.
+pub fn guarded<T>(
+    op: &'static str,
+    f: impl FnOnce() -> Result<T, FfiError>,
+) -> Result<T, FfiError> {
+    let _op = operation(op);
+    catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|p| Err(panic_error(p)))
+}
+
+/// [`guarded`] for a body that cannot fail except by panicking.
+pub fn guarded_value<T>(op: &'static str, f: impl FnOnce() -> T) -> Result<T, FfiError> {
+    guarded(op, || Ok(f()))
+}
+
+/// Call into a foreign listener from a worker thread. A panic (UniFFI panics when a Swift callback reports an
+/// unexpected error) is caught so the worker survives to serve the next job; the hook has written its crash
+/// report. Returns whether the callback returned normally.
+pub fn listener_call(f: impl FnOnce()) -> bool {
+    let _op = operation("listener callback");
+    catch_unwind(AssertUnwindSafe(f)).is_ok()
 }
 
 /// Start writing crash reports into `dir` (created if missing). `app_version` is the app's, `settings_json` the
@@ -142,14 +188,7 @@ fn timestamp(now: SystemTime) -> String {
 }
 
 fn message_of(info: &PanicHookInfo<'_>) -> String {
-    let p = info.payload();
-    if let Some(s) = p.downcast_ref::<&str>() {
-        (*s).to_string()
-    } else if let Some(s) = p.downcast_ref::<String>() {
-        s.clone()
-    } else {
-        "(non-text panic payload)".to_string()
-    }
+    payload_text(info.payload())
 }
 
 fn write_report(info: &PanicHookInfo<'_>) {
@@ -229,7 +268,11 @@ fn write_report(info: &PanicHookInfo<'_>) {
 
 /// A zip (STORE) of `names[i]` holding `datas[i]`: Save crash report… (`sf_io::zip::zip_store`).
 #[uniffi::export]
-pub fn crash_zip(names: Vec<String>, datas: Vec<Vec<u8>>) -> Vec<u8> {
+pub fn crash_zip(names: Vec<String>, datas: Vec<Vec<u8>>) -> Result<Vec<u8>, FfiError> {
+    guarded_value("crash zip", || zip_of(names, datas))
+}
+
+fn zip_of(names: Vec<String>, datas: Vec<Vec<u8>>) -> Vec<u8> {
     let files: Vec<sf_io::zip::ZipFile> = names
         .into_iter()
         .zip(datas)

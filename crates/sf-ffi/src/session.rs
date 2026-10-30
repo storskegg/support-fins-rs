@@ -60,92 +60,94 @@ impl Part {
     /// once, as the part arrives; `beside`: it was added to a plate of models, whose fin settings it takes. The
     /// part's import note says what came of it. A part with no session (or one already restored) is left as it
     /// is (`afterLoad` returns early): `why` is `none`.
-    pub fn restore_session(&self, beside: bool) -> SessionRestore {
-        let Some(pending) = self.note().pending.take() else {
-            return SessionRestore {
-                why: Some("none".into()),
+    pub fn restore_session(&self, beside: bool) -> Result<SessionRestore, FfiError> {
+        crate::crash::guarded_value("restore session", || {
+            let Some(pending) = self.note().pending.take() else {
+                return SessionRestore {
+                    why: Some("none".into()),
+                    walls: Vec::new(),
+                    removed: Vec::new(),
+                    fin_mode: None,
+                    fins_visible: None,
+                    form: Vec::new(),
+                    import_note: self.note().import_note.clone(),
+                };
+            };
+            let outcome = restore_session(&pending, &self.topology().pos, beside);
+            let mut note = self.note();
+            let mut out = SessionRestore {
+                why: None,
                 walls: Vec::new(),
                 removed: Vec::new(),
                 fin_mode: None,
                 fins_visible: None,
                 form: Vec::new(),
-                import_note: self.note().import_note.clone(),
+                import_note: String::new(),
             };
-        };
-        let outcome = restore_session(&pending, &self.topology().pos, beside);
-        let mut note = self.note();
-        let mut out = SessionRestore {
-            why: None,
-            walls: Vec::new(),
-            removed: Vec::new(),
-            fin_mode: None,
-            fins_visible: None,
-            form: Vec::new(),
-            import_note: String::new(),
-        };
-        match outcome {
-            Ok(r) => {
-                let c = r.centre;
-                let shift = |p: [f64; 3]| vec![p[0] + c[0], p[1] + c[1], p[2] + c[2]];
-                out.walls = r
-                    .walls
-                    .iter()
-                    .map(|w| SessionWall {
-                        sway: w.sway,
-                        a: shift(w.a),
-                        b: shift(w.b),
-                        m: w.m.map(shift),
-                        face: w.face.max(0) as u64,
-                        capped: w.capped,
-                    })
-                    .collect();
-                let n = out.walls.len();
-                note.meta.session = if beside {
-                    SessionNote::Beside(n)
-                } else {
-                    SessionNote::Restored(n)
-                };
-                out.removed = r.removed;
-                out.fin_mode = r.fin_mode;
-                out.fins_visible = r.fins_visible;
-                out.form = r
-                    .form
-                    .iter()
-                    .filter_map(|(id, v)| {
-                        settle(id, v).map(|v| match v {
-                            FormValue::Bool(b) => SessionField {
-                                id: id.clone(),
-                                flag: Some(b),
-                                text: None,
-                            },
-                            FormValue::Text(t) => SessionField {
-                                id: id.clone(),
-                                flag: None,
-                                text: Some(t),
-                            },
+            match outcome {
+                Ok(r) => {
+                    let c = r.centre;
+                    let shift = |p: [f64; 3]| vec![p[0] + c[0], p[1] + c[1], p[2] + c[2]];
+                    out.walls = r
+                        .walls
+                        .iter()
+                        .map(|w| SessionWall {
+                            sway: w.sway,
+                            a: shift(w.a),
+                            b: shift(w.b),
+                            m: w.m.map(shift),
+                            face: w.face.max(0) as u64,
+                            capped: w.capped,
                         })
-                    })
-                    .collect();
+                        .collect();
+                    let n = out.walls.len();
+                    note.meta.session = if beside {
+                        SessionNote::Beside(n)
+                    } else {
+                        SessionNote::Restored(n)
+                    };
+                    out.removed = r.removed;
+                    out.fin_mode = r.fin_mode;
+                    out.fins_visible = r.fins_visible;
+                    out.form = r
+                        .form
+                        .iter()
+                        .filter_map(|(id, v)| {
+                            settle(id, v).map(|v| match v {
+                                FormValue::Bool(b) => SessionField {
+                                    id: id.clone(),
+                                    flag: Some(b),
+                                    text: None,
+                                },
+                                FormValue::Text(t) => SessionField {
+                                    id: id.clone(),
+                                    flag: None,
+                                    text: Some(t),
+                                },
+                            })
+                        })
+                        .collect();
+                }
+                Err(why) => {
+                    out.why = Some(why.word().to_string());
+                    note.meta.session = match why {
+                        Why::Changed => SessionNote::Changed,
+                        Why::Unreadable => SessionNote::Unreadable,
+                    };
+                }
             }
-            Err(why) => {
-                out.why = Some(why.word().to_string());
-                note.meta.session = match why {
-                    Why::Changed => SessionNote::Changed,
-                    Why::Unreadable => SessionNote::Unreadable,
-                };
-            }
-        }
-        let name = self.name().to_string();
-        note.render(&name);
-        out.import_note = note.import_note.clone();
-        out
+            let name = self.name().to_string();
+            note.render(&name);
+            out.import_note = note.import_note.clone();
+            out
+        })
     }
 }
 
 /// `JS Number -> text` (`String(x)`): the form's text for a number setting, as the page's field would hold it.
 #[uniffi::export]
-pub fn js_number_text(x: f64) -> String {
-    sf_engine::jsnum::to_js_string(x)
+pub fn js_number_text(x: f64) -> Result<String, FfiError> {
+    crate::crash::guarded_value("number text", || sf_engine::jsnum::to_js_string(x))
 }
 
 /// The session `sessionOf` writes for one model: `session_json` is the app's description (see

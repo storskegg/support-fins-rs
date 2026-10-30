@@ -62,7 +62,7 @@ struct PlateExportTests {
         // the biggest takes the middle, and the others stand on the bed, `gap` clear
         let a = try #require(board.footprint(of: board.plate.models[0])).placed(x: after[0].x, y: after[0].y)
         let b = try #require(board.footprint(of: board.plate.models[1])).placed(x: after[1].x, y: after[1].y)
-        #expect(a.dilate(r: PlateBoard.gap).sharedCount(other: b) == 0)
+        #expect(try a.dilate(r: PlateBoard.gap).sharedCount(other: b) == 0)
         // one undo step puts them back, and redo packs them again
         model.session.undo()
         #expect(board.plate.models.map(\.xy) == before && board.clashing)

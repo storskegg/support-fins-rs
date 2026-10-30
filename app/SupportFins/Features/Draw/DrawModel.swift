@@ -353,8 +353,8 @@ final class DrawModel {
                 if !(drawShown && session.drawnWalls.contains { $0.id == id }) { selectedID = nil }
                 return
             }
-            let tris = sweep.wallTriangles(index: UInt64(i))
-            if tris.count() > 0, let device = controller?.renderer.device, let b = tris.metalBuffer(device: device) {
+            // no highlight when the engine refuses the index (it was found in the same list a line above)
+            if let tris = try? sweep.wallTriangles(index: UInt64(i)), tris.count() > 0, let device = controller?.renderer.device, let b = tris.metalBuffer(device: device) {
                 selectionMesh = OverlayMesh(buffer: b, vertices: Int(tris.count()))
             }
         }
@@ -408,7 +408,7 @@ final class DrawModel {
 
     /// `swayHit`: a click on an UPRIGHT side (no wall half-drawn) stands a brace.
     private func swayHit(_ s: Surface) -> Bool {
-        start == nil && session.settings.sway && (kit?.faceTakesBrace(face: UInt64(s.face)) ?? false)
+        start == nil && session.settings.sway && ((try? kit?.faceTakesBrace(face: UInt64(s.face))) ?? false)
     }
 
     /// Pointer move: the cursor, band and ghost wall track the surface under it (`drawHover`, `braceHover`).

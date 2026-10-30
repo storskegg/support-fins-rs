@@ -294,7 +294,7 @@ struct DrawModelTests {
         for f in 0..<12 where (try kit.surfaceHit(face: UInt64(f), origin: [-50, 0, 30], dir: [1, 0, 0])) != nil { face = f; break }
         let hit = ViewerController.HandPointer(face: face.map { (part: 0, face: $0) }, origin: SIMD3(-50, 0, 30), direction: SIMD3(1, 0, 0),
                                                location: CGPoint(x: 300, y: 200), size: CGSize(width: 800, height: 600))
-        #expect(kit.faceTakesBrace(face: UInt64(try #require(face))))
+        #expect(try kit.faceTakesBrace(face: UInt64(try #require(face))))
         draw.pointerMoved(hit)
         try await eventually("the preview") { !draw.motion.ghosts.isEmpty }
         #expect(draw.motion.tip.text.hasPrefix("Brace · "), "\(draw.motion.tip.text)")

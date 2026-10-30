@@ -444,8 +444,11 @@ fn a_click_on_a_drawn_wall_picks_it_unless_the_part_is_in_front() {
         None
     );
     // one wall's own triangles
-    assert!(sweep.wall_triangles(0).count() > 0 && sweep.wall_triangles(0).count() <= tris.count());
-    assert_eq!(sweep.wall_triangles(7).count(), 0);
+    assert!(
+        sweep.wall_triangles(0).unwrap().count() > 0
+            && sweep.wall_triangles(0).unwrap().count() <= tris.count()
+    );
+    assert_eq!(sweep.wall_triangles(7).unwrap().count(), 0);
 }
 
 #[test]

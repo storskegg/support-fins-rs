@@ -108,7 +108,7 @@ fn check_restore(name: &str, part: &Part, got: &SessionRestore, read: &Json) {
     );
     // a rescale forgets what the session brought back (ui/scale.js forgetSessionNote)
     assert_eq!(
-        part.scaled(1.0).info().import_note,
+        part.scaled(1.0).unwrap().info().import_note,
         text(field(read, "noteScaled")),
         "{name}: note after a rescale"
     );
@@ -194,13 +194,16 @@ fn a_part_restores_the_session_the_page_saved() {
         assert!(parts[0].has_session(), "{name}");
         // the note before the restore says what the file is, nothing of the session
         assert!(!parts[0].info().import_note.contains("restored"), "{name}");
-        let got = parts[0].restore_session(false);
+        let got = parts[0].restore_session(false).unwrap();
         check_restore(name, &parts[0], &got, read);
         assert!(!parts[0].has_session(), "{name}: taken once");
-        assert_eq!(parts[0].restore_session(false).why.as_deref(), Some("none"));
+        assert_eq!(
+            parts[0].restore_session(false).unwrap().why.as_deref(),
+            Some("none")
+        );
         if let Some(beside) = c.get("readBeside") {
             let parts = load(text(field(c, "file")));
-            let got = parts[0].restore_session(true);
+            let got = parts[0].restore_session(true).unwrap();
             check_restore(&format!("{name} (beside)"), &parts[0], &got, beside);
         }
     }
@@ -275,7 +278,7 @@ fn session_input(state: &Json, c: &[f64]) -> Json {
 fn write_case(w: &Json, dir: &std::path::Path, name: &str) -> (PathBuf, Vec<u8>) {
     let mut part = stress(text(field(w, "model")));
     if let Json::Num(s) = field(w, "scale") {
-        part = part.scaled(*s);
+        part = part.scaled(*s).unwrap();
     }
     let rot = nums(field(w, "rot"));
     let c = centre(&part);
@@ -661,7 +664,7 @@ fn a_native_session_comes_back_as_the_same_walls_moved_with_the_part() {
 
     let back = load_parts(path.to_string_lossy().into_owned()).unwrap();
     assert_eq!(back.len(), 1);
-    let r = back[0].restore_session(false);
+    let r = back[0].restore_session(false).unwrap();
     assert_eq!(r.why, None);
     assert_eq!(
         r.import_note,

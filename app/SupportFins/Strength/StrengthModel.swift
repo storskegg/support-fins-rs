@@ -124,6 +124,8 @@ final class StrengthModel {
             activePad = nil
             return
         }
+        // no verdict is the right default when the engine refuses the direction: the card then shows none (the
+        // direction comes from the part's own pose, so this is not an error the user could act on)
         verdict = try? loadAlignment(dirWorld: [world.x, world.y, world.z])
         activePad = Pad.allCases.first { simd_dot(world, $0.world) > 0.999 }
     }
@@ -140,9 +142,15 @@ final class StrengthModel {
         guard let suggester, let local = loadLocal, let world = loadWorld, !thinking else { return }
         thinking = true
         error = nil
-        wanted = suggester.strength(
-            dirLocal: [local.x, local.y, local.z], dirWorld: [world.x, world.y, world.z], thresholdDeg: threshold,
-            listener: sink)
+        do {
+            wanted = try suggester.strength(
+                dirLocal: [local.x, local.y, local.z], dirWorld: [world.x, world.y, world.z], thresholdDeg: threshold,
+                listener: sink)
+        } catch {
+            wanted = nil
+            thinking = false
+            self.error = error.localizedDescription
+        }
     }
 
     /// The overhang threshold the advice is computed at (the inspector's).
