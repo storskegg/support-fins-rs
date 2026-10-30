@@ -14,6 +14,12 @@ final class ExportFeature: Feature {
         }]
     }
 
+    /// Why the last export failed (the engine's or the file system's message): a red line in the status card until the next one.
+    var statusLines: [StatusLine] {
+        guard let why = host?.wiring?.exporter?.error ?? host?.features[PlatesFeature.self]?.board.exportError else { return [] }
+        return [StatusLine("export-error", order: 90, text: "\(JS.t("Export failed")): \(why)", color: .red, bar: .red)]
+    }
+
     var windowToolbarItems: [WindowToolbarItem] {
         [WindowToolbarItem("export", order: 0) { ExportMenu(model: self.host?.wiring?.exporter, board: self.host?.features[PlatesFeature.self]?.board) }]
     }

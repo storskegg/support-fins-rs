@@ -61,20 +61,38 @@ final class ExportJob {
         if run == serial, let w = waiter { waiter = nil; w.resume(returning: r) }
     }
 
-    /// The temp file is `.name.sfexport-<uuid>.ext` beside `url` (the engine picks the format from the extension, and a
-    /// rename stays on one volume).
+    /// The temp file is `.name.sfexport-<uuid>.ext` (the engine picks the format from the extension) in a directory the
+    /// app owns: the sandbox gives a save panel's URL write access to that one file, not to its folder, so a sibling temp
+    /// is denied there. The temporary-items directory for `url`'s volume is tried first (the move stays one rename), then
+    /// the app's tmp. The finished file is moved over `url` with `replaceItemAt`; if even that is refused, its bytes are
+    /// written into `url`. A failed or cancelled export never touches `url`.
     nonisolated static func writeAtomically(to url: URL, token: CancelToken, work: (String) throws -> Void) throws -> Bool {
         let fm = FileManager.default
-        let temp = url.deletingLastPathComponent()
-            .appending(path: ".\(url.deletingPathExtension().lastPathComponent).sfexport-\(UUID().uuidString).\(url.pathExtension)")
+        let home = (try? fm.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: url, create: true))
+            ?? fm.temporaryDirectory
+        let temp = home.appending(path: ".\(url.deletingPathExtension().lastPathComponent).sfexport-\(UUID().uuidString).\(url.pathExtension)")
         defer { try? fm.removeItem(at: temp) }
         try work(temp.path(percentEncoded: false))
         if token.isCancelled { return false }
-        if fm.fileExists(atPath: url.path(percentEncoded: false)) {
-            _ = try fm.replaceItemAt(url, withItemAt: temp)
-        } else {
-            try fm.moveItem(at: temp, to: url)
+        do {
+            if fm.fileExists(atPath: url.path(percentEncoded: false)) {
+                _ = try fm.replaceItemAt(url, withItemAt: temp)
+            } else {
+                try fm.moveItem(at: temp, to: url)
+            }
+        } catch {
+            // the move needs rights on the folder; the file itself may be all the sandbox allows
+            guard !token.isCancelled else { return false }
+            try fm.copyItem(at: temp, to: url, replacing: true)
         }
         return true
+    }
+}
+
+private extension FileManager {
+    /// Copy over `to`, replacing it: the bytes go into the file in place when it exists (rights on the file only).
+    func copyItem(at from: URL, to: URL, replacing: Bool) throws {
+        let data = try Data(contentsOf: from)
+        try data.write(to: to)
     }
 }

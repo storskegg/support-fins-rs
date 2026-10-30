@@ -41,7 +41,7 @@ final class ExportJobTests {
         gate.release.signal()
         #expect(try await task.value)
         #expect(!job.isRunning)
-        #expect(seen.get().count == 1 && seen.get()[0].hasPrefix(".a.sfexport-") && seen.get()[0].hasSuffix(".3mf"), Comment(rawValue: "\(seen.get())"))
+        #expect(seen.get().isEmpty, "no temp beside the target: \(seen.get())")
         #expect(names() == ["a.3mf"], Comment(rawValue: "\(names())"))
         #expect(try Data(contentsOf: target) == Data("whole".utf8))
     }
@@ -104,6 +104,32 @@ final class ExportJobTests {
         #expect(try await job.run(title: "STL", to: target) { try Data("new".utf8).write(to: URL(fileURLWithPath: $0)) })
         let replaced = try Data(contentsOf: target)
         #expect(names() == ["c.stl"] && replaced == Data("new".utf8))
+    }
+
+    /// The sandbox lets a save panel's file be written but not its folder: no temp may be made beside it, and the
+    /// finished bytes must still land in the file. A folder with no write permission mimics it (the file itself stays writable).
+    @Test func aTargetInAFolderThatCannotBeWrittenIsFilledInPlaceWithNoTempBesideIt() async throws {
+        let locked = dir.appending(path: "locked", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        let target = locked.appending(path: "f.3mf")
+        try Data("old".utf8).write(to: target)
+        let seen = LockedBox<String>("")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: locked.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
+        let job = ExportJob()
+        // a failing export leaves the old file as it was
+        struct Boom: Error {}
+        await #expect(throws: Boom.self) { _ = try await job.run(title: "3MF", to: target) { path in
+            try Data("partial".utf8).write(to: URL(fileURLWithPath: path)); throw Boom() } }
+        #expect(try Data(contentsOf: target) == Data("old".utf8))
+        let ok = try await job.run(title: "3MF", to: target) { path in
+            seen.set(path)
+            try Data("new".utf8).write(to: URL(fileURLWithPath: path))
+        }
+        #expect(ok)
+        #expect(!seen.get().hasPrefix(locked.path), "the temp is not beside the target")
+        #expect(try Data(contentsOf: target) == Data("new".utf8))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: locked.path) == ["f.3mf"])
     }
 
     @Test func aRunWhileOneIsOutIsRefusedByTheModelsAvailability() async throws {
