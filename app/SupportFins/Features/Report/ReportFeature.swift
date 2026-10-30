@@ -1,5 +1,4 @@
 import SwiftUI
-import SupportFinsCore
 
 /// The report links under the status card (`#report-row`, `ui/report.js`) and Edit > Copy Build Settings.
 @MainActor
