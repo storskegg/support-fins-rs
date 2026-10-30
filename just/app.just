@@ -9,7 +9,8 @@ swift-bindings:
     set -euo pipefail
     # the app targets macOS 26: build the Rust and the Manifold C++ for it, not for the SDK's newer default
     export MACOSX_DEPLOYMENT_TARGET=26.0
-    cargo build --release -p sf-ffi --target aarch64-apple-darwin
+    # --features app-alloc: BigBlocks is the app's global allocator (C-05)
+    cargo build --release -p sf-ffi --features app-alloc --target aarch64-apple-darwin
     lib=target/aarch64-apple-darwin/release/libsf_ffi.a
     pkg=app/SupportFinsCore
     gen=target/swift-gen

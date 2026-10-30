@@ -336,7 +336,7 @@ impl DrawKit {
                 &self.tris,
                 &walls,
                 &self.settings,
-                auto_build.as_ref().map(|b| b.built()),
+                auto_build.as_ref().map(|b| b.auto()),
                 &gone,
                 &self.cfg,
             );

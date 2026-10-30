@@ -115,8 +115,8 @@ fn loading_welds_lazily_and_a_build_keeps_one_copy_of_its_fins() {
     assert!(merged.is_welded() && !parts[0].is_welded());
     assert_eq!(merged.info().triangles, 28_800);
 
-    // C-07: a held build is the GPU soup (72 B per triangle) and the engine's f64 triangles (96 B) and little else;
-    // it was 36 B more, the f32 copy of the soup, before
+    // C-07: a held build is the GPU soup (72 B per triangle), the engine's f64 vertices deduplicated (about 30 B) and the records;
+    // it was 224 B per triangle before C-07 (an f32 copy of the soup, a clone of the build, 96 B of f64 vertices)
     let rot = {
         let t = 55f64.to_radians();
         [1.0, 0.0, 0.0, 0.0, t.cos(), t.sin(), 0.0, -t.sin(), t.cos()]
@@ -132,7 +132,7 @@ fn loading_welds_lazily_and_a_build_keeps_one_copy_of_its_fins() {
     assert!(tris > 5_000, "a fins-heavy build: {tris} triangles");
     let per_tri = held as f64 / tris as f64;
     eprintln!("a held build: {held} B for {tris} triangles = {per_tri:.0} B per triangle");
-    assert!(per_tri < 215.0, "{per_tri:.0} B per fin triangle is held");
+    assert!(per_tri < 150.0, "{per_tri:.0} B per fin triangle is held");
     assert_eq!(
         result.triangles().len(),
         tris * 9,

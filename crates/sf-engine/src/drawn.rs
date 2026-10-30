@@ -240,6 +240,22 @@ pub struct Sweep {
 /// Port of `sweepDrawn` (web/ui/walls.js:214-299): stand a model's hand-placed supports for its pose,
 /// under the settings on the page. `auto` is Auto's build on screen (or `None`), `gone` its removed fin
 /// ids; `tris` the part in print space ([`print_triangles`]).
+/// Where Auto's fin triangles come from for [`sweep_drawn`]: the build's own vectors, or a host's compact store of them
+/// (`range` is a range of `FinRecord::tri_ranges`, `pad` the bed pad's triangles).
+pub trait AutoTris {
+    fn range(&self, lo: usize, hi: usize) -> std::borrow::Cow<'_, [V4]>;
+    fn pad(&self) -> std::borrow::Cow<'_, [V4]>;
+}
+
+impl AutoTris for FinsBuilt {
+    fn range(&self, lo: usize, hi: usize) -> std::borrow::Cow<'_, [V4]> {
+        std::borrow::Cow::Borrowed(&self.triangles[lo..hi])
+    }
+    fn pad(&self) -> std::borrow::Cow<'_, [V4]> {
+        std::borrow::Cow::Borrowed(&self.pad_triangles)
+    }
+}
+
 pub fn sweep_drawn(
     topo: &Topology,
     res: &Analysis,
@@ -247,7 +263,7 @@ pub fn sweep_drawn(
     tris: &Arc<Tris>,
     walls: &[HandWall],
     settings: &DrawSettings,
-    auto: Option<&FinsBuilt>,
+    auto: Option<(&FinsBuilt, &dyn AutoTris)>,
     gone: &HashSet<usize>,
     cfg: &Config,
 ) -> Sweep {
@@ -262,7 +278,7 @@ pub fn sweep_drawn(
     // away by itself. (Walls drawn later don't check back -- drawn walls never check each other -- and
     // Auto's ribs, built in the Worker, can't see drawn walls.)
     let rib_grid = RefCell::new(PlanGrid::new());
-    if let Some(built) = auto {
+    if let Some((built, tris)) = auto {
         for rec in &built.fins {
             if gone.contains(&rec.id) {
                 continue;
@@ -270,13 +286,12 @@ pub fn sweep_drawn(
             for &[a, b] in &rec.tri_ranges {
                 rib_grid
                     .borrow_mut()
-                    .add(&built.triangles[a..b], Some(0), |_, _, _| true);
+                    .add(&tris.range(a, b), Some(0), |_, _, _| true);
             }
         }
-        if !built.pad_triangles.is_empty() {
-            rib_grid
-                .borrow_mut()
-                .add(&built.pad_triangles, Some(0), |_, _, _| true);
+        let pad = tris.pad();
+        if !pad.is_empty() {
+            rib_grid.borrow_mut().add(&pad, Some(0), |_, _, _| true);
         }
     }
     let gridded = Cell::new(0usize);
@@ -304,7 +319,7 @@ pub fn sweep_drawn(
     // Everything a hand-placed brace has to keep clear of: Auto's braces and walls (when Auto's
     // supports are on screen), then each hand-placed brace as it is re-stood, so a rotation that brings
     // two together is reported rather than fused.
-    let avoid = auto_supports(auto, gone);
+    let avoid = auto_supports(auto.map(|(b, _)| b), gone);
     let mut braces: Vec<SwayRib> = avoid.braces.clone();
     let mut outcomes: Vec<HandOutcome> = Vec::with_capacity(walls.len());
     for w in walls {

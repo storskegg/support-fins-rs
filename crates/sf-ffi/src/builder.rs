@@ -51,6 +51,9 @@ pub struct BuildResult {
     /// what a re-measure after a removal needs: the build, the part's topology, the overhang threshold and
     /// the tunables the build ran under
     built: sf_engine::fins::build::FinsBuilt,
+    /// `built`'s fin and pad vertices, which it no longer holds (`triangles` and `pad_triangles` are emptied once the
+    /// summary and records are made): deduplicated, bit-exact (C-07)
+    tris: crate::tristore::TriStore,
     topo: Arc<sf_engine::overhangs::Topology>,
     threshold: f64,
     tunables: Option<sf_engine::config::Tunables>,
@@ -94,6 +97,16 @@ impl BuildResult {
         &self.built
     }
 
+    /// The build and where its vertices are, for `sweep_drawn`.
+    pub(crate) fn auto(
+        &self,
+    ) -> (
+        &sf_engine::fins::build::FinsBuilt,
+        &dyn sf_engine::drawn::AutoTris,
+    ) {
+        (&self.built, &self.tris)
+    }
+
     /// What a report needs of the build (`report.rs`): the part's topology, the overhang threshold and the
     /// pose it was built in (`None` for the identity).
     pub(crate) fn report_inputs(&self) -> (&Arc<sf_engine::overhangs::Topology>, f64, [f64; 9]) {
@@ -114,10 +127,10 @@ impl BuildResult {
         let mut added: Vec<sf_engine::types::V4> = Vec::new();
         for f in &kept {
             for &[lo, hi] in &f.tri_ranges {
-                added.extend_from_slice(&self.built.triangles[lo..hi]);
+                added.extend_from_slice(&self.tris.range(lo, hi));
             }
         }
-        added.extend_from_slice(&self.built.pad_triangles);
+        added.extend_from_slice(&self.tris.pad_tris());
         let bare = match &self.built.bare {
             None => Json::Null,
             Some(b) if removed.is_empty() => records::bare_json(b.area, b.total, b.coverage),
@@ -154,7 +167,7 @@ impl BuildResult {
         drawn: &[sf_engine::types::V4],
     ) -> Vec<sf_engine::types::V4> {
         let mut added: Vec<sf_engine::types::V4> = if removed.is_empty() {
-            self.built.triangles.clone()
+            self.tris.fin_tris()
         } else {
             // the kept fins' own triangles, in record order (ui/remove.js `filteredTriangles`)
             self.built
@@ -164,12 +177,12 @@ impl BuildResult {
                 .flat_map(|f| {
                     f.tri_ranges
                         .iter()
-                        .flat_map(|&[lo, hi]| self.built.triangles[lo..hi].iter().copied())
+                        .flat_map(|&[lo, hi]| self.tris.range(lo, hi).into_owned())
                 })
                 .collect()
         };
         added.extend_from_slice(drawn);
-        added.extend_from_slice(&self.built.pad_triangles);
+        added.extend_from_slice(&self.tris.pad_tris());
         added
     }
 
@@ -466,7 +479,7 @@ struct Context {
 }
 
 fn finish(
-    built: sf_engine::fins::build::FinsBuilt,
+    mut built: sf_engine::fins::build::FinsBuilt,
     s: &sf_cli::entry::Stats,
     triangles: &[f32],
     offset: Xyz,
@@ -475,11 +488,18 @@ fn finish(
 ) -> BuildResult {
     let fin_floats = (s.fin_triangles + s.sway_triangles) * 9;
     let (fins, pad) = triangles.split_at(fin_floats);
+    let summary = records::summary(&built, s, offset).stringify();
+    let records = records::records(&built).stringify();
+    let tris = crate::tristore::TriStore::new(
+        &std::mem::take(&mut built.triangles),
+        &std::mem::take(&mut built.pad_triangles),
+    );
     BuildResult {
         fins: soup_buffer(fins),
         pad: soup_buffer(pad),
-        summary: records::summary(&built, s, offset).stringify(),
-        records: records::records(&built).stringify(),
+        summary,
+        records,
+        tris,
         offset,
         rot,
         built,
