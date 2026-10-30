@@ -21,14 +21,16 @@
 //!
 //! Line numbers are at the checkout's commit (23039e2).
 
+use crate::guards::JsSort;
 use indexmap::IndexMap;
 use rayon::prelude::*;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 
+use crate::cancel::Cancel;
 use crate::config::Config;
-use crate::fins::build::{FinsOpts, build_fins};
+use crate::fins::build::{FinsOpts, build_fins_cancellable};
 use crate::fins::seating::SeatingKind;
 use crate::jsnum;
 use crate::overhangs::{Analysis, Topology, analyze};
@@ -228,7 +230,7 @@ fn candidate_downs_with(
     }
     let mut sorted: Vec<&Bin> = bins.values().collect();
     // `.sort((p, r) => r.a - p.a)`: stable; a NaN difference compares as 0
-    sorted.sort_by(|p, r| {
+    sorted.js_sort_by(|p, r| {
         let d = r.a - p.a;
         if d < 0.0 {
             std::cmp::Ordering::Less
@@ -537,7 +539,7 @@ fn rank_downs(
     let last_flags = scored
         .last()
         .map(|s| (s.a.over.clone(), s.a.kept.clone(), s.a.on_bed.clone()));
-    scored.sort_by(|p, r| cmp_diff(p.cheap - r.cheap));
+    scored.js_sort_by(|p, r| cmp_diff(p.cheap - r.cheap));
 
     if cheap_only {
         return Some(rank_cheap(&scored, top));
@@ -545,77 +547,104 @@ fn rank_downs(
 
     // pass 2: full fin build on the finalists, to measure real finnable coverage
     scored.truncate(n_final);
-    let built: Vec<Option<Candidate>> = scored
-        .into_par_iter()
-        .map(|mut s| {
-            if cancelled() {
-                return None;
+    // `cancelled` is polled between candidates; a build that is deep in one (a stray vertex at 1e16 once
+    // spun here for minutes) polls the flag in `cfg.cancel`, which a watcher raises when `cancelled` says so.
+    let stop = Arc::new(AtomicBool::new(false));
+    let cancel = Cancel::new(stop.clone());
+    let finished = AtomicBool::new(false);
+    let built: Vec<Option<Candidate>> = std::thread::scope(|sc| {
+        sc.spawn(|| {
+            while !finished.load(AtomicOrdering::Relaxed) {
+                if cancelled() {
+                    stop.store(true, AtomicOrdering::Relaxed);
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
-            if let Some((over, kept, on_bed)) = &last_flags {
-                s.a.over = over.clone();
-                s.a.kept = kept.clone();
-                s.a.on_bed = on_bed.clone();
+        });
+        // (set on the way out whatever happens, a panic included, or the watcher would outlive the scope)
+        struct Done<'a>(&'a AtomicBool);
+        impl Drop for Done<'_> {
+            fn drop(&mut self) {
+                self.0.store(true, AtomicOrdering::Relaxed);
             }
-            let b = build_fins(
-                topo,
-                &s.a,
-                &s.rot,
-                &FinsOpts {
-                    mode: Some("prop".to_string()),
-                    bed_pad: Some(true),
-                    ..Default::default()
-                },
-                cfg,
-            );
-            tick(20);
-            // buildFins reports `unserved` = overhang regions that took NO wall; coverage is
-            // DISPLAY only (how many fins the user will get), never a score driver -- rewarding
-            // coverage rewards ADDING supports, and printability wants fewer.
-            let n_reg = s.a.regions.len() as f64;
-            let coverage = if n_reg != 0.0 {
-                (n_reg - b.unserved) / n_reg
-            } else {
-                1.0
-            };
-            let point = b.seating.kind == SeatingKind::Point;
-            // Holes/slots/bore tops in overhang (the dropped slivers) print rough. Walls inside a
-            // bore are supported (Matthew's print tests, 2026-09-27) but still have to be pulled
-            // out of the hole, so a pose that points the holes UP stays mildly preferred. Both
-            // weighted below the plastic/height terms so they tip near-ties, not so hard they
-            // chase a few holes into a worse-supported pose.
-            let holes = s.a.raw_region_count - s.a.regions.len();
-            let bore = b.props.iter().filter(|q| q.in_bore == Some(true)).count();
-            // Printability cost, lower is better: the overhang that needs supporting at all
-            // dominates; then the plastic the fins themselves cost, a height penalty (layers =
-            // time, and tall = tippy), a bed-adhesion bonus, and the rough-hole penalty. A part
-            // balanced on a point is unprintable in this pose -- push it to the bottom, not out,
-            // so it still shows with an honest "nothing can hold this".
-            let score = s.a.over_area
-                + (b.volume / 1000.0) * 2.0
-                + s.a.size.z * 3.0
-                + jsnum::max(0.0, 300.0 - s.a.bed_area) * 0.5
-                + holes as f64 * 2.0
-                + bore as f64 * 5.0
-                + if point { 1e6 } else { 0.0 };
-            Some(Candidate {
-                rot: s.rot,
-                over_area: s.a.over_area,
-                bed_area: s.a.bed_area,
-                height: s.a.size.z,
-                size: s.a.size,
-                regions: s.a.regions.len(),
-                walls: Some(b.props.len()),
-                coverage: Some(coverage),
-                volume: Some(b.volume),
-                seating: Some(b.seating.kind),
-                holes,
-                bore: Some(bore),
-                score,
+        }
+        let _done = Done(&finished);
+        scored
+            .into_par_iter()
+            .map(|mut s| {
+                if cancelled() {
+                    return None;
+                }
+                if let Some((over, kept, on_bed)) = &last_flags {
+                    s.a.over = over.clone();
+                    s.a.kept = kept.clone();
+                    s.a.on_bed = on_bed.clone();
+                }
+                let Ok(b) = build_fins_cancellable(
+                    topo,
+                    &s.a,
+                    &s.rot,
+                    &FinsOpts {
+                        mode: Some("prop".to_string()),
+                        bed_pad: Some(true),
+                        ..Default::default()
+                    },
+                    cfg,
+                    &cancel,
+                ) else {
+                    return None;
+                };
+                tick(20);
+                // buildFins reports `unserved` = overhang regions that took NO wall; coverage is
+                // DISPLAY only (how many fins the user will get), never a score driver -- rewarding
+                // coverage rewards ADDING supports, and printability wants fewer.
+                let n_reg = s.a.regions.len() as f64;
+                let coverage = if n_reg != 0.0 {
+                    (n_reg - b.unserved) / n_reg
+                } else {
+                    1.0
+                };
+                let point = b.seating.kind == SeatingKind::Point;
+                // Holes/slots/bore tops in overhang (the dropped slivers) print rough. Walls inside a
+                // bore are supported (Matthew's print tests, 2026-09-27) but still have to be pulled
+                // out of the hole, so a pose that points the holes UP stays mildly preferred. Both
+                // weighted below the plastic/height terms so they tip near-ties, not so hard they
+                // chase a few holes into a worse-supported pose.
+                let holes = s.a.raw_region_count - s.a.regions.len();
+                let bore = b.props.iter().filter(|q| q.in_bore == Some(true)).count();
+                // Printability cost, lower is better: the overhang that needs supporting at all
+                // dominates; then the plastic the fins themselves cost, a height penalty (layers =
+                // time, and tall = tippy), a bed-adhesion bonus, and the rough-hole penalty. A part
+                // balanced on a point is unprintable in this pose -- push it to the bottom, not out,
+                // so it still shows with an honest "nothing can hold this".
+                let score = s.a.over_area
+                    + (b.volume / 1000.0) * 2.0
+                    + s.a.size.z * 3.0
+                    + jsnum::max(0.0, 300.0 - s.a.bed_area) * 0.5
+                    + holes as f64 * 2.0
+                    + bore as f64 * 5.0
+                    + if point { 1e6 } else { 0.0 };
+                Some(Candidate {
+                    rot: s.rot,
+                    over_area: s.a.over_area,
+                    bed_area: s.a.bed_area,
+                    height: s.a.size.z,
+                    size: s.a.size,
+                    regions: s.a.regions.len(),
+                    walls: Some(b.props.len()),
+                    coverage: Some(coverage),
+                    volume: Some(b.volume),
+                    seating: Some(b.seating.kind),
+                    holes,
+                    bore: Some(bore),
+                    score,
+                })
             })
-        })
-        .collect();
+            .collect()
+    });
     let mut built: Vec<Candidate> = built.into_iter().collect::<Option<_>>()?;
-    built.sort_by(|p, r| cmp_diff(p.score - r.score));
+    built.js_sort_by(|p, r| cmp_diff(p.score - r.score));
 
     // Confidence is the honest part, and it is about the POSE, not the fins: how clearly does the
     // top pick beat the runner-up? A big separation means "print it this way"; a near-tie means
@@ -788,7 +817,7 @@ pub fn layer_verdict(size: &Xyz) -> Posture {
     let z = size.z;
     let mut dims = [size.x, size.y, size.z];
     // `.sort((a, b) => a - b)`: stable, a NaN difference compares as 0
-    dims.sort_by(|a, b| {
+    dims.js_sort_by(|a, b| {
         let d = a - b;
         if d < 0.0 {
             std::cmp::Ordering::Less
@@ -919,7 +948,7 @@ pub fn suggest_strength_pose(
         .filter(|c| c.print_cost <= best_print + 60.0)
         .collect();
     // `.sort((p, r) => p.cross - r.cross)`: stable; a NaN difference compares as 0
-    affordable.sort_by(|p, r| {
+    affordable.js_sort_by(|p, r| {
         let d = p.cross - r.cross;
         if d < 0.0 {
             std::cmp::Ordering::Less

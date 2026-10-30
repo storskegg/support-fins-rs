@@ -12,6 +12,7 @@ pub mod fins;
 pub mod footprint;
 pub mod fxhash;
 pub mod gridsize;
+pub mod guards;
 pub mod inside;
 pub mod islands;
 pub mod jsnum;

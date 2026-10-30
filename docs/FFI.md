@@ -336,7 +336,8 @@ a part, its pose and a build into the triangles the page rasterizes, and hands g
 ```rust
 #[derive(uniffi::Object)] struct Footprint;   // the 1 mm cells of the bed a model covers at any height; never empty
 impl Footprint {
-  fn bounds(&self) -> Vec<i64>;                              // x0, y0, w, h in cells
+  fn bounds(&self) -> Vec<i64>;                              // x0, y0, w, h in cells of `cell_size()` mm
+  fn cell_size(&self) -> i64;                                // a cell's side in mm: 1, or more past CELL_BUDGET (4M cells, ~2 m square); a coarse cell is set when anything touches it, and `shared` / `clash` cells are then those cells' corners in mm
   fn area(&self) -> u64;                                     // cells set (mm²)
   fn placed(&self, x: f64, y: f64) -> Result<Arc<Footprint>, FfiError>;      // `placed`: standing at (x, y); off the mm grid it widens
   fn shared(&self, other: Arc<Footprint>) -> Result<Vec<i64>, FfiError>;     // `shared`: the cells both cover, flat x, y pairs

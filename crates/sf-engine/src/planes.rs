@@ -3,6 +3,7 @@
 //! Wall sites: the flat, near-upright patches of the part that a fin can stand against.
 
 use crate::cancel::Cancel;
+use crate::guards::{JsSort, cmp_f64};
 use crate::jsnum;
 use crate::overhangs::Topology;
 use crate::types::{Rot3, Xyz};
@@ -141,7 +142,7 @@ pub fn find_wall_patches_cancellable(
         }
     }
     // `seeds.sort((a, b) => area[b] - area[a])`: stable; the biggest face defines the plane
-    seeds.sort_by(|&a, &b| cmp_diff(area[b] - area[a]));
+    seeds.sort_by(|&a, &b| cmp_f64(area[b], area[a]));
 
     let mut taken = vec![0u8; n_faces];
     let mut v = [0.0f64; 3];
@@ -219,7 +220,7 @@ pub fn find_wall_patches_cancellable(
         }
     }
 
-    patches.sort_by(|a, b| cmp_diff(b.area - a.area));
+    patches.js_sort_by(|a, b| cmp_diff(b.area - a.area));
     patches
 }
 

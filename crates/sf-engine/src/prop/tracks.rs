@@ -4,6 +4,7 @@
 //! locally-straight sub-patches, `patch_tracks` lays straight parallel tracks across each,
 //! and `tube_line` gives a curved region one wall along its lowest line.
 
+use crate::guards::{JsSort, cmp_f64};
 use std::collections::{HashMap, HashSet};
 
 use crate::config::Config;
@@ -58,7 +59,7 @@ pub fn split_region(topo: &Topology, faces: &[usize], rot: &Rot3, cfg: &Config) 
     }
 
     let mut order: Vec<usize> = faces.to_vec();
-    order.sort_by(|&a, &b| cmp_diff(area[b] - area[a]));
+    order.sort_by(|&a, &b| cmp_f64(area[b], area[a]));
     let mut assigned: HashSet<usize> = HashSet::new();
     let mut patches: Vec<Region> = Vec::new();
 
@@ -580,7 +581,13 @@ struct Rows {
 /// `rowOffsets(vLo, vHi, rowSpan, probe)` (web/prop/tracks.js:430-448).
 fn row_offsets(v_lo: f64, v_hi: f64, row_span: f64, probe: Option<&Probe>, cfg: &Config) -> Rows {
     let v_ext = v_hi - v_lo;
-    let n = jsnum::max(1.0, jsnum::round(v_ext / row_span)) as usize;
+    // (capped: a patch of absurd extent would be a vector of a billion rows)
+    let n = jsnum::max(1.0, jsnum::round(v_ext / row_span));
+    let n = (if n > crate::guards::MAX_STEPS {
+        crate::guards::MAX_STEPS
+    } else {
+        n
+    }) as usize;
     let mut rows: Vec<f64> = (0..n)
         .map(|w| v_lo + (v_ext * (w as f64 + 0.5)) / n as f64)
         .collect();
@@ -658,10 +665,20 @@ fn low_edges(probe: &Probe, v_lo: f64, v_hi: f64, cfg: &Config) -> LowEdges {
             probe.uy * u + probe.vy * v,
         )
     };
+    // A patch spanning more rows than any real part has (a stray vertex at 1e16: `v += 0.25` stops changing
+    // `v` and the loop never ends) has no low edges to find: one row of nothing.
+    if crate::guards::too_many_steps(v_hi - v_lo, step) {
+        return LowEdges {
+            edges: Vec::new(),
+            cls: vec![Cls::None],
+            v_lo,
+        };
+    }
     let mut vs: Vec<f64> = Vec::new();
     let mut cls: Vec<Cls> = Vec::new();
     let mut v = v_lo;
     while v <= v_hi + 1e-9 {
+        cfg.cancel.check();
         let mut hit = 0usize;
         let mut ok = 0usize;
         let mut sunk = false;
@@ -759,7 +776,7 @@ fn low_edge_rows(rows: Vec<f64>, edges: &LowEdges, near: f64, cfg: &Config) -> V
     if out.len() == rows.len() {
         rows
     } else {
-        out.sort_by(|a, b| cmp_diff(a - b));
+        out.js_sort_by(|a, b| cmp_diff(a - b));
         out
     }
 }

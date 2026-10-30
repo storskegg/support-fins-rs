@@ -5,6 +5,7 @@
 //! (it stays flagged, unsupported); the NEAR-PLATE strip is reported apart. Every other overhang
 //! face is MUST.
 
+use crate::guards::JsSort;
 use std::cell::OnceCell;
 use std::sync::Arc;
 
@@ -183,7 +184,7 @@ pub fn classify_cancellable(
             .into_iter()
             .filter(|h| h[0] >= z - 1e-9)
             .collect();
-        hits.sort_by(|a, b| cmp_diff(a[0] - b[0]));
+        hits.js_sort_by(|a, b| cmp_diff(a[0] - b[0]));
         let mut crossings = 0u32;
         let mut i = 0;
         while i < hits.len() {
