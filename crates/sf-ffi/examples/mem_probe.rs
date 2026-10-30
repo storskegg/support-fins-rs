@@ -8,6 +8,15 @@
 #![allow(unsafe_code)]
 use sf_ffi::{build_part, load_parts};
 use std::alloc::{GlobalAlloc, Layout, System};
+
+/// BIG=1 probes with the app's allocator (`sf_ffi::BigBlocks`) under the counter, otherwise the system's; set in
+/// `main` before the first big block, so every block is freed the way it was allocated
+static BIG_ON: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+macro_rules! inner {
+    ($m:ident($($a:expr),*)) => {
+        if BIG_ON.load(std::sync::atomic::Ordering::Relaxed) { sf_ffi::BigBlocks.$m($($a),*) } else { System.$m($($a),*) }
+    };
+}
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
 /// Counts the bytes allocated and not yet freed, so what a held `BuildResult` owns is exact, not the allocator's
@@ -19,22 +28,22 @@ unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, l: Layout) -> *mut u8 {
         let now = LIVE.fetch_add(l.size(), Relaxed) + l.size();
         HIGH.fetch_max(now, Relaxed);
-        unsafe { System.alloc(l) }
+        unsafe { inner!(alloc(l)) }
     }
     unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
         let now = LIVE.fetch_add(l.size(), Relaxed) + l.size();
         HIGH.fetch_max(now, Relaxed);
-        unsafe { System.alloc_zeroed(l) }
+        unsafe { inner!(alloc_zeroed(l)) }
     }
     unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
         LIVE.fetch_sub(l.size(), Relaxed);
-        unsafe { System.dealloc(p, l) }
+        unsafe { inner!(dealloc(p, l)) }
     }
     unsafe fn realloc(&self, p: *mut u8, l: Layout, new: usize) -> *mut u8 {
         let now = LIVE.fetch_add(new, Relaxed) + new - l.size();
         LIVE.fetch_sub(l.size(), Relaxed);
         HIGH.fetch_max(now, Relaxed);
-        unsafe { System.realloc(p, l, new) }
+        unsafe { inner!(realloc(p, l, new)) }
     }
 }
 #[global_allocator]
@@ -78,10 +87,32 @@ fn say(step: &str) {
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();
+    BIG_ON.store(std::env::var("BIG").is_ok(), Relaxed);
     let file = a.get(2).expect("FILE").clone();
     say("start");
+    // LIVE=1: the live heap every 40 ms during the load, to see which stage holds the peak
+    let sampler = std::env::var("LIVE").ok().map(|_| {
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let s2 = stop.clone();
+        let h = std::thread::spawn(move || {
+            let mut line = Vec::new();
+            while !s2.load(Relaxed) {
+                line.push(LIVE.load(Relaxed) / 1048576);
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+            println!("live MB every 40 ms: {line:?}");
+        });
+        (stop, h)
+    });
     let parts = load_parts(file).expect("load");
+    if let Some((stop, h)) = sampler {
+        stop.store(true, Relaxed);
+        h.join().unwrap();
+    }
     say("load_parts");
+    if let Ok(secs) = std::env::var("PAUSE") {
+        std::thread::sleep(std::time::Duration::from_secs(secs.parse().unwrap()));
+    }
     let faces: u64 = parts.iter().map(|p| p.info().triangles).sum();
     println!("{} objects, {faces} faces", parts.len());
     say("info of every object (picker)");
@@ -121,23 +152,43 @@ fn main() {
             let opts = std::env::var("OPTS").unwrap_or_else(|_| "{}".into());
             let b = std::sync::Arc::new(build_part(&parts[i], &rot, &opts, "{}").expect("build"));
             let ids: Vec<u64> = vec![0, 1, 2, 7];
-            std::fs::write(dir.join("after0.json"), b.after_removal_json(vec![]).unwrap()).unwrap();
-            std::fs::write(dir.join("after3.json"), b.after_removal_json(ids.clone()).unwrap()).unwrap();
+            std::fs::write(
+                dir.join("after0.json"),
+                b.after_removal_json(vec![]).unwrap(),
+            )
+            .unwrap();
+            std::fs::write(
+                dir.join("after3.json"),
+                b.after_removal_json(ids.clone()).unwrap(),
+            )
+            .unwrap();
             std::fs::write(dir.join("records.json"), b.records_json()).unwrap();
             for ext in ["stl", "3mf", "obj"] {
-                let path = dir.join(format!("out.{ext}")).to_string_lossy().into_owned();
+                let path = dir
+                    .join(format!("out.{ext}"))
+                    .to_string_lossy()
+                    .into_owned();
                 match sf_ffi::export(path, vec![parts[i].clone()], vec![b.clone()], "{}".into()) {
                     Ok(()) => {}
                     Err(e) => println!("export {ext}: {e}"),
                 }
             }
             let path = dir.join("removed.stl").to_string_lossy().into_owned();
-            let _ = sf_ffi::export(path, vec![parts[i].clone()], vec![b.clone()], "{\"removed\":[0,1,2,7]}".into());
+            let _ = sf_ffi::export(
+                path,
+                vec![parts[i].clone()],
+                vec![b.clone()],
+                "{\"removed\":[0,1,2,7]}".into(),
+            );
             if let Some(f) = sf_ffi::footprint_of_build(b.clone(), vec![]).unwrap() {
                 println!("footprint area {} bounds {:?}", f.area(), f.bounds());
             }
             if let Some(f) = sf_ffi::footprint_of_build(b.clone(), ids).unwrap() {
-                println!("footprint(removed) area {} bounds {:?}", f.area(), f.bounds());
+                println!(
+                    "footprint(removed) area {} bounds {:?}",
+                    f.area(),
+                    f.bounds()
+                );
             }
         }
         _ => panic!("load | build | digest"),

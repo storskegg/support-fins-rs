@@ -15,6 +15,10 @@ crate-type = ["staticlib", "lib"]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
 
+[features]
+# the app's static library installs `BigBlocks` as its global allocator (C-05); tests and probes do not
+app-alloc = []
+
 [dependencies]
 sf-engine.workspace = true
 sf-io.workspace = true

@@ -5,6 +5,7 @@
 //! only converts formats and adds no geometry logic.
 #![allow(unsafe_code)]
 
+mod bigblocks;
 mod builder;
 pub mod crash;
 mod draw;
@@ -64,3 +65,10 @@ pub(crate) fn upstream_pin() -> String {
         .unwrap_or("unknown");
     commit[..commit.len().min(7)].to_string()
 }
+
+pub use bigblocks::BigBlocks;
+
+/// The app's allocator (feature `app-alloc`, set by `just app-core`): see [`BigBlocks`].
+#[cfg(feature = "app-alloc")]
+#[global_allocator]
+static ALLOC: BigBlocks = BigBlocks;

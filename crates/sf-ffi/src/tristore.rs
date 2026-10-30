@@ -45,7 +45,12 @@ impl TriStore {
         let mut verts: Vec<V4> = Vec::new();
         let mut idx = Vec::with_capacity(fins.len() + pad.len());
         for v in fins.iter().chain(pad) {
-            let key = [v[0].to_bits(), v[1].to_bits(), v[2].to_bits(), v[3].to_bits()];
+            let key = [
+                v[0].to_bits(),
+                v[1].to_bits(),
+                v[2].to_bits(),
+                v[3].to_bits(),
+            ];
             let next = verts.len() as u32;
             let at = *seen.entry(key).or_insert_with(|| {
                 verts.push(*v);
@@ -63,12 +68,22 @@ impl TriStore {
 
     /// `FinsBuilt::triangles[lo..hi]`
     pub(crate) fn range(&self, lo: usize, hi: usize) -> Cow<'_, [V4]> {
-        Cow::Owned(self.idx[lo..hi].iter().map(|&i| self.verts[i as usize]).collect())
+        Cow::Owned(
+            self.idx[lo..hi]
+                .iter()
+                .map(|&i| self.verts[i as usize])
+                .collect(),
+        )
     }
 
     /// `FinsBuilt::pad_triangles`
     pub(crate) fn pad_tris(&self) -> Cow<'_, [V4]> {
-        Cow::Owned(self.idx[self.fins..].iter().map(|&i| self.verts[i as usize]).collect())
+        Cow::Owned(
+            self.idx[self.fins..]
+                .iter()
+                .map(|&i| self.verts[i as usize])
+                .collect(),
+        )
     }
 
     /// `FinsBuilt::triangles`
@@ -99,14 +114,34 @@ mod tests {
     #[test]
     fn every_vertex_comes_back_with_the_same_bits() {
         let v = |x: f64| [x, -x, x * 0.1, (x as i64 % 3) as f64];
-        let fins: Vec<V4> = [1.0, 2.0, 3.0, 1.0, 3.0, 4.0, 0.1 + 0.2, -0.0, 0.0, f64::MIN_POSITIVE / 2.0]
-            .into_iter()
-            .map(v)
-            .collect();
+        let fins: Vec<V4> = [
+            1.0,
+            2.0,
+            3.0,
+            1.0,
+            3.0,
+            4.0,
+            0.1 + 0.2,
+            -0.0,
+            0.0,
+            f64::MIN_POSITIVE / 2.0,
+        ]
+        .into_iter()
+        .map(v)
+        .collect();
         let pad: Vec<V4> = [3.0, 5.0, 1.0].into_iter().map(v).collect();
         let s = TriStore::new(&fins, &pad);
         let bits = |a: &[V4]| -> Vec<[u64; 4]> {
-            a.iter().map(|v| [v[0].to_bits(), v[1].to_bits(), v[2].to_bits(), v[3].to_bits()]).collect()
+            a.iter()
+                .map(|v| {
+                    [
+                        v[0].to_bits(),
+                        v[1].to_bits(),
+                        v[2].to_bits(),
+                        v[3].to_bits(),
+                    ]
+                })
+                .collect()
         };
         assert_eq!(bits(&s.fin_tris()), bits(&fins));
         assert_eq!(bits(&s.pad_tris()), bits(&pad));
@@ -118,8 +153,15 @@ mod tests {
 
     #[test]
     fn a_shared_vertex_is_stored_once() {
-        let q: Vec<V4> = (0..6000).map(|i| [f64::from(i % 1200), 1.0, 2.0, 0.0]).collect();
+        let q: Vec<V4> = (0..6000)
+            .map(|i| [f64::from(i % 1200), 1.0, 2.0, 0.0])
+            .collect();
         let s = TriStore::new(&q, &[]);
-        assert!(s.heap_bytes() * 3 < q.len() * 32, "{} B for {} vertices", s.heap_bytes(), q.len());
+        assert!(
+            s.heap_bytes() * 3 < q.len() * 32,
+            "{} B for {} vertices",
+            s.heap_bytes(),
+            q.len()
+        );
     }
 }
