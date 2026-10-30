@@ -17,7 +17,7 @@ use sf_engine::orient::{
 };
 
 use crate::builder::{page_tunables, split_options};
-use crate::part::{FfiError, Part};
+use crate::part::{FfiError, Part, engine, plural};
 
 /// What the page knows beyond the part when it ranks (`suggestCurBore`, `materialDensity`).
 #[derive(Clone, Debug, PartialEq, uniffi::Record)]
@@ -105,16 +105,6 @@ pub struct StrengthAdvice {
 /// `STRONGEST_NOTE` (web/ui/strength.js).
 const STRONGEST_NOTE: &str = "This is about the strongest printable orientation for this load — a better-aligned pose wouldn’t sit on the bed.";
 
-fn engine(message: impl Into<String>) -> FfiError {
-    FfiError::Engine {
-        message: message.into(),
-    }
-}
-
-fn tn(n: usize, one: &str, other: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { other })
-}
-
 /// `fmtGrams` (web/ui/readout.js).
 fn fmt_grams(g: f64) -> String {
     if g < 9.95 {
@@ -174,12 +164,12 @@ fn row(i: usize, c: &Candidate, ctx: &SuggestContext) -> Suggestion {
     let fins = match walls {
         None => String::new(),
         Some(0) => " · no fins".to_string(),
-        Some(n) => format!(" · {}", tn(n, "fin", "fins")),
+        Some(n) => format!(" · {}", plural(n, "fin", "fins")),
     };
     let tail = if point {
         " · can’t print (on a point)".to_string()
     } else if c.holes > 0 {
-        format!(" · {}", tn(c.holes, "rough hole", "rough holes"))
+        format!(" · {}", plural(c.holes, "rough hole", "rough holes"))
     } else {
         String::new()
     };

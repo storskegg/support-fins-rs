@@ -3,18 +3,12 @@
 //! matching result tests that, the topology (`{"$topo": id}`) and the bisection in one.
 //! `Tol::Exact`.
 
+mod common;
 use ::parity::{Tol, Value, compare, load_cases};
+use common::nums;
 use sf_engine::kiss::{KissOpts, kiss_ends};
 use sf_engine::types::{Rot3, Xyz};
 use sf_testkit::parity::{Resolved, resolve_args};
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::Arr(a) => a.iter().map(Value::num).collect(),
-        Value::F64(a) => a.clone(),
-        other => panic!("expected numbers, got {other:?}"),
-    }
-}
 
 fn num(r: &Resolved) -> f64 {
     r.plain().num()

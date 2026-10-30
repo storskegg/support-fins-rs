@@ -7,6 +7,8 @@
 //! thickness, 2x Slant3D's spec, for weeks). These tests measure the tines that come out of a full
 //! build against the spec, so a regression in width/height/placement shows up on a real part.
 
+mod common;
+use common::xyz;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -43,10 +45,6 @@ fn build(name: &str, tilt: f64, opts: FinsOpts) -> Built {
         res,
         built,
     }
-}
-
-fn xyz(t: &[V4]) -> Vec<[f64; 3]> {
-    t.iter().map(|v| [v[0], v[1], v[2]]).collect()
 }
 
 /// Isolate the tine triangles: whatever a tined build adds over a tine-less one. emitTines appends

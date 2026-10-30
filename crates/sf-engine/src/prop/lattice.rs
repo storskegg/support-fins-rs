@@ -5,7 +5,7 @@
 //! standalone strut already takes; `strut_patches` routes each strut the way `buildProps`
 //! routes a standalone small region.
 
-use crate::guards::JsSort;
+use crate::guards::{JsSort, cmp_diff};
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -369,18 +369,6 @@ pub fn lattice_struts(
         lost: faces.len() - kept,
         groups: sized,
     })
-}
-
-/// What a JS `sort` comparator returning `diff` means: negative first, positive last, zero or
-/// NaN equal.
-fn cmp_diff(diff: f64) -> std::cmp::Ordering {
-    if diff < 0.0 {
-        std::cmp::Ordering::Less
-    } else if diff > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
 }
 
 /// A split patch of a small strut, marked `strut` and carrying the strut's `axis`

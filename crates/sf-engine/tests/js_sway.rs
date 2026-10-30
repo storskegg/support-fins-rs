@@ -8,6 +8,8 @@
 //!   - a short part gets none, and says why;
 //!   - Draw's one-click brace works on an upright side and refuses a roof.
 
+mod common;
+use common::xyz;
 use sf_engine::config::Config;
 use sf_engine::inside::inside_part;
 use sf_engine::overhangs::{Analysis, Topology, analyze, build_topology};
@@ -18,10 +20,6 @@ use std::collections::BTreeMap;
 
 const ID: [f64; 9] = IDENTITY3;
 const LAYER: f64 = 0.2;
-
-fn xyz(t: &[V4]) -> Vec<[f64; 3]> {
-    t.iter().map(|v| [v[0], v[1], v[2]]).collect()
-}
 
 /// z lifted a hair off the plate, as the JS does: exactly at z = 0 the parity ray runs along the
 /// block's bottom edge and counts a crossing.

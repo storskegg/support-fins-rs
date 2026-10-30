@@ -60,7 +60,8 @@ fn rot3(v: &Value) -> Rot3 {
         .unwrap_or_else(|_| panic!("rot: expected 9 numbers, got {}", xs.len()))
 }
 
-fn xyz(v: &Value) -> Xyz {
+/// A recorded `{x, y, z}` object.
+pub fn xyz(v: &Value) -> Xyz {
     Xyz {
         x: v.get("x").num(),
         y: v.get("y").num(),

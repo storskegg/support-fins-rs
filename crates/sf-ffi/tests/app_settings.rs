@@ -3,18 +3,18 @@
 //! wall lines). The Swift test `FinSettingsFixtureTests` proves the app still produces those files byte for byte;
 //! this one runs every variant through every FFI entry that takes JSON. A parser change that rejects or misreads one
 //! of the app's real keys fails here, where a test fed `"{}"` would pass.
+mod common;
+use common::{ctx, load};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
 use sf_cli::cli::rotation_matrix;
 use sf_ffi::{
-    BuildListener, BuildResult, Builder, DrawKit, FfiError, Part, PlateFile, PlateModel,
-    StrengthAdvice, SuggestContext, SuggestListener, SuggestResult, Suggester, build_part,
-    build_part_cancellable, build_report, export, export_plate, export_plates, export_with_drawn,
-    load_parts,
+    BuildListener, BuildResult, Builder, DrawKit, FfiError, PlateFile, PlateModel, StrengthAdvice,
+    SuggestListener, SuggestResult, Suggester, build_part, build_part_cancellable, build_report,
+    export, export_plate, export_plates, export_with_drawn, load_parts,
 };
 use sf_io::json::{Json, parse};
-use sf_testkit::models_dir;
 
 struct Fixture {
     name: String,
@@ -53,22 +53,6 @@ fn fixtures() -> Vec<Fixture> {
     out
 }
 
-fn load(name: &str) -> Arc<Part> {
-    load_parts(
-        models_dir()
-            .join(format!("{name}.stl"))
-            .to_string_lossy()
-            .into_owned(),
-    )
-    .unwrap()
-    .remove(0)
-}
-fn ctx() -> SuggestContext {
-    SuggestContext {
-        current_bore: 0,
-        density: 1.24,
-    }
-}
 fn tmp(name: &str) -> String {
     let d = std::env::temp_dir().join(format!("sf-ffi-app-settings-{}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();

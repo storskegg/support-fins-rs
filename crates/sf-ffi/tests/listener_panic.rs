@@ -4,28 +4,17 @@
 //! it, and the next job on the same worker is delivered.
 mod common;
 
+use common::{ctx, load};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::Duration;
 
 use sf_ffi::{
-    BuildListener, BuildResult, Builder, FfiError, Part, StrengthAdvice, SuggestContext,
-    SuggestListener, SuggestResult, Suggester, crash_reports_start, load_parts,
+    BuildListener, BuildResult, Builder, FfiError, StrengthAdvice, SuggestListener, SuggestResult,
+    Suggester, crash_reports_start,
 };
-use sf_testkit::models_dir;
 
 const ID: [f64; 9] = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
-
-fn load(name: &str) -> Arc<Part> {
-    load_parts(
-        models_dir()
-            .join(format!("{name}.stl"))
-            .to_string_lossy()
-            .into_owned(),
-    )
-    .unwrap()
-    .remove(0)
-}
 
 /// The crash-report folder is process-wide: one folder for every test of this file.
 fn reports_dir() -> &'static std::path::Path {
@@ -187,13 +176,6 @@ fn suggest_probe(
         rx,
     )
 }
-fn ctx() -> SuggestContext {
-    SuggestContext {
-        current_bore: 0,
-        density: 1.24,
-    }
-}
-
 #[test]
 fn a_ranking_lands_after_a_suggested_callback_panicked() {
     reports_dir();

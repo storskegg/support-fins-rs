@@ -431,3 +431,9 @@ pub fn tine_boxes(out: &[[f64; 3]]) -> TineBoxes {
     }
     TineBoxes { tines, steps }
 }
+
+/// The median of a timing sample (the upper middle for an even count), as the bench examples report.
+pub fn median(mut a: Vec<f64>) -> f64 {
+    a.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    a[a.len() / 2]
+}

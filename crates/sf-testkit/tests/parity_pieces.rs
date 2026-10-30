@@ -2,32 +2,19 @@
 //! `floatingPieces` on the stress models, captured from the golden scenes, and on synthetic
 //! multi-body parts. `Tol::Exact`.
 
+mod common;
 use ::parity::{Tol, Value, compare, load_cases};
+use common::nums;
+use common::xyz;
 use sf_engine::overhangs::{Analysis, Region, analyze, build_topology};
 use sf_engine::pieces::{FloatingPiece, floating_pieces};
-use sf_engine::types::{Rot3, Xyz};
+use sf_engine::types::Rot3;
 use sf_testkit::parity::{Resolved, resolve_args};
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::Arr(a) => a.iter().map(Value::num).collect(),
-        Value::F64(a) => a.clone(),
-        other => panic!("expected numbers, got {other:?}"),
-    }
-}
 
 fn u8s(v: &Value) -> Vec<u8> {
     match v {
         Value::U8(b) => b.clone(),
         other => panic!("expected a Uint8Array, got {other:?}"),
-    }
-}
-
-fn xyz(v: &Value) -> Xyz {
-    Xyz {
-        x: v.get("x").num(),
-        y: v.get("y").num(),
-        z: v.get("z").num(),
     }
 }
 

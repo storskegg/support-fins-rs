@@ -1,12 +1,13 @@
 //! Direct tests of `sf_engine::prop::raster` (web/prop/raster.js): the grip rule, the leftover
 //! pieces of a track, the held-area ruler and the race.
 
+mod common;
+use common::ctx;
 use indexmap::IndexSet;
 use sf_engine::config::Config;
 use sf_engine::overhangs::{Analysis, Region, build_topology};
 use sf_engine::prop::build::{BuildOpts, PropRecord, PropsPass};
-use sf_engine::prop::crest::Crest;
-use sf_engine::prop::ctx::{BuildCtx, TineSeed};
+use sf_engine::prop::ctx::TineSeed;
 use sf_engine::prop::raster::*;
 use sf_engine::types::{IDENTITY3, Xyz};
 
@@ -112,10 +113,6 @@ fn held_by_counts_faces_with_a_top_in_reach() {
         held_by(&faces, &[[1.0, 0.0, 10.0], [41.0, 0.0, 10.0]], &cfg),
         80.0
     );
-}
-
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
 }
 
 #[test]

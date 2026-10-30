@@ -1,6 +1,8 @@
 //! Port of upstream `tests/plate_only.test.js`: PLATE ONLY (#218): every support stands on the build
 //! plate, none on the part. A line with part under it is dropped and counted (`skipped.onPart`),
 //! never stilted to the plate through that part; a drawn line there is refused with the reason.
+mod common;
+use common::f32s;
 use std::sync::Arc;
 
 use sf_engine::config::Config;
@@ -11,10 +13,6 @@ use sf_engine::prop::crest::Crest;
 use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::tris::Tris;
 use sf_testkit::{block, load_model, rot_y};
-
-fn f32s(v: &[f64]) -> Vec<f64> {
-    v.iter().map(|&x| (x as f32) as f64).collect()
-}
 
 fn dw(a: [f64; 3], b: [f64; 3], pos: &[f64], plate_only: bool) -> DrawnWall {
     let cfg = Config::default();

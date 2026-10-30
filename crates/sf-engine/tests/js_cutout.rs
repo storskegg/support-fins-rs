@@ -4,6 +4,8 @@
 //! outside the solid wall it replaces; the contact top, the foot and the end posts stay solid; no
 //! hole has a roof flatter than 45deg (nothing bridges open air); a wall too short for a hole comes
 //! out exactly as before, and so does every wall with the pattern off.
+mod common;
+use common::{f32s, xyz};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
@@ -20,14 +22,6 @@ use sf_engine::types::{IDENTITY3, Rot3, V4};
 use sf_testkit::{block, is_closed, load_model};
 
 const PATTERNS: [&str; 5] = ["diamond", "triangle", "arch", "lattice", "honeycomb"];
-
-fn f32s(v: &[f64]) -> Vec<f64> {
-    v.iter().map(|&x| (x as f32) as f64).collect()
-}
-
-fn xyz(t: &[V4]) -> Vec<[f64; 3]> {
-    t.iter().map(|v| [v[0], v[1], v[2]]).collect()
-}
 
 /// A floating slab: its underside at z=30 is a flat overhang with open air to the plate, so a drawn
 /// line under it builds a plate-standing wall ~30mm tall along X.

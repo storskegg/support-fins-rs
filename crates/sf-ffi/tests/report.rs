@@ -2,6 +2,8 @@
 //! builds with the `finOpts()` request, then `reportSettings` / `reportCoverage` / `reportUrl` (web/report.js).
 //! `build_report` takes the two texts the app builds with and must give the same settings JSON (as Copy
 //! settings writes it) and the same link, byte for byte.
+mod common;
+use common::{arr, field, num, text};
 use std::path::PathBuf;
 
 use sf_ffi::{build_part, build_report, load_parts};
@@ -14,29 +16,6 @@ fn corpus() -> Json {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../parity/corpus/ffireport/cases.json");
     parse(&std::fs::read_to_string(path).expect("run `just oracle ffireport`")).unwrap()
 }
-fn arr(v: &Json) -> &[Json] {
-    match v {
-        Json::Arr(a) => a,
-        o => panic!("not an array: {o:?}"),
-    }
-}
-fn num(v: &Json) -> f64 {
-    match v {
-        Json::Num(n) => *n,
-        o => panic!("not a number: {o:?}"),
-    }
-}
-fn text(v: &Json) -> &str {
-    match v {
-        Json::Str(s) => s,
-        o => panic!("not a string: {o:?}"),
-    }
-}
-fn field<'a>(v: &'a Json, k: &str) -> &'a Json {
-    v.get(k)
-        .unwrap_or_else(|| panic!("no {k} in {}", v.stringify()))
-}
-
 fn part_of(spec: &Json, name: &str) -> std::sync::Arc<sf_ffi::Part> {
     if let Some(Json::Str(m)) = spec.get("model") {
         let path = sf_testkit::models_dir().join(format!("{m}.stl"));

@@ -52,19 +52,13 @@ pub fn check(file: &str, c: &Case, actual: &Value, tol: &Tol) {
 }
 
 use sf_engine::overhangs::{Analysis, Region};
-use sf_engine::types::{Rot3, Xyz};
+use sf_engine::types::Rot3;
 
 pub fn rot3(v: &Value) -> Rot3 {
     nums(v).try_into().expect("9 numbers")
 }
 
-pub fn xyz(v: &Value) -> Xyz {
-    Xyz {
-        x: v.get("x").num(),
-        y: v.get("y").num(),
-        z: v.get("z").num(),
-    }
-}
+pub use sf_testkit::parity::xyz;
 
 fn u8s(v: &Value) -> Vec<u8> {
     match v {
@@ -133,5 +127,12 @@ pub fn with_props(items: Value, props: Option<&[(String, Value)]>) -> Value {
     match (items, props) {
         (Value::Arr(a), Some(p)) => Value::ArrProps(a, p.to_vec()),
         (v, _) => v,
+    }
+}
+
+pub fn get<'a>(v: &'a Value, k: &str) -> Option<&'a Value> {
+    match v {
+        Value::Obj(o) => o.iter().find(|(key, _)| key == k).map(|(_, x)| x),
+        _ => None,
     }
 }

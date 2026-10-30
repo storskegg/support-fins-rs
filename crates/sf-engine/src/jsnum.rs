@@ -331,6 +331,12 @@ pub fn to_uint32(x: f64) -> u32 {
     m as u32
 }
 
+/// JS `x || y` on two numbers: `x` unless it is falsy (0, -0 or NaN). The comparators' tie-breaks
+/// (`a.v - b.v || a.h - b.h`).
+pub fn or(x: f64, y: f64) -> f64 {
+    if x != 0.0 && !x.is_nan() { x } else { y }
+}
+
 /// `Math.imul(a, b)` on numbers (each argument goes through ToInt32 first).
 ///
 /// V8 origin: `Math.imul` (ES2024 21.3.2.19): `ToInt32(a) * ToInt32(b)` wrapped to 32 bits.

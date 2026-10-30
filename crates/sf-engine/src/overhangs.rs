@@ -39,13 +39,11 @@ pub struct Topology {
     pub adj_b: Vec<i32>,
     pub vertex_count: usize,
     pub edge_count: usize,
-    #[allow(dead_code)] // read by the M1 ports; remove this allow when they land
     pub(crate) cache: TopoCache,
 }
 
 /// Per-topology lazy caches: one slot per JS cache. Each module owns its slot's type.
 #[derive(Debug, Default)]
-#[allow(dead_code)] // slots filled by the M1 ports; remove this allow when they land
 pub(crate) struct TopoCache {
     /// `topo._insideGrid` (web/inside.js:41-59).
     pub(crate) inside_grid: OnceLock<crate::inside::InsideGrid>,
@@ -97,9 +95,30 @@ const NAN_KEY: f64 = f64::MAX;
 
 /// `q3(v)` (web/overhangs.js:39-42): quantise to 1e-3 mm so shared vertices weld. `+ 0`
 /// turns -0 into 0 and every NaN welds to `NAN_KEY`.
-fn q3(v: f64) -> f64 {
+pub(crate) fn q3(v: f64) -> f64 {
     let q = jsnum::round(v * 1000.0);
     if !q.is_nan() { q + 0.0 } else { NAN_KEY }
+}
+
+/// `find(x)` of a union-find over `i32` parents, with path halving: `x = parent[x] = parent[parent[x]]`
+/// (overhangs.js, pieces.js, islands.js and the coverage patches each write it out).
+pub(crate) fn find(parent: &mut [i32], mut x: i32) -> i32 {
+    while parent[x as usize] != x {
+        let g = parent[parent[x as usize] as usize];
+        parent[x as usize] = g;
+        x = g;
+    }
+    x
+}
+
+/// [`find`] over `usize` parents (trace.js's region groups, fill.js's point clusters): the same path halving.
+pub(crate) fn find_index(parent: &mut [usize], mut x: usize) -> usize {
+    while parent[x] != x {
+        let g = parent[parent[x]];
+        parent[x] = g;
+        x = g;
+    }
+    x
 }
 
 /// `mix(h, v)` (web/overhangs.js:50): `Math.imul(h ^ (v | 0) ^ ((v / 4294967296) | 0), 0x9e3779b1)`.
@@ -397,15 +416,6 @@ pub fn analyze_with(topo: &Topology, threshold_deg: f64, rot: &Rot3, par: bool) 
 
     // union-find over adjacent overhang faces
     let mut parent: Vec<i32> = (0..n_faces as i32).collect();
-    // `find(x)`: path halving, `x = parent[x] = parent[parent[x]]`
-    fn find(parent: &mut [i32], mut x: i32) -> i32 {
-        while parent[x as usize] != x {
-            let g = parent[parent[x as usize] as usize];
-            parent[x as usize] = g;
-            x = g;
-        }
-        x
-    }
     for e in 0..adj_a.len() {
         let a = adj_a[e];
         let b = adj_b[e];

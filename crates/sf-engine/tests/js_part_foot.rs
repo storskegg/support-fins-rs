@@ -1,6 +1,8 @@
 //! Port of upstream `tests/part_foot.test.js`: a WALL STANDING ON THE PART stops PROP.footGap above
 //! it (local issue 009): the welded bottom tip scarred the part on every wall of the slenderness
 //! coupon, and the foot coupon (prototype/calibration/foot/) printed a 0.2 gap clean.
+mod common;
+use common::{f32s, xyz};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -11,10 +13,6 @@ use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::tris::Tris;
 use sf_engine::types::V4;
 use sf_testkit::{block, is_closed};
-
-fn f32s(v: &[f64]) -> Vec<f64> {
-    v.iter().map(|&x| (x as f32) as f64).collect()
-}
 
 fn dw(a: [f64; 3], b: [f64; 3], pos: &[f64], cfg: &Config) -> DrawnWall {
     let tris = Arc::new(Tris::new(pos.to_vec()));
@@ -27,10 +25,6 @@ fn ok_of(w: DrawnWall, what: &str) -> DrawnOk {
         DrawnWall::Ok(o) => o,
         DrawnWall::Refused { reason } => panic!("wall failed ({what}): {reason}"),
     }
-}
-
-fn xyz(t: &[V4]) -> Vec<[f64; 3]> {
-    t.iter().map(|v| [v[0], v[1], v[2]]).collect()
 }
 
 fn lo(v: impl Iterator<Item = f64>) -> f64 {

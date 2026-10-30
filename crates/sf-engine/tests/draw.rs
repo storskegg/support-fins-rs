@@ -1,21 +1,17 @@
 //! Own tests of `sf_engine::draw` (web/draw.js): every refusal's message, each return shape of
 //! `drawn_wall`, and `drawn_line`. Parity (recorded after the M3 pin moves) pins equality with JS.
 
+mod common;
+use common::ctx;
 use std::sync::Arc;
 
 use sf_engine::config::Config;
 use sf_engine::draw::*;
-use sf_engine::prop::crest::Crest;
-use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::tris::Tris;
 use sf_testkit::block;
 
 fn tris_of(blocks: &[Vec<f64>]) -> Arc<Tris> {
     Arc::new(Tris::new(blocks.iter().flatten().copied().collect()))
-}
-
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
 }
 
 /// A 60 x 20 slab with its underside at z = 20 (a shelf in the air).

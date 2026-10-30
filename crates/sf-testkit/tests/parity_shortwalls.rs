@@ -2,6 +2,7 @@
 //! web/fins/shortwalls.js): `last_resort_walls` on the stress models (nothing served / what
 //! `buildProps` served and built) and as the 54 golden scenes' Auto builds call it. Exact.
 mod common;
+
 use ::parity::{Tol, Value, load_cases};
 use common::*;
 use sf_engine::fins::coverage::automatic_targets;
@@ -13,13 +14,6 @@ use sf_engine::tris::Tris;
 use sf_engine::types::V4;
 use sf_testkit::parity::{Resolved, resolve_args};
 use std::sync::Arc;
-
-fn get<'a>(v: &'a Value, k: &str) -> Option<&'a Value> {
-    match v {
-        Value::Obj(o) => o.iter().find(|(key, _)| key == k).map(|(_, x)| x),
-        _ => None,
-    }
-}
 
 fn num_opt(v: &Value, k: &str) -> Option<f64> {
     match get(v, k) {

@@ -6,12 +6,12 @@
 //! "worst way" he warns of). And the squat bed walls must be able to carry tines at all (the
 //! base-height gate was skipping every one of them).
 
+mod common;
+use common::ctx;
 use sf_engine::config::Config;
 use sf_engine::inside::inside_part;
 use sf_engine::jsnum;
 use sf_engine::overhangs::Topology;
-use sf_engine::prop::crest::Crest;
-use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::prop::surface::surface_z_at;
 use sf_engine::prop::tines::{TineOpts, emit_tines};
 use sf_engine::tris::Tris;
@@ -24,10 +24,6 @@ const ORIGIN: Xyz = Xyz {
     y: 0.0,
     z: 0.0,
 };
-
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
-}
 
 fn v3(out: &[V4]) -> Vec<[f64; 3]> {
     out.iter().map(|v| [v[0], v[1], v[2]]).collect()

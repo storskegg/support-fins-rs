@@ -15,13 +15,13 @@ default = ["occt"]
 occt = ["dep:libc"]
 
 [dependencies]
-sf-engine.workspace = true
 libc = { workspace = true, optional = true }
 
 [build-dependencies]
 cc.workspace = true
 
 [dev-dependencies]
+sf-engine.workspace = true
 parity = { path = "../../parity" }
 sf-testkit.workspace = true
 

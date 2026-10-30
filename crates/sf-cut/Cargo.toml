@@ -14,6 +14,9 @@ sf-io.workspace = true
 indexmap.workspace = true
 
 [build-dependencies]
+# Exact on purpose: Manifold's build is part of parity (the cut's floats, and so the bench_m5 hashes), so a cc that
+# changed its compiler flags would be a parity change. Bump it deliberately, with the hashes. (The workspace's
+# `cc = "1.2"` resolves to this same 1.8.0: one cc in Cargo.lock.)
 cc = "=1.8.0"
 
 [dev-dependencies]

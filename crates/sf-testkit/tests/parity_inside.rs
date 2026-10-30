@@ -3,18 +3,12 @@
 //! scenes. The topology comes from the `{"$topo": id}` reference (`sf_testkit::parity::topo`),
 //! so the replay also tests `build_topology`. Pure arithmetic on the inputs: `Tol::Exact`.
 
+mod common;
 use ::parity::{Case, Tol, Value, compare, load_cases};
+use common::nums;
 use sf_engine::inside::{inside_part, nearest_part, solid_clearance};
 use sf_engine::types::{Rot3, Xyz};
 use sf_testkit::parity::{Resolved, resolve_args};
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::Arr(a) => a.iter().map(Value::num).collect(),
-        Value::F64(a) => a.clone(),
-        other => panic!("expected numbers, got {other:?}"),
-    }
-}
 
 fn rot(r: &Resolved) -> Rot3 {
     <[f64; 9]>::try_from(nums(r.plain()).as_slice()).expect("rot has 9 numbers")

@@ -7,6 +7,8 @@
 //! - the files the native side writes are read by the page's reader (Deno, `parity/cli/session_check.js`) to the
 //!   state they were written from.
 // `"{}"` is the plate export's empty options (the failure case), not an app request; see common/mod.rs.
+mod common;
+use common::{arr, field, num, nums, text};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
@@ -26,36 +28,6 @@ fn corpus() -> Json {
             .expect("run `just oracle session`"),
     )
     .unwrap()
-}
-
-fn arr(v: &Json) -> &[Json] {
-    match v {
-        Json::Arr(a) => a,
-        o => panic!("not an array: {o:?}"),
-    }
-}
-
-fn field<'a>(v: &'a Json, k: &str) -> &'a Json {
-    v.get(k)
-        .unwrap_or_else(|| panic!("no {k} in {}", v.stringify()))
-}
-
-fn text(v: &Json) -> &str {
-    match v {
-        Json::Str(s) => s,
-        o => panic!("not a string: {o:?}"),
-    }
-}
-
-fn num(v: &Json) -> f64 {
-    match v {
-        Json::Num(n) => *n,
-        o => panic!("not a number: {o:?}"),
-    }
-}
-
-fn nums(v: &Json) -> Vec<f64> {
-    arr(v).iter().map(num).collect()
 }
 
 fn fnv64(bytes: &[u8]) -> String {

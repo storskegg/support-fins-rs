@@ -20,7 +20,7 @@ use crate::overhangs::Topology;
 use crate::prop::clearance::{longest_run, welds};
 use crate::prop::contact::{contour_top, lower_sag, settle_top};
 use crate::prop::ctx::BuildCtx;
-use crate::prop::mold::{FloorPt, floor_line, mold_line};
+use crate::prop::mold::{FloorPt, floor_line, floor_vec, mold_line};
 use crate::prop::sweep::sweep_between;
 use crate::tris::Tris;
 use crate::types::{Rot3, V4, Xyz};
@@ -252,16 +252,6 @@ pub enum Attached {
     /// `{}`: no floor beneath the overhang; an ordinary bed overhang. The caller falls through to
     /// the plate path UNCHANGED, so the flagship parts don't change.
     NoFloor,
-}
-
-/// A floor station as the JS array `[x, y, z]` or `[x, y, z, zNeg, zPos]`, the shape
-/// `sweep_between` takes.
-fn floor_vec(f: &FloorPt) -> Vec<f64> {
-    let mut v = vec![f.x, f.y, f.z];
-    if let Some(s) = f.sides {
-        v.extend(s);
-    }
-    v
 }
 
 /// Port of `buildPartAttached` (web/prop/attached.js:126-192): try to stand a PART-ATTACHED wall

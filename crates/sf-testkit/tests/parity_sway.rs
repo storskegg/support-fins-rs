@@ -3,6 +3,7 @@
 //! `face_is_upright`, on synthetic parts (`*.soup`: the replay builds the topology and the analysis
 //! from the recorded soup), on the stress models and in the golden scene that turns sway on. Exact.
 mod common;
+
 use ::parity::{Case, Tol, Value, load_cases};
 use common::*;
 use sf_engine::config::Config;
@@ -15,13 +16,6 @@ use sf_engine::types::{Rot3, V4, Xyz};
 use sf_testkit::parity::{Resolved, resolve_args};
 
 type V3 = [f64; 3];
-
-fn get<'a>(v: &'a Value, k: &str) -> Option<&'a Value> {
-    match v {
-        Value::Obj(o) => o.iter().find(|(key, _)| key == k).map(|(_, x)| x),
-        _ => None,
-    }
-}
 
 fn pts_of(v: &Value) -> Vec<V3> {
     v.arr().iter().map(p3).collect()

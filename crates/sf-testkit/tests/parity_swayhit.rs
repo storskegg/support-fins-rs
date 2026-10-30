@@ -2,7 +2,9 @@
 //! web/swaycrop.js): `lowest_hit` (through the XY grid, with the rib's z bounds; the full scan agrees too) and
 //! `crop_for_rib`, on the stress models. Exact.
 
+mod common;
 use ::parity::{Case, Tol, Value, compare, load_cases};
+use common::nums;
 use sf_engine::sway::Frame;
 use sf_engine::swaycrop::crop_for_rib;
 use sf_engine::swayhit::{lowest_hit, lowest_hit_brute};
@@ -10,14 +12,6 @@ use sf_engine::tris::Tris;
 use sf_testkit::parity::{Resolved, resolve_args};
 
 type V3 = [f64; 3];
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::Arr(a) => a.iter().map(Value::num).collect(),
-        Value::F64(a) => a.clone(),
-        other => panic!("expected numbers, got {other:?}"),
-    }
-}
 
 fn part(a: &Resolved) -> Tris {
     let t = a.topo();

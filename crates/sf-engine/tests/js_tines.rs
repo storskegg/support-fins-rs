@@ -2,12 +2,13 @@
 //! tiny HORIZONTAL bridge that fuses INTO the part; pinned on `emit_tines` directly on a controlled
 //! solid, plus the thick-layer and wedge cases through `build_fins`.
 mod builds;
+mod common;
 use builds::*;
+use common::ctx;
 use sf_engine::config::Config;
 use sf_engine::fins::build::{FinKind, FinsOpts, build_fins};
 use sf_engine::inside::inside_part;
 use sf_engine::overhangs::{Topology, analyze};
-use sf_engine::prop::crest::Crest;
 use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::prop::surface::surface_z_at;
 use sf_engine::prop::tines::{TineOpts, emit_tines};
@@ -24,9 +25,6 @@ const OFFSET: Xyz = Xyz {
     z: 0.0,
 };
 
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
-}
 fn emit(
     line: &[[f64; 3]],
     topo: &Topology,

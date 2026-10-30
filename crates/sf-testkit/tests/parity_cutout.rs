@@ -2,17 +2,12 @@
 //! `holesFor`, `honeycombHoles` and `cutWall`, called directly and as real builds call them.
 //! `Tol::Exact`. The trailing `{"$config": ...}` argument is the config snapshot at call time.
 
+mod common;
+use common::nums;
 use parity::{Case, Tol, Value, compare, load_cases};
 use sf_engine::config::Config;
 use sf_engine::cutout::{Station, Wall, cut_wall, holes_for, honeycomb_holes};
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::F64(a) => a.clone(),
-        other => other.arr().iter().map(Value::num).collect(),
-    }
-}
 
 /// The case's config: the trailing `$config` argument, applied over the defaults.
 fn cfg_of(c: &Case) -> Config {

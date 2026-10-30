@@ -1,7 +1,8 @@
 //! The readout data of `summary_json()`, `after_removal_json()` and the part-level numbers, each checked
 //! against the engine value the page's `ui/readout.js` / `ui/part.js` read.
 // every build here is compared with the engine on the same inputs, so the request is spelled out (`"{}"` is the empty request); see common/mod.rs.
-use std::sync::Arc;
+mod common;
+use common::{field as get, load};
 
 use sf_cli::entry::{PageRequest, engine_request, options_from_dialog};
 use sf_engine::config::Config;
@@ -11,30 +12,16 @@ use sf_engine::fins::fill::{FillOpts, bare_area, fill_reach};
 use sf_engine::fins::pad::PadStyle;
 use sf_engine::islands::find_islands;
 use sf_engine::overhangs::analyze;
-use sf_ffi::{BuildResult, Part, build_part, island_card, load_parts};
+use sf_ffi::{BuildResult, Part, build_part, island_card};
 use sf_io::json::{Json, parse};
-use sf_testkit::{models_dir, rot_x};
+use sf_testkit::rot_x;
 
-fn load(name: &str) -> Arc<Part> {
-    load_parts(
-        models_dir()
-            .join(format!("{name}.stl"))
-            .to_string_lossy()
-            .into_owned(),
-    )
-    .unwrap()
-    .remove(0)
-}
 fn num(v: &Json) -> f64 {
     if let Json::Num(n) = v {
         *n
     } else {
         panic!("not a number: {v:?}")
     }
-}
-fn get<'a>(v: &'a Json, k: &str) -> &'a Json {
-    v.get(k)
-        .unwrap_or_else(|| panic!("no {k} in {}", v.stringify()))
 }
 fn n(v: f64) -> Json {
     Json::Num(v)

@@ -26,7 +26,7 @@ use sf_io::stl::write_binary_stl_checked;
 use sf_io::threemf::{Bed, ExtraPart, Model, write_plate_3mf_checked};
 
 use crate::gpu::GpuBuffer;
-use crate::part::{FfiError, Part, rot9};
+use crate::part::{FfiError, Part, engine, rot9};
 use crate::records;
 use crate::session::SessionInput;
 
@@ -238,12 +238,6 @@ pub(crate) fn soup_buffer(tris: &[f32]) -> Arc<GpuBuffer> {
         }
     }
     Arc::new(buf)
-}
-
-fn engine(message: impl Into<String>) -> FfiError {
-    FfiError::Engine {
-        message: message.into(),
-    }
 }
 
 /// The `options.json` keys of a JSON object (empty text is `{}`), as `optionsFromDialog` takes them.

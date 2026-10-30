@@ -8,6 +8,15 @@ use crate::jsnum;
 use crate::prop::surface::surface_zs_at;
 use crate::tris::Tris;
 
+/// A floor station as the JS array `[x, y, z]` or `[x, y, z, zNeg, zPos]`, the shape `sweep_between` reads.
+pub(crate) fn floor_vec(f: &FloorPt) -> Vec<f64> {
+    let mut v = vec![f.x, f.y, f.z];
+    if let Some(s) = f.sides {
+        v.extend(s);
+    }
+    v
+}
+
 /// One station of a floor contour: JS `[x, y, z]`, or `[x, y, z, zNeg, zPos]` when the
 /// bottom is lifted by `footGap` (the floors under its two sides).
 #[derive(Clone, Copy, Debug, PartialEq)]

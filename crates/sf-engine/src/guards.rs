@@ -176,6 +176,18 @@ pub fn cmp_f64(a: f64, b: f64) -> Ordering {
         .unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
 }
 
+/// What a JS `sort` comparator returning `diff` means: negative first, positive last, and zero or NaN equal. Not a
+/// total order (NaN), so it goes with [`JsSort::js_sort_by`], never `slice::sort_by`.
+pub fn cmp_diff(diff: f64) -> Ordering {
+    if diff < 0.0 {
+        Ordering::Less
+    } else if diff > 0.0 {
+        Ordering::Greater
+    } else {
+        Ordering::Equal
+    }
+}
+
 /// A stable sort that never panics (see the module docs).
 pub trait JsSort<T> {
     /// Any `T`: sorts a permutation, then applies it.
@@ -253,17 +265,6 @@ impl<T> JsSort<T> for [T] {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// What a JS `sort` comparator returning `diff` means: zero or NaN is equal (the six `cmp_diff` copies).
-    fn cmp_diff(diff: f64) -> Ordering {
-        if diff < 0.0 {
-            Ordering::Less
-        } else if diff > 0.0 {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }
 
     fn rng(seed: u64) -> impl FnMut() -> u64 {
         let mut s = seed;

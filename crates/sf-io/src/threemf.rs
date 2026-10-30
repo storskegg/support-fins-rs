@@ -29,7 +29,8 @@ use crate::limits::{
     LimitExceeded, LoadOptions, MAX_COMPONENT_DEPTH, MAX_OBJECTS_PER_PART, MAX_TRIANGLES,
     ReadError, check_finite,
 };
-use crate::obj::ObjBbox;
+// `bbox` (web/threemf.js:969-977) is obj.js's, line for line
+use crate::obj::{ObjBbox, bbox};
 use crate::paintcode::{FilamentPainter, Paint};
 use crate::text::{decode, is_js_space, js_trim};
 use crate::zip::{ZipData, ZipFile, unzip_with, zip_store_checked};
@@ -2637,41 +2638,6 @@ fn emit_object(
     Ok(())
 }
 
-/// `bbox` (web/threemf.js:969-977). Min and max do not depend on the order they are taken in (a NaN
-/// never replaces a bound), so a big soup is reduced in parallel with the same result.
-fn bbox(positions: &[f64]) -> ObjBbox {
-    use rayon::prelude::*;
-    let part = |ch: &[f64]| {
-        let mut lo = [f64::INFINITY; 3];
-        let mut hi = [f64::NEG_INFINITY; 3];
-        for p in ch.as_chunks::<3>().0 {
-            for k in 0..3 {
-                if p[k] < lo[k] {
-                    lo[k] = p[k];
-                }
-                if p[k] > hi[k] {
-                    hi[k] = p[k];
-                }
-            }
-        }
-        (lo, hi)
-    };
-    let (lo, hi) = positions.par_chunks(3 * 32768).map(part).reduce(
-        || ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]),
-        |(l1, h1), (l2, h2)| {
-            (
-                std::array::from_fn(|k| if l2[k] < l1[k] { l2[k] } else { l1[k] }),
-                std::array::from_fn(|k| if h2[k] > h1[k] { h2[k] } else { h1[k] }),
-            )
-        },
-    );
-    ObjBbox {
-        lo,
-        hi,
-        size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]],
-    }
-}
-
 /// `findRootPart` (web/threemf.js:980-1004): locate the root 3dmodel.model part name (the one
 /// carrying <build>).
 fn find_root_part(parts: &IndexMap<String, Vec<u8>>) -> Option<String> {
@@ -2824,14 +2790,9 @@ pub fn read_three_mf(bytes: &[u8]) -> Result<ThreeMf, String> {
     read_package(bytes, true, &LoadOptions::default()).map_err(String::from)
 }
 
-/// `read_three_mf` without the merged soup: `positions` is left empty (a caller that takes the
-/// objects one by one has no use for the second copy of every triangle).
-pub fn read_three_mf_unmerged(bytes: &[u8]) -> Result<ThreeMf, String> {
-    read_package(bytes, false, &LoadOptions::default()).map_err(String::from)
-}
-
-/// [`read_three_mf_unmerged`] with the load options (`allow_large`), and the load-anyway limits
-/// as a [`ReadError::Limit`] instead of a message. The limits are checked before the work they
+/// [`read_three_mf_with`] without the merged soup: `positions` is left empty (a caller that takes the
+/// objects one by one has no use for the second copy of every triangle). The load-anyway limits
+/// come back as a [`ReadError::Limit`]. The limits are checked before the work they
 /// guard: the ZIP's declared sizes before anything is inflated, the triangle count of the whole
 /// build before anything is emitted.
 pub fn read_three_mf_unmerged_with(bytes: &[u8], opts: &LoadOptions) -> Result<ThreeMf, ReadError> {

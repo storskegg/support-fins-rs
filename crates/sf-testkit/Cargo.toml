@@ -11,8 +11,11 @@ publish.workspace = true
 sf-engine.workspace = true
 sf-io.workspace = true
 indexmap.workspace = true
-rayon.workspace = true
 parity = { path = "../../parity" }
+
+[dev-dependencies]
+# the bench examples time the parallel paths
+rayon.workspace = true
 
 [lints]
 workspace = true

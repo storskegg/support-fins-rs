@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 
 use crate::jsnum;
-use crate::overhangs::{Analysis, BED_EPS, Topology};
+use crate::overhangs::{Analysis, BED_EPS, Topology, find};
 use crate::types::Rot3;
 
 /// One floating piece: `{ faces, lowest, drop }` (web/pieces.js:122).
@@ -22,16 +22,6 @@ struct Piece {
     faces: usize,
     lowest: Option<[f64; 3]>,
     vol: f64,
-}
-
-/// `find(x)` with path halving: `x = parent[x] = parent[parent[x]]`.
-fn find(parent: &mut [i32], mut x: i32) -> i32 {
-    while parent[x as usize] != x {
-        let g = parent[parent[x as usize] as usize];
-        parent[x as usize] = g;
-        x = g;
-    }
-    x
 }
 
 /// Pieces of the part that start in mid-air: closed shells that neither touch the plate nor sit

@@ -16,7 +16,7 @@ use crate::cancel::Cancel;
 use crate::fins::seating::seated_part_tris;
 use crate::fxhash::FxHashMap;
 use crate::jsnum;
-use crate::overhangs::{Analysis, Region, Topology};
+use crate::overhangs::{Analysis, Region, Topology, find};
 use crate::prop::surface::surface_hits_at;
 use crate::tris::Tris;
 use crate::types::Rot3;
@@ -145,14 +145,6 @@ pub fn classify_cancellable(
     };
     // connected overhang patches, union-find over shared edges
     let mut parent: Vec<i32> = (0..n_faces as i32).collect();
-    fn find(parent: &mut [i32], mut i: i32) -> i32 {
-        while parent[i as usize] != i {
-            let g = parent[parent[i as usize] as usize];
-            parent[i as usize] = g;
-            i = g;
-        }
-        i
-    }
     for k in 0..adj_a.len() {
         if k & 0xfff == 0 {
             cancel.check();

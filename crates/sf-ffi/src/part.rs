@@ -44,6 +44,13 @@ pub enum FfiError {
     },
 }
 
+/// An [`FfiError::Engine`] with `message`.
+pub(crate) fn engine(message: impl Into<String>) -> FfiError {
+    FfiError::Engine {
+        message: message.into(),
+    }
+}
+
 /// Which load limit a [`FfiError::LimitExceeded`] hit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum LimitKind {
@@ -678,7 +685,7 @@ fn stem(path: &str) -> String {
 }
 
 /// `tn(one, other)` in English: the singular for exactly one.
-fn plural(n: usize, one: &str, other: &str) -> String {
+pub(crate) fn plural(n: usize, one: &str, other: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { other })
 }
 

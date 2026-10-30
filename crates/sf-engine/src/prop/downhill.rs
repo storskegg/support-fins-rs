@@ -43,7 +43,7 @@ impl Default for DownhillConfig {
     }
 }
 
-use crate::guards::JsSort;
+use crate::guards::{JsSort, cmp_diff};
 use std::collections::HashMap;
 
 use crate::config::Config;
@@ -85,17 +85,6 @@ pub struct DownhillOpts<'a> {
 /// Rounded to 1e-6 mm (`q6`, web/prop/downhill.js:92).
 fn q6(v: f64) -> f64 {
     jsnum::round(v * 1e6) / 1e6
-}
-
-/// A JS comparator's number as an `Ordering` (NaN counts as 0).
-fn ordering(d: f64) -> std::cmp::Ordering {
-    if d < 0.0 {
-        std::cmp::Ordering::Less
-    } else if d > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
 }
 
 /// `a || b` over comparator numbers: the first that is neither 0 nor NaN, else the last.
@@ -209,7 +198,7 @@ pub fn downhill_lines(
         .map(|(i, p)| (q6(p[0] * ax + p[1] * ay), i))
         .collect();
     across.js_sort_by(|a, b| {
-        ordering(or(a.0 - b.0, || {
+        cmp_diff(or(a.0 - b.0, || {
             or(q6(top[a.1][0]) - q6(top[b.1][0]), || {
                 q6(top[a.1][1]) - q6(top[b.1][1])
             })
@@ -375,7 +364,7 @@ pub fn downhill_lines(
         }
         let mut order: Vec<usize> = (0..cover.len()).filter(|&i| !done[i]).collect();
         order.js_sort_by(|&a, &b| {
-            ordering(or(cover[b][2] - cover[a][2], || {
+            cmp_diff(or(cover[b][2] - cover[a][2], || {
                 or(cover[a][0] - cover[b][0], || cover[a][1] - cover[b][1])
             }))
         });

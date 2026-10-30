@@ -18,8 +18,7 @@
 //! after it takes what rows can't reach (scattered patches: an android zombie's 90% fell to 76% on
 //! rows alone).
 
-use crate::guards::JsSort;
-use std::cmp::Ordering;
+use crate::guards::{JsSort, cmp_diff};
 use std::sync::Arc;
 
 use crate::config::Config;
@@ -123,21 +122,6 @@ struct Piece {
     done: bool,
 }
 
-/// JS `x || y` on numbers.
-fn or(x: f64, y: f64) -> f64 {
-    if x != 0.0 && !x.is_nan() { x } else { y }
-}
-
-fn num_ord(d: f64) -> Ordering {
-    if d < 0.0 {
-        Ordering::Less
-    } else if d > 0.0 {
-        Ordering::Greater
-    } else {
-        Ordering::Equal
-    }
-}
-
 /// Port of `rowWalls` (web/fins/rows.js:46-133): lays the rows. Returns `{ walls, builds }`.
 pub fn row_walls(args: RowWallsArgs, ctx: &mut BuildCtx) -> RowWalls {
     let cfg: &Config = ctx.cfg;
@@ -169,7 +153,7 @@ pub fn row_walls(args: RowWallsArgs, ctx: &mut BuildCtx) -> RowWalls {
     );
     // the points by their offset across the heading, so a row reads only its own band
     let mut by_acr: Vec<(f64, usize)> = pts.iter().enumerate().map(|(i, p)| (acr(p), i)).collect();
-    by_acr.js_sort_by(|a, b| num_ord(a.0 - b.0));
+    by_acr.js_sort_by(|a, b| cmp_diff(a.0 - b.0));
     let from = |v: f64| {
         let (mut lo, mut hi) = (0usize, by_acr.len());
         while lo < hi {
@@ -221,7 +205,7 @@ pub fn row_walls(args: RowWallsArgs, ctx: &mut BuildCtx) -> RowWalls {
         }
         v += rows_cfg.step;
     }
-    rows.js_sort_by(|a, b| num_ord(or(or(b.w - a.w, a.v - b.v), a.h - b.h)));
+    rows.js_sort_by(|a, b| cmp_diff(jsnum::or(jsnum::or(b.w - a.w, a.v - b.v), a.h - b.h)));
     let mut search = draw_opts.clone();
     search.tines = false;
     let mut builds = 0usize;

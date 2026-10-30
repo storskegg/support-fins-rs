@@ -3,6 +3,8 @@
 //! undersides and as the 54 golden scenes' builds (and builds with the crest on everywhere and
 //! vertical pins) call them. The positional rest arguments are `(step, minTop, tineH, body, grip)`.
 
+mod common;
+use common::nums;
 use parity::{Case, Tol, Value, compare, load_cases};
 use sf_engine::prop::crest::Crest;
 use sf_engine::prop::ctx::BuildCtx;
@@ -11,13 +13,6 @@ use sf_engine::prop::tines::{TineOpts, emit_tines, tine_step_for};
 use sf_engine::types::Xyz;
 use sf_testkit::parity::resolve;
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::F64(a) => a.clone(),
-        other => other.arr().iter().map(Value::num).collect(),
-    }
-}
 
 fn opt_num(args: &[Value], i: usize) -> Option<f64> {
     match args.get(i) {

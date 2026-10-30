@@ -3,7 +3,7 @@
 //! Wall sites: the flat, near-upright patches of the part that a fin can stand against.
 
 use crate::cancel::Cancel;
-use crate::guards::{JsSort, cmp_f64};
+use crate::guards::{JsSort, cmp_diff, cmp_f64};
 use crate::jsnum;
 use crate::overhangs::Topology;
 use crate::types::{Rot3, Xyz};
@@ -222,18 +222,6 @@ pub fn find_wall_patches_cancellable(
 
     patches.js_sort_by(|a, b| cmp_diff(b.area - a.area));
     patches
-}
-
-/// What a JS `sort` comparator returning `diff` means: negative first, positive last, zero or
-/// NaN equal.
-fn cmp_diff(diff: f64) -> std::cmp::Ordering {
-    if diff < 0.0 {
-        std::cmp::Ordering::Less
-    } else if diff > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
 }
 
 /// Neighbour lists in CSR form, cached on the topology (it is rotation-invariant).

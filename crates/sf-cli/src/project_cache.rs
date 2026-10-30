@@ -10,7 +10,6 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use sf_engine::jsnum;
 use sf_engine::types::Xyz;
 use sf_io::json::{Json, parse};
 
@@ -401,10 +400,4 @@ impl DiskCache {
             ));
         }
     }
-}
-
-/// `String(jsnum)` helper kept private to the format.
-#[allow(dead_code)]
-fn n(v: f64) -> String {
-    jsnum::to_js_string(v)
 }

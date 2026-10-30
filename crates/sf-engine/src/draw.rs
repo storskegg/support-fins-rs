@@ -34,7 +34,7 @@ use crate::prop::brace::{BraceKinds, brace_wall};
 use crate::prop::contact::{contour_top, lower_sag, settle_top};
 use crate::prop::crest::{Crest, crest_on};
 use crate::prop::ctx::BuildCtx;
-use crate::prop::mold::{FloorPt, floor_line, mold_line};
+use crate::prop::mold::{floor_line, floor_vec, mold_line};
 use crate::prop::squat::sweep_squat;
 use crate::prop::surface::{surface_hits_at, surface_zs_at};
 use crate::prop::sweep::{foot_for, sweep, sweep_between};
@@ -379,15 +379,6 @@ fn refuse(reason: impl Into<String>) -> DrawnWall {
     DrawnWall::Refused {
         reason: reason.into(),
     }
-}
-
-/// `floorLine` row as the `[x, y, z, (zNeg, zPos)]` array `sweepBetween` reads.
-fn floor_vec(f: &FloorPt) -> Vec<f64> {
-    let mut v = vec![f.x, f.y, f.z];
-    if let Some(s) = f.sides {
-        v.extend(s);
-    }
-    v
 }
 
 /// The `withTines` closure of `drawnWall` (web/draw.js:211-214): a drawn wall grips the part

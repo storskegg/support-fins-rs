@@ -5,6 +5,7 @@
 //! section. The private coin file contributes only its name, counts and timings.
 //!
 //!   cargo run --release -p sf-testkit --example bench_suggest [-- --private] [model ...]
+use sf_testkit::median;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -19,10 +20,6 @@ use sf_testkit::models_dir;
 const RUNS: usize = 5;
 const DENSITY: f64 = 10.0;
 
-fn median(mut a: Vec<f64>) -> f64 {
-    a.sort_by(|x, y| x.partial_cmp(y).unwrap());
-    a[a.len() / 2]
-}
 fn time<T>(mut f: impl FnMut() -> T) -> (f64, T) {
     let mut out = f();
     let mut ts = vec![];

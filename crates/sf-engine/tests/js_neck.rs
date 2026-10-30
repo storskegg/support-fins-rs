@@ -8,11 +8,11 @@
 //! JS mutates the module config (`applyNozzle`, `applyWallLines`, `CUT.pattern`) and restores it in
 //! a `finally`; here each test owns its `Config`.
 
+mod common;
+use common::ctx;
 use sf_engine::config::Config;
 use sf_engine::jsnum;
 use sf_engine::nozzle::{apply_nozzle, apply_wall_lines};
-use sf_engine::prop::crest::Crest;
-use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::prop::squat::sweep_squat;
 use sf_engine::prop::sweep::{profile_half, sweep};
 use sf_engine::types::V4;
@@ -28,10 +28,6 @@ fn neck_deg(top: f64, cfg: &Config) -> f64 {
     } else {
         jsnum::atan2(top - ztip, step) * 180.0 / std::f64::consts::PI
     }
-}
-
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
 }
 
 // neck.test.js:20
