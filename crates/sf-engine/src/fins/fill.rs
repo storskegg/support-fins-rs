@@ -335,7 +335,7 @@ fn face_points(
     // walks over ordinary meshes of small faces never touch the shared counter.
     const SMALL_FACE: f64 = 256.0;
     let mine = n_f * n_f;
-    if !(mine < SMALL_FACE) {
+    if mine.is_nan() || mine >= SMALL_FACE {
         let budget = cfg.limits.fill_points;
         let over = |need: f64| crate::guards::OverBudget {
             what: "overhang",
