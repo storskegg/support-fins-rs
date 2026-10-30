@@ -34,6 +34,8 @@ final class LimitAlertPresenter {
         a.informativeText = prompt.message()
         let cancel = a.addButton(withTitle: JS.t("Cancel"))      // first: Return (the default)
         let anyway = a.addButton(withTitle: JS.t("Load anyway"))
+        // NSAlert gives a button titled "Cancel" Esc in place of Return: set both after the buttons are added (Esc is the monitor below)
+        cancel.keyEquivalent = "\r"
         anyway.keyEquivalent = ""
         anyway.setAccessibilityIdentifier("load-anyway")
         cancel.setAccessibilityIdentifier("load-cancel")

@@ -203,7 +203,7 @@ struct LoadLimitTests {
             #expect(alert.messageText == "Load big.stl anyway?" && alert.informativeText == "This model is 3 m across (the limit is 2 m).")
             #expect(alert.buttons.map(\.title) == ["Cancel", "Load anyway"])
             // Cancel is the first button, so NSAlert's default (Return); Load anyway answers no key
-            #expect(alert.buttons[1].keyEquivalent == "")
+            #expect(alert.buttons[0].keyEquivalent == "\r" && alert.buttons[1].keyEquivalent == "")
             #expect(window.attachedSheet != nil)
             alert.buttons[0].performClick(nil)
             #expect(await eventually { answers.list == [false] && window.attachedSheet == nil })
