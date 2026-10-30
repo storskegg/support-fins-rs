@@ -1,11 +1,12 @@
 import XCTest
 
 /// STEP import through the real window (M6): a `.step` opened from the Open panel is read through OpenCascade, the
-/// window opens, and the Status block carries the page's import note ("STEP: tessellated at 0.01 mm."). Run by the
-/// orchestrator, like `FinsLoopUITests` (it drives the Open panel); the launch and the window are
+/// window opens, and the Status block carries the page's import note ("STEP: tessellated at 0.01 mm."). OpenCascade runs
+/// in the StepReader XPC service (X-01), so a file that crashes it is an error in the window, and the app lives on. Run
+/// by the orchestrator, like `FinsLoopUITests` (it drives the Open panel); the launch and the window are
 /// `PartWindowUITestCase`'s.
 ///
-/// Elements are found by the accessibility identifiers the app sets: `fins-toggle`.
+/// Elements are found by the accessibility identifiers the app sets: `fins-toggle`, `load-status`.
 final class StepImportUITests: PartWindowUITestCase {
     func testOpenAStepFile() throws {
         let part = dir.appending(path: "ball.step")
@@ -14,6 +15,32 @@ final class StepImportUITests: PartWindowUITestCase {
         try openPart(part, timeout: 30)
         let note = partWindow.staticTexts["STEP: tessellated at 0.01 mm."]
         XCTAssertTrue(note.waitForExistence(timeout: 10), "the import note")
+    }
+
+    /// `loft.step` without one line (`crates/sf-step-xpc/tests/segv/step_segv_loft.step`): OpenCascade dereferences
+    /// null reading it, which killed the app before X-01. Now the service's process ends, the window says it could not
+    /// read the file, and the app still opens the next one.
+    func testABadStepFileIsAnErrorAndTheAppLivesOn() throws {
+        let bundled = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "step_segv_loft", withExtension: "step"))
+        let part = dir.appending(path: "broken.step")
+        try FileManager.default.copyItem(at: bundled, to: part)
+        try openPart(part, timeout: 30)
+        let status = element("load-status")
+        XCTAssertTrue(status.waitForExistence(timeout: 30), "the read failure")
+        XCTAssertEqual(text(status), "Could not read broken.step:\nCouldn't read this STEP file")
+        XCTAssertEqual(app.state, .runningForeground, "the app survived")
+
+        // the service comes back: the window's Import button opens a good STEP file in the same window
+        let ball = dir.appending(path: "ball.step")
+        try Self.sphereStep.write(to: ball, atomically: true, encoding: .utf8)
+        let importButton = element("empty-import")
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5), "the empty window offers Import")
+        importButton.click()
+        XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
+        chooseInPanel(ball.path)
+        let note = partWindow.staticTexts["STEP: tessellated at 0.01 mm."]
+        XCTAssertTrue(note.waitForExistence(timeout: 30), "the good file's import note")
+        XCTAssertFalse(status.exists, "the failure is gone")
     }
 
     /// A 12 mm ball: one spherical face (OpenCascade's own export, `parity/step-fixtures/sphere.step`).
