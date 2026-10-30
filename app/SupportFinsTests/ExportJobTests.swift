@@ -90,7 +90,6 @@ final class ExportJobTests {
         let job = ExportJob()
         let target = dir.appending(path: "c.stl")
         try Data("old".utf8).write(to: target)
-        struct Boom: Error {}
         await #expect(throws: Boom.self) {
             _ = try await job.run(title: "STL", to: target) { path in
                 try Data("partial".utf8).write(to: URL(fileURLWithPath: path))
@@ -118,7 +117,6 @@ final class ExportJobTests {
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
         let job = ExportJob()
         // a failing export leaves the old file as it was
-        struct Boom: Error {}
         await #expect(throws: Boom.self) { _ = try await job.run(title: "3MF", to: target) { path in
             try Data("partial".utf8).write(to: URL(fileURLWithPath: path)); throw Boom() } }
         #expect(try Data(contentsOf: target) == Data("old".utf8))
@@ -216,15 +214,8 @@ final class ExportJobTests {
         print("EXPORT-STALL the same export called on the main thread (before): blocked \(Int((ContinuousClock.now - blocked) / .milliseconds(1))) ms")
         #expect(try sha(url) == sha(direct), "byte-identical to the synchronous call")
     }
-}
 
-/// A value two threads share.
-final class LockedBox<T: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: T
-    init(_ v: T) { value = v }
-    func get() -> T { lock.lock(); defer { lock.unlock() }; return value }
-    func set(_ v: T) { lock.lock(); value = v; lock.unlock() }
+    struct Boom: Error {}
 
     // MARK: AtomicWrite (audit X-09)
 
@@ -233,7 +224,6 @@ final class LockedBox<T: Sendable>: @unchecked Sendable {
         try Data("old".utf8).write(to: target)
         try AtomicWrite.write(Data("new contents".utf8), to: target)
         #expect(try Data(contentsOf: target) == Data("new contents".utf8))
-        struct Boom: Error {}
         #expect(throws: Boom.self) {
             _ = try AtomicWrite.write(to: target) { path in
                 try Data("half".utf8).write(to: URL(fileURLWithPath: path))
@@ -251,4 +241,13 @@ final class LockedBox<T: Sendable>: @unchecked Sendable {
         #expect(try Data(contentsOf: target) == Data("keep".utf8))
         #expect(names() == ["d.stl"], Comment(rawValue: "\(names())"))
     }
+}
+
+/// A value two threads share.
+final class LockedBox<T: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: T
+    init(_ v: T) { value = v }
+    func get() -> T { lock.lock(); defer { lock.unlock() }; return value }
+    func set(_ v: T) { lock.lock(); value = v; lock.unlock() }
 }
