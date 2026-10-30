@@ -29,3 +29,6 @@ tools/dashboard/state.json
 # Generated: the StepReader service's static library (`just swift-bindings`) and Info.plist (`just app-project`)
 /app/StepRead/sf_step_xpc.xcframework/
 /app/StepReader/Info.plist
+
+# Periphery's build output (the Swift dead-code scan's derived data)
+/.dd-periph/
