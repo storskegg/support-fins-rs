@@ -62,7 +62,8 @@ struct OpenFlowTests {
         #expect(!model.hasPart)
         // a fresh load of the same file: every object is a soup until something asks for its mesh
         let parts = try await CoreLoader.parts(at: try Self.threeObjects().path(percentEncoded: false))
-        #expect(parts.count == 3 && parts.allSatisfy { $0.info().weldMs == 0 })
+        try #require(parts.count == 3)
+        #expect(parts.allSatisfy { $0.info().weldMs == 0 })
         _ = parts[1].mesh()
         #expect(parts.map { $0.info().weldMs > 0 } == [false, true, false])
     }
