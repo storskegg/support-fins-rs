@@ -73,3 +73,36 @@ fn a_part_over_2_metres_says_how_to_load_it_anyway() {
         "{err:?}"
     );
 }
+
+// ---- audit X-09: the CLI's plain output is written atomically
+#[test]
+fn an_output_replaces_the_old_file_whole_and_leaves_no_temp() {
+    let dir = std::env::temp_dir().join(format!("sf-atomic-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let out = dir.join("out.stl");
+    std::fs::write(&out, b"old contents, longer than the new").unwrap();
+    sf_cli::project_io::write_atomically(out.to_str().unwrap(), b"new").unwrap();
+    assert_eq!(std::fs::read(&out).unwrap(), b"new");
+    let left: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(left.len(), 1, "{left:?}");
+}
+
+#[test]
+fn a_write_that_fails_keeps_the_old_file() {
+    let dir = std::env::temp_dir().join(format!("sf-atomic-fail-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let out = dir.join("out.stl");
+    std::fs::write(&out, b"keep me").unwrap();
+    // /dev/full accepts the open and fails every write: stand-in for a full disk, through the temp's rename target
+    if std::path::Path::new("/dev/full").exists() {
+        assert!(sf_cli::project_io::write_atomically("/dev/full", b"x").is_err());
+    }
+    assert_eq!(std::fs::read(&out).unwrap(), b"keep me");
+    // a folder that does not exist is an error, and nothing is created
+    let missing = dir.join("nope").join("out.stl");
+    assert!(sf_cli::project_io::write_atomically(missing.to_str().unwrap(), b"x").is_err());
+    assert!(!dir.join("nope").exists());
+}

@@ -119,3 +119,46 @@ pub fn write_project(
     }
     result
 }
+
+/// Audit X-09: the bytes go to a temp file beside the output, are synced, then renamed over it, so a full disk or a
+/// crash leaves an older output as it was. A target that is not a regular file (`/dev/null`, a pipe) or a folder that
+/// refuses the temp file is written in place instead. (The app does the same through `AtomicWrite`; it cannot make a
+/// sibling in the sandbox.)
+pub fn write_atomically(path: &str, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let target = std::path::Path::new(path);
+    if let Ok(m) = std::fs::metadata(target)
+        && !m.is_file()
+    {
+        return std::fs::write(target, bytes);
+    }
+    let dir = target
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(std::path::Path::new("."));
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let temp = dir.join(format!(".{name}.sfexport-{}.tmp", std::process::id()));
+    let mut f = match std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temp)
+    {
+        Ok(f) => f,
+        Err(_) => return std::fs::write(target, bytes),
+    };
+    let done = f
+        .write_all(bytes)
+        .and_then(|()| f.sync_all())
+        .and_then(|()| {
+            drop(f);
+            std::fs::rename(&temp, target)
+        });
+    if done.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    done
+}

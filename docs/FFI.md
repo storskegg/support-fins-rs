@@ -448,6 +448,16 @@ the build volume the spots are on. `export_plates` writes each `PlateFile` as a 
 `crates/sf-ffi/tests/export.rs` compares them. `footprint_arrange` is `arrange`'s placement (`sf_engine::footprint::arrange`: `pack`'s
 spots, a model with no room in a row past the bed's right edge).
 
+**Safe writes (audit X-08, X-09, X-10, S-11).** The entry names `export_plates` writes are made safe first
+(`sf_io::zip::safe_entry_names`): `/`, `\`, `:` and control characters become `-`, `..` is collapsed, a name over 200 bytes is
+cut (extension kept), and a repeated name (compared without case) gets `-2`, `-3`... before its extension. A name with none of
+that is written as given, so the bytes above are unchanged. `export`, `export_plate`, `export_plates` and `crash_zip` refuse
+with `FfiError::Engine` (a readable sentence) where the file would pass a ZIP32 limit (a name over 65,535 bytes, over 65,535
+entries, over 4 GB) or the binary STL's uint32 triangle count, instead of writing a corrupt file. The engine writes the `path` it is given
+with a plain write; the app passes a temp path and moves the finished file over the user's URL (`AtomicWrite`, shared by
+`ExportJob`, the calibration download and Save crash report), and the CLI writes its output through a sibling temp file and a rename
+(`sf_cli::project_io::write_atomically`). Nothing in the engine creates files beside a user-chosen path.
+
 ## M7 additions: report links (`ui/report.js`, `web/report.js`)
 
 ```rust

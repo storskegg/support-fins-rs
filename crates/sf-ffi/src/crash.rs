@@ -269,10 +269,11 @@ fn write_report(info: &PanicHookInfo<'_>) {
 /// A zip (STORE) of `names[i]` holding `datas[i]`: Save crash report… (`sf_io::zip::zip_store`).
 #[uniffi::export]
 pub fn crash_zip(names: Vec<String>, datas: Vec<Vec<u8>>) -> Result<Vec<u8>, FfiError> {
-    guarded_value("crash zip", || zip_of(names, datas))
+    guarded_value("crash zip", || zip_of(names, datas))?
+        .map_err(|m| FfiError::Engine { message: m })
 }
 
-fn zip_of(names: Vec<String>, datas: Vec<Vec<u8>>) -> Vec<u8> {
+fn zip_of(names: Vec<String>, datas: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
     let files: Vec<sf_io::zip::ZipFile> = names
         .into_iter()
         .zip(datas)
@@ -281,7 +282,7 @@ fn zip_of(names: Vec<String>, datas: Vec<Vec<u8>>) -> Vec<u8> {
             data: sf_io::zip::ZipData::Bytes(d),
         })
         .collect();
-    sf_io::zip::zip_store(&files)
+    sf_io::zip::zip_store_checked(&files)
 }
 
 /// A Rust symbol's readable name (legacy `_ZN...17h<hash>E` or v0 `_R...`, with or without the leading `_` the

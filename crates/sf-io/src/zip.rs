@@ -63,7 +63,111 @@ fn put32(out: &mut [u8], o: usize, v: u32) {
 
 /// Port of `zipStore` (web/zip.js:38-107): the .zip / .3mf payload (JS returns a `Blob` of
 /// these bytes).
+///
+/// Panics where [`zip_store_checked`] refuses (a ZIP32 limit passed): callers that write what a user
+/// supplied (names, plates) use the checked one.
 pub fn zip_store(files: &[ZipFile]) -> Vec<u8> {
+    zip_store_checked(files).expect("zip_store: past the ZIP32 limits")
+}
+
+/// The ZIP32 limits `zip_store` writes under: names and entry counts are `u16`, sizes and offsets `u32` (audit X-10,
+/// S-11). The JS has the same limits and writes a corrupt archive past them; this refuses with a sentence to show.
+const ZIP_MAX_NAME: usize = u16::MAX as usize;
+const ZIP_MAX_ENTRIES: usize = u16::MAX as usize;
+const ZIP_MAX_BYTES: u64 = u32::MAX as u64;
+
+/// `zip_store`, or the message that says which ZIP32 limit the files pass (a name over 65,535 bytes, more than
+/// 65,535 files, or an archive over 4 GiB). Below the limits the bytes are `zip_store`'s.
+pub fn zip_store_checked(files: &[ZipFile]) -> Result<Vec<u8>, String> {
+    zip32_check(
+        files.len(),
+        files.iter().map(|f| {
+            (
+                f.name.len(),
+                match &f.data {
+                    ZipData::Text(s) => s.len(),
+                    ZipData::Bytes(b) => b.len(),
+                } as u64,
+            )
+        }),
+    )?;
+    Ok(zip_store_unchecked(files))
+}
+
+/// Entry names that are safe to extract: the characters that make a path (`/`, `\`, `:`) and control characters
+/// become `-`, `..` is collapsed, a name over 200 bytes is cut (its extension kept), an empty one becomes `file`, and
+/// a name an earlier entry already has (compared without case, as macOS and Windows do) gets `-2`, `-3`... before its
+/// extension. A name with none of that is returned as it is. Audit X-08.
+pub fn safe_entry_names(names: &[String]) -> Vec<String> {
+    use std::collections::HashSet;
+    const MAX: usize = 200;
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out = Vec::with_capacity(names.len());
+    for name in names {
+        let mut s: String = name
+            .chars()
+            .map(|c| {
+                if matches!(c, '/' | '\\' | ':') || c.is_control() {
+                    '-'
+                } else {
+                    c
+                }
+            })
+            .collect();
+        while s.contains("..") {
+            s = s.replace("..", "-");
+        }
+        let (mut stem, ext) = match s.rfind('.') {
+            Some(i) if i > 0 && s.len() - i <= 8 => (s[..i].to_string(), s[i..].to_string()),
+            _ => (s.clone(), String::new()),
+        };
+        while stem.len() + ext.len() > MAX {
+            stem.pop();
+        }
+        if stem.is_empty() {
+            stem = "file".into();
+        }
+        let mut candidate = format!("{stem}{ext}");
+        let mut k = 2;
+        while !seen.insert(candidate.to_lowercase()) {
+            candidate = format!("{stem}-{k}{ext}");
+            k += 1;
+        }
+        out.push(candidate);
+    }
+    out
+}
+
+/// The ZIP32 check on `count` entries of `(name bytes, data bytes)`, before anything is built (so a test can pass
+/// sizes no machine could hold).
+pub fn zip32_check(
+    count: usize,
+    entries: impl Iterator<Item = (usize, u64)>,
+) -> Result<(), String> {
+    if count > ZIP_MAX_ENTRIES {
+        return Err(format!(
+            "The zip would hold {count} files; a zip holds at most {ZIP_MAX_ENTRIES}."
+        ));
+    }
+    let mut total: u64 = 22;
+    for (n, d) in entries {
+        if n > ZIP_MAX_NAME {
+            return Err(format!(
+                "A file name in the zip is {n} bytes long; a zip allows {ZIP_MAX_NAME}."
+            ));
+        }
+        total = total.saturating_add(30 + 46 + 2 * n as u64 + d);
+    }
+    if total > ZIP_MAX_BYTES {
+        return Err(format!(
+            "The zip would be {:.1} GB; a zip (without Zip64) holds at most 4 GB. Export fewer plates at a time.",
+            total as f64 / 1e9
+        ));
+    }
+    Ok(())
+}
+
+fn zip_store_unchecked(files: &[ZipFile]) -> Vec<u8> {
     struct E {
         name_bytes: Vec<u8>,
         bytes: Vec<u8>,

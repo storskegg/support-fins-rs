@@ -145,6 +145,26 @@ struct PlateExportTests {
         #expect(!zipped.contains("plate-3-"))
     }
 
+    /// Audit X-08: a model named like a path (the file chooses the name) must not put that path in the zip.
+    @Test func aTraversalNamedModelExportsASafeZip() async throws {
+        let model = ViewerModel()
+        try #require(model.controller != nil, "no Metal device")
+        let evil = FileManager.default.temporaryDirectory.appending(path: "evil-\(UUID().uuidString).3mf")
+        try TestThreeMF.box(named: "x/../../../../Library/LaunchAgents/evil").write(to: evil)
+        await model.load(url: evil)
+        let board = try #require(model.features[PlatesFeature.self]?.board)
+        #expect(model.session.parts.first?.info.name.contains("../") == true, "the part carries the file's name")
+        try await helper.add(model, "second", slab: 20)
+        let out = try dir()
+        board.savePanel = Panel(url: out.appending(path: "support-fins-plates.zip"))
+        board.addPlate()
+        await model.load(url: evil)
+        let url = try #require(await board.exportAll(), "\(board.exportError ?? "")")
+        let zipped = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+        #expect(zipped.contains("plate-1-x") && zipped.contains("plate-2-x"), "both plates are in the zip")
+        #expect(!zipped.contains("../") && !zipped.contains("LaunchAgents/"), "no path in an entry name")
+    }
+
     @Test func onePlateWithModelsIsTheThreeMFAlone() async throws {
         let (model, board) = try await two()
         defer { withExtendedLifetime(model) {} }         // the board works through its window

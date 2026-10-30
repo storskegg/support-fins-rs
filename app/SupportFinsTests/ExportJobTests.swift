@@ -225,4 +225,30 @@ final class LockedBox<T: Sendable>: @unchecked Sendable {
     init(_ v: T) { value = v }
     func get() -> T { lock.lock(); defer { lock.unlock() }; return value }
     func set(_ v: T) { lock.lock(); value = v; lock.unlock() }
+
+    // MARK: AtomicWrite (audit X-09)
+
+    @Test func atomicWriteReplacesWholeAndAFailedWriteKeepsTheOldFile() throws {
+        let target = dir.appending(path: "c.stl")
+        try Data("old".utf8).write(to: target)
+        try AtomicWrite.write(Data("new contents".utf8), to: target)
+        #expect(try Data(contentsOf: target) == Data("new contents".utf8))
+        struct Boom: Error {}
+        #expect(throws: Boom.self) {
+            _ = try AtomicWrite.write(to: target) { path in
+                try Data("half".utf8).write(to: URL(fileURLWithPath: path))
+                throw Boom()
+            }
+        }
+        #expect(try Data(contentsOf: target) == Data("new contents".utf8), "a failed write leaves the old file")
+        #expect(names() == ["c.stl"], Comment(rawValue: "\(names())"))
+    }
+
+    @Test func atomicCopyOfAMissingSourceKeepsTheOldFileAndWritesNothingElse() throws {
+        let target = dir.appending(path: "d.stl")
+        try Data("keep".utf8).write(to: target)
+        #expect(throws: (any Error).self) { try AtomicWrite.copy(from: dir.appending(path: "no-such"), to: target) }
+        #expect(try Data(contentsOf: target) == Data("keep".utf8))
+        #expect(names() == ["d.stl"], Comment(rawValue: "\(names())"))
+    }
 }

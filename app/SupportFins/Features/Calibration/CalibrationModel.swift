@@ -29,8 +29,7 @@ final class CalibrationModel {
             return
         }
         do {
-            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
-            try FileManager.default.copyItem(at: source, to: url)
+            try AtomicWrite.copy(from: source, to: url)
         } catch {
             self.error = error.localizedDescription
         }

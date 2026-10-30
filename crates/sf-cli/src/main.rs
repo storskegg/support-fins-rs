@@ -12,7 +12,7 @@ impl Io for StdIo {
         std::fs::read(path).map_err(|e| e.to_string())
     }
     fn write(&self, path: &str, bytes: &[u8]) -> Result<(), String> {
-        std::fs::write(path, bytes).map_err(|e| e.to_string())
+        project_io::write_atomically(path, bytes).map_err(|e| e.to_string())
     }
     fn out(&self, line: &str) {
         println!("{line}");

@@ -18,6 +18,15 @@ enum TestThreeMF {
         return zip(files)
     }
 
+    /// A box named `name` (the object's `name` attribute), as a file chooses it: a path, say.
+    static func box(named name: String) -> Data {
+        let v = [(0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0), (0, 0, 10), (10, 0, 10), (10, 10, 10), (0, 10, 10)]
+        let f = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4), (1, 2, 6), (1, 6, 5), (2, 3, 7), (2, 7, 6), (3, 0, 4), (3, 4, 7)]
+        let mesh = "<mesh><vertices>" + v.map { "<vertex x=\"\($0.0)\" y=\"\($0.1)\" z=\"\($0.2)\"/>" }.joined()
+            + "</vertices><triangles>" + f.map { "<triangle v1=\"\($0.0)\" v2=\"\($0.1)\" v3=\"\($0.2)\"/>" }.joined() + "</triangles></mesh>"
+        return zip([("3D/3dmodel.model", model(objects: "<object id=\"1\" type=\"model\" name=\"\(name)\">\(mesh)</object>", item: 1))])
+    }
+
     /// Object 1 is a triangle, object k has `fan` components of k - 1: `fan`^`depth` triangles once expanded.
     static func fanOut(depth: Int, fan: Int) -> Data {
         var objects = "<object id=\"1\" type=\"model\">\(triangle)</object>"

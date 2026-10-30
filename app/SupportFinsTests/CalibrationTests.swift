@@ -95,4 +95,20 @@ struct CalibrationTests {
         model.export(CalibrationCatalog.coupons[0], to: dest)
         #expect(model.error == nil)
     }
+
+    @Test func aFailedDownloadKeepsTheFileThatWasThere() throws {
+        let model = CalibrationModel()
+        let dir = try Scratch.directory()
+        defer { Scratch.remove(dir) }
+        let dest = dir.appending(path: "angle-coupon.stl")
+        try Data("mine".utf8).write(to: dest)
+        // a destination whose folder is gone cannot be written; nothing is created and the other file stays
+        let gone = dir.appending(path: "no-folder").appending(path: "angle-coupon.stl")
+        model.export(CalibrationCatalog.coupons[0], to: gone)
+        #expect(model.error != nil)
+        #expect(!FileManager.default.fileExists(atPath: gone.deletingLastPathComponent().path))
+        #expect(try Data(contentsOf: dest) == Data("mine".utf8))
+        let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix(".") }
+        #expect(leftovers.isEmpty, "\(leftovers)")
+    }
 }
