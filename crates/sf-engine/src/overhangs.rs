@@ -111,6 +111,16 @@ pub(crate) fn find(parent: &mut [i32], mut x: i32) -> i32 {
     x
 }
 
+/// [`find`] over `usize` parents (trace.js's region groups, fill.js's point clusters): the same path halving.
+pub(crate) fn find_index(parent: &mut [usize], mut x: usize) -> usize {
+    while parent[x] != x {
+        let g = parent[parent[x]];
+        parent[x] = g;
+        x = g;
+    }
+    x
+}
+
 /// `mix(h, v)` (web/overhangs.js:50): `Math.imul(h ^ (v | 0) ^ ((v / 4294967296) | 0), 0x9e3779b1)`.
 fn mix(h: f64, v: f64) -> i32 {
     let x = jsnum::to_int32(h) ^ jsnum::to_int32(v) ^ jsnum::to_int32(v / 4294967296.0);

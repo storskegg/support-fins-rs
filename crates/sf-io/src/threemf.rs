@@ -29,7 +29,8 @@ use crate::limits::{
     LimitExceeded, LoadOptions, MAX_COMPONENT_DEPTH, MAX_OBJECTS_PER_PART, MAX_TRIANGLES,
     ReadError, check_finite,
 };
-use crate::obj::ObjBbox;
+// `bbox` (web/threemf.js:969-977) is obj.js's, line for line
+use crate::obj::{ObjBbox, bbox};
 use crate::paintcode::{FilamentPainter, Paint};
 use crate::text::{decode, is_js_space, js_trim};
 use crate::zip::{ZipData, ZipFile, unzip_with, zip_store_checked};
@@ -2636,41 +2637,6 @@ fn emit_object(
     }
     seen.shift_remove(&key);
     Ok(())
-}
-
-/// `bbox` (web/threemf.js:969-977). Min and max do not depend on the order they are taken in (a NaN
-/// never replaces a bound), so a big soup is reduced in parallel with the same result.
-fn bbox(positions: &[f64]) -> ObjBbox {
-    use rayon::prelude::*;
-    let part = |ch: &[f64]| {
-        let mut lo = [f64::INFINITY; 3];
-        let mut hi = [f64::NEG_INFINITY; 3];
-        for p in ch.as_chunks::<3>().0 {
-            for k in 0..3 {
-                if p[k] < lo[k] {
-                    lo[k] = p[k];
-                }
-                if p[k] > hi[k] {
-                    hi[k] = p[k];
-                }
-            }
-        }
-        (lo, hi)
-    };
-    let (lo, hi) = positions.par_chunks(3 * 32768).map(part).reduce(
-        || ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]),
-        |(l1, h1), (l2, h2)| {
-            (
-                std::array::from_fn(|k| if l2[k] < l1[k] { l2[k] } else { l1[k] }),
-                std::array::from_fn(|k| if h2[k] > h1[k] { h2[k] } else { h1[k] }),
-            )
-        },
-    );
-    ObjBbox {
-        lo,
-        hi,
-        size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]],
-    }
 }
 
 /// `findRootPart` (web/threemf.js:980-1004): locate the root 3dmodel.model part name (the one

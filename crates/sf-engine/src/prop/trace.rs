@@ -4,7 +4,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::config::Config;
 use crate::jsnum;
-use crate::overhangs::{Analysis, Topology};
+use crate::overhangs::{Analysis, Topology, find_index as find};
 use crate::prop::config::PropConfig;
 use crate::prop::surface::seat;
 use crate::tris::Tris;
@@ -132,13 +132,6 @@ pub fn trace_groups(
 
     // union-find over region indices
     let mut parent: Vec<usize> = (0..result.regions.len()).collect();
-    fn find(parent: &mut [usize], mut x: usize) -> usize {
-        while parent[x] != x {
-            parent[x] = parent[parent[x]];
-            x = parent[x];
-        }
-        x
-    }
     fn join(parent: &mut [usize], a: usize, b: usize) {
         let (a, b) = (find(parent, a), find(parent, b));
         if a != b {

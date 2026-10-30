@@ -41,7 +41,7 @@ pub struct ObjFile {
 /// `bbox` (web/obj.js:15-22), with JS `<` / `>` comparisons. Min and max are order-free (a
 /// position is never NaN: every coordinate was checked finite before the f32 rounding), so big
 /// soups are reduced in parallel with the same result.
-fn bbox(positions: &[f64]) -> ObjBbox {
+pub(crate) fn bbox(positions: &[f64]) -> ObjBbox {
     use rayon::prelude::*;
     let part = |ch: &[f64]| {
         let mut lo = [f64::INFINITY; 3];

@@ -71,7 +71,7 @@ use crate::fins::rows::{RowWallsArgs, row_walls};
 use crate::fins::seating::seated_part_tris;
 use crate::islands::Island;
 use crate::jsnum;
-use crate::overhangs::Topology;
+use crate::overhangs::{Topology, find_index as find};
 use crate::prop::attached::PART_BAND;
 use crate::prop::brace::{BraceKinds, brace_wall};
 use crate::prop::ctx::BuildCtx;
@@ -506,14 +506,6 @@ fn groups_of(pts: &[Pt], cfg: &Config) -> Vec<Vec<usize>> {
             .push(i);
     }
     let mut parent: Vec<usize> = (0..pts.len()).collect();
-    fn find(parent: &mut [usize], mut i: usize) -> usize {
-        while parent[i] != i {
-            let g = parent[parent[i]];
-            parent[i] = g;
-            i = g;
-        }
-        i
-    }
     for (i, p) in pts.iter().enumerate() {
         let gi = jsnum::floor(p.x / l);
         let gj = jsnum::floor(p.y / l);
