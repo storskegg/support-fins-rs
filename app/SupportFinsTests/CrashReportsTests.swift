@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Testing
 
 @testable import Support_Fins
@@ -160,6 +161,26 @@ struct CrashReportsTests {
         #expect(r.folder.reports().contains { $0.stem.hasPrefix("crash-session-") })
     }
     #endif
+
+    /// The banner view reads `showsBanner` in its body; Dismiss must be a change that read observes (so the overlay
+    /// redraws without it), and nothing at launch or a later refresh raises it again in the same run.
+    @Test func dismissIsObservedByTheBannerAndStaysDismissed() throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        folder.writeMarker(now: Date().addingTimeInterval(-60))      // the last run did not end normally
+        let r = CrashReporter(folder: folder)
+        r.start(register: false)
+        #expect(r.showsBanner)
+        final class Flag: @unchecked Sendable { var set = false }   // onChange runs synchronously, in dismiss()
+        let changed = Flag()
+        withObservationTracking { _ = r.showsBanner } onChange: { changed.set = true }
+        r.dismiss()
+        #expect(changed.set, "the banner's read of showsBanner sees Dismiss")
+        #expect(!r.showsBanner)
+        r.refresh()
+        r.record(metrics: [.init(kind: "hang", json: Data("{}".utf8))])
+        #expect(!r.showsBanner, "a dismissed banner stays down for the rest of the run")
+    }
 
     @Test func aUnitTestHostWithoutAFolderDoesNotStart() {
         #expect(!CrashReporter.shouldStart(environment: ["XCTestConfigurationFilePath": "/x"], defaults: UserDefaults(suiteName: "sf-none-\(UUID().uuidString)")!))

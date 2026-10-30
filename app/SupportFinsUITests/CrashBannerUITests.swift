@@ -19,14 +19,18 @@ final class CrashBannerUITests: PartWindowUITestCase {
         XCTAssertTrue(element("crash-banner-show").exists)
         XCTAssertTrue(element("crash-banner-save").exists)
 
+        // Dismiss before the Help menu is opened: a click that arrives while a menu is still closing (just after Esc)
+        // is taken by the menu's tracking, not the button
+        let dismiss = element("crash-banner-dismiss")
+        XCTAssertTrue(dismiss.isHittable, "Dismiss can be clicked")
+        dismiss.click()
+        waitFor("the banner is gone", timeout: 5) { !message.exists }
+
         // Help > Show crash reports sits under Report a problem
         let help = menuBarItem("Help")
         help.click()
         XCTAssertTrue(help.menuItems["Show crash reports"].exists)
         app.typeKey(.escape, modifierFlags: [])
-
-        element("crash-banner-dismiss").click()
-        waitFor("the banner is gone", timeout: 5) { !message.exists }
     }
 
     func testNoBannerAfterANormalLaunch() throws {
