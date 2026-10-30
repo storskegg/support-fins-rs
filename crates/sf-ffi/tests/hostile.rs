@@ -1384,6 +1384,7 @@ const GETTERS: &[(&str, &str)] = &[
         "takes only an already loaded Part; spawns the worker",
     ),
     ("Builder::cancel", "bumps a counter and raises a flag"),
+    ("Suggester::cancel", "bumps a counter"),
     (
         "Suggester::new",
         "takes only an already loaded Part; spawns the worker",

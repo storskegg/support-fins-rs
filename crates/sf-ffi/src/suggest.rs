@@ -13,7 +13,7 @@ use sf_engine::jsnum;
 use sf_engine::orient::{
     Candidate, Confidence, Posture, SuggestOpts, layer_verdict,
     load_alignment as engine_load_alignment, suggest_orientations_cancellable_opts,
-    suggest_orientations_wide_opts, suggest_strength_pose,
+    suggest_orientations_wide_opts, suggest_strength_pose_cancellable,
 };
 
 use crate::builder::{page_tunables, split_options};
@@ -382,15 +382,32 @@ impl Part {
         dir_world: &[f64],
         threshold_deg: f64,
     ) -> Result<StrengthAdvice, FfiError> {
+        Ok(self
+            .strength_advice_with(dir_local, dir_world, threshold_deg, &|| false)?
+            .expect("never cancelled"))
+    }
+
+    /// [`Part::strength_advice`] that polls `cancelled`; `None`: it said stop part-way.
+    pub fn strength_advice_with(
+        &self,
+        dir_local: &[f64],
+        dir_world: &[f64],
+        threshold_deg: f64,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Option<StrengthAdvice>, FfiError> {
         if !threshold_deg.is_finite() {
             return Err(engine("threshold must be a finite number of degrees"));
         }
         let (local, world) = (dir3(dir_local, "dir_local")?, dir3(dir_world, "dir_world")?);
-        let pose = suggest_strength_pose(self.topology(), local, threshold_deg);
+        let Some(pose) =
+            suggest_strength_pose_cancellable(self.topology(), local, threshold_deg, cancelled)
+        else {
+            return Ok(None);
+        };
         let cur = engine_load_alignment(world);
         match pose {
             Some(p) if !cur.as_ref().is_some_and(|c| p.cross >= c.cross - 0.05) => {
-                Ok(StrengthAdvice {
+                Ok(Some(StrengthAdvice {
                     pose: Some(StrengthPose {
                         rot: rot9(&p.rot),
                         cross: p.cross,
@@ -402,13 +419,13 @@ impl Part {
                     }),
                     already_strongest: false,
                     note: None,
-                })
+                }))
             }
-            _ => Ok(StrengthAdvice {
+            _ => Ok(Some(StrengthAdvice {
                 pose: None,
                 already_strongest: true,
                 note: Some(STRONGEST_NOTE.into()),
-            }),
+            })),
         }
     }
 }
@@ -575,10 +592,16 @@ impl Suggester {
                             dir_world,
                             threshold_deg,
                         } => part
-                            .strength_advice(dir_local, dir_world, *threshold_deg)
-                            .map(|a| {
-                                Box::new(move |g, l: &dyn SuggestListener| l.strength(g, a))
-                                    as Delivery
+                            .strength_advice_with(dir_local, dir_world, *threshold_deg, &|| {
+                                latest.load(Ordering::SeqCst) != job.generation
+                            })
+                            .map(|a| match a {
+                                Some(a) => {
+                                    Box::new(move |g, l: &dyn SuggestListener| l.strength(g, a))
+                                        as Delivery
+                                }
+                                // stopped early: superseded or cancelled, so nothing is delivered
+                                None => Box::new(|_, _: &dyn SuggestListener| {}) as Delivery,
                             }),
                     }))
                     .unwrap_or_else(|p| Err(crate::crash::panic_error(p)));
@@ -648,6 +671,13 @@ impl Suggester {
         })
     }
 
+    /// Abandon the ranking or strength search in flight (and any queued one): nothing of it is
+    /// delivered, and the engine stops at its next poll. A later request is unaffected. Dropping the
+    /// Suggester does the same.
+    pub fn cancel(&self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+    }
+
     /// Queue a strength-pose search; returns its generation.
     pub fn strength(
         &self,
@@ -666,6 +696,14 @@ impl Suggester {
                 listener,
             )
         })
+    }
+}
+
+impl Drop for Suggester {
+    /// The worker outlives the sender until its queue drains: stale-ing the generation stops the job
+    /// in flight and skips the queued ones, so a closed window leaves no orphan search running.
+    fn drop(&mut self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
     }
 }
 

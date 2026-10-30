@@ -157,7 +157,9 @@ private let device: MTLDevice = MTLCreateSystemDefaultDevice()!
     let rot = rotation(30, 0, 0)
     func fins(optsJson: String, tunablesJson: String) async throws -> (UInt32, Data) {
         let collector = Collector()
-        _ = try Builder(part: part).build(rot: rot, optsJson: optsJson, tunablesJson: tunablesJson, listener: collector)
+        let builder = Builder(part: part)  // dropped = cancelled (C-04): keep it until the result lands
+    defer { withExtendedLifetime(builder) {} }
+    _ = try builder.build(rot: rot, optsJson: optsJson, tunablesJson: tunablesJson, listener: collector)
         for await event in collector.stream {
             guard case .done(_, let result) = event else { Issue.record("the build failed"); break }
             let fins = result.fins()

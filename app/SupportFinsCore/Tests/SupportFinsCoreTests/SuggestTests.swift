@@ -155,7 +155,9 @@ private final class BuildCollector: BuildListener, @unchecked Sendable {
 @Test func theBuildSummaryCarriesTheReadoutData() async throws {
     let part = try #require(try loadParts(path: try modelPath("sphere")).first)
     let collector = BuildCollector()
-    _ = try Builder(part: part).build(
+    let builder = Builder(part: part)  // dropped = cancelled (C-04): keep it until the result lands
+    defer { withExtendedLifetime(builder) {} }
+    _ = try builder.build(
         rot: [1, 0, 0, 0, 0.8660254037844387, 0.49999999999999994, 0, -0.49999999999999994, 0.8660254037844387],
         optsJson: "{}", tunablesJson: "{}", listener: collector)
     var built: BuildResult?
@@ -180,7 +182,9 @@ private final class BuildCollector: BuildListener, @unchecked Sendable {
     #expect(islandCard(count: 2, bare: nil, capped: false, markersVisible: true).hasPrefix("⚠ 2 spots start in midair (red cones)"))
 
     let collector = BuildCollector()
-    _ = try Builder(part: part).build(rot: rot, optsJson: "{}", tunablesJson: "{}", listener: collector)
+    let builder = Builder(part: part)  // dropped = cancelled (C-04): keep it until the result lands
+    defer { withExtendedLifetime(builder) {} }
+    _ = try builder.build(rot: rot, optsJson: "{}", tunablesJson: "{}", listener: collector)
     var built: BuildResult?
     for await result in collector.stream { built = result; break }
     let result = try #require(built)

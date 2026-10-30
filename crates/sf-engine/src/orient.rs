@@ -158,7 +158,8 @@ struct Bin {
 ///
 /// `maxClusters` is JS's `maxClusters = 12`; callers pass it.
 pub fn candidate_downs(topo: &Topology, max_clusters: usize) -> Vec<V3> {
-    candidate_downs_with(topo, max_clusters, WEB_BUCKETS, WEB_DEDUP_COS)
+    candidate_downs_with(topo, max_clusters, WEB_BUCKETS, WEB_DEDUP_COS, &|| false)
+        .expect("never cancelled")
 }
 
 /// `q(v) = Math.round(v * 12) / 12` of `candidateDowns`: buckets per unit of normal component.
@@ -173,31 +174,46 @@ const WEB_DEDUP_COS: f64 = 0.996;
 /// `density` times as many distinct poses. A part with few distinct face normals (a box) has no
 /// more stable down-faces to find and keeps what it has.
 pub fn wide_candidate_downs(topo: &Topology, density: f64) -> Vec<V3> {
+    wide_candidate_downs_cancellable(topo, density, &|| false).expect("never cancelled")
+}
+
+/// [`wide_candidate_downs`] that polls `cancelled` while it bins the faces (a serial pass that takes
+/// most of a second on a 770k-face part); `None` once it said stop.
+pub fn wide_candidate_downs_cancellable(
+    topo: &Topology,
+    density: f64,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Vec<V3>> {
     let density = if density.is_finite() && density > 1.0 {
         density
     } else {
         1.0
     };
     if density == 1.0 {
-        return candidate_downs(topo, 12);
+        return candidate_downs_with(topo, 12, WEB_BUCKETS, WEB_DEDUP_COS, cancelled);
     }
     let s = density.sqrt();
     let max_clusters = (18.0 * density - 6.0).round() as usize;
     let dedup_cos = (WEB_DEDUP_COS.acos() / s).cos();
-    candidate_downs_with(topo, max_clusters, WEB_BUCKETS * s, dedup_cos)
+    candidate_downs_with(topo, max_clusters, WEB_BUCKETS * s, dedup_cos, cancelled)
 }
 
+/// `None`: `cancelled` said stop (polled every few thousand faces).
 fn candidate_downs_with(
     topo: &Topology,
     max_clusters: usize,
     buckets: f64,
     dedup_cos: f64,
-) -> Vec<V3> {
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Vec<V3>> {
     let (nrm, area, n_faces) = (&topo.nrm, &topo.area, topo.n_faces);
     // keyed by the JS template string `${q(x)},${q(y)},${q(z)}`, in first-seen order
     let mut bins: IndexMap<String, Bin> = IndexMap::new();
     let q = |v: f64| jsnum::round(v * buckets) / buckets; // ~5deg buckets (web)
     for f in 0..n_faces {
+        if f % 4096 == 0 && cancelled() {
+            return None;
+        }
         let (x, y, z) = (nrm[f * 3], nrm[f * 3 + 1], nrm[f * 3 + 2]);
         if x == 0.0 && y == 0.0 && z == 0.0 {
             continue;
@@ -266,7 +282,7 @@ fn candidate_downs_with(
             out.push(d);
         }
     }
-    out
+    Some(out)
 }
 
 /// `DOWN` (web/orient.js:134).
@@ -429,7 +445,7 @@ pub fn suggest_orientations_wide_opts(
     cancelled: &(dyn Fn() -> bool + Sync),
     opts: &SuggestOpts,
 ) -> Option<Suggestions> {
-    let downs = wide_candidate_downs(topo, density);
+    let downs = wide_candidate_downs_cancellable(topo, density, cancelled)?;
     rank_downs(topo, &downs, top, threshold, cfg, cancelled, opts)
 }
 
@@ -460,7 +476,7 @@ pub fn suggest_orientations_cancellable_opts(
     cancelled: &(dyn Fn() -> bool + Sync),
     opts: &SuggestOpts,
 ) -> Option<Suggestions> {
-    let downs = candidate_downs(topo, 12);
+    let downs = wide_candidate_downs_cancellable(topo, 1.0, cancelled)?;
     rank_downs(topo, &downs, top, threshold, cfg, cancelled, opts)
 }
 
@@ -894,6 +910,18 @@ pub fn suggest_strength_pose(
     dir_local: V3,
     threshold: f64,
 ) -> Option<StrengthPose> {
+    suggest_strength_pose_cancellable(topo, dir_local, threshold, &|| false)
+        .expect("never cancelled")
+}
+
+/// [`suggest_strength_pose`] with `cancelled` polled before each candidate's `analyze`. The outer
+/// `None` means it stopped early (no result); when it is never true the answer is unchanged.
+pub fn suggest_strength_pose_cancellable(
+    topo: &Topology,
+    dir_local: V3,
+    threshold: f64,
+    cancelled: &dyn Fn() -> bool,
+) -> Option<Option<StrengthPose>> {
     let dl = {
         let n = jsnum::hypot(&[dir_local[0], dir_local[1], dir_local[2]]);
         if n < 1e-9 {
@@ -901,7 +929,8 @@ pub fn suggest_strength_pose(
         } else {
             Some([dir_local[0] / n, dir_local[1] / n, dir_local[2] / n])
         }
-    }?;
+    };
+    let Some(dl) = dl else { return Some(None) };
 
     struct Cand {
         rot: Rot3,
@@ -911,9 +940,12 @@ pub fn suggest_strength_pose(
         over: f64,
         bed_area: f64,
     }
-    let cands: Vec<Cand> = candidate_downs(topo, 12)
-        .into_iter()
-        .map(|d| {
+    let mut cands: Vec<Cand> = Vec::new();
+    for d in wide_candidate_downs_cancellable(topo, 1.0, cancelled)? {
+        if cancelled() {
+            return None;
+        }
+        cands.push({
             let rot = rot_from_to(d, DOWN);
             let a = analyze(topo, threshold, &rot);
             let cross = jsnum::abs(apply_rot(&rot, dl)[2]); // rot orthonormal, dl unit -> result unit
@@ -929,15 +961,15 @@ pub fn suggest_strength_pose(
                 over: a.over_area,
                 bed_area: a.bed_area,
             }
-        })
-        .collect();
+        });
+    }
 
     // A pose with ~no bed contact is a tip/needle -- unprintable regardless of how nicely the
     // layers line up. Drop those before ranking; if that leaves nothing, there's no printable
     // pose to recommend.
     let seated: Vec<&Cand> = cands.iter().filter(|c| c.bed_area >= 1.0).collect();
     if seated.is_empty() {
-        return None;
+        return Some(None);
     }
 
     // Bound the strength search by printability: only poses within a budget of the most
@@ -964,7 +996,7 @@ pub fn suggest_strength_pose(
         .first()
         .expect("suggestStrengthPose: no affordable pose (NaN printability cost)");
     let a = align_quality(best.cross);
-    Some(StrengthPose {
+    Some(Some(StrengthPose {
         rot: best.rot,
         cross: best.cross,
         quality: a.quality,
@@ -972,5 +1004,5 @@ pub fn suggest_strength_pose(
         height: best.height,
         over: best.over,
         bed_area: best.bed_area,
-    })
+    }))
 }

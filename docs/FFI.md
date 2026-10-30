@@ -22,7 +22,7 @@ sources and a thin hand-written Swift layer. The app depends on that package.
   inside its Rayon loops, so a stale build stops part-way (a few milliseconds on a typical part, under
   ~20 ms on a 772k-triangle object: `just bench-cancel`) and a cancelled build returns a distinct result,
   never a partial one. A finished job whose generation is stale is still dropped without being
-  delivered. `Builder.cancel()` abandons the build in flight without starting another. An uncancelled
+  delivered. `Builder.cancel()` abandons the build in flight without starting another, and so does dropping the Builder (C-04: a closed window leaves no orphan build). An uncancelled
   build is byte-identical to one that was never cancellable.
 - **Input-taking exports throw (X-11, C-06).** A Rust panic in a non-throwing export reaches the generated Swift as a
   `try!`, which traps and kills the app. So **every export that takes data derived from a file or the user** (JSON, text,
@@ -271,9 +271,10 @@ impl Suggester {
     fn suggest(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError>;
     fn suggest_wide(&self, threshold_deg: f64, opts_json: String, tunables_json: String, context: SuggestContext, density: f64, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError>;
     fn strength(&self, dir_local: Vec<f64>, dir_world: Vec<f64>, threshold_deg: f64, listener: Box<dyn SuggestListener>) -> Result<u64, FfiError>;
+    fn cancel(&self); // abandon the ranking / strength search in flight and any queued one; nothing of it is delivered. Dropping the Suggester does the same (C-04)
 }
 // Scoring runs on Rayon's global pool (candidates in parallel, results collected in candidate order, so the ranking and its
-// tie-breaks equal the serial run). A newer request stops an older ranking between candidates; the older one is never delivered.
+// tie-breaks equal the serial run). A newer request, `cancel()` or dropping the Suggester stops an older ranking or Strength search: while binning the faces into candidate poses, between candidates, and inside each finalist's fin build; the older one is never delivered. Stopping does not change any result that is delivered (tests/cancel.rs measures the CPU dropping within 100 ms).
 ```
 
 `opts_json` is the same `options.json` object a build takes: the finalists are built under that gap, pad and
