@@ -58,7 +58,7 @@ final class CrashReporter {
         #if DEBUG
         let args = UserDefaults.standard
         // test hooks, DEBUG builds only: a folder of the test's own, and a marker planted as if the last run crashed
-        if let dir = args.string(forKey: "SFCrashDir") { folder = CrashFolder(url: URL(fileURLWithPath: dir, isDirectory: true)) }
+        if let dir = args.string(forKey: "SFCrashDir") { folder = CrashFolder(url: CrashFolder.testFolder(named: dir)) }
         if args.bool(forKey: "SFPlantCrash") {
             folder.create()
             folder.writeMarker(now: Date().addingTimeInterval(-60))

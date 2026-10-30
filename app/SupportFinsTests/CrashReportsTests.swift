@@ -118,9 +118,9 @@ struct CrashReportsTests {
     }
 
     #if DEBUG
-    /// The launch arguments `-SFCrashDir <dir> -SFPlantCrash YES` (UserDefaults' argument domain): the marker is planted in
-    /// that folder before `start` looks for a leftover one, so the banner shows; and a test host that carries the XCTest
-    /// environment still starts when it names its own folder.
+    /// The launch arguments `-SFCrashDir <name> -SFPlantCrash YES` (UserDefaults' argument domain): the marker is planted in
+    /// that folder (in the app's own temporary directory) before `start` looks for a leftover one, so the banner shows;
+    /// and a test host that carries the XCTest environment still starts when it names its own folder.
     @Test func plantingTheMarkerBeforeStartShowsTheBanner() throws {
         let folder = tempFolder()
         defer { try? FileManager.default.removeItem(at: folder.url) }
@@ -133,9 +133,31 @@ struct CrashReportsTests {
         let r = CrashReporter(folder: CrashFolder(url: FileManager.default.temporaryDirectory.appending(path: "unused-\(UUID().uuidString)")))
         r.start(register: false)
         #expect(r.showsBanner && r.closedUnexpectedly)
-        #expect(r.folder.url.standardizedFileURL == folder.url.standardizedFileURL)
-        #expect(folder.reports().contains { $0.stem.hasPrefix("crash-session-") })
-        #expect(folder.markerExists, "this run's own marker is set after the leftover one was read")
+        defer { try? FileManager.default.removeItem(at: r.folder.url) }
+        #expect(r.folder.url.standardizedFileURL == CrashFolder.testFolder(named: folder.url.path).standardizedFileURL)
+        #expect(r.folder.reports().contains { $0.stem.hasPrefix("crash-session-") })
+        #expect(r.folder.markerExists, "this run's own marker is set after the leftover one was read")
+    }
+
+    /// The UI tests' `-SFCrashDir` names a folder in the test runner's temporary directory, which is the runner's
+    /// sandbox container (`~/Library/Containers/<runner>/Data/tmp/sf-uitest-<UUID>/crash-reports`). The app is sandboxed
+    /// too and cannot write there: the marker was never planted and the banner never showed (PR #213's UI test). The
+    /// folder the app uses must be one it can write, so the planted marker is there at the leftover check.
+    @Test func aCrashFolderNamedByTheSandboxedUITestRunnerIsOneTheAppCanWrite() throws {
+        guard let pw = getpwuid(getuid()) else { Issue.record("no home"); return }
+        let home = String(cString: pw.pointee.pw_dir)       // the real home: NSHomeDirectory() is the app's container
+        let id = "sf-uitest-\(UUID().uuidString)"
+        let runnerPath = "\(home)/Library/Containers/com.storskegg.SupportFinsUITests.xctrunner/Data/tmp/\(id)/crash-reports"
+        let d = UserDefaults.standard
+        d.set(runnerPath, forKey: "SFCrashDir")
+        d.set(true, forKey: "SFPlantCrash")
+        defer { d.removeObject(forKey: "SFCrashDir"); d.removeObject(forKey: "SFPlantCrash") }
+        let r = CrashReporter(folder: CrashFolder(url: FileManager.default.temporaryDirectory.appending(path: "unused-\(UUID().uuidString)")))
+        r.start(register: false)
+        defer { try? FileManager.default.removeItem(at: r.folder.url) }
+        #expect(r.folder.markerExists, "the app wrote its marker into \(r.folder.url.path)")
+        #expect(r.closedUnexpectedly && r.showsBanner, "the planted marker was found: the banner shows")
+        #expect(r.folder.reports().contains { $0.stem.hasPrefix("crash-session-") })
     }
     #endif
 

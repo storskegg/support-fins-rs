@@ -19,6 +19,16 @@ struct CrashFolder: Sendable {
         return library.appending(path: "Logs/Support Fins", directoryHint: .isDirectory)
     }
 
+    /// The folder of a DEBUG launch's `-SFCrashDir <name>` (the UI tests): `name` inside the app's own temporary
+    /// directory. The app is sandboxed, so a folder the test runner made (in the runner's container) is not one it can
+    /// write: there the marker was never planted and the banner never showed. A path is taken as a name too (its
+    /// components, `..` dropped), so it always lands inside the app's sandbox.
+    static func testFolder(named name: String) -> URL {
+        let parts = name.split(separator: "/").filter { $0 != "." && $0 != ".." }
+        let base = FileManager.default.temporaryDirectory.appending(path: "sf-crash-tests", directoryHint: .isDirectory)
+        return parts.reduce(base) { $0.appending(path: String($1), directoryHint: .isDirectory) }
+    }
+
     var markerURL: URL { url.appending(path: "running.marker") }
     var seenURL: URL { url.appending(path: "seen.marker") }
     /// The breadcrumbs and settings of the session now running, saved from time to time.

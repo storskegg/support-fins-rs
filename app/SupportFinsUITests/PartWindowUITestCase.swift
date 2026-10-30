@@ -33,8 +33,9 @@ class PartWindowUITestCase: XCTestCase {
         dir = FileManager.default.temporaryDirectory.appending(path: "sf-uitest-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         app = XCUIApplication()
-        // the app writes its crash reports into the test's own folder (DEBUG-only hook), never the user's
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO", "-SFCrashDir", dir.appending(path: "crash-reports").path]
+        // the app writes its crash reports into a folder of this test's own (DEBUG-only hook), never the user's. It is a
+        // name, not a path: the app is sandboxed and puts it in its own temporary directory (it cannot write `dir`)
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO", "-SFCrashDir", dir.lastPathComponent]
     }
 
     override func tearDownWithError() throws {
