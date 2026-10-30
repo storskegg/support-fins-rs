@@ -15,6 +15,7 @@ mod records;
 mod report;
 mod session;
 mod suggest;
+mod tristore;
 
 pub use builder::{
     BuildListener, BuildResult, Builder, ExportKind, PlateFile, PlateModel, build_part,

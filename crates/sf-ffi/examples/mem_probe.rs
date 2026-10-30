@@ -110,6 +110,36 @@ fn main() {
             }
             println!("fin triangles {}", held[0].triangles().len() / 9);
         }
-        _ => panic!("load | build"),
+        // digest FILE OBJ TILT OUTDIR: what the removal readouts, the exports and the footprint make of one build, so a
+        // change to how a BuildResult stores its fins can be compared byte for byte (sha256 of the files and the JSON)
+        "digest" => {
+            let i: usize = a[3].parse().unwrap();
+            let t = a[4].parse::<f64>().unwrap().to_radians();
+            let dir = std::path::PathBuf::from(&a[5]);
+            std::fs::create_dir_all(&dir).unwrap();
+            let rot = [1.0, 0.0, 0.0, 0.0, t.cos(), t.sin(), 0.0, -t.sin(), t.cos()];
+            let opts = std::env::var("OPTS").unwrap_or_else(|_| "{}".into());
+            let b = std::sync::Arc::new(build_part(&parts[i], &rot, &opts, "{}").expect("build"));
+            let ids: Vec<u64> = vec![0, 1, 2, 7];
+            std::fs::write(dir.join("after0.json"), b.after_removal_json(vec![]).unwrap()).unwrap();
+            std::fs::write(dir.join("after3.json"), b.after_removal_json(ids.clone()).unwrap()).unwrap();
+            std::fs::write(dir.join("records.json"), b.records_json()).unwrap();
+            for ext in ["stl", "3mf", "obj"] {
+                let path = dir.join(format!("out.{ext}")).to_string_lossy().into_owned();
+                match sf_ffi::export(path, vec![parts[i].clone()], vec![b.clone()], "{}".into()) {
+                    Ok(()) => {}
+                    Err(e) => println!("export {ext}: {e}"),
+                }
+            }
+            let path = dir.join("removed.stl").to_string_lossy().into_owned();
+            let _ = sf_ffi::export(path, vec![parts[i].clone()], vec![b.clone()], "{\"removed\":[0,1,2,7]}".into());
+            if let Some(f) = sf_ffi::footprint_of_build(b.clone(), vec![]).unwrap() {
+                println!("footprint area {} bounds {:?}", f.area(), f.bounds());
+            }
+            if let Some(f) = sf_ffi::footprint_of_build(b.clone(), ids).unwrap() {
+                println!("footprint(removed) area {} bounds {:?}", f.area(), f.bounds());
+            }
+        }
+        _ => panic!("load | build | digest"),
     }
 }
