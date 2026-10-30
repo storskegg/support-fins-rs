@@ -38,7 +38,7 @@ final class ExportJob {
     /// Run `work` (the engine's export, given the temp path to write) off the main thread and put the file at `url`.
     /// Returns true when it was written, false when cancelled; throws the engine's error. One at a time.
     func run(title: String, to url: URL, work: @escaping @Sendable (String) throws -> Void) async throws -> Bool {
-        precondition(!isRunning, "one export at a time")
+        precondition(!isRunning)   // one export at a time
         let token = CancelToken()
         serial += 1
         let mine = serial
