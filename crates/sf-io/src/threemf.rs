@@ -2791,6 +2791,9 @@ pub struct ThreeMf {
     pub dropped: usize,
     /// SESSION_PART's object when the site wrote one, else `None`
     pub session: Option<Json>,
+    /// SESSION_PART is in the file but could not be used (damaged, nested deeper than the JSON limit, or
+    /// not a version-1 session): the JS ignores it silently, the app says so
+    pub session_unreadable: bool,
 }
 
 /// Port of `readThreeMF` (web/threemf.js:1056-1059): read a .3mf package into per-object
@@ -3157,6 +3160,7 @@ fn read_three_mf_core(
     } else {
         merge_positions(&objects)
     };
+    let session = read_session(parts);
     Ok(ThreeMf {
         unit,
         positions,
@@ -3164,7 +3168,8 @@ fn read_three_mf_core(
         items: objects.len(),
         skipped: agg_skipped,
         dropped: agg_dropped,
-        session: read_session(parts),
+        session_unreadable: session.is_none() && parts.contains_key(SESSION_PART),
+        session,
         objects,
     })
 }

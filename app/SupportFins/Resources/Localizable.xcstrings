@@ -7375,6 +7375,111 @@
         }
       }
     },
+    "Load anyway" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trotzdem laden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然加载"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregar mesmo assim"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحميل على أي حال"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toch laden"
+          }
+        }
+      }
+    },
+    "Load this file anyway?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Datei trotzdem laden?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍要加载此文件吗？"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregar este arquivo mesmo assim?"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد تحميل هذا الملف على أي حال؟"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit bestand toch laden?"
+          }
+        }
+      }
+    },
+    "Load %@ anyway?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ trotzdem laden?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍要加载 %1$@ 吗？"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregar %1$@ mesmo assim?"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد تحميل %1$@ على أي حال؟"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ toch laden?"
+          }
+        }
+      }
+    },
     "Long walls" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13782,6 +13887,41 @@
         }
       }
     },
+    "The settings saved in this file couldn't be read; defaults are used." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die in dieser Datei gespeicherten Einstellungen konnten nicht gelesen werden; es gelten die Standardwerte."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取此文件中保存的设置，将使用默认值。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler as configurações salvas neste arquivo; os padrões serão usados."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّرت قراءة الإعدادات المحفوظة في هذا الملف؛ سيتم استخدام الإعدادات الافتراضية."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De in dit bestand opgeslagen instellingen konden niet worden gelezen; de standaardwaarden worden gebruikt."
+          }
+        }
+      }
+    },
     "The sway braces stand edge-on against the tall sides and are tied on by tines all the way up, so the top can’t drift or wobble as it prints." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14044,6 +14184,41 @@
         }
       }
     },
+    "This file expands to %@ triangles, which may need about %@ of memory." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Datei wird zu %1$@ Dreiecken, was etwa %2$@ Arbeitsspeicher benötigen kann."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件会展开为 %1$@ 个三角形，可能需要约 %2$@ 内存。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este arquivo se expande para %1$@ triângulos, o que pode exigir cerca de %2$@ de memória."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتوسع هذا الملف إلى %1$@ مثلث، وقد يحتاج إلى حوالي %2$@ من الذاكرة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit bestand breidt uit tot %1$@ driehoeken, wat ongeveer %2$@ geheugen kan vragen."
+          }
+        }
+      }
+    },
     "This file has several objects" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14057,6 +14232,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Este arquivo tem vários objetos"
+          }
+        }
+      }
+    },
+    "This file unpacks to %@ (the limit is %@)." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Datei wird auf %1$@ entpackt (die Grenze liegt bei %2$@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件解压后为 %1$@（上限为 %2$@）。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este arquivo se descompacta para %1$@ (o limite é %2$@)."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند فك ضغط هذا الملف يصبح حجمه %1$@ (الحد الأقصى %2$@)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit bestand pakt uit tot %1$@ (de limiet is %2$@)."
           }
         }
       }
@@ -14092,6 +14302,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dit is ongeveer de sterkste printbare oriëntatie voor deze belasting — een beter uitgelijnde positie zou niet op het printbed staan."
+          }
+        }
+      }
+    },
+    "This model is %@ across (the limit is %@)." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Modell ist %1$@ breit (die Grenze liegt bei %2$@)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此模型最宽处为 %1$@（上限为 %2$@）。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este modelo tem %1$@ de largura (o limite é %2$@)."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يبلغ عرض هذا النموذج %1$@ (الحد الأقصى %2$@)."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit model is %1$@ breed (de limiet is %2$@)."
           }
         }
       }

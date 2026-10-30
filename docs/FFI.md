@@ -187,6 +187,17 @@ Estimates are what the file needs, so a refused file costs a few milliseconds an
 input of the audit stays under 30 MB (`crates/sf-ffi/examples/limits_probe.rs`). Reaching a limit says nothing about
 whether a *build* of a large part will be fast: a 7.7 M-triangle file loads in about 1.2 s and 2.3 GB.
 
+**The app's prompt** (track 2C): every load goes through `ViewerModel.load`, which catches `LimitExceeded`, shows an alert
+on the window (title "Load <file> anyway?", a message built from `kind`, `estimate` and `limit` -- never the engine's
+`message` -- and, for `Triangles`, about 280 bytes of memory per triangle; buttons Cancel (default, Return and Esc) and
+Load anyway) and on yes calls `load_parts_with` with `allow_large`. A caller loading several files in turn awaits the
+answer per file, so Cancel skips only that file.
+
+**Unreadable session.** `Part.session_unreadable() -> bool` (and `sf_io::threemf::ThreeMf::session_unreadable`): the 3MF
+holds a session (`Metadata/support_fins.json`) that could not be used -- damaged, nested past the JSON limit, or not
+version 1. The part loads with defaults, as the JS does silently; the app shows "The settings saved in this file
+couldn't be read; defaults are used." in its status banner. The import note is unchanged (parity).
+
 The CLI takes `--allow-large` (not in `--help`, which stays the JS's text for `cli-parity`); its refusal lines end
 "; pass --allow-large to load it anyway". The Rust readers: `sf_io::{stl::read_stl_with, obj::read_obj_with,
 threemf::read_three_mf_unmerged_with, threemf::read_three_mf_with, zip::unzip_with}(bytes, &LoadOptions)`, returning
