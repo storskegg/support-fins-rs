@@ -73,6 +73,8 @@ final class ViewerModel {
             // a plate of several goes to the picker; cancelling it keeps whatever is on show (`io.js:200-205`)
             guard parts.count > 1 else { show(parts, url: url); return }
             let picker = ObjectPickerModel(objects: parts.map {
+                // from the engine's description: asking a CorePart for its bounds would weld and mesh it (C-05)
+                if let core = $0.mesh as? CorePart { return (name: $0.name, triangles: core.faceCount, size: core.info.size) }
                 let d = $0.mesh.bounds.max - $0.mesh.bounds.min
                 return (name: $0.name, triangles: $0.mesh.faceCount, size: [Double(d.x), Double(d.y), Double(d.z)])
             })
@@ -80,7 +82,7 @@ final class ViewerModel {
             picker.onLoad = { [weak self] chosen in
                 guard let self else { return }
                 self.picker = nil
-                guard chosen.count > 1 else { self.show([parts[chosen[0]]], url: url); return }
+                guard chosen.count > 1 else { Task { await self.showPrepared([parts[chosen[0]]], url: url) }; return }
                 Task { await self.showMerged(chosen.map { parts[$0] }, of: parts.count, url: url) }
             }
             self.picker = picker
@@ -123,6 +125,20 @@ final class ViewerModel {
         c?.resume(returning: loadAnyway)
     }
 
+    /// The picked object, welded and meshed off the main thread first (C-05), then shown.
+    private func showPrepared(_ parts: [LoadedPart], url: URL?) async {
+        isLoading = true
+        defer { isLoading = false }
+        for core in parts.compactMap({ $0.mesh as? CorePart }) {
+            guard await core.prepare() else {
+                addingModel = false
+                status = JS.t("The file's mesh could not be shared with the GPU.")
+                return
+            }
+        }
+        show(parts, url: url)
+    }
+
     /// "Merge N & load": the chosen objects as one part (`merge_parts`; `mergeObjectPositions`, `ui/io.js:120`).
     private func showMerged(_ chosen: [LoadedPart], of total: Int, url: URL?) async {
         guard let controller else { return }
@@ -132,7 +148,8 @@ final class ViewerModel {
             let cores = chosen.compactMap { ($0.mesh as? CorePart)?.part }
             guard cores.count == chosen.count else { addingModel = false; status = JS.t("These objects cannot be merged."); return }
             let merged = try await Task.detached(priority: .userInitiated) { try mergeParts(parts: cores, objectCount: UInt64(total)) }.value
-            guard let core = CorePart(part: merged, device: controller.renderer.device) else { addingModel = false; status = JS.t("The merged mesh could not be shared with the GPU."); return }
+            let core = CorePart(lazy: merged, device: controller.renderer.device)
+            guard await core.prepare() else { addingModel = false; status = JS.t("The merged mesh could not be shared with the GPU."); return }
             show([LoadedPart(name: core.info.name, mesh: core)], url: url)
         } catch {
             addingModel = false

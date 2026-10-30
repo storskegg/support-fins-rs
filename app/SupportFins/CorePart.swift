@@ -14,21 +14,52 @@ final class CorePart: MeshSource {
     /// The engine's description of the part. The import note changes once, when a saved session is restored onto it
     /// (`refreshInfo`), so it is observed.
     private(set) var info: PartInfo
-    let vertexBuffer: MTLBuffer
     let vertexStride = 24
     let faceCount: Int
-    let bounds: (min: SIMD3<Float>, max: SIMD3<Float>)
     private let device: MTLDevice
+    /// The Metal mesh and its box, once made (C-05). A file's objects are described from their soups alone (the
+    /// picker needs a name, a triangle count and a size); only an object that is shown is welded and meshed.
+    @ObservationIgnored private var loaded: (buffer: MTLBuffer, bounds: (min: SIMD3<Float>, max: SIMD3<Float>))?
 
-    init?(part: Part, device: MTLDevice) {
+    /// The part with its mesh made now (it welds the part, on the calling thread). `nil` when the GPU cannot share it.
+    convenience init?(part: Part, device: MTLDevice) {
+        self.init(lazy: part, device: device)
+        guard adopt(part.mesh()) else { return nil }
+    }
+
+    /// The part described but not welded or meshed: `prepare()` makes the mesh before the part is shown.
+    init(lazy part: Part, device: MTLDevice) {
         self.part = part
         self.device = device
         let described = part.info()
         info = described
-        guard let buffer = part.mesh().metalBuffer(device: device) else { return nil }
-        vertexBuffer = buffer
         faceCount = Int(described.triangles)
-        bounds = Self.bounds(of: buffer, vertices: faceCount * 3)
+    }
+
+    var vertexBuffer: MTLBuffer { mesh().buffer }
+    var bounds: (min: SIMD3<Float>, max: SIMD3<Float>) { mesh().bounds }
+
+    /// Weld and mesh the part off the main thread (the engine welds on first use). `false` when the GPU cannot share it.
+    func prepare() async -> Bool {
+        if loaded != nil { return true }
+        let part = self.part
+        let gpu = await Task.detached(priority: .userInitiated) { part.mesh() }.value
+        return adopt(gpu)
+    }
+
+    private func adopt(_ gpu: GpuBuffer) -> Bool {
+        if loaded != nil { return true }
+        guard let buffer = gpu.metalBuffer(device: device) else { return false }
+        loaded = (buffer, Self.bounds(of: buffer, vertices: faceCount * 3))
+        refreshInfo()       // the weld's time is known now
+        return true
+    }
+
+    /// The mesh, made here if `prepare()` has not (a caller that needs it before it was prepared pays on this thread).
+    private func mesh() -> (buffer: MTLBuffer, bounds: (min: SIMD3<Float>, max: SIMD3<Float>)) {
+        if loaded == nil { _ = adopt(part.mesh()) }
+        // a mesh the GPU cannot share: an empty buffer, so nothing draws and nothing reads past its end
+        return loaded ?? (device.makeBuffer(length: max(faceCount * 72, 24), options: .storageModeShared)!, (.zero, .zero))
     }
 
     /// The part's description again: its import note says what a session restored (`restoreSession`, `afterLoad`).
@@ -96,10 +127,11 @@ struct CoreLoader: PartLoading {
     func load(url: URL?, device: MTLDevice, allowLarge: Bool) async throws -> [LoadedPart] {
         guard let url else { throw NoFile() }
         let parts = try await Self.parts(at: url.path(percentEncoded: false), allowLarge: allowLarge)
-        return try parts.map { part in
-            guard let core = CorePart(part: part, device: device) else { throw Unreadable() }
-            return LoadedPart(name: core.info.name, mesh: core)
-        }
+        // C-05: the objects are described, not welded or meshed; a file with one object is shown at once, so its mesh
+        // is made now (off the main thread), and a file with several waits for the picker's choice (`ViewerModel`)
+        let cores = parts.map { CorePart(lazy: $0, device: device) }
+        if cores.count == 1, await cores[0].prepare() == false { throw Unreadable() }
+        return cores.map { LoadedPart(name: $0.info.name, mesh: $0) }
     }
 
     /// The engine's parts of a file: `load_parts`, except that a file it would read as STEP (`reads_as_step`) is read
