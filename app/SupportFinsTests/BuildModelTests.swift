@@ -10,39 +10,11 @@ import Viewer
 /// puts fins under. Written to the app's temp directory (the test host is sandboxed, so the upstream checkout's
 /// `tests/fixtures` cannot be read here) and loaded by the real `load_parts`.
 private func tShapeSTL() throws -> String {
-    func box(_ x0: Float, _ x1: Float, _ y0: Float, _ y1: Float, _ z0: Float, _ z1: Float) -> [[Float]] {
-        let v: [[Float]] = [
-            [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
-            [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1],
-        ]
-        let faces = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]]
-        return faces.map { f in f.flatMap { v[$0] } }
-    }
-    let tris = box(-5, 5, -5, 5, 0, 20) + box(-20, 20, -20, 20, 20, 24)
-    var data = Data(count: 80)
-    var count = UInt32(tris.count)
-    withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
-    for t in tris {
-        for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
-        data.append(contentsOf: [0, 0])
-    }
-    let path = try Scratch.file("build-model-tests-tshape.stl").path(percentEncoded: false)
-    try data.write(to: URL(fileURLWithPath: path))
-    return path
+    try TestParts.write(TestParts.box(-5, 5, -5, 5, 0, 20) + TestParts.box(-20, 20, -20, 20, 20, 24),
+                        to: Scratch.file("build-model-tests-tshape.stl"))
 }
 
 private let identity: [Double] = [1, 0, 0, 0, 1, 0, 0, 0, 1]
-
-/// three.js `Euler(x, y, z, 'XYZ')` in degrees as nine column-major numbers (the CLI's `--rot`).
-private func rotation(_ x: Double, _ y: Double, _ z: Double) -> [Double] {
-    let r = { (d: Double) in d * Double.pi / 180 }
-    let (cx, sx, cy, sy, cz, sz) = (cos(r(x)), sin(r(x)), cos(r(y)), sin(r(y)), cos(r(z)), sin(r(z)))
-    return [
-        cy * cz, cx * sz + sx * sy * cz, sx * sz - cx * sy * cz,
-        -cy * sz, cx * cz - sx * sy * sz, sx * cz + cx * sy * sz,
-        sy, -sx * cy, cx * cy,
-    ]
-}
 
 @MainActor
 private func tShapeModel() throws -> BuildModel {
@@ -106,8 +78,8 @@ struct BuildModelTests {
 
     @Test func aNewerRequestSupersedesAnOlderOne() async throws {
         let model = try tShapeModel()
-        let g1 = model.build(rotation: rotation(30, 0, 0), optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
-        let g2 = model.build(rotation: rotation(30, 0, 0), optionsJSON: #"{"mode":"full"}"#)
+        let g1 = model.build(rotation: eulerMatrix(30, 0, 0), optionsJSON: FinSettings().optionsJSON(), tunablesJSON: FinSettings().tunablesJSON())
+        let g2 = model.build(rotation: eulerMatrix(30, 0, 0), optionsJSON: #"{"mode":"full"}"#)
         #expect(g2 == g1 + 1)
         await model.settled()
         // whichever order the worker finishes in, only the newest request's build is shown

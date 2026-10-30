@@ -11,14 +11,6 @@ import simd
 @MainActor
 @Suite("Draw and several models", .serialized)
 struct DrawParkedTests {
-    private func eventually(_ what: String, _ condition: () -> Bool) async throws {
-        for _ in 0..<1500 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("timed out: \(what)")
-    }
-
     private func stl(_ name: String) throws -> URL {
         URL(fileURLWithPath: try TestParts.write(
             TestParts.box(-5, 5, -5, 5, 0, 20) + TestParts.box(-30, 30, -30, 30, 20, 24), name: "\(name)-\(UUID().uuidString).stl"))
@@ -36,12 +28,12 @@ struct DrawParkedTests {
         window.session.setSettings(s)
         window.session.perform("Add Fins") { window.session.finsOn = true }
         draw.model.sync()
-        try await eventually("the kit") { draw.model.kitReady }
+        try await eventually("the kit", tries: 1500) { draw.model.kitReady }
         // a wall across the slab's underside, clear of the stem
         let wall = DrawnWall.wall(from: SIMD3(-12, 12, 20), to: SIMD3(12, 12, 20))
         window.session.perform("Draw Wall") { window.session.drawnWalls.append(wall) }
         draw.model.sync()
-        try await eventually("the sweep") { draw.model.sweepCurrent }
+        try await eventually("the sweep", tries: 1500) { draw.model.sweepCurrent }
         #expect(draw.model.outcomes[wall.id]?.ok == true)
 
         // add a second model: the first is parked with its wall, the second shows none
@@ -55,7 +47,7 @@ struct DrawParkedTests {
 
         // while parked its wall is stood for its pose and shown with it
         var shown: (sweep: DrawnSweep?, mesh: OverlayMesh?)?
-        try await eventually("the parked wall") {
+        try await eventually("the parked wall", tries: 1500) {
             shown = draw.parkedDrawn(stash, settings: window.session.settings, finsOn: true) { board.sync() }
             return shown?.mesh != nil
         }
@@ -66,7 +58,7 @@ struct DrawParkedTests {
         board.swap(to: 0)
         #expect(window.session.drawnWalls == [wall])
         #expect(board.plate.models[1].stash?.featureStates[ObjectIdentifier(DrawFeature.self)] == nil, "the second had none")
-        try await eventually("the sweep again") { draw.model.sweepCurrent && draw.model.outcomes[wall.id] != nil }
+        try await eventually("the sweep again", tries: 1500) { draw.model.sweepCurrent && draw.model.outcomes[wall.id] != nil }
         #expect(draw.model.outcomes[wall.id]?.ok == true)
     }
 }

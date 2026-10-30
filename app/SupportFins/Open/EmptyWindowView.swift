@@ -33,7 +33,7 @@ struct EmptyWindowView: View {
     private func step(_ n: Int, _ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("\(n).").monospacedDigit().foregroundStyle(.secondary)
-            Text(title).bold() + Text(" ") + Text(detail)
+            Text("\(Text(title).bold()) \(Text(detail))")
         }
     }
 }

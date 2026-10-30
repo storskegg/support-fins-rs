@@ -61,5 +61,5 @@ struct TinesSection: View {
     }
 
     /// The slider's tooltip for Vertical tines (`PIN_SPACING_TIP`, `web/ui/settings.js:176-178`).
-    static var pinSpacingTip: String { JS.t("How many pins each wall gets. More pins = a firmer hold; fewer = fewer marks to clean up. Add pins before deepening them: a deeper pin leaves a bigger mark and is harder to snap off.") }
+    nonisolated static var pinSpacingTip: String { JS.t("How many pins each wall gets. More pins = a firmer hold; fewer = fewer marks to clean up. Add pins before deepening them: a deeper pin leaves a bigger mark and is harder to snap off.") }
 }

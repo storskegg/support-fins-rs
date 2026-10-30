@@ -82,9 +82,6 @@ struct BuildRecords: Codable, Equatable, Sendable {
     }
 
     init(json: String) throws { self = try JSONDecoder().decode(Self.self, from: Data(json.utf8)) }
-    init(fins: [FinRecord], props: [PropRecord], crestRanges: [Range<Int>] = []) {
-        (self.fins, self.props, self.crestRanges) = (fins, props, crestRanges)
-    }
 }
 
 /// The CLI's `--json` stats (`sf_cli::entry::Stats::to_json`).

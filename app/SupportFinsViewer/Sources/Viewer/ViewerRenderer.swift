@@ -106,7 +106,6 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     var idTexture: MTLTexture?
     var idDepth: MTLTexture?
     let readback: MTLBuffer
-    private var lastDrawTime: Double?
     /// Bumped whenever something drawn changes; a test or a caller can see whether a frame was needed.
     public internal(set) var changeCount = 0
     private var drawnCount = -1

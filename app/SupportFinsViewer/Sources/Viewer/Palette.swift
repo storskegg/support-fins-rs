@@ -27,6 +27,4 @@ public enum Palette {
     public static let gridMajor = hex(0x3d4552)
     public static let plateEdge = hex(0x5b6472)
     public static let volumeBox = hex(0x39414f)
-    /// Reverse side of a face (`web/ui/part.js`: `vec3(0.09, 0.10, 0.13)`).
-    public static let backFace = SIMD3<Float>(0.09, 0.10, 0.13)
 }

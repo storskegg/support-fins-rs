@@ -33,7 +33,9 @@ private struct OpenFlowModifier: ViewModifier {
             .onChange(of: model.limitPrompt, initial: true) { _, prompt in presenter.update(prompt, window: window) }
             .onChange(of: window) { _, w in presenter.update(model.limitPrompt, window: w) }
             .onDisappear { presenter.finish(false); model.answerLimitPrompt(false) }
-            .dropDestination(for: URL.self) { urls, _ in dropped(urls) }
+            // the Bool-returning overload: its `false` refuses an unsupported drop (the file slides back); the macOS 26 one
+            // returns nothing, so every drop would count as taken
+            .dropDestination(for: URL.self, action: { (urls: [URL], _: CGPoint) -> Bool in dropped(urls) })
     }
 
     /// A drop (`#drop`): an STL, OBJ or 3MF opens. An empty window takes it; a window with a part opens it in a
