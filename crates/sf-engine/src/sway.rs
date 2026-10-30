@@ -7,9 +7,8 @@
 //! spaced EVENLY up the whole height). The gap arrives in `opts` rather than being read from
 //! FIN/PROP, so the module depends on neither.
 
-use crate::guards::JsSort;
+use crate::guards::{JsSort, cmp_diff};
 use indexmap::IndexMap;
-use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
 
 use crate::config::Config;
@@ -18,6 +17,8 @@ use crate::fins::seating::pose_key;
 use crate::inside::inside_part;
 use crate::jsnum;
 use crate::kiss::{KissOpts, kiss_ends};
+// sway.js's printTriangles (web/sway.js:135-145) is walls.js's, line for line
+use crate::drawn::print_triangles;
 use crate::overhangs::{Analysis, Topology};
 use crate::planes::{
     MAX_LEAN_DEG, Patch, find_wall_patches, patch_point, patch_probe, t_at_z, z_at,
@@ -212,22 +213,6 @@ struct PatchEntry {
     part_tris: Arc<Tris>,
 }
 
-/// JS `a - b` as a sort comparator result: negative, positive, and 0 or NaN (both "equal").
-fn num_ord(d: f64) -> Ordering {
-    if d < 0.0 {
-        Ordering::Less
-    } else if d > 0.0 {
-        Ordering::Greater
-    } else {
-        Ordering::Equal
-    }
-}
-
-/// JS `x || y` on two numbers (0 and NaN are falsy).
-fn or(x: f64, y: f64) -> f64 {
-    if x != 0.0 && !x.is_nan() { x } else { y }
-}
-
 /// `opts.crossClear`: a cross rib's triangles in, whether they stand clear.
 pub type CrossClear<'a> = &'a dyn Fn(&[V4]) -> bool;
 
@@ -350,22 +335,6 @@ fn settings(opts: &SwayOpts, cfg: &Config) -> Settings {
         // tool suggests, the person decides -- the same split as the rest of the app.
         allow_stilt: opts.allow_stilt == Some(true),
     }
-}
-
-/// Port of `printTriangles` (web/sway.js:135-145): the part's triangles in print space, as a flat
-/// array.
-fn print_triangles(topo: &Topology, rot: &Rot3, offset: &Xyz) -> Vec<f64> {
-    let pos = &topo.pos;
-    let mut a = vec![0.0; topo.n_faces * 9];
-    let mut i = 0;
-    while i < a.len() {
-        let (x, y, z) = (pos[i], pos[i + 1], pos[i + 2]);
-        a[i] = rot[0] * x + rot[3] * y + rot[6] * z + offset.x;
-        a[i + 1] = rot[1] * x + rot[4] * y + rot[7] * z + offset.y;
-        a[i + 2] = rot[2] * x + rot[5] * y + rot[8] * z + offset.z;
-        i += 3;
-    }
-    a
 }
 
 /// Port of `pushSolid` (web/sway.js:163-172): push a closed solid, flipping the winding outward
@@ -913,7 +882,7 @@ pub fn build_sway_rib(
         }
         z = jsnum::min(h, z + sw.level_step);
     }
-    level_heights.js_sort_by(|a, b| num_ord(a - b));
+    level_heights.js_sort_by(|a, b| cmp_diff(a - b));
     let levels: Vec<SwayLevel> = level_heights
         .iter()
         .map(|&z| SwayLevel {
@@ -1049,7 +1018,7 @@ fn plan_hull(points: &[[f64; 2]]) -> Vec<[f64; 2]> {
         (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
     };
     let mut sorted: Vec<[f64; 2]> = points.iter().map(|p| [p[0], p[1]]).collect();
-    sorted.js_sort_by(|a, b| num_ord(or(a[0] - b[0], a[1] - b[1])));
+    sorted.js_sort_by(|a, b| cmp_diff(jsnum::or(a[0] - b[0], a[1] - b[1])));
     let pts: Vec<[f64; 2]> = sorted
         .iter()
         .enumerate()
@@ -1348,7 +1317,7 @@ fn columns_for(p: &Patch, cfg: &Config) -> Vec<f64> {
         });
         k += 1.0;
     }
-    samples.js_sort_by(|x, y| num_ord(or(y.top - x.top, y.edge - x.edge)));
+    samples.js_sort_by(|x, y| cmp_diff(jsnum::or(y.top - x.top, y.edge - x.edge)));
     let apart = jsnum::max(sw.pitch / 2.0, w / (n + 1.0));
     let mut cols: Vec<f64> = Vec::new();
     for s in &samples {
@@ -1438,7 +1407,7 @@ pub fn build_sway_braces(
             p,
         })
         .collect();
-    cands.js_sort_by(|a, b| num_ord(b.score - a.score));
+    cands.js_sort_by(|a, b| cmp_diff(b.score - a.score));
     if cands.is_empty() {
         return none("no upright side is tall and flat enough to brace in this pose".to_string());
     }

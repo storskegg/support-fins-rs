@@ -11,6 +11,7 @@
 //! Run with `cargo test -p sf-ffi --release --test hostile`.
 mod common;
 
+use common::load;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -28,7 +29,6 @@ use sf_ffi::{
     reads_as_step, scale_from_percent_text, scale_percent_text,
 };
 use sf_io::json::{Json, parse};
-use sf_testkit::models_dir;
 
 const ID: [f64; 9] = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
 
@@ -292,17 +292,6 @@ fn corrupted(base: &str) -> Vec<String> {
 }
 
 // ---------------------------------------------------------------------------------------------- fixtures
-
-fn load(name: &str) -> Arc<Part> {
-    load_parts(
-        models_dir()
-            .join(format!("{name}.stl"))
-            .to_string_lossy()
-            .into_owned(),
-    )
-    .unwrap()
-    .remove(0)
-}
 
 fn build_of(part: &Arc<Part>) -> Arc<BuildResult> {
     Arc::new(build_part(part, &ID, &common::options(), &common::tunables()).unwrap())

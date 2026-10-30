@@ -3,6 +3,8 @@
 //! sends, and records the counts, a hash of the triangles and the per-fin records. The FFI build must give
 //! the same numbers, records and triangles, exactly.
 // these tests are about the page-vs-CLI difference and the refusals, so they spell the request out (`"{}"` is the empty request); see common/mod.rs.
+mod common;
+use common::{arr, field, num};
 use std::path::PathBuf;
 
 use sf_ffi::{BuildResult, build_part, load_parts};
@@ -15,23 +17,6 @@ fn corpus() -> Json {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../parity/corpus/ffibuild/cases.json");
     parse(&std::fs::read_to_string(path).expect("run `just oracle ffibuild`")).unwrap()
 }
-fn arr(v: &Json) -> &[Json] {
-    match v {
-        Json::Arr(a) => a,
-        o => panic!("not an array: {o:?}"),
-    }
-}
-fn num(v: &Json) -> f64 {
-    match v {
-        Json::Num(n) => *n,
-        o => panic!("not a number: {o:?}"),
-    }
-}
-fn field<'a>(v: &'a Json, k: &str) -> &'a Json {
-    v.get(k)
-        .unwrap_or_else(|| panic!("no {k} in {}", v.stringify()))
-}
-
 /// FNV-1a 64 over the little-endian words, as the oracle hashes them.
 fn fnv64(words: &[f32]) -> String {
     let mut h: u64 = 0xcbf29ce484222325;

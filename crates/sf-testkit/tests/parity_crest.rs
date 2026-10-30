@@ -2,6 +2,8 @@
 //! JS keeps `part` / `layerH` in module state; each case carries it as a `state` argument.
 //! `P(o, z)` is fixed to `[2 + 0.5 * o, 3 - 0.25 * o, z]`; a vertex tag is a bool per vertex.
 
+mod common;
+use common::nums;
 use std::sync::Arc;
 
 use parity::{Case, Tol, Value, compare, load_cases};
@@ -13,13 +15,6 @@ use sf_engine::prop::crest::{
 use sf_engine::tris::Tris;
 use sf_engine::types::V4;
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::F64(a) => a.clone(),
-        other => other.arr().iter().map(Value::num).collect(),
-    }
-}
 
 /// A recorded Float64Array of xyz triples as untagged soup vertices.
 fn verts(v: &Value) -> Vec<V4> {

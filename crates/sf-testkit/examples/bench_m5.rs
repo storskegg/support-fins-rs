@@ -11,6 +11,7 @@
 //! writing; with no filter it rewrites the block between the `bench:begin` / `bench:end` markers of
 //! `docs/PERF-M5.md` (the rest of that file is hand-written). `BENCH_PRIVATE_3MF` overrides the private
 //! file's path; the file's geometry is read into memory only and nothing derived from it is stored.
+use sf_testkit::median;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -134,11 +135,6 @@ fn pose_rot(group: Group, pose: &str) -> [f64; 9] {
         rest = &rest[n..];
     }
     site_pose(deg, 0.0)
-}
-
-fn median(mut a: Vec<f64>) -> f64 {
-    a.sort_by(|x, y| x.partial_cmp(y).unwrap());
-    a[a.len() / 2]
 }
 
 /// Build `pos` once from a fresh topology: (build ms, output vertices).

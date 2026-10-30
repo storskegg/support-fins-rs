@@ -5,6 +5,7 @@
 // the remaining `"{}"` are failure cases (bad settings, bad walls) and an empty sweep; see common/mod.rs.
 mod common;
 
+use common::{arr, field, num, nums, text};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -18,32 +19,6 @@ fn corpus() -> Json {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../parity/corpus/ffidraw/cases.json");
     parse(&std::fs::read_to_string(path).expect("run `just oracle ffidraw`")).unwrap()
 }
-fn arr(v: &Json) -> &[Json] {
-    match v {
-        Json::Arr(a) => a,
-        o => panic!("not an array: {o:?}"),
-    }
-}
-fn num(v: &Json) -> f64 {
-    match v {
-        Json::Num(n) => *n,
-        o => panic!("not a number: {o:?}"),
-    }
-}
-fn field<'a>(v: &'a Json, k: &str) -> &'a Json {
-    v.get(k)
-        .unwrap_or_else(|| panic!("no {k} in {}", v.stringify()))
-}
-fn text(v: &Json) -> &str {
-    match v {
-        Json::Str(s) => s,
-        o => panic!("not a string: {o:?}"),
-    }
-}
-fn nums(v: &Json) -> Vec<f64> {
-    arr(v).iter().map(num).collect()
-}
-
 /// FNV-1a 64 over the little-endian words, as the oracle hashes them.
 fn fnv64(words: &[f32]) -> String {
     let mut h: u64 = 0xcbf29ce484222325;

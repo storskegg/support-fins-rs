@@ -13,18 +13,10 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use rayon::prelude::*;
 
 use crate::jsnum;
-use crate::overhangs::{TopoCache, Topology};
+use crate::overhangs::{TopoCache, Topology, q3};
 
 /// Faces below which the serial weld wins (rayon's fixed cost outweighs the work).
 pub const PAR_MIN_FACES: usize = 20_000;
-
-/// `NaN_KEY` (web/overhangs.js:38).
-const NAN_KEY: f64 = f64::MAX;
-
-fn q3(v: f64) -> f64 {
-    let q = jsnum::round(v * 1000.0);
-    if !q.is_nan() { q + 0.0 } else { NAN_KEY }
-}
 
 #[inline]
 fn finish(mut h: u64) -> u32 {

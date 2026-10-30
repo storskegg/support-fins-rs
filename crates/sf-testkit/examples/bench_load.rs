@@ -7,6 +7,7 @@
 //! The private 3MF (`private-fixtures/Earth Focus Many Vertical.3mf`, or `BENCH_PRIVATE_3MF`) is timed
 //! when present: parse of the whole file, then weld + analyze per object. Only counts and timings are
 //! printed. Usage: `bench_load [stl|obj|3mf] ...` (default all). Writes `target/bench-load/rust.json`.
+use sf_testkit::median;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -18,10 +19,6 @@ const U: usize = 1000;
 const V: usize = 750;
 const ID: [f64; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 
-fn median(mut a: Vec<f64>) -> f64 {
-    a.sort_by(|x, y| x.partial_cmp(y).unwrap());
-    a[a.len() / 2]
-}
 fn ms(t: Instant) -> f64 {
     t.elapsed().as_secs_f64() * 1e3
 }

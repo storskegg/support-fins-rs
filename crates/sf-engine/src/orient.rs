@@ -21,7 +21,7 @@
 //!
 //! Line numbers are at the checkout's commit (23039e2).
 
-use crate::guards::JsSort;
+use crate::guards::{JsSort, cmp_diff};
 use indexmap::IndexMap;
 use rayon::prelude::*;
 
@@ -95,23 +95,6 @@ pub fn rot_from_to(a: V3, b: V3) -> Rot3 {
     ]
 }
 
-/// Port of `mul` (web/orient.js:65-75): multiply two column-major 3x3s: returns A*B. (Unused by
-/// the rest of orient.js, as there.)
-#[allow(dead_code)]
-fn mul(a: &Rot3, b: &Rot3) -> Rot3 {
-    let mut o = [0.0; 9];
-    for col in 0..3 {
-        for row in 0..3 {
-            let mut s = 0.0;
-            for k in 0..3 {
-                s += a[k * 3 + row] * b[col * 3 + k];
-            }
-            o[col * 3 + row] = s;
-        }
-    }
-    o
-}
-
 /// Port of `applyRot` (web/orient.js:78-84): apply a column-major 3x3 (THREE.Matrix3.elements
 /// order) to a vector: R * v.
 fn apply_rot(r: &Rot3, v: V3) -> V3 {
@@ -119,27 +102,6 @@ fn apply_rot(r: &Rot3, v: V3) -> V3 {
         r[0] * v[0] + r[3] * v[1] + r[6] * v[2],
         r[1] * v[0] + r[4] * v[1] + r[7] * v[2],
         r[2] * v[0] + r[5] * v[1] + r[8] * v[2],
-    ]
-}
-
-/// Port of `rotAxis` (web/orient.js:87-95): column-major rotation of `deg` about a unit world
-/// axis. (Unused by the rest of orient.js, as there.)
-#[allow(dead_code)]
-fn rot_axis(axis: V3, deg: f64) -> Rot3 {
-    let a = (deg * std::f64::consts::PI) / 180.0;
-    let (c, s) = (jsnum::cos(a), jsnum::sin(a));
-    let [x, y, z] = axis;
-    let t = 1.0 - c;
-    [
-        t * x * x + c,
-        t * x * y + s * z,
-        t * x * z - s * y,
-        t * x * y - s * z,
-        t * y * y + c,
-        t * y * z + s * x,
-        t * x * z + s * y,
-        t * y * z - s * x,
-        t * z * z + c,
     ]
 }
 
@@ -337,17 +299,6 @@ impl Confidence {
 pub struct Suggestions {
     pub candidates: Vec<Candidate>,
     pub confidence: Confidence,
-}
-
-/// `.sort((p, r) => p.x - r.x)` comparator: stable, a NaN difference compares as 0.
-fn cmp_diff(d: f64) -> std::cmp::Ordering {
-    if d < 0.0 {
-        std::cmp::Ordering::Less
-    } else if d > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
 }
 
 /// Above this many faces Suggest ranks on pass 1 alone, with no fin build per finalist. Port of

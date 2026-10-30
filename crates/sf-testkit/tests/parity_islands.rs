@@ -3,20 +3,14 @@
 //! (the replay builds the topology and the analysis). Pure arithmetic on the inputs, so
 //! `Tol::Exact`. The `ISLAND` config is the default unless a `$config` argument says otherwise.
 
+mod common;
 use ::parity::{Tol, Value, compare, load_cases};
+use common::nums;
 use sf_engine::islands::{IslandOpts, find_islands};
 use sf_engine::overhangs::{analyze, build_topology};
 use sf_engine::types::Rot3;
 use sf_testkit::parity::{Resolved, resolve_args};
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::Arr(a) => a.iter().map(Value::num).collect(),
-        Value::F64(a) => a.clone(),
-        other => panic!("expected numbers, got {other:?}"),
-    }
-}
 
 fn rot_of(v: &Value) -> Rot3 {
     <Rot3>::try_from(nums(v).as_slice()).expect("rot has 9 numbers")

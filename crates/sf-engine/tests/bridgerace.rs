@@ -1,5 +1,7 @@
 //! Direct tests of `sf_engine::prop::bridgerace` (web/prop/bridgerace.js): the turned-walls race.
 
+mod common;
+use common::ctx;
 use std::sync::Arc;
 
 use sf_engine::tris::Tris;
@@ -7,8 +9,7 @@ use sf_engine::tris::Tris;
 use sf_engine::config::Config;
 use sf_engine::prop::bridgerace::{RACE_ABS, RACE_REL, bridge_race};
 use sf_engine::prop::build::{Acc, Lines, Patch, PropRecord};
-use sf_engine::prop::crest::Crest;
-use sf_engine::prop::ctx::{BuildCtx, TineSeed};
+use sf_engine::prop::ctx::TineSeed;
 
 fn patch() -> Patch {
     // a 20 x 20 mm face at z = 10
@@ -21,10 +22,6 @@ fn patch() -> Patch {
         ])),
         ..Default::default()
     }
-}
-
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
 }
 
 fn turned() -> Lines {

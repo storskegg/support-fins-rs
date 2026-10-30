@@ -9,12 +9,13 @@
 #![allow(unsafe_code)]
 mod common;
 
+use common::ctx;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use sf_ffi::{
-    BuildListener, BuildResult, Builder, FfiError, Part, StrengthAdvice, SuggestContext,
-    SuggestListener, SuggestResult, Suggester, build_part, load_parts,
+    BuildListener, BuildResult, Builder, FfiError, Part, StrengthAdvice, SuggestListener,
+    SuggestResult, Suggester, build_part, load_parts,
 };
 
 #[repr(C)]
@@ -96,13 +97,6 @@ fn part() -> Arc<Part> {
     let _ = std::fs::remove_dir_all(&dir);
     p
 }
-fn ctx() -> SuggestContext {
-    SuggestContext {
-        current_bore: 0,
-        density: 1.24,
-    }
-}
-
 enum Ev {
     Progress,
     Done,

@@ -11,7 +11,7 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::config::Config;
 use crate::jsnum;
-use crate::overhangs::{Analysis, Topology};
+use crate::overhangs::{Analysis, Topology, find};
 use crate::types::Rot3;
 
 /// `ISLAND` (web/islands.js:24). Fields mirror the JS keys in order (snake_case); `Default` = the JS initial values.
@@ -153,16 +153,6 @@ impl IslandOpts {
             max_faces: self.max_faces.unwrap_or(base.max_faces),
         }
     }
-}
-
-/// `find(i)` of a union-find with path halving: `i = parent[i] = parent[parent[i]]`.
-fn find(parent: &mut [i32], mut i: i32) -> i32 {
-    while parent[i as usize] != i {
-        let g = parent[parent[i as usize] as usize];
-        parent[i as usize] = g;
-        i = g;
-    }
-    i
 }
 
 /// A candidate: a run of low vertices (`run.verts`), its height `z0` and the faces around it.

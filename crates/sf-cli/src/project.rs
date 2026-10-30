@@ -15,9 +15,9 @@ use sf_io::zip::{ProjectZip, ZipData};
 use crate::cli::{Args, FileResult, FinError, Io};
 use crate::entry::{EngineOptions, compute_fins, options_from_dialog};
 use crate::project_analysis::{PositionsPlan, default_cut, negative_components, project_positions};
-use crate::project_cache::{CacheRequest, Generated, runtime_identity};
+use crate::project_cache::{CacheRequest, Generated};
 use crate::project_nozzle::project_nozzle;
-use crate::project_report::{ProjectReport, ReportData, format_project_report};
+use crate::project_report::{ProjectReport, format_project_report};
 use crate::project_xml::{
     Edit, Node, child, children, edit_xml, escape_xml, insert, meta, metadata, xml_tree,
 };
@@ -1331,12 +1331,4 @@ fn process_project(
         ]),
         incompatible: false,
     })
-}
-
-/// Used by the report formatter for data not needed here.
-#[allow(dead_code)]
-fn _unused(_: &ReportData) {}
-#[allow(dead_code)]
-fn _unused2() -> Result<String, String> {
-    runtime_identity()
 }

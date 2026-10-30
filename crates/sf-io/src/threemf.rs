@@ -2825,14 +2825,9 @@ pub fn read_three_mf(bytes: &[u8]) -> Result<ThreeMf, String> {
     read_package(bytes, true, &LoadOptions::default()).map_err(String::from)
 }
 
-/// `read_three_mf` without the merged soup: `positions` is left empty (a caller that takes the
-/// objects one by one has no use for the second copy of every triangle).
-pub fn read_three_mf_unmerged(bytes: &[u8]) -> Result<ThreeMf, String> {
-    read_package(bytes, false, &LoadOptions::default()).map_err(String::from)
-}
-
-/// [`read_three_mf_unmerged`] with the load options (`allow_large`), and the load-anyway limits
-/// as a [`ReadError::Limit`] instead of a message. The limits are checked before the work they
+/// [`read_three_mf_with`] without the merged soup: `positions` is left empty (a caller that takes the
+/// objects one by one has no use for the second copy of every triangle). The load-anyway limits
+/// come back as a [`ReadError::Limit`]. The limits are checked before the work they
 /// guard: the ZIP's declared sizes before anything is inflated, the triangle count of the whole
 /// build before anything is emitted.
 pub fn read_three_mf_unmerged_with(bytes: &[u8], opts: &LoadOptions) -> Result<ThreeMf, ReadError> {

@@ -9,7 +9,7 @@ use sf_io::json::{Json, parse};
 use sf_io::report::{UrlOpts, box_of, report_coverage, report_settings, report_url, web_fin_opts};
 
 use crate::builder::BuildResult;
-use crate::part::FfiError;
+use crate::part::{FfiError, engine};
 
 /// The report of one build: its settings JSON and the link, from the build, the part's scale and the two
 /// texts the build was requested with.
@@ -17,12 +17,6 @@ use crate::part::FfiError;
 pub struct BuildReport {
     rep: Json,
     cov: sf_io::report::Coverage,
-}
-
-fn engine(message: impl Into<String>) -> FfiError {
-    FfiError::Engine {
-        message: message.into(),
-    }
 }
 
 /// The report of `result`, a build of the part at `scale` (1 = as loaded) requested with `opts_json` and

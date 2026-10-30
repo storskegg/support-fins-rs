@@ -2,6 +2,8 @@
 //! branches the ported JS tests and the parity corpus do not name. Parity
 //! (`sf-testkit/tests/parity_wedges.rs`, `parity_pad.rs`) pins equality with JS.
 
+mod common;
+use common::ctx;
 use indexmap::IndexSet;
 use sf_engine::config::Config;
 use sf_engine::fins::pad::{PadStyle, build_pad};
@@ -10,15 +12,10 @@ use sf_engine::fins::wedges::*;
 use sf_engine::overhangs::{analyze, build_topology};
 use sf_engine::prop::build::PropRecord;
 use sf_engine::prop::crest::Crest;
-use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::tris::Tris;
 use sf_engine::types::{IDENTITY3, Xyz};
 use sf_testkit::{block, load_model, rot_x};
 use std::sync::Arc;
-
-fn ctx(cfg: &Config) -> BuildCtx<'_> {
-    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
-}
 
 /// The cube stood on its edge: its down-facing patches are the wedge candidates.
 fn cube_x45() -> (

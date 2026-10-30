@@ -4,6 +4,8 @@
 //! with it off, the geometry stays watertight, and the tines -- and only the tines -- bite into the
 //! part. Then "Draw opens up" (local issue 011): short walls, squat walls on the plate and on the
 //! part; review fixes; and local issue 033: full-height drawn walls stay out of the part.
+mod common;
+use common::{f32s, xyz};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -24,14 +26,6 @@ const OFF: Xyz = Xyz {
     y: 0.0,
     z: 0.0,
 };
-
-fn f32s(v: &[f64]) -> Vec<f64> {
-    v.iter().map(|&x| (x as f32) as f64).collect()
-}
-
-fn xyz(t: &[V4]) -> Vec<[f64; 3]> {
-    t.iter().map(|v| [v[0], v[1], v[2]]).collect()
-}
 
 /// `topoOf(...blocks)`: a topology of the blocks' soup, stored as a Float32Array.
 fn topo_of(blocks: &[Vec<f64>]) -> Topology {

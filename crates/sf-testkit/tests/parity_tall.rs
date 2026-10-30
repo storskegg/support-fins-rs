@@ -3,6 +3,7 @@
 //! `brace_tall_walls` on real builds (the stress models with the ribs off, `BRACE.tallH` lowered so
 //! walls qualify) and in the golden scenes. Exact.
 mod common;
+
 use ::parity::{Tol, Value, load_cases};
 use common::*;
 use sf_engine::fins::build::{FinKind, FinRecord, FinsBuilt};
@@ -11,13 +12,6 @@ use sf_engine::fins::tall::{PlanGrid, brace_tall_walls};
 use sf_engine::overhangs::Analysis;
 use sf_engine::types::{V4, Xyz};
 use sf_testkit::parity::resolve_args;
-
-fn get<'a>(v: &'a Value, k: &str) -> Option<&'a Value> {
-    match v {
-        Value::Obj(o) => o.iter().find(|(key, _)| key == k).map(|(_, x)| x),
-        _ => None,
-    }
-}
 
 fn v4s(flat: &Value) -> Vec<V4> {
     nums(flat)

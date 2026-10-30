@@ -8,7 +8,7 @@ use std::sync::Arc;
 use sf_engine::footprint::{self as fp, Grid};
 
 use crate::builder::BuildResult;
-use crate::part::{FfiError, Part, rot9};
+use crate::part::{FfiError, Part, engine, rot9};
 
 /// A footprint grid: the 1 mm cells of the bed that a model covers at any height. Never empty (an empty
 /// footprint is `None` where one can be).
@@ -31,12 +31,6 @@ const MAX_COORD: f64 = 4000.0;
 const MAX_SPAN: f64 = 4000.0;
 /// The largest gap or dilation, in cells.
 const MAX_REACH: i64 = 1000;
-
-fn engine(message: impl Into<String>) -> FfiError {
-    FfiError::Engine {
-        message: message.into(),
-    }
-}
 
 fn coord(v: f64, what: &str) -> Result<f64, FfiError> {
     if v.is_finite() && v.abs() <= MAX_COORD {

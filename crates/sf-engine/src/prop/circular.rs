@@ -4,7 +4,7 @@
 //! horizontal circular boundary loops with a common centre. An ellipse, open arc, uneven rim or
 //! non-circular inner boundary keeps the existing placement path.
 
-use crate::guards::JsSort;
+use crate::guards::{JsSort, cmp_diff};
 use std::sync::{Arc, Mutex};
 
 use indexmap::{IndexMap, IndexSet};
@@ -109,18 +109,6 @@ fn circle(points: &[[f64; 3]]) -> Option<Circle> {
         z,
         tolerance,
     })
-}
-
-/// What a JS `sort` comparator returning `diff` means: negative first, positive last, zero or
-/// NaN equal.
-fn cmp_diff(diff: f64) -> std::cmp::Ordering {
-    if diff < 0.0 {
-        std::cmp::Ordering::Less
-    } else if diff > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
 }
 
 /// `surroundingGeometry`'s result (web/prop/circular.js:80-81):

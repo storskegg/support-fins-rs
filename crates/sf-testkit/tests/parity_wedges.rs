@@ -4,6 +4,7 @@
 //! scenes' builds call them. Exact.
 mod common;
 use ::parity::{Case, Tol, Value, load_cases};
+use common::xyz as xyz_of;
 use common::*;
 use indexmap::IndexSet;
 use sf_engine::config::Config;
@@ -18,13 +19,6 @@ use sf_engine::types::Xyz;
 use sf_testkit::parity::{Resolved, resolve_args};
 use std::sync::Arc;
 
-fn xyz_of(v: &Value) -> Xyz {
-    Xyz {
-        x: v.get("x").num(),
-        y: v.get("y").num(),
-        z: v.get("z").num(),
-    }
-}
 fn xy_of(v: &Value) -> Xy {
     Xy {
         x: v.get("x").num(),

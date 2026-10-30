@@ -3,6 +3,8 @@
 //! builds with the crest on everywhere and vertical pins) call them. The crest's module state is
 //! the `state` argument.
 
+mod common;
+use common::nums;
 use std::sync::Arc;
 
 use parity::{Case, Tol, Value, compare, load_cases};
@@ -14,13 +16,6 @@ use sf_engine::tris::Tris;
 use sf_engine::types::Xyz;
 use sf_testkit::parity::{resolve, seated};
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::F64(a) => a.clone(),
-        other => other.arr().iter().map(Value::num).collect(),
-    }
-}
 
 fn line(v: &Value) -> Vec<[f64; 3]> {
     v.arr()

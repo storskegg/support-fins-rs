@@ -24,14 +24,8 @@ use sf_io::json::{Json, parse};
 
 use crate::builder::{BuildResult, soup_buffer};
 use crate::gpu::GpuBuffer;
-use crate::part::{FfiError, Part, rot9};
+use crate::part::{FfiError, Part, engine, rot9};
 use crate::records;
-
-fn engine(message: impl Into<String>) -> FfiError {
-    FfiError::Engine {
-        message: message.into(),
-    }
-}
 
 fn num(j: &Json, key: &str) -> Result<f64, FfiError> {
     match j.get(key) {

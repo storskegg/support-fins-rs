@@ -3,26 +3,15 @@
 //! against the JS in `crates/sf-engine/tests/parity_footprint.rs`.
 mod common;
 
+use common::load;
 use std::sync::Arc;
 
 use sf_ffi::{
-    Footprint, Part, build_part, footprint_clash_cells, footprint_of_build, footprint_of_part,
-    footprint_spot, footprint_union, load_parts, plate_under,
+    Footprint, build_part, footprint_clash_cells, footprint_of_build, footprint_of_part,
+    footprint_spot, footprint_union, plate_under,
 };
-use sf_testkit::models_dir;
 
 const ID: [f64; 9] = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
-
-fn load(name: &str) -> Arc<Part> {
-    load_parts(
-        models_dir()
-            .join(format!("{name}.stl"))
-            .to_string_lossy()
-            .into_owned(),
-    )
-    .unwrap()
-    .remove(0)
-}
 
 fn cube_grid() -> Arc<Footprint> {
     footprint_of_part(load("cube"), ID.to_vec(), vec![0.0; 3])

@@ -3,6 +3,8 @@
 //! the 54 golden scenes' builds (and builds with the crest, a cutout pattern and vertical pins
 //! switched on) call them. The crest's module state is the `state` argument.
 
+mod common;
+use common::nums;
 use std::sync::Arc;
 
 use parity::{Case, Tol, Value, compare, load_cases};
@@ -13,13 +15,6 @@ use sf_engine::prop::sweep::{foot_for, profile_half, stem_half, sweep, sweep_bet
 use sf_engine::tris::Tris;
 use sf_testkit::parity::seated;
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::F64(a) => a.clone(),
-        other => other.arr().iter().map(Value::num).collect(),
-    }
-}
 
 fn cfg_of(c: &Case) -> Config {
     config(c.args.last().unwrap().get("$config"))

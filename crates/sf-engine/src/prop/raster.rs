@@ -23,7 +23,7 @@
 //!
 //! Split out of prop.js, which only wires the two passes together.
 
-use crate::guards::JsSort;
+use crate::guards::{JsSort, cmp_diff};
 use indexmap::{IndexMap, IndexSet};
 
 use crate::config::Config;
@@ -575,17 +575,6 @@ fn near_region(faces: &[OverFace], ri: usize, cfg: &Config) -> Vec<usize> {
         .collect()
 }
 
-/// A JS comparator number as an `Ordering` (NaN counts as equal).
-fn ordering(d: f64) -> std::cmp::Ordering {
-    if d < 0.0 {
-        std::cmp::Ordering::Less
-    } else if d > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
-}
-
 /// Port of `keepers` (web/prop/raster.js:300-317): the normal-pass walls `qa` a region swapped
 /// to raster (`qb`) still keeps, or `None` when the swap must not happen.
 ///
@@ -615,7 +604,7 @@ fn keepers<'a>(
     };
     // lowest-gripping first, so a low wall claims its spot before a neighbour
     let mut order: Vec<&PropRecord> = qa.to_vec();
-    order.js_sort_by(|x, y| ordering(grip_z(&[x]) - grip_z(&[y])));
+    order.js_sort_by(|x, y| cmp_diff(grip_z(&[x]) - grip_z(&[y])));
     for q in order {
         // (`alone`: the swap replaces the region's walls, none stay beside it)
         if alone || q.line.is_empty() {

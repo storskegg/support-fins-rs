@@ -1,6 +1,8 @@
 //! Replays `parity/corpus/brace/` and `parity/corpus/ties/` (recorded by `parity/oracle/brace.js`)
 //! with `Tol::Exact`.
 
+mod common;
+use common::nums;
 use std::cell::Cell;
 
 use parity::{Case, Tol, Value, compare, load_cases};
@@ -8,13 +10,6 @@ use sf_engine::prop::brace::{BraceKinds, brace_cross_rib, brace_wall};
 use sf_engine::prop::ties::tie_walls;
 use sf_engine::tris::Tris;
 use sf_testkit::parity_config::config;
-
-fn nums(v: &Value) -> Vec<f64> {
-    match v {
-        Value::F64(a) => a.clone(),
-        other => other.arr().iter().map(Value::num).collect(),
-    }
-}
 
 fn p3(v: &Value) -> Vec<[f64; 3]> {
     v.arr()

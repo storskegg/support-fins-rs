@@ -28,15 +28,10 @@ enum Group {
     Private,
 }
 
-#[allow(dead_code)]
 struct Case {
     group: Group,
     model: String,
     pose: String,
-    /// M3 JS `buildFins` ms (`None` for the private file: JS cannot load it).
-    js_ms: Option<f64>,
-    /// M3 single-thread Rust `build_fins` ms.
-    m3_ms: f64,
 }
 
 /// The case list from the tables of PERF-M3.md.
@@ -62,15 +57,14 @@ fn read_cases(perf_m3: &str) -> Vec<Case> {
         if cells.len() < 7 || cells[1] == "model" || cells[1].starts_with("---") {
             continue;
         }
-        let Ok(m3_ms) = cells[5].parse::<f64>() else {
+        // a timed row: its M3 Rust ms is a number
+        if cells[5].parse::<f64>().is_err() {
             continue;
-        };
+        }
         out.push(Case {
             group: g,
             model: cells[1].to_string(),
             pose: cells[2].to_string(),
-            js_ms: cells[4].parse().ok(),
-            m3_ms,
         });
     }
     out
@@ -126,12 +120,6 @@ fn pose_rot(group: Group, pose: &str) -> [f64; 9] {
         rest = &rest[n..];
     }
     site_pose(deg, 0.0)
-}
-
-#[allow(dead_code)]
-fn median(mut a: Vec<f64>) -> f64 {
-    a.sort_by(|x, y| x.partial_cmp(y).unwrap());
-    a[a.len() / 2]
 }
 
 const TRIALS: usize = 16;

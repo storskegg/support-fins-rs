@@ -4,6 +4,7 @@
 //! and writes `target/bench-m3/rust.json`. Per case: one discarded warm-up, then the median of 5 runs
 //! of `load` (read + parse), `weld` (`build_topology` + `analyze`) and `build` (`build_fins`).
 //! The private coin file's geometry is read from `private-fixtures/` into memory only.
+use sf_testkit::median;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
@@ -22,11 +23,6 @@ fn text(v: &Json, k: &str) -> String {
         _ => panic!("no string {k}"),
     }
 }
-fn median(mut a: Vec<f64>) -> f64 {
-    a.sort_by(|x, y| x.partial_cmp(y).unwrap());
-    a[a.len() / 2]
-}
-
 struct Once {
     load: f64,
     weld: f64,

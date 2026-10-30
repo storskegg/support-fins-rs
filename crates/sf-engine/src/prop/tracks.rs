@@ -4,7 +4,7 @@
 //! locally-straight sub-patches, `patch_tracks` lays straight parallel tracks across each,
 //! and `tube_line` gives a curved region one wall along its lowest line.
 
-use crate::guards::{JsSort, cmp_f64};
+use crate::guards::{JsSort, cmp_diff, cmp_f64};
 use std::collections::{HashMap, HashSet};
 
 use crate::config::Config;
@@ -21,18 +21,6 @@ use crate::types::Rot3;
 /// `step` and `nU` of `lowEdges` (web/prop/tracks.js:489).
 const LOW_EDGE_STEP: f64 = 0.25;
 const LOW_EDGE_N_U: usize = 9;
-
-/// What a JS `sort` comparator returning `diff` means: negative first, positive last, zero or
-/// NaN equal.
-fn cmp_diff(diff: f64) -> std::cmp::Ordering {
-    if diff < 0.0 {
-        std::cmp::Ordering::Less
-    } else if diff > 0.0 {
-        std::cmp::Ordering::Greater
-    } else {
-        std::cmp::Ordering::Equal
-    }
-}
 
 /// Split one overhang region into locally-straight sub-patches: `[{ faces, area }]`.
 ///

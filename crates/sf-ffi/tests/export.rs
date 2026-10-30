@@ -4,6 +4,7 @@
 // the remaining `"{}"` are export options that are empty on purpose (failure cases); see common/mod.rs.
 mod common;
 
+use common::{arr, field};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -18,16 +19,6 @@ fn corpus() -> Json {
     let path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../parity/corpus/ffiexport/cases.json");
     parse(&std::fs::read_to_string(path).expect("run `just oracle ffiexport`")).unwrap()
-}
-fn arr(v: &Json) -> &[Json] {
-    match v {
-        Json::Arr(a) => a,
-        o => panic!("not an array: {o:?}"),
-    }
-}
-fn field<'a>(v: &'a Json, k: &str) -> &'a Json {
-    v.get(k)
-        .unwrap_or_else(|| panic!("no {k} in {}", v.stringify()))
 }
 fn text(v: &Json) -> &str {
     if let Json::Str(s) = v {

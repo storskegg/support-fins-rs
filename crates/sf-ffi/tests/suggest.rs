@@ -2,7 +2,8 @@
 //! engine call the parity corpus already covers.
 mod common;
 
-use std::sync::{Arc, Mutex, mpsc};
+use common::{ctx, load};
+use std::sync::{Mutex, mpsc};
 use std::time::Duration;
 
 use sf_cli::cli::rotation_matrix;
@@ -10,29 +11,13 @@ use sf_cli::entry::{EngineOptions, support_tunables};
 use sf_engine::config::{Config, apply_tunables};
 use sf_engine::orient::{self, Confidence};
 use sf_ffi::{
-    FfiError, Part, StrengthAdvice, SuggestContext, SuggestListener, SuggestResult, SuggestTier,
+    FfiError, StrengthAdvice, SuggestContext, SuggestListener, SuggestResult, SuggestTier,
     Suggester, build_part, load_alignment, load_parts,
 };
 use sf_io::json::{Json, parse};
 use sf_io::stl::write_binary_stl;
-use sf_testkit::{CircularBore, circular_bore, models_dir};
+use sf_testkit::{CircularBore, circular_bore};
 
-fn load(name: &str) -> Arc<Part> {
-    load_parts(
-        models_dir()
-            .join(format!("{name}.stl"))
-            .to_string_lossy()
-            .into_owned(),
-    )
-    .unwrap()
-    .remove(0)
-}
-fn ctx() -> SuggestContext {
-    SuggestContext {
-        current_bore: 0,
-        density: 1.24,
-    }
-}
 fn engine_cfg() -> Config {
     let mut cfg = Config::default();
     apply_tunables(

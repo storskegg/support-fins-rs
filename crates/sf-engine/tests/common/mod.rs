@@ -1,8 +1,11 @@
 //! Shared by the M2/A prop tests: block soups and the region inputs `buildProps` makes.
 #![allow(dead_code)]
+use sf_engine::config::Config;
 use sf_engine::overhangs::{Analysis, Topology};
+use sf_engine::prop::crest::Crest;
+use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::tris::Tris;
-use sf_engine::types::Rot3;
+use sf_engine::types::{Rot3, V4};
 
 pub fn quad(a: [f64; 3], b: [f64; 3], c: [f64; 3], d: [f64; 3]) -> Vec<[f64; 3]> {
     vec![a, b, c, a, c, d]
@@ -91,4 +94,19 @@ pub fn region_inputs(
         pts.push([gx / 3.0, gy / 3.0, gz / 3.0]);
     }
     (region.faces.clone(), Tris::new(tris), pts)
+}
+
+/// A build context with no crest cut, as the prop tests build with.
+pub fn ctx(cfg: &Config) -> BuildCtx<'_> {
+    BuildCtx::new(cfg, Crest::new(None, 0.0, cfg))
+}
+
+/// Tagged vertices without the tag.
+pub fn xyz(t: &[V4]) -> Vec<[f64; 3]> {
+    t.iter().map(|v| [v[0], v[1], v[2]]).collect()
+}
+
+/// `new Float32Array(v)`: each value rounded to f32.
+pub fn f32s(v: &[f64]) -> Vec<f64> {
+    v.iter().map(|&x| (x as f32) as f64).collect()
 }

@@ -4,6 +4,7 @@
 //! off, Plate only, Separate walls, no tines, island starts, `fillRegions`) and `bareArea` as the 54
 //! golden scenes' builds call it. Exact.
 mod common;
+
 use ::parity::{Tol, Value, load_cases};
 use common::*;
 use indexmap::IndexSet;
@@ -16,13 +17,6 @@ use sf_engine::prop::crest::Crest;
 use sf_engine::prop::ctx::BuildCtx;
 use sf_engine::types::V4;
 use sf_testkit::parity::resolve_args;
-
-fn get<'a>(v: &'a Value, k: &str) -> Option<&'a Value> {
-    match v {
-        Value::Obj(o) => o.iter().find(|(key, _)| key == k).map(|(_, x)| x),
-        _ => None,
-    }
-}
 
 fn opt_num(v: &Value, k: &str) -> Option<f64> {
     match get(v, k) {

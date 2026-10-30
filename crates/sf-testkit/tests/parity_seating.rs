@@ -1,6 +1,8 @@
 //! Replay of `parity/corpus/seating/*` (recorded by `parity/oracle/seating.js` from web/fins/seating.js).
 //! Exact: the functions are arithmetic on their inputs.
+mod common;
 use ::parity::{Tol, Value, compare, load_cases};
+use common::xyz;
 use sf_engine::fins::seating::{SeatingKind, bed_contact, seated_part_tris, seating_of};
 use sf_engine::overhangs::Analysis;
 use sf_engine::types::{Rot3, Xyz};
@@ -15,14 +17,6 @@ fn rot3(v: &Value) -> Rot3 {
     };
     xs.try_into().expect("9 numbers")
 }
-fn xyz(v: &Value) -> Xyz {
-    Xyz {
-        x: v.get("x").num(),
-        y: v.get("y").num(),
-        z: v.get("z").num(),
-    }
-}
-
 #[test]
 fn seated_part_tris_direct() {
     let cases = load_cases("seating", "seatedPartTris");
