@@ -24,5 +24,6 @@ enum Features {
         SearchFeature.self,
         ReportFeature.self,
         SessionFeature.self,
+        CrashReportsFeature.self,
     ]
 }

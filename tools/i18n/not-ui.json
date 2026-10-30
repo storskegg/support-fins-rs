@@ -116,5 +116,20 @@
   "%arg min": "CalibrationCatalog.fmtTime: the web's fmtTime writes minutes untranslated",
   " %arg min": "CalibrationCatalog.fmtTime: the web's fmtTime writes minutes untranslated",
   "Calibration": "the bundled folder of the test prints",
-  "%arg is missing from the app.": "CalibrationModel: a programming error (a bundled file is missing)"
+  "%arg is missing from the app.": "CalibrationModel: a programming error (a bundled file is missing)",
+  "Logs/Support Fins": "crash report text (English on purpose: it is read by the developer)",
+  "MetricKit %arg diagnostic": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "Support Fins closed unexpectedly (no normal quit)": "crash report text (English on purpose: it is read by the developer)",
+  "Support Fins crash report.zip": "crash report text (English on purpose: it is read by the developer)",
+  "build requested": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "edit: %arg": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "export: %arg": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "menu: %arg": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "open file: %arg (%arg), %arg objects, %arg triangles": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "open file: planted.stl (STL), 1 objects, 12 triangles": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "plate: arrange": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "plate: export": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "\nLast actions (oldest first):\n": "crash report text (English on purpose: it is read by the developer)",
+  "\nSettings:\n": "crash report text (English on purpose: it is read by the developer)",
+  "\nDiagnostic:\n": "crash report text (English on purpose: it is read by the developer)"
 }
