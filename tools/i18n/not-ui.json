@@ -131,5 +131,10 @@
   "plate: export": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
   "\nLast actions (oldest first):\n": "crash report text (English on purpose: it is read by the developer)",
   "\nSettings:\n": "crash report text (English on purpose: it is read by the developer)",
-  "\nDiagnostic:\n": "crash report text (English on purpose: it is read by the developer)"
+  "\nDiagnostic:\n": "crash report text (English on purpose: it is read by the developer)",
+  "Support Fins: native crash dumps of this test run go to %arg\n": "stderr line of a test run (where its native crash dumps go)",
+  " (also captured natively: %arg)": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
+  "Support Fins crashed: uncaught exception %arg": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
+  "Support Fins crashed (%arg)": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
+  "\nThe panic aborted the app. Native capture at the abort:\n\n%arg": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI"
 }

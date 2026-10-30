@@ -12,8 +12,14 @@ let package = Package(
     targets: [
         .binaryTarget(name: "sf_ffiFFI", path: "sf_ffiFFI.xcframework"),
         // sf-cut is Manifold, C++: the static library needs the C++ runtime
-        .target(name: "SupportFinsCore", dependencies: ["sf_ffiFFI"], linkerSettings: [.linkedLibrary("c++")]),
-        .testTarget(name: "SupportFinsCoreTests", dependencies: ["SupportFinsCore"]),
+        .target(name: "SupportFinsCore", dependencies: ["sf_ffiFFI", "SFCrashCapture"], linkerSettings: [.linkedLibrary("c++")]),
+        // native crash capture (fix plan 1E): the fatal-signal and uncaught-exception handlers, in C (async-signal-safe)
+        .target(name: "SFCrashCapture", linkerSettings: [.linkedFramework("Foundation")]),
+        // a command-line child that crashes on purpose, for each signal and an uncaught NSException, with the handlers
+        // installed: NativeCrashProbeTests runs it (a non-GUI process: no crash dialog) and reads its dump
+        .target(name: "SFCrashProbeC"),
+        .executableTarget(name: "sf-crash-probe", dependencies: ["SFCrashCapture", "SFCrashProbeC"]),
+        .testTarget(name: "SupportFinsCoreTests", dependencies: ["SupportFinsCore", "sf-crash-probe"]),
     ],
     swiftLanguageModes: [.v6]
 )
