@@ -13,7 +13,7 @@ struct WhatsNewList: View {
             VStack(alignment: .leading, spacing: 4) {
                 if let newest = changelog.newest { lines(newest) }
                 ForEach(changelog.older) { release in
-                    (Text(release.tag) + Text(" ") + Text(release.date).fontWeight(.regular).foregroundStyle(.secondary))
+                    Text("\(Text(release.tag)) \(Text(release.date).fontWeight(.regular).foregroundStyle(.secondary))")
                         .fontWeight(.semibold)
                         .padding(.top, 6)
                         .accessibilityIdentifier("whatsnew-release-\(release.tag)")
@@ -53,7 +53,7 @@ struct WhatsNewSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            (Text("What's new").fontWeight(.semibold) + Text(" ") + Text(changelog.newest?.tag ?? "").foregroundStyle(.secondary))
+            Text("\(Text("What's new").fontWeight(.semibold)) \(Text(changelog.newest?.tag ?? "").foregroundStyle(.secondary))")
                 .font(.headline)
                 .help("Version")
                 .accessibilityIdentifier("whatsnew-heading")
