@@ -7,7 +7,7 @@ struct StrengthPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            (Text("Strength arrow").bold() + Text(": ") + Text("which way is it loaded?"))
+            Text("\(Text("Strength arrow").bold()): \(Text("which way is it loaded?"))")
             Grid(horizontalSpacing: 4, verticalSpacing: 4) {
                 GridRow {
                     pad(.up); pad(.down); pad(.left)

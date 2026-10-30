@@ -48,7 +48,7 @@ struct ChangedLabel: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            if let detail { Text(title) + Text(" ") + Text(detail).foregroundStyle(.secondary) } else { Text(title) }
+            if let detail { Text("\(Text(title)) \(Text(detail).foregroundStyle(.secondary))") } else { Text(title) }
             if changed {
                 Circle().fill(Color.accentColor).frame(width: 6, height: 6)
                     .accessibilityLabel("changed")

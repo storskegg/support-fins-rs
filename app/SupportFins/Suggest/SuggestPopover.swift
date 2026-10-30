@@ -40,7 +40,7 @@ struct SuggestRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(row.rank).bold().frame(width: 40, alignment: .leading)
                 // one tight line per pose: height, fins, rough holes, then the badge (ui/suggest.js:101-108)
-                (Text(row.line) + (row.badge.map { Text("  \($0)").foregroundColor(.green).bold() } ?? Text("")))
+                Text("\(Text(row.line))\(row.badge.map { Text("  \($0)").foregroundColor(.green).bold() } ?? Text(""))")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, 5)

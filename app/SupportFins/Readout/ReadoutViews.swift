@@ -64,9 +64,9 @@ struct StatsCard: View {
     private var overhangsText: Text {
         part.overhangs.reduce(Text("")) { acc, seg in
             switch seg {
-            case .text(let s): acc + Text(s)
-            case .swatch: acc + Text(Image(systemName: "circle.fill")).foregroundStyle(Color.orange).font(.caption2)
-            case .redSwatch: acc + Text(Image(systemName: "circle.fill")).foregroundStyle(Color(red: 1, green: 0.353, blue: 0.302)).font(.caption2)
+            case .text(let s): Text("\(acc)\(Text(s))")
+            case .swatch: Text("\(acc)\(Text(Image(systemName: "circle.fill")).foregroundStyle(Color.orange).font(.caption2))")
+            case .redSwatch: Text("\(acc)\(Text(Image(systemName: "circle.fill")).foregroundStyle(Color(red: 1, green: 0.353, blue: 0.302)).font(.caption2))")
             }
         }
     }
