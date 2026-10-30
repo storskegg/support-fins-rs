@@ -23,12 +23,6 @@ struct DrawOverlayTests {
         return ViewerRenderer.pixels(of: r.renderOffscreen(width: size, height: size))
     }
 
-    func count(_ px: [UInt8], _ test: (Int, Int, Int) -> Bool) -> Int {
-        var n = 0
-        for i in stride(from: 0, to: px.count, by: 4) where test(Int(px[i + 2]), Int(px[i + 1]), Int(px[i])) { n += 1 }
-        return n
-    }
-
     func middle(_ px: [UInt8]) -> SIMD3<Float> {
         let o = (size / 2 * size + size / 2) * 4
         return SIMD3(Float(px[o + 2]), Float(px[o + 1]), Float(px[o]))

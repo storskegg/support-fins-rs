@@ -306,9 +306,6 @@ final class DrawModel {
         var autoOn: Bool
     }
 
-    /// What the current state would sweep, to compare with `sweptKey`.
-    var currentKey: SweepKey? { currentSweepKey() }
-
     private func currentSweepKey() -> SweepKey? {
         guard let kit, kitIsCurrent else { return nil }
         return SweepKey(kit: ObjectIdentifier(kit), walls: session.drawnWalls, build: build?.latest.map { ObjectIdentifier($0) },

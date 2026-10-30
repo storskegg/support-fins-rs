@@ -24,7 +24,6 @@ struct SearchEngine {
     /// The gates this query has shown, kept while the query stays the same (they stay to switch back off).
     private(set) var gated: Set<String> = []
     private var gatedFor = ""
-    private(set) var result: Result?
 
     /// `fold`: lower case, accents removed.
     static func fold(_ s: String) -> String {
@@ -53,7 +52,6 @@ struct SearchEngine {
         guard !words.isEmpty else {
             gated = []
             gatedFor = ""
-            result = nil
             return nil
         }
         func has(_ text: String) -> Bool { words.allSatisfy { text.contains($0) } }
@@ -75,8 +73,6 @@ struct SearchEngine {
             guard let row = SearchCatalog.byID[id], row.shown(ctx) else { continue }
             blocks.formUnion(row.blocks)
         }
-        let r = Result(show: show, blocks: blocks, none: !show.contains { SearchCatalog.byID[$0]?.shown(ctx) == true })
-        result = r
-        return r
+        return Result(show: show, blocks: blocks, none: !show.contains { SearchCatalog.byID[$0]?.shown(ctx) == true })
     }
 }

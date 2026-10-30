@@ -50,7 +50,7 @@ extension ProbeFeature {
 @MainActor private final class PB: ProbeFeature { unowned let host: ViewerModel; init(host: ViewerModel) { self.host = host } }
 @MainActor private final class PC: ProbeFeature { unowned let host: ViewerModel; init(host: ViewerModel) { self.host = host } }
 
-private let probeTypes: [any Feature.Type] = [PA.self, PB.self, PC.self]
+@MainActor private let probeTypes: [any Feature.Type] = [PA.self, PB.self, PC.self]
 
 /// Runs `body` with the probes configured and a set of them on a window that lives as long as `body` (a set holds
 /// its window weakly, as the window owns it).

@@ -27,19 +27,13 @@ struct DrawnWall: Equatable, Identifiable, Sendable {
 
     /// The `walls_json` entry (docs/FFI.md, "M6 additions: Draw").
     var json: String {
-        func v(_ p: SIMD3<Double>) -> String { "[\(Self.number(p.x)),\(Self.number(p.y)),\(Self.number(p.z))]" }
+        func v(_ p: SIMD3<Double>) -> String { "[\(JS.number(p.x)),\(JS.number(p.y)),\(JS.number(p.z))]" }
         switch kind {
         case .wall:
             return "{\"kind\":\"wall\",\"a\":\(v(a)),\"b\":\(v(b))" + (m.map { ",\"m\":\(v($0))" } ?? "") + "}"
         case .sway:
             return "{\"kind\":\"sway\",\"a\":\(v(a)),\"face\":\(face),\"capped\":\(capped)}"
         }
-    }
-
-    /// A finite double as the shortest JSON text that reads back as the same value.
-    private static func number(_ x: Double) -> String {
-        if x == x.rounded(), abs(x) < 1e15 { return String(Int64(x)) }
-        return "\(x)"
     }
 }
 
@@ -66,12 +60,6 @@ struct WallOutcome: Decodable, Equatable, Sendable {
     var cross = 0
     /// A brace's stilt (`info.stilt`).
     var stilt = 0.0
-
-    init(ok: Bool, triStart: Int = 0, triEnd: Int = 0, kind: String? = nil, reason: String? = nil, length: Double = 0,
-         height: Double = 0, tines: Int = 0, ribs: Int = 0, cross: Int = 0, stilt: Double = 0) {
-        (self.ok, self.triStart, self.triEnd, self.kind, self.reason) = (ok, triStart, triEnd, kind, reason)
-        (self.length, self.height, self.tines, self.ribs, self.cross, self.stilt) = (length, height, tines, ribs, cross, stilt)
-    }
 
     private enum Key: String, CodingKey { case ok, triStart, triEnd, kind, reason, length, height, tines, ribs, cross, stilt }
 

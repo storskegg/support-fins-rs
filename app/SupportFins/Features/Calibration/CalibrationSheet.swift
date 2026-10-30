@@ -51,8 +51,7 @@ struct CalibrationSheet: View {
         } label: {
             // the name is the label alone: a Download button inside a disclosure label is folded into it by VoiceOver and
             // the accessibility tree, so the button sits beside the group instead (the overlay below)
-            (Text(JS.t(c.name)).bold()
-                + Text(model.estimates?.coupons[c.file].map(CalibrationCatalog.detail) ?? "").foregroundStyle(.secondary))
+            Text("\(Text(JS.t(c.name)).bold())\(Text(model.estimates?.coupons[c.file].map(CalibrationCatalog.detail) ?? "").foregroundStyle(.secondary))")
                 .accessibilityIdentifier("calibrate-row-\(c.name.lowercased())")
         }
         .overlay(alignment: .topTrailing) {

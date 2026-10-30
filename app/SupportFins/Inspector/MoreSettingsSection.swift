@@ -115,5 +115,5 @@ struct MoreSettingsSection: View {
     }
 
     /// The coverage slider's tooltip in Full coverage (`COVER_TIP_FULL`, `web/ui/settings.js:50-51`).
-    static var coverageTipFull: String { JS.t("Full coverage supports every overhang a wall can reach, so this slider only applies in Auto.") }
+    nonisolated static var coverageTipFull: String { JS.t("Full coverage supports every overhang a wall can reach, so this slider only applies in Auto.") }
 }

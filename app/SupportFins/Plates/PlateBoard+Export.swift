@@ -193,7 +193,4 @@ extension PlateBoard {
             }
         }
     }
-
-    /// The plates' files as `exportAll` would write them, for the tests.
-    func allPlateWrites() -> [(Int, PlateWrite)] { plates.indices.compactMap { i in plateWrite(i).map { (i, $0) } } }
 }

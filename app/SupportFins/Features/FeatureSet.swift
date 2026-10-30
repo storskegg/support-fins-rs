@@ -4,7 +4,6 @@ import SwiftUI
 /// A window's features: one instance of each type, and the contributions composed in their fixed order.
 @MainActor
 final class FeatureSet {
-    let types: [any Feature.Type]
     private(set) var instances: [any Feature] = []
     /// The features hold their window weakly, and the menu bar can outlive it (the focused value of a window
     /// that just closed), so a lookup answers nil once the window is gone: the menus then show with nothing to act on.
@@ -13,7 +12,6 @@ final class FeatureSet {
     /// `host` is not finished when the set is made (it makes its own set), so the features must not call back
     /// into it beyond reading its shared models.
     init(types: [any Feature.Type] = Features.all, host: ViewerModel) {
-        self.types = types
         self.host = host
         instances = types.map { Self.make($0, host: host) }
         for f in instances { f.registerTools(in: host.toolbar) }
