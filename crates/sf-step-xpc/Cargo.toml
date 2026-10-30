@@ -1,0 +1,19 @@
+[package]
+name = "sf-step-xpc"
+description = "The STEP reader the app runs out of process: sf-step and OpenCascade behind a C API for step-read, which the StepReader XPC service starts per file"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# `staticlib` for step-read (`just swift-bindings` builds it, app/StepRead links it); `lib` for the tests
+crate-type = ["staticlib", "lib"]
+
+[dependencies]
+sf-step.workspace = true
+libc.workspace = true
+
+[lints]
+workspace = true

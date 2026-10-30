@@ -161,3 +161,37 @@ fn is_step_matches_the_oracle() {
         }
     }
 }
+
+/// The app's path (X-01): the StepReader XPC service sends `read_raw`'s result as bytes (`sf_step::wire`) and the app
+/// runs `step_objects` on what it decodes. Every oracle case comes through it unchanged: the same raw result, bit for
+/// bit, and the same objects as the web's.
+#[test]
+fn the_step_readers_bytes_carry_every_oracle_case_exactly() {
+    let cases = load_cases("step", "readStep");
+    assert!(cases.len() >= 15);
+    for c in cases {
+        let read = read_raw(bytes_of(&c));
+        let decoded = sf_step::wire::decode(&sf_step::wire::encode(&read));
+        assert_eq!(decoded, read, "{}", c.id);
+        let objects = decoded.unwrap().ok_or(sf_step::UNREADABLE.to_string());
+        match (
+            objects.and_then(|r| step_objects(Some(&r))),
+            &c.out,
+            &c.throws,
+        ) {
+            (Ok(o), Some(expected), None) => {
+                if let Err(m) = compare(&objects_value(&o), expected, &Tol::Exact) {
+                    fail(&c.id, m);
+                }
+            }
+            (Err(e), None, Some(msg)) => assert_eq!(&e, msg, "{}", c.id),
+            (r, out, throws) => panic!(
+                "{}: Rust {:?}, JS out={} throws={:?}",
+                c.id,
+                r.map(|_| ()),
+                out.is_some(),
+                throws
+            ),
+        }
+    }
+}

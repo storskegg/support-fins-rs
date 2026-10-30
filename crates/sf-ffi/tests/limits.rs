@@ -456,3 +456,36 @@ fn a_malformed_bambu_config_does_not_panic() {
         let _ = load_parts(path);
     }
 }
+
+// ---- the STEP helper's parts get the same limits ------------------------------------------------
+
+#[test]
+fn load_step_parts_refuses_nan_and_asks_about_a_part_over_2_metres() {
+    let f = sf_testkit::upstream_root().join("tests/fixtures/bracket.step");
+    let path = f.to_string_lossy().into_owned();
+    let raw = sf_step::read_raw(&std::fs::read(&f).unwrap());
+    let with = |edit: &dyn Fn(&mut Vec<f32>)| {
+        let mut r = raw.clone();
+        if let Ok(Some(res)) = &mut r {
+            for m in &mut res.meshes {
+                edit(&mut m.positions);
+            }
+        }
+        sf_step::wire::encode(&r)
+    };
+    let nan = with(&|p| p[0] = f32::NAN);
+    let msg = format_msg(
+        sf_ffi::load_step_parts(path.clone(), nan)
+            .err()
+            .expect("refused"),
+    );
+    assert!(msg.contains("not a number"), "{msg}");
+    let big = with(&|p| p[0] = 5000.0);
+    let (kind, ..) = limit(
+        sf_ffi::load_step_parts(path.clone(), big.clone())
+            .err()
+            .expect("asks"),
+    );
+    assert_eq!(kind, LimitKind::Dimension);
+    sf_ffi::load_step_parts_with(path, big, LoadOptions { allow_large: true }).unwrap();
+}

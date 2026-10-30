@@ -23,6 +23,7 @@
 //!
 //! Split out of prop.js, which only wires the two passes together.
 
+use crate::guards::JsSort;
 use indexmap::{IndexMap, IndexSet};
 
 use crate::config::Config;
@@ -614,7 +615,7 @@ fn keepers<'a>(
     };
     // lowest-gripping first, so a low wall claims its spot before a neighbour
     let mut order: Vec<&PropRecord> = qa.to_vec();
-    order.sort_by(|x, y| ordering(grip_z(&[x]) - grip_z(&[y])));
+    order.js_sort_by(|x, y| ordering(grip_z(&[x]) - grip_z(&[y])));
     for q in order {
         // (`alone`: the swap replaces the region's walls, none stay beside it)
         if alone || q.line.is_empty() {

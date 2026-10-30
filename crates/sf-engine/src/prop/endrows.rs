@@ -118,7 +118,13 @@ fn free_edge(probe: &Probe, v_edge: f64, dir: f64, cfg: &Config) -> bool {
             let [cx, cy] =
                 at(v_edge - dir * prop.edge_inset + side * dir * (prop.th / 2.0 + prop.side_clear));
             let mut zz = z - 0.5;
+            // (an underside at an absurd height -- a stray vertex at 1e16, or a degenerate triangle's
+            // infinite z, where `zz -= 1.0` changes nothing -- cannot be walked down: not a free edge)
+            if crate::guards::too_many_steps(zz - 0.3, 1.0) {
+                return false;
+            }
             while zz > 0.3 {
+                cfg.cancel.check();
                 if inside_part(support.topo, support.rot, support.offset, cx, cy, zz) {
                     return false;
                 }

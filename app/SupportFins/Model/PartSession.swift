@@ -134,6 +134,7 @@ final class PartSession {
         let before = snapshot
         body()
         guard snapshot != before else { return }
+        CrashReporter.note("edit: \(name ?? "change")")
         history.push(before)
         register(name)
     }

@@ -34,6 +34,7 @@ pub fn build_report(
     opts_json: String,
     tunables_json: String,
 ) -> Result<Arc<BuildReport>, FfiError> {
+    let _op = crate::crash::operation("report");
     let options = match parse(&opts_json) {
         Some(j @ Json::Obj(_)) => j,
         _ => return Err(engine("options must be a JSON object of options.json keys")),

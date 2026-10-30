@@ -702,6 +702,12 @@ pub(crate) fn build_pass(
             }
             region_pts.push([gx / 3.0, gy / 3.0, gz / 3.0]);
         }
+        // A region out where no part is (a stray vertex at 1e16 -- the f32 triangle the loader keeps -- or a
+        // NaN) gets no wall: its heights would drive every `z += 2.0` / `v += 0.25` loop below to billions of
+        // steps, or to none at all once the step no longer changes the value. Parts reach a few metres.
+        if region_pts.iter().any(|p| !crate::guards::in_reach(p)) {
+            continue;
+        }
         let region_tris = Arc::new(Tris::new(region_v));
 
         if opts.circular_pass {

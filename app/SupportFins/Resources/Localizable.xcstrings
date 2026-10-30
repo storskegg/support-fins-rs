@@ -3072,6 +3072,41 @@
         }
       }
     },
+    "Couldn't read this STEP file" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese STEP-Datei konnte nicht gelesen werden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取此 STEP 文件"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler este arquivo STEP"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّرت قراءة ملف STEP هذا"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kan dit STEP-bestand niet lezen"
+          }
+        }
+      }
+    },
     "Cross-rib height" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3815,6 +3850,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Richting"
+          }
+        }
+      }
+    },
+    "Dismiss" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schließen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忽略"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispensar"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تجاهل"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sluiten"
           }
         }
       }
@@ -6532,6 +6602,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "استورد ملف STL أو 3MF أو STEP أو OBJ."
+          }
+        }
+      }
+    },
+    "Include the model file that was open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die geöffnete Modelldatei beilegen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含当时打开的模型文件"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir o arquivo do modelo que estava aberto"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تضمين ملف النموذج الذي كان مفتوحًا"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Het geopende modelbestand toevoegen"
           }
         }
       }
@@ -11250,6 +11355,41 @@
         }
       }
     },
+    "Save crash report…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Absturzbericht speichern…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存崩溃报告…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvar relatório de falha…"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حفظ تقرير الأعطال…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crashrapport bewaren…"
+          }
+        }
+      }
+    },
     "Scale" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12019,6 +12159,41 @@
         }
       }
     },
+    "Show Report" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bericht zeigen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示报告"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar relatório"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار التقرير"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rapport tonen"
+          }
+        }
+      }
+    },
     "Show Rotate Rings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12050,6 +12225,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Draairingen tonen"
+          }
+        }
+      }
+    },
+    "Show crash reports" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Absturzberichte zeigen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示崩溃报告"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar relatórios de falha"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار تقارير الأعطال"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crashrapporten tonen"
           }
         }
       }
@@ -12852,6 +13062,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Oriëntatie voorstellen ▾"
+          }
+        }
+      }
+    },
+    "Support Fins closed unexpectedly last time." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support Fins wurde beim letzten Mal unerwartet beendet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support Fins 上次意外退出。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Support Fins fechou inesperadamente da última vez."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم إغلاق Support Fins بشكل غير متوقع في المرة الماضية."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Support Fins is de vorige keer onverwacht gesloten."
           }
         }
       }

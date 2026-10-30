@@ -151,6 +151,7 @@ final class ExportModel {
         guard availability.enabled.contains(format), let name = fileName(for: format),
               let url = panel.url(suggesting: name, type: format.contentType) else { return nil }
         lastFormat = format
+        CrashReporter.note("export: \(format)")
         return write(format, to: url)
     }
 
