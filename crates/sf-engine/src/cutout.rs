@@ -638,7 +638,7 @@ fn by_difference(a: f64, b: f64) -> std::cmp::Ordering {
     }
 }
 
-/// Port of `stripSolid` (web/cutout.js:336-398): the solid of the strip [s0,s1] x [zb,zt] minus
+/// Port of `stripSolid` (web/cutout.js:336-398): the solid of the strip `[s0,s1] x [zb,zt]` minus
 /// `obst` (convex polygons: the holes, plus the regions above the zone's top edge and below its
 /// bottom edge), as convex CCW polygons in (s, z). The strip is cut into horizontal slabs at
 /// every obstacle corner and wherever an obstacle edge crosses the strip's side; inside a slab

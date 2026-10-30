@@ -6,14 +6,14 @@
 //!      classic "my part imported at 1/25 scale" bug. 3MF states mm.
 //!   2. SEPARATE BODIES, two ways (`separate`):
 //!      - LOCKED (default here; the CLI and plugins): the part and the fins are two meshes
-//!        assembled by <components> into ONE build item, so they stay locked in place. But a
+//!        assembled by `<components>` into ONE build item, so they stay locked in place. But a
 //!        slicer unions the parts of one object, so it runs one perimeter through part and
 //!        tine -- the tine welds (GitHub #38).
 //!      - SEPARATE (the site's default 3MF): two build items, two objects, the way Clough42
 //!        splits his support ("Split to objects"). Each keeps its own perimeter and a tine only
 //!        touches the part: a cleaner release. Both items carry the same transform, so they
 //!        open in register. With the interface crest on (GitHub #21) the supports object is an
-//!        assembly of two parts, the body and "<name> interface" (the walls' tops and the
+//!        assembly of two parts, the body and "`<name>` interface" (the walls' tops and the
 //!        tines), so a toolchanger can give the interface its own filament.
 //!
 //! We do NOT embed slicer-specific print profiles (Bambu/Orca bind "supports off" to a full
@@ -21,7 +21,7 @@
 //! factory profiles default to no supports, and the fins are ordinary model geometry -- so the
 //! exported file prints as intended without reaching into any slicer's settings.
 //!
-//! Geometry in, same as the STL path: flat arrays of [x,y,z], three vertices per triangle,
+//! Geometry in, same as the STL path: flat arrays of `[x,y,z]`, three vertices per triangle,
 //! already in print space (oriented, seated on the plate).
 
 use crate::json::{self, Json};
@@ -62,7 +62,7 @@ fn fmt(n: f64) -> String {
     if s == "-0" { "0".to_string() } else { s }
 }
 
-/// Port of `meshXML` (web/threemf.js:60-96): build an indexed <mesh> from a flat triangle-soup
+/// Port of `meshXML` (web/threemf.js:60-96): build an indexed `<mesh>` from a flat triangle-soup
 /// array. Vertices that share exact coordinates are merged (they do, because every vertex is
 /// produced by the identical transform of the same source point), which restores shared
 /// topology and shrinks the file; anything that doesn't merge is left as-is and slices fine.
@@ -152,11 +152,11 @@ fn esc(s: &str) -> String {
 /// A part's colours (GitHub #236), so a painted part keeps them through the export.
 /// `PartColors = { paint, rgb }` (web/threemf.js:100-114), both sparse arrays by triangle
 /// index (`None` is a hole: an uncoloured triangle):
-///   paint[i]  `{ name, v }`: a slicer's painted-colour attribute, verbatim -- Bambu Studio /
+///   `paint[i]`  `{ name, v }`: a slicer's painted-colour attribute, verbatim -- Bambu Studio /
 ///             OrcaSlicer write paint_color, PrusaSlicer its own slic3rpe:mmu_segmentation.
 ///             Each reads only its own name, so it goes back out under the name it came in with.
-///   rgb[i]    '#RRGGBB[AA]': the core spec's colour (a <basematerials> or <m:colorgroup>
-///             entry), written back as one <basematerials> table.
+///   `rgb[i]`    `'#RRGGBB[AA]'`: the core spec's colour (a `<basematerials>` or `<m:colorgroup>`
+///             entry), written back as one `<basematerials>` table.
 /// The fins stay uncoloured: they are their own object, on whatever filament the slicer gives
 /// them.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -249,7 +249,7 @@ impl ColorXml<'_> {
     }
 }
 
-/// The part's colours as a <basematerials> table (resource `id`) + a per-triangle attribute
+/// The part's colours as a `<basematerials>` table (resource `id`) + a per-triangle attribute
 /// string.
 fn color_xml(colors: Option<&PartColors>, id: i64) -> ColorXml<'_> {
     let Some(c) = colors else {
@@ -1203,7 +1203,7 @@ struct ModelParser {
     unit: String,
     /// key of the object being filled
     cur: Option<String>,
-    /// key of the <basematerials>/<colorgroup> being filled
+    /// key of the `<basematerials>`/`<colorgroup>` being filled
     group: Option<String>,
     in_vertices: bool,
     /// `withComponents`: retain source topology and property resources
@@ -2639,7 +2639,7 @@ fn emit_object(
 }
 
 /// `findRootPart` (web/threemf.js:980-1004): locate the root 3dmodel.model part name (the one
-/// carrying <build>).
+/// carrying `<build>`).
 fn find_root_part(parts: &IndexMap<String, Vec<u8>>) -> Option<String> {
     if parts.contains_key("3D/3dmodel.model") {
         return Some("3D/3dmodel.model".to_string());
@@ -2751,7 +2751,7 @@ pub struct ComponentInfo {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThreeMfObject {
     pub name: String,
-    /// `Float32Array` (or `Float64Array` with `double_precision`): flat [x,y,z] x 3 per triangle
+    /// `Float32Array` (or `Float64Array` with `double_precision`): flat `[x,y,z]` x 3 per triangle
     pub positions: Vec<f64>,
     pub tris: usize,
     pub meshes: usize,

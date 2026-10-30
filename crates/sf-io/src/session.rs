@@ -9,7 +9,7 @@
 //! (`Restored::centre`); the FFI adds it.
 //!
 //! The DOM the JS reads (`document.getElementById(id)` for a setting's field) is [`FORM_FIELDS`]: the
-//! page's settings fields, with the kind of each as `index.html` declares it. [`FORM_IDS`] is
+//! page's settings fields, with the kind of each as `index.html` declares it. `FORM_IDS` ([`FORM_FIELDS`]) is
 //! `ui/history.js`'s list; a field of the page outside it is inert in `restoreForm`, so a session key
 //! naming one is dropped here.
 
@@ -265,7 +265,7 @@ pub fn session_of(part_tris: &[[f64; 3]], model: &SessionModel) -> Json {
 }
 
 /// Port of `partObjectOf` (web/ui/session.js:69-72): which of a 3MF's objects is the part a session was
-/// saved with. The export names the supports "<name> supports", so the one object that isn't. `None` if
+/// saved with. The export names the supports "`<name>` supports", so the one object that isn't. `None` if
 /// unclear.
 pub fn part_object_of(objects: &[ThreeMfObject]) -> Option<usize> {
     let mut parts = objects
