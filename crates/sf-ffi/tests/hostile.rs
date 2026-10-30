@@ -1275,6 +1275,7 @@ const GETTERS: &[(&str, &str)] = &[
         "copies the loaded part's validated positions into a buffer",
     ),
     ("Footprint::bounds", "reads the grid's four fields"),
+    ("Footprint::cell_size", "reads the grid's cell side"),
     (
         "Footprint::area",
         "counts the set cells of an existing grid",
