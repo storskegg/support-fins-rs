@@ -24,12 +24,23 @@ swift-bindings:
     cp "$gen/sf_ffiFFI.modulemap" "$gen/headers/module.modulemap"
     rm -rf "$pkg/sf_ffiFFI.xcframework"
     xcodebuild -create-xcframework -library "$lib" -headers "$gen/headers" -output "$pkg/sf_ffiFFI.xcframework"
+    # The app never runs OpenCascade (X-01): sf-ffi is built without sf-step's `occt` feature (a separate cargo run, so
+    # sf-step-xpc's features do not unify into it), and this fails if the kernel got into the app's library anyway.
+    if nm -gU "$lib" 2>/dev/null | grep -q -e '_sf_step_read$' -e 'STEPControl_Reader'; then
+        echo "error: $lib links OpenCascade; the app must read STEP through the StepReader XPC service" >&2
+        exit 1
+    fi
+    # The StepReader XPC service's library (crates/sf-step-xpc): sf-step with OpenCascade, behind include/sf_step_xpc.h.
+    cargo build --release -p sf-step-xpc --target aarch64-apple-darwin
+    rm -rf app/StepRead/sf_step_xpc.xcframework
+    xcodebuild -create-xcframework -library target/aarch64-apple-darwin/release/libsf_step_xpc.a \
+        -headers crates/sf-step-xpc/include -output app/StepRead/sf_step_xpc.xcframework
 
 # Generate the Swift bindings only when they are missing (a fresh clone), for recipes that need them but not a rebuild.
 _bindings-present:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ ! -f app/SupportFinsCore/Sources/SupportFinsCore/sf_ffi.swift ] || [ ! -d app/SupportFinsCore/sf_ffiFFI.xcframework ]; then
+    if [ ! -f app/SupportFinsCore/Sources/SupportFinsCore/sf_ffi.swift ] || [ ! -d app/SupportFinsCore/sf_ffiFFI.xcframework ] || [ ! -d app/StepRead/sf_step_xpc.xcframework ]; then
         just swift-bindings
     fi
 

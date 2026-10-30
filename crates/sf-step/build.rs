@@ -2,7 +2,8 @@
 //!
 //! OpenCascade is found in `$SF_OCCT_DIR`, else `~/.cache/support-fins/occt-7.6.1` (what `just occt`
 //! builds, tools/build-occt.sh). Without it the crate still builds with `--cfg no_occt`: `read_step`
-//! then says STEP import is not available in this build, and nothing else changes.
+//! then says STEP import is not available in this build, and nothing else changes. Without the `occt` feature it is
+//! `no_occt` too, quietly: that build (the app's engine) never meant to link OpenCascade.
 
 use std::path::{Path, PathBuf};
 
@@ -12,6 +13,12 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/step_shim.cpp");
     println!("cargo:rerun-if-changed=cpp/step_shim.h");
     println!("cargo:rerun-if-changed=build.rs");
+
+    // without the `occt` feature (the app's engine, sf-ffi) nothing links OpenCascade: the StepReader XPC service does
+    if std::env::var_os("CARGO_FEATURE_OCCT").is_none() {
+        println!("cargo:rustc-cfg=no_occt");
+        return;
+    }
 
     let dir = std::env::var_os("SF_OCCT_DIR")
         .map(PathBuf::from)

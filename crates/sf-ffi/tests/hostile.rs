@@ -24,7 +24,8 @@ use sf_ffi::{
     export_plates, export_with_drawn, footprint_arrange, footprint_clash_cells,
     footprint_drag_step, footprint_of_build, footprint_of_build_with_drawn, footprint_of_part,
     footprint_spot, footprint_union, island_card, js_number_text, load_alignment, load_parts,
-    merge_parts, plate_under, scale_from_percent_text, scale_percent_text,
+    load_step_parts, merge_parts, plate_under, reads_as_step, scale_from_percent_text,
+    scale_percent_text,
 };
 use sf_io::json::{Json, parse};
 use sf_testkit::models_dir;
@@ -479,7 +480,20 @@ fn part_exports_take_anything() {
     assert!(part.mesh().count() > 0);
     // load_parts / merge_parts
     for p in paths() {
+        chk("reads_as_step", reads_as_step(p.clone()));
         chk("load_parts", load_parts(p));
+    }
+    // the STEP kernel's answer arrives from the XPC helper as bytes: whatever they hold
+    let step = scratch("hostile.step");
+    std::fs::write(&step, b"ISO-10303-21;\nEND-ISO-10303-21;").unwrap();
+    let step = step.to_string_lossy().into_owned();
+    chk("reads_as_step", reads_as_step(step.clone()));
+    let mut kernels: Vec<Vec<u8>> = vec![vec![], vec![0], vec![0xff; 64], vec![0; 100_000]];
+    kernels.push(u32::MAX.to_le_bytes().to_vec());
+    kernels.push([&u32::MAX.to_le_bytes()[..], &[1u8; 40][..]].concat());
+    for k in kernels {
+        chk("load_step_parts", load_step_parts(step.clone(), k.clone()));
+        chk("load_step_parts", load_step_parts(String::new(), k));
     }
     let a = load("lbracket");
     let b = load("cube");

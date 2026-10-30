@@ -3,7 +3,10 @@
 use std::path::PathBuf;
 
 use sf_engine::overhangs::{analyze, build_topology};
-use sf_ffi::{FfiError, GpuBuffer, Part, engine_version, load_parts, merge_parts};
+use sf_ffi::{
+    FfiError, GpuBuffer, Part, engine_version, load_parts, load_step_parts, merge_parts,
+    reads_as_step,
+};
 use sf_io::threemf::{ExtraPart, PartKind, PartSettings, ThreeMfOpts, write_three_mf};
 use sf_testkit::{block, models_dir, rot_x};
 
@@ -570,5 +573,107 @@ fn load_parts_reads_step_files_through_opencascade() {
     assert!(
         matches!(&e, FfiError::Format { message } if message == "the CAD kernel could not read this STEP file"),
         "{e:?}"
+    );
+}
+
+// X-01: the app reads STEP in its StepReader XPC service and hands the kernel's bytes to `load_step_parts`; that makes
+// the parts `load_parts` makes reading in process, mesh for mesh. `reads_as_step` picks the files that go there.
+#[test]
+fn load_step_parts_makes_what_load_parts_makes() {
+    let fixtures = sf_testkit::upstream_root().join("tests/fixtures");
+    let step_dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../parity/step-fixtures");
+    let mut files = vec![
+        fixtures.join("bracket.step"),
+        fixtures.join("two-bodies.step"),
+    ];
+    for e in std::fs::read_dir(&step_dir).unwrap() {
+        let p = e.unwrap().path();
+        if p.extension().is_some_and(|x| x == "step") {
+            files.push(p);
+        }
+    }
+    files.sort();
+    assert!(files.len() >= 15, "{}", files.len());
+    for f in &files {
+        let path = f.to_string_lossy().into_owned();
+        assert!(reads_as_step(path.clone()).unwrap(), "{path}");
+        let kernel = sf_step::wire::encode(&sf_step::read_raw(&std::fs::read(f).unwrap()));
+        let direct = load_parts(path.clone()).unwrap();
+        let helper = load_step_parts(path.clone(), kernel).unwrap();
+        assert_eq!(direct.len(), helper.len(), "{path}");
+        for (a, b) in direct.iter().zip(&helper) {
+            let (ia, ib) = (a.info(), b.info());
+            assert_eq!(ia.name, ib.name, "{path}");
+            assert_eq!(ia.import_note, ib.import_note, "{path}");
+            assert_eq!(ia.notes, ib.notes, "{path}");
+            assert_eq!(ia.triangles, ib.triangles, "{path}");
+            assert_eq!(a.mesh().as_slice(), b.mesh().as_slice(), "{path}: the mesh");
+        }
+    }
+
+    // what goes to the reader: STEP by name or content, never a file named as another format
+    let bytes = std::fs::read(fixtures.join("bracket.step")).unwrap();
+    for (name, step) in [
+        ("sniffed.dat", true),
+        ("short.stp", true),
+        ("UPPER.STEP", true),
+        ("named.stl", false),
+        ("named.3mf", false),
+        ("named.obj", false),
+    ] {
+        let p = tmp(name);
+        std::fs::write(&p, &bytes).unwrap();
+        assert_eq!(
+            reads_as_step(p.to_string_lossy().into_owned()).unwrap(),
+            step,
+            "{name}"
+        );
+    }
+    let stl = tmp("plain.dat");
+    std::fs::write(&stl, "solid x\nendsolid x\n").unwrap();
+    assert!(!reads_as_step(stl.to_string_lossy().into_owned()).unwrap());
+    let empty = tmp("empty.step-like");
+    std::fs::write(&empty, "").unwrap();
+    assert!(!reads_as_step(empty.to_string_lossy().into_owned()).unwrap());
+    assert!(matches!(
+        reads_as_step(tmp("missing.step").to_string_lossy().into_owned()),
+        Err(FfiError::Io { .. })
+    ));
+
+    // what the reader says comes back as the page's errors; bytes that are not a read are an error, not a panic
+    let path = "x.step".to_string();
+    let message = |r: Result<Vec<std::sync::Arc<Part>>, FfiError>| match r {
+        Err(FfiError::Format { message }) => message,
+        r => panic!("{:?}", r.map(|p| p.len())),
+    };
+    assert_eq!(
+        message(load_step_parts(
+            path.clone(),
+            sf_step::wire::encode(&Ok(None))
+        )),
+        "the CAD kernel could not read this STEP file"
+    );
+    assert_eq!(
+        message(load_step_parts(
+            path.clone(),
+            sf_step::wire::encode(&Err("no kernel".into()))
+        )),
+        "no kernel"
+    );
+    assert_eq!(
+        message(load_step_parts(path.clone(), b"garbage".to_vec())),
+        sf_step::wire::MALFORMED
+    );
+    let empty_tree = sf_step::RawResult {
+        nodes: vec![],
+        meshes: vec![],
+    };
+    assert_eq!(
+        message(load_step_parts(
+            path,
+            sf_step::wire::encode(&Ok(Some(empty_tree)))
+        )),
+        "the CAD kernel could not read this STEP file"
     );
 }
