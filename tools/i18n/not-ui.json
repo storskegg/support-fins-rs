@@ -7,7 +7,6 @@
   "light": "padStyle value compared with the engine's",
   "fins": "ExportModel: the key of the export options the engine reads",
   "too tight": "compared with the engine's reason text (the shown text goes through JS.t)",
-  "a setting is not a finite number": "precondition message, a programming error",
   " supports": "ObjectPickerModel: matches the name of the supports object a 3MF export writes",
   "The build's records could not be read: %arg": "a mismatch between the engine's JSON and the app, a bug to see (docs/FFI.md); the web shows its errors untranslated too",
   "%.0f fps": "debug-build frame-time overlay",
