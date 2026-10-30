@@ -49,6 +49,23 @@ struct PlateBoardTests {
         #expect(model.session.owner == live.id)
     }
 
+    /// The clash banner's Arrange (`clash-arrange`) runs `board.arrange()`: a model put onto another clashes (the banner
+    /// shows) and Arrange packs them apart (it goes). The UI test cannot set the clash up through the window (Add model
+    /// always picks a free spot and a drag needs window coordinates), so this is the always-run check of the flow.
+    @Test func models_standingOnEachOtherClashAndArrangeClearsIt() async throws {
+        let (model, board) = try await window(name: "clash-a")
+        try await add(model, "clash-b")
+        #expect(!board.clashing, "Add model leaves a free spot")
+        let first = board.plate.models[0]
+        board.placeLive(board.plate.liveSlot, first.xy)       // the live model onto the parked one
+        board.sync()
+        #expect(board.clashing, "the models overlap: the banner shows")
+        #expect(!board.computeClash().isEmpty)
+        await board.arrange()
+        board.sync()
+        #expect(!board.clashing && board.computeClash().isEmpty, "Arrange packed them apart")
+    }
+
     @Test func addingToAnEmptyWindowIsAnOrdinaryLoad() async throws {
         let model = ViewerModel()
         try #require(model.controller != nil, "no Metal device")

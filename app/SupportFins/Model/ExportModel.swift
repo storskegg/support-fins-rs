@@ -179,7 +179,10 @@ final class ExportModel {
             o["placed"] = s.placed
             if let text = s.session, let session = try? JSONSerialization.jsonObject(with: Data(text.utf8)) { o["session"] = session }
         }
-        guard let data = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]) else { return nil }
+        // a NaN or infinity in the pose, threshold, bed or spot makes `data(withJSONObject:)` raise an ObjC exception,
+        // which `try?` does not catch: ask first (S-10)
+        guard JSONSerialization.isValidJSONObject(o),
+              let data = try? JSONSerialization.data(withJSONObject: o, options: [.sortedKeys]) else { return nil }
         return String(decoding: data, as: UTF8.self)
     }
 

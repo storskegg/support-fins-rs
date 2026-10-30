@@ -95,7 +95,7 @@ struct BraceTipView: View {
             .padding(.vertical, 4)
             .frame(minWidth: 208, maxWidth: 288, alignment: .leading)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 9))
-            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Color.white.opacity(0.09)))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Color.white.opacity(0.09)).allowsHitTesting(false))
             .opacity(tip.shown ? 1 : 0)
             .animation(.easeOut(duration: 0.12), value: tip.shown)
             .offset(x: tip.at?.x ?? 0, y: tip.at?.y ?? 0)

@@ -211,4 +211,21 @@ final class ExportModelTests {
         let none = rig(part, panel: StubPanel(answer: target))
         #expect(await none.0.run(.stl) == nil && StubPanel.asked.count == before)
     }
+
+    /// S-10: a NaN pose made `JSONSerialization.data(withJSONObject:)` raise an ObjC exception that `try?` does not catch.
+    @Test func aNonFinitePoseOrThresholdGivesNoOptionsInsteadOfCrashing() throws {
+        let part = try cube()
+        for bad in [Double.nan, .infinity] {
+            var pose = identity; pose[4] = bad
+            let (a, _) = rig(part, finsOn: false, pose: pose)
+            #expect(a.optionsJSON(for: .stl) == nil)
+            let build = BuildModel(part: part)
+            let b = ExportModel(build: build, finsOn: { false }, source: {
+                .init(partName: "p.stl", part: part, nozzle: 0.4, layerHeight: 0.2, pose: identity, threshold: bad, bed: [256, 256])
+            }, removed: { [] }, panel: StubPanel())
+            #expect(b.optionsJSON(for: .threeMF) == nil)
+        }
+        let (ok, _) = rig(part, finsOn: false)
+        #expect(ok.optionsJSON(for: .stl) != nil)
+    }
 }

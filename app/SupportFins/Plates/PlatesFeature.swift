@@ -202,7 +202,7 @@ struct PlateToast: View {
             .padding(.leading, 14)
             .padding(.trailing, 10)
             .background(.regularMaterial, in: .rect(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator).allowsHitTesting(false))
             .shadow(radius: 12)
             .padding(.bottom, 70)
             .accessibilityElement(children: .contain)

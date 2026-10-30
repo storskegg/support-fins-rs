@@ -50,6 +50,7 @@ struct ReadingStepSpinner: View {
         }
         .frame(maxWidth: .infinity)
         .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
         .accessibilityLabel("reading STEP…")
         .accessibilityIdentifier("reading-step")
     }

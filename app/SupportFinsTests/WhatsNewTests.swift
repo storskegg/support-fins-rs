@@ -26,6 +26,22 @@ struct WhatsNewTests {
         #expect(!c.isEmpty && Changelog.none.isEmpty && Changelog.none.newest == nil && Changelog.none.older.isEmpty)
     }
 
+    /// X-15: `-SFChangelogFixture` is a DEBUG-only hook; a Release build never reads a list from a default. (The
+    /// Release half is checked on the built binary by `just app-release-hooks`.)
+    @Test("the fixture default is honoured in DEBUG builds only")
+    func fixtureHook() throws {
+        let suite = "sf-fixture-\(UUID().uuidString)"
+        let d = try #require(UserDefaults(suiteName: suite))
+        defer { d.removePersistentDomain(forName: suite) }
+        #expect(Changelog.fixtureURL(defaults: d) == nil)
+        d.set("/tmp/x.json", forKey: "SFChangelogFixture")
+        #if DEBUG
+        #expect(Changelog.fixtureURL(defaults: d)?.path == "/tmp/x.json")
+        #else
+        #expect(Changelog.fixtureURL(defaults: d) == nil)
+        #endif
+    }
+
     @Test("a file that is not a changelog is no changelog")
     func broken() throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "whatsnew-\(UUID().uuidString).json")

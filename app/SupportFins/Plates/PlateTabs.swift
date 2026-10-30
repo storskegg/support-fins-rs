@@ -38,7 +38,7 @@ struct PlateTabs: View {
         }
         .padding(3)
         .background(.regularMaterial, in: .rect(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator).allowsHitTesting(false))
         .padding(.top, 8)
         .disabled(board.busy)
         .accessibilityElement(children: .contain)

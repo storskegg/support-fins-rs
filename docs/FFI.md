@@ -69,11 +69,13 @@ fn scale_percent_text(factor: f64) -> Result<String, FfiError>;             // M
 impl Part {
   fn info(&self) -> PartInfo;
   fn mesh(&self) -> Arc<GpuBuffer>;                          // interleaved position+normal, f32, model frame
-  fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError>;   // rot: 9, column-major
+  fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError>;   // rot: 9, column-major; a bad threshold or pose is FfiError::Engine, a panic is caught (crash::guarded)
+  fn islands(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Vec<Island>, FfiError>;       // findIslands: the midair starts (see "Readout data")
   fn face_flags(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Arc<GpuBuffer>, FfiError>; // u8 per face: over/kept/on_bed bits
   fn scaled(&self, factor: f64) -> Result<Arc<Part>, FfiError>;                // M6 Scale (ui/scale.js setScale): uniform scale about the box centre with the page's two f32 roundings (centred `f32(p - c)`, then `f32(c + s * centred)`; exact vs the oracle `parity/oracle/setscale.js`), welded afresh; slicer parts scale with it, colours/notes/name kept. Call it on the part as loaded (never on a scaled one: no compounding)
 }
-#[derive(uniffi::Record)] struct AnalysisSummary { over_area: f64, bed_area: f64, over_face_count: u64, region_count: u64, offset: Vec<f64>, size: Vec<f64> }
+#[derive(uniffi::Record)] struct AnalysisSummary { over_area: f64, bed_area: f64, over_face_count: u64, region_count: u64, raw_region_count: u64 /* before the sliver filter: the sliver warning compares it with region_count */, analyze_ms: f64 /* analysisTiming */, offset: Vec<f64>, size: Vec<f64> }
+#[derive(uniffi::Record)] struct Island { x: f64, y: f64, z: f64, points: Vec<f64> /* flat x,y,z,... */ }
 
 // M4b:
 #[uniffi::export(callback_interface)] trait BuildListener: Send + Sync { fn done(&self, generation: u64, result: Arc<BuildResult>); fn failed(&self, generation: u64, err: FfiError); }

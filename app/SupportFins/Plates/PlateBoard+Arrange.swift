@@ -107,7 +107,7 @@ struct ClashBanner: View {
             .foregroundStyle(Color(red: 1, green: 0.54, blue: 0.54))
             .padding(.vertical, 6).padding(.leading, 14).padding(.trailing, 8)
             .background(.regularMaterial, in: .rect(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color(red: 1, green: 0.42, blue: 0.42)))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color(red: 1, green: 0.42, blue: 0.42)).allowsHitTesting(false))
             .shadow(radius: 12)
             .padding(.top, 52)
             .accessibilityElement(children: .contain)
