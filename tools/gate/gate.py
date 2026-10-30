@@ -30,6 +30,9 @@ BASE = [
     ("fmt", ["cargo", "fmt", "--all", "--check"]),
     ("clippy", ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]),
     ("test", ["cargo", "test", "--workspace"]),
+    # licences, bans and sources (deny.toml); the Acknowledgements file matches what Cargo.lock ships (tools/licenses)
+    ("deny", ["cargo", "deny", "check"]),
+    ("licenses", ["python3", "tools/licenses/gen.py", "--check"]),
     ("deno", DENO),
     ("cli-parity", ["just", "cli-parity"]),
     ("i18n-catalog", ["just", "i18n-catalog"]),

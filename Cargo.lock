@@ -732,6 +732,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sf-bindgen"
+version = "0.1.0"
+dependencies = [
+ "uniffi",
+]
+
+[[package]]
 name = "sf-cli"
 version = "0.1.0"
 dependencies = [

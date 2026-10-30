@@ -598,5 +598,29 @@
     "pt": "Falha na exportação",
     "ar": "فشل التصدير",
     "nl": "Exporteren mislukt"
+  },
+  "Acknowledgements": {
+    "why": "title of the Acknowledgements window (open-source licence notices; the web has none)",
+    "de": "Danksagungen",
+    "zh": "致谢",
+    "pt": "Agradecimentos",
+    "ar": "شكر وتقدير",
+    "nl": "Dankbetuigingen"
+  },
+  "Acknowledgements…": {
+    "why": "app menu item (Support Fins) that opens the Acknowledgements window",
+    "de": "Danksagungen …",
+    "zh": "致谢…",
+    "pt": "Agradecimentos…",
+    "ar": "شكر وتقدير…",
+    "nl": "Dankbetuigingen…"
+  },
+  "Support Fins is built on open-source software. Its licences ask for these notices.": {
+    "why": "intro line of the Acknowledgements window",
+    "de": "Support Fins basiert auf Open-Source-Software. Deren Lizenzen verlangen diese Hinweise.",
+    "zh": "Support Fins 基于开源软件构建。这些软件的许可证要求列出以下声明。",
+    "pt": "O Support Fins é construído com software de código aberto. As licenças dele pedem estes avisos.",
+    "ar": "يعتمد Support Fins على برامج مفتوحة المصدر. وتتطلب تراخيصها هذه الإشعارات.",
+    "nl": "Support Fins is gebouwd op opensourcesoftware. De licenties daarvan vragen om deze vermeldingen."
   }
 }

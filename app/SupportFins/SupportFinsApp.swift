@@ -19,7 +19,9 @@ struct SupportFinsApp: App {
         }
         .defaultSize(width: 1100, height: 760)
         .commands {
+            CommandGroup(after: .appInfo) { AcknowledgementsCommand() }
             FeatureCommands()
         }
+        AcknowledgementsScene()
     }
 }
