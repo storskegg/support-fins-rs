@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SupportFinsCore
 import Testing
@@ -176,5 +177,75 @@ struct LoadLimitTests {
             await model.load(url: url)
             #expect(model.hasPart && model.status == nil, "session \(session ?? "none")")
         }
+    }
+
+    // MARK: the alert's keys
+
+    @MainActor final class Answers { var list: [Bool] = [] }
+
+    private func presented(_ code: (LimitAlertPresenter, NSWindow, Answers) async throws -> Void) async throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false         // ARC owns it: the default release-on-close over-releases
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        let answers = Answers()
+        let presenter = LimitAlertPresenter { answers.list.append($0) }
+        try await code(presenter, window, answers)
+    }
+
+    private let prompt = LoadLimitPrompt(kind: .dimension, estimate: 3000, limit: 2000, name: "big.stl")
+
+    @Test("Return is Cancel, Load anyway has no key, and the sheet carries the message")
+    func alertButtons() async throws {
+        try await presented { presenter, window, answers in
+            presenter.update(prompt, window: window)
+            let alert = try #require(presenter.alert)
+            #expect(alert.messageText == "Load big.stl anyway?" && alert.informativeText == "This model is 3 m across (the limit is 2 m).")
+            #expect(alert.buttons.map(\.title) == ["Cancel", "Load anyway"])
+            // Cancel is the first button, so NSAlert's default (Return); Load anyway answers no key
+            #expect(alert.buttons[1].keyEquivalent == "")
+            #expect(window.attachedSheet != nil)
+            alert.buttons[0].performClick(nil)
+            #expect(await eventually { answers.list == [false] && window.attachedSheet == nil })
+        }
+    }
+
+    @Test("Load anyway answers yes, once")
+    func alertLoadAnyway() async throws {
+        try await presented { presenter, window, answers in
+            presenter.update(prompt, window: window)
+            try #require(presenter.alert).buttons[1].performClick(nil)
+            #expect(await eventually { answers.list == [true] && window.attachedSheet == nil })
+            presenter.finish(false)                      // a late second call does nothing
+            #expect(answers.list == [true])
+        }
+    }
+
+    @Test("the model answering first takes the sheet down; the window closing answers Cancel")
+    func alertEnds() async throws {
+        try await presented { presenter, window, answers in
+            presenter.update(prompt, window: window)
+            presenter.update(nil, window: window)        // the model's question is gone
+            #expect(presenter.alert == nil && answers.list == [false])
+            #expect(await eventually { window.attachedSheet == nil })
+        }
+        try await presented { presenter, window, answers in
+            presenter.update(prompt, window: window)
+            NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
+            #expect(await eventually { answers.list == [false] && presenter.alert == nil })
+        }
+    }
+
+    @Test("answering Cancel resumes the waiting load; a second answer is ignored")
+    func answerResumesWaiter() async throws {
+        let model = ViewerModel()
+        let url = try box(3000, name: "limit-close.stl")
+        let load = Task { await model.load(url: url) }
+        #expect(await eventually { model.limitPrompt != nil })
+        model.answerLimitPrompt(false)
+        await load.value
+        #expect(!model.hasPart && model.limitPrompt == nil)
+        model.answerLimitPrompt(true)                   // no waiter: ignored
+        #expect(model.limitPrompt == nil)
     }
 }
