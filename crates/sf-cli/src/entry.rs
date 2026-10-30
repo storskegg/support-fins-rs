@@ -598,12 +598,14 @@ pub fn compute_fins_detail(
 }
 
 /// Why a cancellable build gave no result.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BuildStop {
     /// The request or the part is unusable.
     Failed(String),
     /// The cancel flag was raised; nothing of the build is kept.
     Cancelled,
+    /// The build would take more than its budget (X-07: a part loaded past the size limit).
+    TooLarge(sf_engine::guards::OverBudget),
 }
 
 impl std::fmt::Display for BuildStop {
@@ -611,6 +613,7 @@ impl std::fmt::Display for BuildStop {
         match self {
             BuildStop::Failed(m) => f.write_str(m),
             BuildStop::Cancelled => f.write_str("cancelled"),
+            BuildStop::TooLarge(o) => o.fmt(f),
         }
     }
 }
@@ -637,8 +640,11 @@ pub fn compute_fins_detail_cancellable(
         return Err(BuildStop::Cancelled);
     }
     let cfg = Config::default();
-    let built = build_fins_cancellable(&topo, &result, &IDENTITY3, &request.opts, &cfg, cancel)
-        .map_err(|_| BuildStop::Cancelled)?;
+    let built = sf_engine::guards::catch_over_budget(|| {
+        build_fins_cancellable(&topo, &result, &IDENTITY3, &request.opts, &cfg, cancel)
+    })
+    .map_err(BuildStop::TooLarge)?
+    .map_err(|_| BuildStop::Cancelled)?;
 
     let to_f32 = |v: &[[f64; 4]]| -> Vec<f32> {
         v.iter()

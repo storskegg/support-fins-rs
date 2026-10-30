@@ -394,6 +394,14 @@ pub fn build_part(
     build_part_cancellable(part, rot, opts_json, tunables_json, &Cancel::default())
 }
 
+/// The part's largest side (mm), as the load limit measures it.
+fn part_across(part: &Part) -> f64 {
+    part.info()
+        .size
+        .iter()
+        .fold(0.0, |m, &v| if v > m { v } else { m })
+}
+
 /// [`build_part`] that stops soon after `cancel`'s flag is raised and then returns
 /// `Err(FfiError::Cancelled)`; never a partial result. Unraised, the result is byte-identical.
 pub fn build_part_cancellable(
@@ -403,7 +411,11 @@ pub fn build_part_cancellable(
     tunables_json: &str,
     cancel: &Cancel,
 ) -> Result<BuildResult, FfiError> {
-    let built = build_part_inner(part, rot, opts_json, tunables_json, cancel);
+    // X-07: a build over its budget unwinds with `OverBudget`, which is the `Dimension` limit here
+    let built = sf_engine::guards::catch_over_budget(|| {
+        build_part_inner(part, rot, opts_json, tunables_json, cancel)
+    })
+    .unwrap_or_else(|o| Err(FfiError::too_large(part_across(part), o)));
     // the build's per-thread stamp arrays (4 B per face on every Rayon worker) are done with (C-11)
     sf_engine::inside::release_scratch();
     built
@@ -429,6 +441,7 @@ fn build_part_inner(
             compute_fins_detail_cancellable(&posed, &options, cancel).map_err(|e| match e {
                 BuildStop::Failed(m) => engine(m),
                 BuildStop::Cancelled => FfiError::Cancelled,
+                BuildStop::TooLarge(o) => FfiError::too_large(part_across(part), o),
             })?;
         let s = &result.stats;
         let request = engine_request(&options, None).map_err(engine)?;

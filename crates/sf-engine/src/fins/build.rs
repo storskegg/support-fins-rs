@@ -432,7 +432,8 @@ pub fn build_fins(
 
 /// [`build_fins`] that stops soon after `cancel`'s flag is raised and then returns `Err(Cancelled)`
 /// (never a partial build; nothing of the abandoned build is kept). Unraised, the result is
-/// byte-identical to [`build_fins`]'s.
+/// byte-identical to [`build_fins`]'s. A build over one of `cfg.limits` unwinds with a
+/// [`crate::guards::OverBudget`] (catch it with [`crate::guards::catch_over_budget`]).
 pub fn build_fins_cancellable(
     topo: &Arc<Topology>,
     result: &Analysis,
@@ -443,12 +444,19 @@ pub fn build_fins_cancellable(
 ) -> Result<FinsBuilt, Cancelled> {
     let mut cfg = cfg.clone();
     cfg.cancel = cancel.clone();
-    let built = crate::cancel::catch(|| build_fins_inner(topo, result, rot, opts, &cfg, false).0);
-    if built.is_err() {
-        // the seated part is cached on the topology for one build only
+    let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::cancel::catch(|| build_fins_inner(topo, result, rot, opts, &cfg, false).0)
+    }));
+    let stopped = match &built {
+        Ok(r) => r.is_err(),
+        Err(p) => p.is::<crate::guards::OverBudget>(),
+    };
+    if stopped {
+        // the seated part is cached on the topology for one build only (a build stopped by a cancel, or by a
+        // budget: `guards::OverBudget` goes on unwinding to the caller)
         forget_seated(topo);
     }
-    built
+    built.unwrap_or_else(|p| std::panic::resume_unwind(p))
 }
 
 /// `buildFins` run the way the JS tests run it with `globalThis.__TINECAP = []` set around the
