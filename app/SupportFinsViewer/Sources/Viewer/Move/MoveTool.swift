@@ -33,7 +33,6 @@ public final class MoveTool {
     @ObservationIgnored public var onToggleKey: (() -> Void)?
 
     @ObservationIgnored private var plateZ: Float = 0
-    @ObservationIgnored private var hoverPoint = false
 
     public init() {}
 

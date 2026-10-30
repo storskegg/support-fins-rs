@@ -89,7 +89,7 @@ final class MoveModel {
         d.over = over(xy, on: board)
         drag = d
         put(d.slot, at: xy, on: board)
-        lightTarget(d.over?.plate, on: board)
+        lightTarget(d.over?.plate)
     }
 
     /// The other plate a model at `xy` (the edited plate's coordinates) would be dropped on: its middle over that
@@ -103,7 +103,7 @@ final class MoveModel {
     }
 
     /// That plate's bed lit while the model is over it (`markTarget`, `ui/plateview.js`).
-    private func lightTarget(_ plate: Int?, on board: PlateBoard) {
+    private func lightTarget(_ plate: Int?) {
         guard let renderer = host?.controller?.renderer, renderer.plateScene.target != plate else { return }
         var scene = renderer.plateScene
         scene.target = plate
@@ -144,7 +144,7 @@ final class MoveModel {
         session.dragLocked = false
         guard let d = drag, let board else { drag = nil; return }
         drag = nil
-        if let renderer = host?.controller?.renderer, renderer.plateScene.target != nil { lightTarget(nil, on: board) }
+        if let renderer = host?.controller?.renderer, renderer.plateScene.target != nil { lightTarget(nil) }
         guard d.moved else { return }
         if let to = d.over, !leaving, board.moveToPlate(d.slot, to: to.plate, at: to.xy, back: d.from) {
             setOn(true)

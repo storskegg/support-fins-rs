@@ -67,12 +67,6 @@ struct WallOutcome: Decodable, Equatable, Sendable {
     /// A brace's stilt (`info.stilt`).
     var stilt = 0.0
 
-    init(ok: Bool, triStart: Int = 0, triEnd: Int = 0, kind: String? = nil, reason: String? = nil, length: Double = 0,
-         height: Double = 0, tines: Int = 0, ribs: Int = 0, cross: Int = 0, stilt: Double = 0) {
-        (self.ok, self.triStart, self.triEnd, self.kind, self.reason) = (ok, triStart, triEnd, kind, reason)
-        (self.length, self.height, self.tines, self.ribs, self.cross, self.stilt) = (length, height, tines, ribs, cross, stilt)
-    }
-
     private enum Key: String, CodingKey { case ok, triStart, triEnd, kind, reason, length, height, tines, ribs, cross, stilt }
 
     init(from decoder: Decoder) throws {

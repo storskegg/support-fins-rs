@@ -57,8 +57,6 @@ final class ToolbarRegistry {
     /// Show these slots, in the given order (the features' `toolbarSlots`, sorted).
     func declare(_ slots: [ToolbarSlot]) { self.slots = slots }
 
-    func register(_ slot: ToolbarSlot, badge: ToolbarBadge) { badges[slot] = badge }
-
     func register<Content: View>(_ slot: ToolbarSlot, isLit: @escaping () -> Bool = { false },
                                  detail: @escaping () -> String = { "" }, @ViewBuilder popover: @escaping () -> Content) {
         var badge = ToolbarBadge(isLit: isLit, popover: popover)

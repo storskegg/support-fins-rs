@@ -41,7 +41,7 @@ enum NativeCrashImport {
         let signalFrames = dump.signal.map(symbolizer.frames(of:)) ?? []
         if NativeCrashReport.isRustPanicAbort(signal: dump.signal?.signal, frames: signalFrames),
            let rust = rustReport(in: folder, near: dump.time) {
-            return join(rust, native: made, folder: folder) ? rust.stem : nil
+            return join(rust, native: made) ? rust.stem : nil
         }
 
         let iso = ISO8601DateFormatter()
@@ -77,7 +77,7 @@ enum NativeCrashImport {
     }
 
     /// Add the native capture to the panic report: `native` in its JSON, the stacks at the end of its text.
-    private static func join(_ report: CrashFolder.Report, native: (json: [String: Any], text: String, frames: [NativeSymbolizer.Frame]), folder: CrashFolder) -> Bool {
+    private static func join(_ report: CrashFolder.Report, native: (json: [String: Any], text: String, frames: [NativeSymbolizer.Frame])) -> Bool {
         guard let jsonURL = report.files.first(where: { $0.pathExtension == "json" }),
               let data = try? Data(contentsOf: jsonURL),
               var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }

@@ -143,11 +143,6 @@ public struct NativeCrashDump: Sendable, Equatable {
         }
     }
 
-    /// The image an address falls in.
-    public func image(containing address: UInt64) -> Image? {
-        images.first { address >= $0.load && address < $0.load &+ max($0.size, 1) }
-    }
-
     /// The context's breadcrumbs and settings (the JSON `NativeCrashCapture.setContext` wrote).
     public var contextObject: [String: Any]? {
         guard let context, !context.isEmpty else { return nil }
