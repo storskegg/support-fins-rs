@@ -272,9 +272,17 @@ fn abandoning_a_search_or_a_build_stops_the_cpu_within_100_ms() {
         )
         .unwrap();
     }
-    std::mem::forget(b);
     let leaked = cores(WINDOW);
     eprintln!("build, Builder leaked (old drop): {leaked:.2} cores");
+    // the old drop would have left that build running; stop it here and wait for quiet, so the scenario
+    // below measures only itself
+    b.cancel();
+    drop(b);
+    for _ in 0..200 {
+        if cores(Duration::from_millis(50)) < 0.05 {
+            break;
+        }
+    }
 
     // dropping the Builder mid-build
     let b = Builder::new(part.clone());
