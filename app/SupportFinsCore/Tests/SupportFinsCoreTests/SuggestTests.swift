@@ -3,16 +3,6 @@ import Testing
 
 @testable import SupportFinsCore
 
-private func modelPath(_ name: String) throws -> String {
-    var url = URL(fileURLWithPath: #filePath)
-    for _ in 0..<5 { url.deleteLastPathComponent() }
-    let upstream = try String(contentsOf: url.appendingPathComponent("UPSTREAM"), encoding: .utf8)
-    let line = try #require(upstream.split(separator: "\n").first { $0.hasPrefix("checkout=") })
-    var root = String(line.dropFirst("checkout=".count)).trimmingCharacters(in: .whitespaces)
-    if root.hasPrefix("~") { root = NSHomeDirectory() + root.dropFirst() }
-    return root + "/prototype/stress/models/\(name).stl"
-}
-
 private final class Collector: SuggestListener, @unchecked Sendable {
     enum Event: Sendable {
         case suggested(UInt64, SuggestResult)

@@ -16,7 +16,8 @@ enum TestParts {
         return faces.map { f in f.flatMap { v[$0] } }
     }
 
-    static func write(_ tris: [[Float]], name: String) throws -> String {
+    /// `tris` (nine floats each) as a binary STL: no normals, no attributes.
+    static func stl(_ tris: [[Float]]) -> Data {
         var data = Data(count: 80)
         var count = UInt32(tris.count)
         withUnsafeBytes(of: &count) { data.append(contentsOf: $0) }
@@ -24,9 +25,18 @@ enum TestParts {
             for f in [Float](repeating: 0, count: 3) + t { var x = f; withUnsafeBytes(of: &x) { data.append(contentsOf: $0) } }
             data.append(contentsOf: [0, 0])
         }
-        let path = NSTemporaryDirectory() + name
-        try data.write(to: URL(fileURLWithPath: path))
-        return path
+        return data
+    }
+
+    /// `tris` as a binary STL at `url`; its path.
+    @discardableResult
+    static func write(_ tris: [[Float]], to url: URL) throws -> String {
+        try stl(tris).write(to: url)
+        return url.path(percentEncoded: false)
+    }
+
+    static func write(_ tris: [[Float]], name: String) throws -> String {
+        try write(tris, to: URL(fileURLWithPath: NSTemporaryDirectory() + name))
     }
 
     /// A 40 mm cube: it sits flat with nothing to support.
@@ -70,4 +80,14 @@ func eventually(_ seconds: Double = 30, _ condition: () -> Bool) async -> Bool {
         try? await Task.sleep(for: .milliseconds(10))
     }
     return true
+}
+
+/// Poll `condition` on the main actor every 10 ms, `tries` times, then record a timeout naming `what`.
+@MainActor
+func eventually(_ what: String, tries: Int = 1000, _ condition: () -> Bool) async throws {
+    for _ in 0..<tries {
+        if condition() { return }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    Issue.record("timed out: \(what)")
 }

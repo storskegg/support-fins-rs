@@ -18,13 +18,6 @@ struct RenderTests {
         return (Int(px[o + 2]), Int(px[o + 1]), Int(px[o]))
     }
 
-    /// Count of pixels satisfying `test`.
-    func count(_ px: [UInt8], _ test: (Int, Int, Int) -> Bool) -> Int {
-        var n = 0
-        for i in stride(from: 0, to: px.count, by: 4) where test(Int(px[i + 2]), Int(px[i + 1]), Int(px[i])) { n += 1 }
-        return n
-    }
-
     func seat(_ r: ViewerRenderer, _ mesh: GeneratedMesh, _ degrees: SIMD3<Float>, threshold: Double = 45) async {
         let rot = rotationMatrix(degrees: degrees)
         r.setPose(rotation: rot, offset: seatingOffset(bounds: mesh.bounds, rotation: rot))

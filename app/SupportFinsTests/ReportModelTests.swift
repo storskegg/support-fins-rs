@@ -9,14 +9,6 @@ import Testing
 @MainActor
 @Suite("Report")
 struct ReportModelTests {
-    private func eventually(_ what: String, _ condition: () -> Bool) async throws {
-        for _ in 0..<1000 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("timed out: \(what)")
-    }
-
     @Test func theRowWaitsForABuildAndThenReportsIt() async throws {
         let window = ViewerModel()
         try #require(window.controller != nil, "no Metal device")
