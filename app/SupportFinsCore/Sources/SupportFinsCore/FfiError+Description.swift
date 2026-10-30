@@ -6,6 +6,7 @@ import Foundation
 func ffiErrorDescription(_ error: FfiError) -> String {
     switch error {
     case .Io(let message), .Format(let message), .Engine(let message): message
+    case .LimitExceeded(_, _, _, let message): message
     case .Cancelled: "Cancelled."
     }
 }

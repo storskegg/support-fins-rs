@@ -4,6 +4,7 @@
 //! APPNOTE: a local file header + data per entry, then the central directory, then the
 //! end-of-central-directory record.
 
+use crate::limits::{LimitExceeded, LoadOptions, MAX_DECOMPRESSED_BYTES, ReadError};
 use crate::text::decode;
 use indexmap::IndexMap;
 use miniz_oxide::{
@@ -227,15 +228,36 @@ fn find_extra(view: &View, start: usize, len: usize, id: u16) -> Result<Option<u
 /// about twice as fast as miniz_oxide; every other outcome (truncated or corrupt data, bytes
 /// after the end of the stream) is re-run through the miniz_oxide code below, which defines
 /// those behaviours, so they cannot differ.
+#[cfg(test)]
 fn inflate_raw(bytes: &[u8], size_hint: usize) -> Result<Vec<u8>, String> {
-    inflate_fast(bytes, size_hint).map_or_else(|| inflate_raw_miniz(bytes), Ok)
+    inflate_capped(bytes, size_hint, usize::MAX).map_err(|e| match e {
+        Capped::Over => unreachable!("no cap"),
+        Capped::Err(m) => m,
+    })
+}
+
+/// Why a capped inflate stopped.
+enum Capped {
+    /// more than the cap came out
+    Over,
+    Err(String),
+}
+
+/// `inflate_raw` that stops (with `Capped::Over`) as soon as more than `cap` bytes have come out.
+fn inflate_capped(bytes: &[u8], size_hint: usize, cap: usize) -> Result<Vec<u8>, Capped> {
+    match inflate_fast(bytes, size_hint, cap)? {
+        Some(v) => Ok(v),
+        None => inflate_miniz_capped(bytes, cap),
+    }
 }
 
 /// A clean inflate of the whole of `bytes`, or `None`.
-fn inflate_fast(bytes: &[u8], size_hint: usize) -> Option<Vec<u8>> {
+fn inflate_fast(bytes: &[u8], size_hint: usize, cap: usize) -> Result<Option<Vec<u8>>, Capped> {
     use flate2::{Decompress, FlushDecompress, Status};
     // deflate cannot expand more than 1032:1, so the hint can't make this reserve absurd
-    let want = size_hint.min(bytes.len().saturating_mul(1032));
+    let want = size_hint
+        .min(bytes.len().saturating_mul(1032))
+        .min(cap.saturating_add(1));
     let mut out: Vec<u8> = Vec::with_capacity(want.max(64 * 1024));
     let mut d = Decompress::new(false);
     let mut input = bytes;
@@ -245,18 +267,29 @@ fn inflate_fast(bytes: &[u8], size_hint: usize) -> Option<Vec<u8>> {
         }
         let (in0, out0) = (d.total_in(), out.len());
         let status = d.decompress_vec(input, &mut out, FlushDecompress::None);
+        if out.len() > cap {
+            return Err(Capped::Over);
+        }
         let consumed = (d.total_in() - in0) as usize;
         input = &input[consumed..];
         match status {
-            Ok(Status::StreamEnd) => return input.is_empty().then_some(out),
+            Ok(Status::StreamEnd) => return Ok(input.is_empty().then_some(out)),
             Ok(_) if consumed > 0 || out.len() > out0 => {}
-            _ => return None,
+            _ => return Ok(None),
         }
     }
 }
 
 /// `inflate_raw` as miniz_oxide runs it: the definition of the edge-case behaviour.
+#[cfg(test)]
 fn inflate_raw_miniz(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    inflate_miniz_capped(bytes, usize::MAX).map_err(|e| match e {
+        Capped::Over => unreachable!("no cap"),
+        Capped::Err(m) => m,
+    })
+}
+
+fn inflate_miniz_capped(bytes: &[u8], cap: usize) -> Result<Vec<u8>, Capped> {
     let mut state = InflateState::new_boxed(DataFormat::Raw);
     let mut out: Vec<u8> = Vec::new();
     let mut buf = vec![0u8; 64 * 1024];
@@ -264,11 +297,14 @@ fn inflate_raw_miniz(bytes: &[u8]) -> Result<Vec<u8>, String> {
     loop {
         let r = inflate(&mut state, input, &mut buf, MZFlush::None);
         out.extend_from_slice(&buf[..r.bytes_written]);
+        if out.len() > cap {
+            return Err(Capped::Over);
+        }
         input = &input[r.bytes_consumed..];
         match r.status {
             Ok(MZStatus::StreamEnd) => {
                 if !input.is_empty() {
-                    return Err("failed to write whole buffer".to_string());
+                    return Err(Capped::Err("failed to write whole buffer".to_string()));
                 }
                 return Ok(out);
             }
@@ -278,9 +314,21 @@ fn inflate_raw_miniz(bytes: &[u8]) -> Result<Vec<u8>, String> {
                 }
             }
             Err(MZError::Buf) => return Ok(out),
-            Err(_) => return Err("corrupt deflate stream".to_string()),
+            Err(_) => return Err(Capped::Err("corrupt deflate stream".to_string())),
         }
     }
+}
+
+/// One central-directory record, resolved: where its data is and what it claims to unpack to.
+struct Entry {
+    name: String,
+    method: u16,
+    /// where the compressed data starts and how long it says it is
+    start: usize,
+    comp_size: usize,
+    local_off: usize,
+    /// the central record's uncompressed size (a claim, checked against the real inflate)
+    declared: u64,
 }
 
 /// Port of `unzip` (web/zip.js:172-238): entry name (forward slashes) -> contents, in the
@@ -291,10 +339,25 @@ fn inflate_raw_miniz(bytes: &[u8]) -> Result<Vec<u8>, String> {
 /// We walk the central directory rather than scanning for local headers: the central
 /// directory is the authoritative index, and a local header may carry zeroed sizes with the
 /// real ones in a trailing data descriptor.
+///
+/// Hostile archives (audit X-04): overlapping entries are refused outright, and the entries'
+/// total unpacked size is held to [`MAX_DECOMPRESSED_BYTES`] (declared sizes are checked before
+/// anything is inflated; a running budget catches a stream that lies about its size). Use
+/// [`unzip_with`] for `allow_large`.
 pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
+    unzip_with(bytes, &LoadOptions::default()).map_err(String::from)
+}
+
+/// [`unzip`] with the load options: `allow_large` lifts the 2 GiB total (overlap is still refused).
+pub fn unzip_with(
+    bytes: &[u8],
+    opts: &LoadOptions,
+) -> Result<IndexMap<String, Vec<u8>>, ReadError> {
     let view = View(bytes);
     let Some(eocd) = find_eocd(&view)? else {
-        return Err("not a ZIP archive (no end-of-central-directory record)".to_string());
+        return Err("not a ZIP archive (no end-of-central-directory record)"
+            .to_string()
+            .into());
     };
 
     let mut count = view.u16(eocd + 10)? as usize;
@@ -315,13 +378,16 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
     // Placeholders with no ZIP64 record to resolve them: the archive is malformed
     // rather than merely large, and reading on would walk garbage offsets.
     if count == 0xffff || o == 0xffffffff {
-        return Err("corrupt ZIP: ZIP64 markers with no ZIP64 record".to_string());
+        return Err("corrupt ZIP: ZIP64 markers with no ZIP64 record"
+            .to_string()
+            .into());
     }
 
-    let mut out: IndexMap<String, Vec<u8>> = IndexMap::new();
+    // Pass 1: the whole central directory, resolved. Nothing is inflated yet.
+    let mut entries: Vec<Entry> = Vec::new();
     for _ in 0..count {
         if view.u32(o)? != 0x02014b50 {
-            return Err("corrupt ZIP central directory".to_string());
+            return Err("corrupt ZIP central directory".to_string().into());
         }
         let method = view.u16(o + 10)?;
         let name_len = view.u16(o + 28)? as usize;
@@ -334,7 +400,7 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
             decode(&bytes[s..e])
         };
         let mut comp_size = view.u32(o + 20)? as usize;
-        let uncomp_hint = view.u32(o + 24)? as usize; // 0xffffffff when ZIP64: only a hint
+        let mut declared = view.u32(o + 24)? as u64; // 0xffffffff when ZIP64: read below
         let mut local_off = view.u32(o + 42)? as usize;
 
         // Any 0xffffffff field is really in the entry's ZIP64 extended-information
@@ -345,13 +411,14 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
         let uncomp_placeheld = view.u32(o + 24)? == 0xffffffff;
         if uncomp_placeheld || comp_size == 0xffffffff || local_off == 0xffffffff {
             let Some(z) = find_extra(&view, o + 46 + name_len, extra_len, 0x0001)? else {
-                return Err(format!(
-                    "corrupt ZIP: {name} needs a ZIP64 extra field and has none"
-                ));
+                return Err(
+                    format!("corrupt ZIP: {name} needs a ZIP64 extra field and has none").into(),
+                );
             };
             let mut f = z;
             if uncomp_placeheld {
-                f += 8; // skip uncompressed size
+                declared = u64::from_le_bytes(view.get(f, 8)?.try_into().unwrap());
+                f += 8;
             }
             if comp_size == 0xffffffff {
                 comp_size = view.num64(f)?;
@@ -370,25 +437,88 @@ pub fn unzip(bytes: &[u8]) -> Result<IndexMap<String, Vec<u8>>, String> {
         // The local header's own name/extra lengths give where the data starts --
         // the extra field routinely differs in length from the central one.
         if view.u32(local_off)? != 0x04034b50 {
-            return Err(format!("corrupt local header for {name}"));
+            return Err(format!("corrupt local header for {name}").into());
         }
         let l_name_len = view.u16(local_off + 26)? as usize;
         let l_extra_len = view.u16(local_off + 28)? as usize;
         let start = local_off + 30 + l_name_len + l_extra_len;
-        // bytes.subarray(start, start + compSize) clamps to the archive
-        let s = start.min(bytes.len());
-        let e = (start + comp_size).min(bytes.len());
-        let data = &bytes[s..e.max(s)];
-
-        if method == 0 {
-            out.insert(name, data.to_vec());
-        } else if method == 8 {
-            out.insert(name, inflate_raw(data, uncomp_hint)?);
-        } else {
-            return Err(format!(
-                "unsupported ZIP compression method {method} for {name}"
-            ));
+        if method != 0 && method != 8 {
+            return Err(format!("unsupported ZIP compression method {method} for {name}").into());
         }
+        entries.push(Entry {
+            name,
+            method,
+            start,
+            comp_size,
+            local_off,
+            declared,
+        });
+    }
+
+    // Entries must not share bytes: an archive whose records point at one stream makes the
+    // inflated total many times the file (a 1 MB archive of 4 GiB). Two records with one local
+    // header always share; otherwise ranges that lie inside the archive must not overlap (a size
+    // that runs off the end is a truncated entry, left to the inflate, as the JS does).
+    let mut by_off: Vec<(usize, usize)> = entries
+        .iter()
+        .map(|e| (e.local_off, e.start.saturating_add(e.comp_size)))
+        .collect();
+    by_off.sort_unstable();
+    if by_off
+        .windows(2)
+        .any(|w| w[1].0 == w[0].0 || (w[0].1 <= bytes.len() && w[1].0 < w[0].1))
+    {
+        return Err("corrupt ZIP: entries overlap".to_string().into());
+    }
+
+    // What the entries claim to unpack to, before any of it is inflated. Deflate cannot
+    // expand more than 1032:1, so a larger claim is capped at what the data could give.
+    let claimed = |e: &Entry| -> u64 {
+        let avail = e.comp_size.min(bytes.len().saturating_sub(e.start)) as u64;
+        if e.method == 0 {
+            avail
+        } else {
+            e.declared.min(avail.saturating_mul(1032))
+        }
+    };
+    let total_claim: u64 = entries.iter().map(claimed).fold(0, u64::saturating_add);
+    if !opts.allow_large && total_claim > MAX_DECOMPRESSED_BYTES {
+        return Err(LimitExceeded::bytes(total_claim).into());
+    }
+
+    // Pass 2: inflate, with a running budget for a stream that outgrows its claim.
+    let mut out: IndexMap<String, Vec<u8>> = IndexMap::new();
+    let mut spent: u64 = 0;
+    for e in entries {
+        // bytes.subarray(start, start + compSize) clamps to the archive
+        let s = e.start.min(bytes.len());
+        let end = e.start.saturating_add(e.comp_size).min(bytes.len());
+        let data = &bytes[s..end.max(s)];
+        let cap = if opts.allow_large {
+            usize::MAX
+        } else {
+            (MAX_DECOMPRESSED_BYTES - spent) as usize
+        };
+        let got = if e.method == 0 {
+            if data.len() > cap {
+                return Err(
+                    LimitExceeded::bytes(total_claim.max(spent + data.len() as u64)).into(),
+                );
+            }
+            data.to_vec()
+        } else {
+            match inflate_capped(data, claimed(&e) as usize, cap) {
+                Ok(v) => v,
+                Err(Capped::Over) => {
+                    return Err(
+                        LimitExceeded::bytes(total_claim.max(MAX_DECOMPRESSED_BYTES + 1)).into(),
+                    );
+                }
+                Err(Capped::Err(m)) => return Err(m.into()),
+            }
+        };
+        spent += got.len() as u64;
+        out.insert(e.name, got);
     }
     Ok(out)
 }
@@ -748,5 +878,55 @@ mod inflate_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+
+    fn deflate_zeros(n: usize) -> Vec<u8> {
+        use flate2::{Compress, Compression, FlushCompress};
+        let mut c = Compress::new(Compression::fast(), false);
+        let mut out = Vec::with_capacity(n / 500 + 64);
+        let zeros = vec![0u8; 1 << 16];
+        let mut left = n;
+        while left > 0 {
+            let k = left.min(zeros.len());
+            let before = c.total_in();
+            out.reserve(4096);
+            c.compress_vec(&zeros[..k], &mut out, FlushCompress::None)
+                .unwrap();
+            left -= (c.total_in() - before) as usize;
+        }
+        loop {
+            out.reserve(4096);
+            let st = c
+                .compress_vec(&[], &mut out, FlushCompress::Finish)
+                .unwrap();
+            if st == flate2::Status::StreamEnd {
+                break;
+            }
+        }
+        out
+    }
+
+    /// A stream that lies about its size (or has none): the running budget stops it, whichever
+    /// inflater would have taken it, with no more than the cap and one buffer produced.
+    #[test]
+    fn a_stream_past_its_cap_stops_early() {
+        let packed = deflate_zeros(4 << 20);
+        assert!(packed.len() < 1 << 20, "{}", packed.len());
+        assert!(matches!(
+            inflate_capped(&packed, 10, 1 << 20),
+            Err(Capped::Over)
+        ));
+        assert!(matches!(
+            inflate_miniz_capped(&packed, 1 << 20),
+            Err(Capped::Over)
+        ));
+        // under the cap, the same bytes
+        let ok = inflate_capped(&packed, 0, 8 << 20).ok().unwrap();
+        assert_eq!(ok.len(), 4 << 20);
     }
 }

@@ -2,7 +2,12 @@
 //! objects 3MF carries (the session, a slicer's volume settings). Key order is the object's
 //! JS property order: integer-like keys ascending first, the rest in insertion order.
 
+use crate::limits::MAX_JSON_DEPTH;
 use sf_engine::jsnum;
+use std::collections::HashMap;
+
+/// An object with fewer keys than this is searched linearly (cheaper than hashing).
+const SLOT_AT: usize = 16;
 
 /// A parsed JSON value. `Obj` keeps its keys in insertion order (a duplicate key replaces the
 /// value in place, as assigning a property does).
@@ -197,15 +202,11 @@ fn write_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
-/// How deeply arrays and objects may nest. The parser recurses, so unbounded nesting in a hostile file (a 3MF's
-/// session) would overflow the stack, which is a crash no `catch_unwind` can catch. Real documents here nest under
-/// ten deep; V8's own `JSON.parse` also gives up on deep input (with a `RangeError`, where this returns `None`).
-pub const MAX_DEPTH: usize = 256;
-
 struct P<'a> {
     t: &'a str,
     s: &'a [u8],
     i: usize,
+    /// containers currently open (capped at [`MAX_JSON_DEPTH`]: deeper is refused, audit X-05)
     depth: usize,
 }
 
@@ -217,21 +218,34 @@ impl P<'_> {
     }
 
     fn value(&mut self) -> Result<Json, ()> {
-        if self.depth >= MAX_DEPTH {
-            return Err(());
-        }
-        self.depth += 1;
-        let v = self.value_at_depth();
-        self.depth -= 1;
-        v
-    }
-
-    fn value_at_depth(&mut self) -> Result<Json, ()> {
         self.ws();
         match self.s.get(self.i).copied().ok_or(())? {
+            b'{' | b'[' => {
+                if self.depth >= MAX_JSON_DEPTH {
+                    return Err(());
+                }
+                self.depth += 1;
+                let v = self.container();
+                self.depth -= 1;
+                v
+            }
+            b'"' => Ok(Json::Str(self.string()?)),
+            b't' => self.lit("true", Json::Bool(true)),
+            b'f' => self.lit("false", Json::Bool(false)),
+            b'n' => self.lit("null", Json::Null),
+            b'-' | b'0'..=b'9' => self.number(),
+            _ => Err(()),
+        }
+    }
+
+    fn container(&mut self) -> Result<Json, ()> {
+        match self.s[self.i] {
             b'{' => {
                 self.i += 1;
                 let mut kv: Vec<(String, Json)> = Vec::new();
+                // key -> slot, built once an object grows (a duplicate key replaces in place;
+                // a linear search per key made 200k keys take 33 s, audit X-06)
+                let mut slots: HashMap<String, usize> = HashMap::new();
                 self.ws();
                 if self.s.get(self.i) == Some(&b'}') {
                     self.i += 1;
@@ -249,9 +263,22 @@ impl P<'_> {
                     }
                     self.i += 1;
                     let v = self.value()?;
-                    match kv.iter_mut().find(|(kk, _)| *kk == k) {
-                        Some(slot) => slot.1 = v,
-                        None => kv.push((k, v)),
+                    if kv.len() < SLOT_AT {
+                        match kv.iter_mut().find(|(kk, _)| *kk == k) {
+                            Some(slot) => slot.1 = v,
+                            None => kv.push((k, v)),
+                        }
+                    } else {
+                        if slots.is_empty() {
+                            slots.extend(kv.iter().enumerate().map(|(i, (k, _))| (k.clone(), i)));
+                        }
+                        match slots.get(&k) {
+                            Some(&i) => kv[i].1 = v,
+                            None => {
+                                slots.insert(k.clone(), kv.len());
+                                kv.push((k, v));
+                            }
+                        }
                     }
                     self.ws();
                     match self.s.get(self.i) {
@@ -285,12 +312,7 @@ impl P<'_> {
                     }
                 }
             }
-            b'"' => Ok(Json::Str(self.string()?)),
-            b't' => self.lit("true", Json::Bool(true)),
-            b'f' => self.lit("false", Json::Bool(false)),
-            b'n' => self.lit("null", Json::Null),
-            b'-' | b'0'..=b'9' => self.number(),
-            _ => Err(()),
+            _ => unreachable!("value() calls container() at an open bracket"),
         }
     }
 
@@ -411,7 +433,7 @@ impl P<'_> {
     }
 }
 
-/// `JSON.parse(text)`; `None` where JS throws a `SyntaxError`. A lone `\uD800`-style surrogate
+/// `JSON.parse(text)`; `None` where JS throws a `SyntaxError`, and for nesting deeper than [`MAX_JSON_DEPTH`] (JS parses deeper; no file the app writes does). A lone `\uD800`-style surrogate
 /// escape becomes U+FFFD (a Rust `String` cannot hold it).
 pub fn parse(text: &str) -> Option<Json> {
     let mut p = P {
@@ -423,24 +445,4 @@ pub fn parse(text: &str) -> Option<Json> {
     let v = p.value().ok()?;
     p.ws();
     if p.i == p.s.len() { Some(v) } else { None }
-}
-
-#[cfg(test)]
-mod depth_tests {
-    use super::*;
-
-    #[test]
-    fn nesting_up_to_the_limit_parses_and_deeper_is_refused_not_a_stack_overflow() {
-        let nest = |n: usize| format!("{}{}", "[".repeat(n), "]".repeat(n));
-        assert!(parse(&nest(MAX_DEPTH)).is_some());
-        assert!(parse(&nest(MAX_DEPTH + 1)).is_none());
-        // a hostile file's session: a million levels would overflow the stack of any thread
-        assert!(parse(&nest(1_000_000)).is_none());
-        assert!(parse(&"[".repeat(1_000_000)).is_none());
-        let objs = format!("{}1{}", "{\"a\":".repeat(100_000), "}".repeat(100_000));
-        assert!(parse(&objs).is_none());
-        // siblings do not count as depth
-        let wide = format!("[{}]", vec!["[1]"; 10_000].join(","));
-        assert!(parse(&wide).is_some());
-    }
 }

@@ -6,11 +6,15 @@ use std::sync::{Arc, Mutex};
 
 use sf_engine::jsnum;
 use sf_engine::overhangs::{Topology, analyze, build_topology};
-use sf_io::obj::read_obj;
+use sf_io::limits::{
+    self, LimitKind as IoLimitKind, LoadOptions as IoLoadOptions, ReadError, check_finite,
+};
+use sf_io::obj::read_obj_with;
 use sf_io::scale::{scale_about, scale_from_percent};
-use sf_io::stl::read_stl;
+use sf_io::stl::read_stl_with;
 use sf_io::threemf::{
-    MergeItem, PartColors, PartKind, ReadExtra, ThreeMfObject, merge_colors, read_three_mf_unmerged,
+    MergeItem, PartColors, PartKind, ReadExtra, ThreeMfObject, merge_colors,
+    read_three_mf_unmerged_with,
 };
 
 use crate::gpu::GpuBuffer;
@@ -26,6 +30,55 @@ pub enum FfiError {
     Engine { message: String },
     /// A build was superseded (M4b).
     Cancelled,
+    /// The file is bigger than a load allows without the user's say-so (audit X-03, X-04, X-07;
+    /// docs/FFI.md "Load limits"): ask "Load anyway?", then load again with `allow_large`.
+    /// `estimate` is what the file needs (a triangle count, bytes, or millimetres by `kind`),
+    /// `limit` the ceiling, `message` the sentence to show.
+    LimitExceeded {
+        kind: LimitKind,
+        estimate: f64,
+        limit: f64,
+        message: String,
+    },
+}
+
+/// Which load limit a [`FfiError::LimitExceeded`] hit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum LimitKind {
+    /// Triangles after component expansion; `estimate` and `limit` are counts.
+    Triangles,
+    /// Total unpacked ZIP bytes; `estimate` and `limit` are bytes.
+    Bytes,
+    /// Largest bounding-box dimension; `estimate` and `limit` are millimetres.
+    Dimension,
+}
+
+/// How a load may behave (`load_parts_with`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, uniffi::Record)]
+pub struct LoadOptions {
+    /// Load past the "Load anyway?" limits (more than 20 million triangles, 2 GiB unpacked, or a
+    /// side over 2 m). What is always refused (damaged coordinates, absurd nesting, overlapping
+    /// ZIP entries) stays refused.
+    #[uniffi(default = false)]
+    pub allow_large: bool,
+}
+
+impl From<ReadError> for FfiError {
+    fn from(e: ReadError) -> Self {
+        match e {
+            ReadError::Msg(message) => FfiError::Format { message },
+            ReadError::Limit(l) => FfiError::LimitExceeded {
+                kind: match l.kind {
+                    IoLimitKind::Triangles => LimitKind::Triangles,
+                    IoLimitKind::Bytes => LimitKind::Bytes,
+                    IoLimitKind::Dimension => LimitKind::Dimension,
+                },
+                estimate: l.estimate,
+                limit: l.limit,
+                message: l.to_string(),
+            },
+        }
+    }
 }
 
 impl fmt::Display for FfiError {
@@ -33,7 +86,8 @@ impl fmt::Display for FfiError {
         match self {
             FfiError::Io { message }
             | FfiError::Format { message }
-            | FfiError::Engine { message } => f.write_str(message),
+            | FfiError::Engine { message }
+            | FfiError::LimitExceeded { message, .. } => f.write_str(message),
             FfiError::Cancelled => f.write_str("cancelled"),
         }
     }
@@ -774,9 +828,23 @@ pub fn reads_as_step(path: String) -> Result<bool, FfiError> {
 /// an error, never a panic.
 #[uniffi::export]
 pub fn load_step_parts(path: String, kernel: Vec<u8>) -> Result<Vec<Arc<Part>>, FfiError> {
+    load_step_parts_with(path, kernel, LoadOptions::default())
+}
+
+/// `load_step_parts` with the load options: the same limits as `load_parts_with` apply to the STEP's parts (a coordinate
+/// that is not a number is refused; a part over 2 m is `FfiError::LimitExceeded` unless `allow_large`).
+#[uniffi::export]
+pub fn load_step_parts_with(
+    path: String,
+    kernel: Vec<u8>,
+    options: LoadOptions,
+) -> Result<Vec<Arc<Part>>, FfiError> {
     crate::crash::guarded("load model", || {
         let parts = step_loaded(sf_step::wire::decode(&kernel))?;
-        finish_parts(&path, parts, None)
+        let opts = IoLoadOptions {
+            allow_large: options.allow_large,
+        };
+        finish_parts(&path, parts, None, &opts)
     })
 }
 
@@ -795,73 +863,108 @@ fn step_loaded(read: Result<Option<sf_step::RawResult>, String>) -> Result<Vec<L
 /// the CLI's `readPart` gets it). A 3MF object's negative parts are cut out at import, as the page does
 /// (`web/ui/io.js`), through `sf-cut`; `PartInfo.notes` says what was cut and why anything was not.
 ///
+/// Hostile files are refused or held back, not crashed on (docs/FFI.md "Load limits"): this is
+/// `load_parts_with` with the default options, so a file over a limit fails with
+/// `FfiError::LimitExceeded`.
+///
 /// STEP runs OpenCascade in this process, which only a build with sf-step's `occt` feature can (the tests, the
 /// CLI's); the app's engine has none and reads STEP through its StepReader XPC service ([`reads_as_step`],
 /// [`load_step_parts`]).
 #[uniffi::export]
 pub fn load_parts(path: String) -> Result<Vec<Arc<Part>>, FfiError> {
+    load_parts_with(path, LoadOptions::default())
+}
+
+/// `load_parts` with the load options. The parse runs on its own thread with an 8 MiB stack
+/// (the caller may be a 512 KiB cooperative-pool thread), and every limit is checked before the
+/// work it guards: ZIP sizes before inflating, the triangle count before emitting, the size of
+/// the part after the parse (a cheap pass over the positions).
+#[uniffi::export]
+pub fn load_parts_with(path: String, options: LoadOptions) -> Result<Vec<Arc<Part>>, FfiError> {
     crate::crash::guarded("load model", || {
-        let bytes = std::fs::read(&path).map_err(|e| FfiError::Io {
-            message: format!("{path}: {e}"),
-        })?;
-        let format = |message: String| FfiError::Format { message };
-        let lower = path.to_ascii_lowercase();
-        let mut parts: Vec<Loaded> = Vec::new();
-        // a 3MF this app or the site exported carries a session: its part loads, and the supports come back from the
-        // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
-        let mut own: Option<(usize, sf_io::json::Json)> = None;
-        if lower.ends_with(".stl") {
+        let opts = IoLoadOptions {
+            allow_large: options.allow_large,
+        };
+        let run = move || load_parts_on_this_thread(path, &opts);
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("sf-load".into())
+                .stack_size(limits::LOAD_STACK_BYTES)
+                .spawn_scoped(scope, run)
+                .map_err(|e| FfiError::Engine {
+                    message: format!("could not start the loader: {e}"),
+                })?
+                .join()
+                .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+        })
+    })
+}
+
+fn load_parts_on_this_thread(
+    path: String,
+    opts: &IoLoadOptions,
+) -> Result<Vec<Arc<Part>>, FfiError> {
+    let _op = crate::crash::operation("load model");
+    let bytes = std::fs::read(&path).map_err(|e| FfiError::Io {
+        message: format!("{path}: {e}"),
+    })?;
+    let format = |message: String| FfiError::Format { message };
+    let lower = path.to_ascii_lowercase();
+    let mut parts: Vec<Loaded> = Vec::new();
+    // a 3MF this app or the site exported carries a session: its part loads, and the supports come back from the
+    // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
+    let mut own: Option<(usize, sf_io::json::Json)> = None;
+    if lower.ends_with(".stl") {
+        parts.push((
+            stem(&path),
+            read_stl_with(&bytes, opts)?,
+            None,
+            None,
+            ImportMeta::new(Kind::Stl),
+        ));
+    } else if lower.ends_with(".obj") {
+        for o in read_obj_with(&bytes, opts)?.objects {
+            parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Obj)));
+        }
+    } else if lower.ends_with(".3mf") {
+        let m = read_three_mf_unmerged_with(&bytes, opts)?;
+        drop(bytes);
+        let mut objects = m.objects;
+        if let Some(session) = m.session
+            && let Some(i) = sf_io::session::part_object_of(&objects)
+        {
+            own = Some((objects.len(), session));
+            objects = vec![objects.swap_remove(i)];
+        }
+        let (skipped, unit) = (m.skipped, m.unit);
+        let file = |mut meta: ImportMeta| {
+            meta.skipped = skipped;
+            meta.unit.clone_from(&unit);
+            meta
+        };
+        if objects.is_empty() {
             parts.push((
                 stem(&path),
-                read_stl(&bytes).map_err(|e| format(e.0))?,
+                m.positions,
                 None,
                 None,
-                ImportMeta::new(Kind::Stl),
+                file(ImportMeta::new(Kind::ThreeMf)),
             ));
-        } else if lower.ends_with(".obj") {
-            for o in read_obj(&bytes).map_err(format)?.objects {
-                parts.push((o.name, o.positions, None, None, ImportMeta::new(Kind::Obj)));
-            }
-        } else if lower.ends_with(".3mf") {
-            let m = read_three_mf_unmerged(&bytes).map_err(format)?;
-            drop(bytes);
-            let mut objects = m.objects;
-            if let Some(session) = m.session
-                && let Some(i) = sf_io::session::part_object_of(&objects)
-            {
-                own = Some((objects.len(), session));
-                objects = vec![objects.swap_remove(i)];
-            }
-            let (skipped, unit) = (m.skipped, m.unit);
-            let file = |mut meta: ImportMeta| {
-                meta.skipped = skipped;
-                meta.unit.clone_from(&unit);
-                meta
-            };
-            if objects.is_empty() {
-                parts.push((
-                    stem(&path),
-                    m.positions,
-                    None,
-                    None,
-                    file(ImportMeta::new(Kind::ThreeMf)),
-                ));
-            } else {
-                parts.extend(
-                    objects
-                        .into_iter()
-                        .map(cut_object)
-                        .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
-                );
-            }
-        } else if reads_as_step_file(&lower, &bytes) {
-            // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
-            parts = step_loaded(sf_step::read_raw(&bytes))?;
         } else {
-            return Err(format("reads .stl, .3mf, .obj and .step only".into()));
+            parts.extend(
+                objects
+                    .into_iter()
+                    .map(cut_object)
+                    .map(|(a, b, c, d, meta)| (a, b, c, d, file(meta))),
+            );
         }
-        finish_parts(&path, parts, own)
-    })
+    } else if reads_as_step_file(&lower, &bytes) {
+        // `parseStep` (web/ui/io.js:313-350); the page sniffs the content, so a STEP under any name loads
+        parts = step_loaded(sf_step::read_raw(&bytes))?;
+    } else {
+        return Err(format("reads .stl, .3mf, .obj and .step only".into()));
+    }
+    finish_parts(&path, parts, own, opts)
 }
 
 /// The loaded objects as `Part`s: empty ones dropped, unnamed ones named after the file, a saved session (`own`: the
@@ -870,12 +973,19 @@ fn finish_parts(
     path: &str,
     mut parts: Vec<Loaded>,
     own: Option<(usize, sf_io::json::Json)>,
+    opts: &IoLoadOptions,
 ) -> Result<Vec<Arc<Part>>, FfiError> {
     parts.retain(|(_, p, _, _, _)| !p.is_empty());
     if parts.is_empty() {
         return Err(FfiError::Format {
             message: "no triangles in the file".into(),
         });
+    }
+    // a part with a damaged coordinate is refused (a STEP can produce one too), and one over 2 m
+    // wants a yes: a single vertex at 1e30 sent a build allocating past 32 GB (audit X-07)
+    for (_, p, _, _, _) in &parts {
+        check_finite(p, "this file").map_err(|message| FfiError::Format { message })?;
+        limits::check_dimension(p, opts).map_err(|l| FfiError::from(ReadError::Limit(l)))?;
     }
     let base = stem(path);
     let objects_len = own.as_ref().map_or(parts.len(), |(n, _)| *n);

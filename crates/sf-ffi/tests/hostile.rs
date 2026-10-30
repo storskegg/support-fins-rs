@@ -18,14 +18,14 @@ use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::Duration;
 
 use sf_ffi::{
-    BuildListener, BuildResult, Builder, DrawKit, ExportKind, FfiError, Part, PlateFile,
-    PlateModel, StrengthAdvice, SuggestContext, SuggestListener, SuggestResult, Suggester,
-    arc_band, build_part, build_report, crash_zip, export, export_file_name, export_plate,
-    export_plates, export_with_drawn, footprint_arrange, footprint_clash_cells,
+    BuildListener, BuildResult, Builder, DrawKit, ExportKind, FfiError, LoadOptions, Part,
+    PlateFile, PlateModel, StrengthAdvice, SuggestContext, SuggestListener, SuggestResult,
+    Suggester, arc_band, build_part, build_report, crash_zip, export, export_file_name,
+    export_plate, export_plates, export_with_drawn, footprint_arrange, footprint_clash_cells,
     footprint_drag_step, footprint_of_build, footprint_of_build_with_drawn, footprint_of_part,
     footprint_spot, footprint_union, island_card, js_number_text, load_alignment, load_parts,
-    load_step_parts, merge_parts, plate_under, reads_as_step, scale_from_percent_text,
-    scale_percent_text,
+    load_parts_with, load_step_parts, load_step_parts_with, merge_parts, plate_under,
+    reads_as_step, scale_from_percent_text, scale_percent_text,
 };
 use sf_io::json::{Json, parse};
 use sf_testkit::models_dir;
@@ -481,7 +481,16 @@ fn part_exports_take_anything() {
     // load_parts / merge_parts
     for p in paths() {
         chk("reads_as_step", reads_as_step(p.clone()));
-        chk("load_parts", load_parts(p));
+        chk("load_parts", load_parts(p.clone()));
+        // (allow_large only lifts the "Load anyway?" limits; what is damaged stays refused)
+        chk(
+            "load_parts_with",
+            load_parts_with(p.clone(), LoadOptions { allow_large: true }),
+        );
+        chk(
+            "load_parts_with",
+            load_parts_with(p, LoadOptions { allow_large: false }),
+        );
     }
     // the STEP kernel's answer arrives from the XPC helper as bytes: whatever they hold
     let step = scratch("hostile.step");
@@ -493,6 +502,10 @@ fn part_exports_take_anything() {
     kernels.push([&u32::MAX.to_le_bytes()[..], &[1u8; 40][..]].concat());
     for k in kernels {
         chk("load_step_parts", load_step_parts(step.clone(), k.clone()));
+        chk(
+            "load_step_parts_with",
+            load_step_parts_with(step.clone(), k.clone(), LoadOptions { allow_large: true }),
+        );
         chk("load_step_parts", load_step_parts(String::new(), k));
     }
     let a = load("lbracket");
@@ -516,6 +529,13 @@ fn hostile_files_load_and_restore_without_a_panic() {
         n += 1;
         let path = dir.join(format!("f{n}.{ext}"));
         std::fs::write(&path, bytes).unwrap();
+        chk(
+            "load_parts_with",
+            load_parts_with(
+                path.to_string_lossy().into_owned(),
+                LoadOptions { allow_large: true },
+            ),
+        );
         if let Some(parts) = chk(
             "load_parts",
             load_parts(path.to_string_lossy().into_owned()),

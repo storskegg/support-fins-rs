@@ -9,6 +9,7 @@
 //! (`l`), points, curves and texture/normal data are skipped. OBJ carries no unit, so it is
 //! read as mm, as a slicer does.
 
+use crate::limits::{LimitExceeded, LoadOptions, MAX_TRIANGLES, ReadError, check_finite};
 use crate::text::{decode, is_js_space, js_trim};
 use sf_engine::jsnum;
 
@@ -548,6 +549,22 @@ fn cut_lines(bytes: &[u8], n: usize) -> Vec<&[u8]> {
 /// error in file order is the one reported, with the text `read_obj_reference` gives.
 pub fn read_obj(bytes: &[u8]) -> Result<ObjFile, String> {
     read_obj_chunked(bytes, None)
+}
+
+/// [`read_obj`] as a hostile-input-safe load (audit X-03, X-07): also refuses a coordinate that is
+/// not finite once rounded to `f32` (the JS goes on with it), and more than [`MAX_TRIANGLES`]
+/// triangles unless `allow_large` (counted after the parse: an OBJ's faces are not known before).
+pub fn read_obj_with(bytes: &[u8], opts: &LoadOptions) -> Result<ObjFile, ReadError> {
+    let file = read_obj_chunked(bytes, None)?;
+    let mut tris = 0u64;
+    for o in &file.objects {
+        check_finite(&o.positions, "this OBJ")?;
+        tris += (o.positions.len() / 9) as u64;
+    }
+    if !opts.allow_large && tris > MAX_TRIANGLES {
+        return Err(LimitExceeded::triangles(tris).into());
+    }
+    Ok(file)
 }
 
 /// `read_obj` with the chunk count forced (tests cut small inputs into many chunks).
