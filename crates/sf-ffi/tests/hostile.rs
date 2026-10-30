@@ -1303,6 +1303,10 @@ const GETTERS: &[(&str, &str)] = &[
         "text from three integers and two flags: no indexing, no arithmetic that can overflow",
     ),
     ("Part::has_session", "reads a flag of the loaded part"),
+    (
+        "Part::session_unreadable",
+        "reads a flag of the loaded part",
+    ),
     ("Part::info", "reads the fields of the loaded part"),
     (
         "Part::mesh",

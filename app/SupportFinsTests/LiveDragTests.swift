@@ -139,7 +139,7 @@ struct LiveDragWindowTests {
         let clock = ManualClock()
         let wiring = BuildWiring(session: session, controller: controller, liveDrag: { flag.on },
                                  sleep: { try await clock.sleep($0) })
-        let loaded = try await CoreLoader().load(url: try tURL(), device: controller.renderer.device)
+        let loaded = try await CoreLoader().load(url: try tURL(), device: controller.renderer.device, allowLarge: false)
         session.replaceParts(loaded.compactMap { $0.mesh as? CorePart })
         wiring.attach()
         controller.show(loaded.map(\.mesh), name: "bracket.stl")

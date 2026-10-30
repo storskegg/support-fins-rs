@@ -12,6 +12,11 @@ final class SessionFeature: Feature {
     init(host: ViewerModel) { self.host = host }
 
     func partDidShow(_ parts: [LoadedPart]) {
+        // a session too deep or damaged to read: the part loads with defaults, and the window says so (non-modal;
+        // the JS drops it silently)
+        if let host, parts.contains(where: { ($0.mesh as? CorePart)?.part.sessionUnreadable() == true }) {
+            host.status = JS.t("The settings saved in this file couldn't be read; defaults are used.")
+        }
         guard let host, let core = parts.count == 1 ? parts[0].mesh as? CorePart : nil, core.part.hasSession() else { return }
         // added to a plate of models: they keep the plate's settings (`beside`, `ui/models.js`); the board has already
         // given this model its slot

@@ -17,10 +17,22 @@ enum OpenFlow {
 private struct OpenFlowModifier: ViewModifier {
     @Bindable var model: ViewerModel
     @Environment(\.openDocument) private var openDocument
+    @State private var window: NSWindow?
+    @State private var presenter: LimitAlertPresenter
+
+    init(model: ViewerModel) {
+        self.model = model
+        _presenter = State(initialValue: LimitAlertPresenter { [weak model] in model?.answerLimitPrompt($0) })
+    }
 
     func body(content: Content) -> some View {
         content
             .sheet(item: $model.picker) { ObjectPickerSheet(model: $0) }
+            // a file over a load limit: Cancel is the default (Return and Esc), Load anyway must be clicked
+            .background(WindowReader { window = $0 })
+            .onChange(of: model.limitPrompt, initial: true) { _, prompt in presenter.update(prompt, window: window) }
+            .onChange(of: window) { _, w in presenter.update(model.limitPrompt, window: w) }
+            .onDisappear { presenter.finish(false); model.answerLimitPrompt(false) }
             .dropDestination(for: URL.self) { urls, _ in dropped(urls) }
     }
 

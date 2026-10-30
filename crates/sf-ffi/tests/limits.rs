@@ -311,7 +311,26 @@ fn a_session_nested_200000_deep_is_an_unreadable_session_not_a_crash() {
     let parts = r.unwrap();
     assert_eq!(parts[0].info().triangles, 1);
     assert!(parts[0].restore_session(false).unwrap().walls.is_empty());
+    assert!(
+        parts[0].session_unreadable(),
+        "the host is told the session was dropped"
+    );
     assert!(took < Duration::from_secs(1), "{took:?}");
+}
+
+#[test]
+fn a_3mf_with_no_session_or_a_good_one_is_not_flagged_unreadable() {
+    let xml = model(
+        &format!(r#"<object id="1">{TRI}</object>"#),
+        r#"<item objectid="1"/>"#,
+    );
+    let plain = write("nosession.3mf", &pkg(&xml, &[]));
+    assert!(!load_parts(plain).unwrap()[0].session_unreadable());
+    let good = write(
+        "goodsession.3mf",
+        &pkg(&xml, &[("Metadata/support_fins.json", r#"{"v":1}"#)]),
+    );
+    assert!(!load_parts(good).unwrap()[0].session_unreadable());
 }
 
 #[test]
