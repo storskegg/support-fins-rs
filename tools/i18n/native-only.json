@@ -590,5 +590,13 @@
     "pt": "Exportando",
     "ar": "جارٍ التصدير",
     "nl": "Exporteren"
+  },
+  "Export failed": {
+    "why": "the status card's red line when a file could not be written (the reason follows). Agent translation, to be checked by a native speaker",
+    "de": "Export fehlgeschlagen",
+    "zh": "导出失败",
+    "pt": "Falha na exportação",
+    "ar": "فشل التصدير",
+    "nl": "Exporteren mislukt"
   }
 }
