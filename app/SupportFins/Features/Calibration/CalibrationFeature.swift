@@ -7,7 +7,19 @@ final class CalibrationFeature: Feature {
     weak let host: ViewerModel?
     let model = CalibrationModel()
 
-    init(host: ViewerModel) { self.host = host }
+    init(host: ViewerModel) {
+        self.host = host
+        model.tieInputs = { [weak host] in host.flatMap(Self.tieInputs) }
+    }
+
+    /// The Plate ties print's inputs (issue #50): the printer picked, this window's fin settings and its bed.
+    static func tieInputs(_ host: ViewerModel) -> TiePrintInputs? {
+        let store = PrinterProfileStore.shared
+        guard let printer = store.current else { return nil }
+        let s = host.session.settings
+        let bed = host.controller.map { [Double($0.volume.x), Double($0.volume.y)] } ?? []
+        return TiePrintInputs(profile: printer.id, printer: printer.name, options: s.optionsJSON(), tunables: s.tunablesJSON(), bed: bed)
+    }
 
     var modifiers: [WindowModifier] {
         [WindowModifier("calibration-sheet") { content in AnyView(CalibrationHost(model: self.model, content: content)) }]

@@ -16,9 +16,13 @@ struct CalibrationSheet: View {
                 .accessibilityIdentifier("calibrate-intro")
             List {
                 ForEach(CalibrationCatalog.coupons) { coupon in row(coupon) }
+                tieRow(CalibrationCatalog.tiePrint)
             }
             .frame(minHeight: 280)
             .accessibilityIdentifier("calibrate-list")
+            if let summary = model.tieSummary {
+                Text(summary).font(.caption).accessibilityIdentifier("calibrate-tie-summary")
+            }
             if let error = model.error {
                 Text(error).foregroundStyle(.red).font(.caption).accessibilityIdentifier("calibrate-error")
             }
@@ -36,6 +40,35 @@ struct CalibrationSheet: View {
         }
         .padding(20)
         .frame(width: 560)
+    }
+
+    /// The app's own Plate ties print (issue #50): made when saved, for the printer picked and the window's settings, so
+    /// the row also says which thicknesses it will carry.
+    private func tieRow(_ c: TiePrintInfo) -> some View {
+        DisclosureGroup(isExpanded: Binding(get: { open.contains(c.name) }, set: { if $0 { open.insert(c.name) } else { open.remove(c.name) } })) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(JS.t(c.sets)).fontWeight(.medium)
+                Text(JS.t(c.note)).foregroundStyle(.orange)
+                Text(JS.t(c.how)).foregroundStyle(.secondary)
+                let line = CalibrationCatalog.tieVariantsLine(model.tieVariants, printer: model.tiePrinter)
+                if !line.isEmpty { Text(line).accessibilityIdentifier("calibrate-tie-variants") }
+            }
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, 4)
+        } label: {
+            Text(JS.t(c.name)).bold()
+                .accessibilityIdentifier("calibrate-row-\(c.id)")
+        }
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: 6) {
+                if model.tieBusy { ProgressView().controlSize(.small) }
+                Button("Download") { model.downloadTiePrint(from: NSApp.keyWindow) }
+                    .help(c.file)
+                    .disabled(model.tieBusy || model.tieVariants.isEmpty)
+                    .accessibilityIdentifier("calibrate-download-\(c.id)")
+            }
+        }
     }
 
     private func row(_ c: Coupon) -> some View {

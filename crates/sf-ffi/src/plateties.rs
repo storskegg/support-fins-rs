@@ -593,3 +593,117 @@ pub fn plate_ties_of_3mf(path: String) -> Result<Option<String>, FfiError> {
         Ok(doc.map(|d| d.to_json().stringify()))
     })
 }
+
+/// One tie thickness of the Plate ties calibration print (issue #50, slice 3).
+#[derive(uniffi::Record, Clone, Debug, PartialEq)]
+pub struct TieCalibrationVariant {
+    /// 1, 2 or 3, thinnest first: the number raised on the pair's coins.
+    pub label: u64,
+    /// mm, where a tie meets a coin and in the middle of the gap.
+    pub contact_thickness: f64,
+    pub middle_thickness: f64,
+    /// The settings' own contact thickness (the profile's default for `""`).
+    pub is_default: bool,
+}
+
+/// What `export_tie_calibration` wrote.
+#[derive(uniffi::Record, Clone, Debug)]
+pub struct TieCalibrationResult {
+    pub variants: Vec<TieCalibrationVariant>,
+    /// Ties placed and asked for, over the three pairs.
+    pub placed: u64,
+    pub requested: u64,
+    /// The engine's notes (English: `1a - 1b: ...`), none when every tie went where it should.
+    pub notes: Vec<String>,
+}
+
+fn variant_info(v: &sf_engine::plateties::calibration::Variant) -> TieCalibrationVariant {
+    TieCalibrationVariant {
+        label: u64::from(v.label),
+        contact_thickness: v.contact_thickness,
+        middle_thickness: v.middle_thickness,
+        is_default: v.is_default,
+    }
+}
+
+/// The calibration print's three tie thicknesses on printer `profile_id` with `settings_json` (as
+/// `plate_ties_settings` reads it; `""` is the profile's defaults): the contact thickness bracketed by the
+/// printer's thinnest tie (`sf_engine::plateties::calibration::variants`).
+#[uniffi::export]
+pub fn tie_calibration_variants(
+    profile_id: String,
+    settings_json: String,
+) -> Result<Vec<TieCalibrationVariant>, FfiError> {
+    crate::crash::guarded("tie calibration variants", || {
+        let s = settings(&profile_id, &settings_json)?;
+        Ok(sf_engine::plateties::calibration::variants(&s)
+            .iter()
+            .map(variant_info)
+            .collect())
+    })
+}
+
+/// Write the Plate ties calibration print to `path` (a .3mf): six upright coins in three pairs, each pair tied at
+/// one of `tie_calibration_variants`, every coin finned as `build_part` fins a part with `opts_json` and
+/// `tunables_json` (the window's settings), written as ONE merged object as `export_plate_tied` writes a tied
+/// plate (`sf_cli::calibration`), on the bed of `export_options_json` (`{ "bed": [x, y] }`). Synchronous: six
+/// fin builds (well under a second each in release); call it off the main actor.
+#[uniffi::export]
+pub fn export_tie_calibration(
+    path: String,
+    profile_id: String,
+    settings_json: String,
+    opts_json: String,
+    tunables_json: String,
+    export_options_json: String,
+) -> Result<TieCalibrationResult, FfiError> {
+    crate::crash::guarded("export tie calibration", || {
+        let s = settings(&profile_id, &settings_json)?;
+        let bed = plate_bed(&export_options_json)?;
+        let mut fin = |c: &sf_engine::plateties::calibration::Coin| -> Result<
+            sf_cli::calibration::FinnedCoin,
+            String,
+        > {
+            let at = sf_cli::plateties::bbox_centre(&c.positions);
+            let part = Arc::new(Part::generated(&c.name, c.positions.clone()));
+            let build = crate::builder::build_part(&part, &IDENTITY3, &opts_json, &tunables_json)
+                .map_err(|e| e.to_string())?;
+            let m = PlateModel {
+                part,
+                build: Some(Arc::new(build)),
+                drawn: None,
+                pose: IDENTITY3.to_vec(),
+                threshold: 45.0,
+                removed: vec![],
+                x: 0.0,
+                y: 0.0,
+                session: None,
+            };
+            let (part, supports) = placed(&m).map_err(|e| e.to_string())?;
+            // back to where the coin stood: its box's middle over the same spot
+            let now = sf_cli::plateties::bbox_centre(&part);
+            let (dx, dy) = (at[0] - now[0], at[1] - now[1]);
+            let shift = |v: Vec<f64>| -> Vec<f64> {
+                v.chunks(3)
+                    .flat_map(|c| [c[0] + dx, c[1] + dy, c[2]])
+                    .collect()
+            };
+            Ok(sf_cli::calibration::FinnedCoin {
+                part: shift(part),
+                supports: shift(supports),
+            })
+        };
+        let print = sf_cli::calibration::tie_print(&s, bed, &mut fin).map_err(engine)?;
+        write_file(&path, print.bytes.clone())?;
+        Ok(TieCalibrationResult {
+            variants: print
+                .pairs
+                .iter()
+                .map(|p| variant_info(&p.variant))
+                .collect(),
+            placed: print.placed() as u64,
+            requested: print.requested() as u64,
+            notes: print.pairs.iter().flat_map(|p| p.notes.clone()).collect(),
+        })
+    })
+}

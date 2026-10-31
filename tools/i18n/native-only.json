@@ -1046,5 +1046,37 @@
     "pt": "…e mais {more}",
     "ar": "…و{more} أخرى",
     "nl": "…en nog {more}"
+  },
+  "Optional: sets Plate ties ▸ Contact thickness, for tall, thin parts printed side by side": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Plate ties calibration print in Help > Calibration Prints",
+    "de": "Optional: setzt Plattenstege ▸ Dicke am Kontakt, für hohe, dünne Teile, die nebeneinander gedruckt werden",
+    "zh": "可选：设置 平台连接条 ▸ 接触处厚度，适用于并排打印的高而薄的零件",
+    "pt": "Opcional: define Ligações da placa ▸ Espessura no contato, para peças altas e finas impressas lado a lado",
+    "ar": "اختياري: يضبط روابط اللوحة ▸ السماكة عند التلامس، للقطع الطويلة الرفيعة المطبوعة جنبًا إلى جنب",
+    "nl": "Optioneel: stelt Plaatverbindingen ▸ Dikte bij contact in, voor hoge, dunne onderdelen die naast elkaar worden geprint"
+  },
+  "Made when you save it, for the printer picked under Printer and with your fin settings. It is one merged object, as a plate with ties exports.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Plate ties calibration print in Help > Calibration Prints",
+    "de": "Wird beim Sichern erstellt, für den unter Drucker gewählten Drucker und mit deinen Finnen-Einstellungen. Es ist ein zusammengeführtes Objekt, so wie eine Platte mit Stegen exportiert wird.",
+    "zh": "在保存时生成，针对“打印机”中选定的打印机并使用你的鳍片设置。它是一个合并的对象，与带连接条的平台导出方式相同。",
+    "pt": "É gerado quando você o salva, para a impressora escolhida em Impressora e com as suas configurações de aletas. É um único objeto mesclado, como uma placa com ligações é exportada.",
+    "ar": "يُنشأ عند حفظه، للطابعة المختارة في قسم الطابعة وبإعدادات الزعانف لديك. وهو كائن واحد مدمج، كما تُصدَّر اللوحة ذات الروابط.",
+    "nl": "Wordt gemaakt wanneer je het bewaart, voor de printer die onder Printer is gekozen en met je vininstellingen. Het is één samengevoegd object, zoals een plaat met verbindingen wordt geëxporteerd."
+  },
+  "Three pairs of upright coins, each pair held by three ties of its own thickness, numbered on the coins' outer faces: 1 thinnest, 3 thickest. Check that every pair stood straight, then snap each pair apart. A tie that broke during the print or let its coins lean is too thin; one that tore the coin's face or left a stub is too thick. Use the thinnest that held and snapped off clean as your Contact thickness.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Plate ties calibration print in Help > Calibration Prints",
+    "de": "Drei Paare aufrecht stehender Münzen, jedes Paar von drei Stegen eigener Dicke gehalten, nummeriert auf den Außenseiten der Münzen: 1 am dünnsten, 3 am dicksten. Prüfe, ob jedes Paar gerade stand, und brich dann jedes Paar auseinander. Ein Steg, der beim Druck brach oder seine Münzen kippen ließ, ist zu dünn; einer, der die Münzfläche aufriss oder einen Stummel hinterließ, ist zu dick. Nimm den dünnsten, der hielt und sauber abbrach, als Dicke am Kontakt.",
+    "zh": "三对竖立的硬币，每对由三根各自厚度的连接条相连，编号印在硬币外侧面上：1 最薄，3 最厚。检查每一对是否站得笔直，然后把每对掰开。打印中断裂或让硬币倾斜的连接条太薄；撕坏硬币表面或留下残根的太厚。把既撑住又能干净掰断的最薄一档作为你的接触处厚度。",
+    "pt": "Três pares de moedas em pé, cada par preso por três ligações da sua própria espessura, numerados nas faces externas das moedas: 1 a mais fina, 3 a mais grossa. Verifique se cada par ficou reto e depois separe cada par. Uma ligação que quebrou durante a impressão ou deixou as moedas inclinarem é fina demais; uma que rasgou a face da moeda ou deixou um toco é grossa demais. Use a mais fina que segurou e se soltou limpa como sua Espessura no contato.",
+    "ar": "ثلاثة أزواج من العملات القائمة، كل زوج مثبَّت بثلاثة روابط بسماكته الخاصة، ومرقَّمة على الوجوه الخارجية للعملات: 1 الأرفع و3 الأسمك. تحقّق من أن كل زوج وقف مستقيمًا، ثم افصل كل زوج. الرابط الذي انكسر أثناء الطباعة أو ترك عملتيه تميلان رفيع جدًا؛ والذي مزّق وجه العملة أو ترك بقايا سميك جدًا. استخدم أرفع رابط صمد وانفصل بنظافة كقيمة السماكة عند التلامس.",
+    "nl": "Drie paren rechtopstaande munten, elk paar vastgehouden door drie verbindingen van een eigen dikte, genummerd op de buitenkant van de munten: 1 het dunst, 3 het dikst. Controleer of elk paar recht stond en breek dan elk paar los. Een verbinding die tijdens het printen brak of de munten liet scheefzakken is te dun; een die het muntoppervlak scheurde of een stompje achterliet is te dik. Gebruik de dunste die hield en schoon afbrak als je Dikte bij contact."
+  },
+  "On {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm at the contact; {default} is the printer's default.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Plate ties calibration print in Help > Calibration Prints",
+    "de": "Auf {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm am Kontakt; {default} ist die Vorgabe des Druckers.",
+    "zh": "在 {printer} 上：接触处 1 = {one} mm，2 = {two} mm，3 = {three} mm；{default} 是该打印机的默认值。",
+    "pt": "Na {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm no contato; {default} é o padrão da impressora.",
+    "ar": "على {printer}: 1 = {one} مم، 2 = {two} مم، 3 = {three} مم عند التلامس؛ و{default} هو الافتراضي للطابعة.",
+    "nl": "Op {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm bij het contact; {default} is de standaard van de printer."
   }
 }

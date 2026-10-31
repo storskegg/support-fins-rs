@@ -33,6 +33,7 @@
 //! Everything is deterministic: pairs come in the order of their models (first model, then second),
 //! ties bottom up, and the notes with them.
 
+pub mod calibration;
 mod geom;
 mod mesh;
 mod sat;

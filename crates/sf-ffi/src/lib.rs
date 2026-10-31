@@ -40,10 +40,11 @@ pub use part::{
     scale_from_percent_text, scale_percent_text,
 };
 pub use plateties::{
-    PlateExport, PrinterProfileInfo, TieBuildResult, TieLink, TieModelInput, TieNoteInfo,
-    TieOverrides, TiePairKey, TiePairOrigin, TiePairResult, TiePlate, export_plate_tied,
-    export_plates_tied, plate_ties_document, plate_ties_of_3mf, plate_ties_settings,
-    printer_profile, printer_profiles,
+    PlateExport, PrinterProfileInfo, TieBuildResult, TieCalibrationResult, TieCalibrationVariant,
+    TieLink, TieModelInput, TieNoteInfo, TieOverrides, TiePairKey, TiePairOrigin, TiePairResult,
+    TiePlate, export_plate_tied, export_plates_tied, export_tie_calibration, plate_ties_document,
+    plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
+    tie_calibration_variants,
 };
 pub use report::{BuildReport, build_report};
 pub use session::{SessionField, SessionRestore, SessionWall, js_number_text};

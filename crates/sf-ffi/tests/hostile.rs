@@ -30,8 +30,8 @@ use sf_ffi::{
 };
 use sf_ffi::{
     PlateExport, TieModelInput, TieOverrides, TiePairKey, TiePlate, export_plate_tied,
-    export_plates_tied, plate_ties_document, plate_ties_of_3mf, plate_ties_settings,
-    printer_profile, printer_profiles,
+    export_plates_tied, export_tie_calibration, plate_ties_document, plate_ties_of_3mf,
+    plate_ties_settings, printer_profile, printer_profiles, tie_calibration_variants,
 };
 use sf_io::json::{Json, parse};
 
@@ -1486,6 +1486,44 @@ fn plate_tie_exports_take_anything() {
         "export_plate_tied",
         export_plate_tied(p3.clone(), models(), None, "{}".into()),
     );
+    // the calibration print (slice 3): hostile profiles, settings, fin options and export options, then paths
+    let calib = |path: &str, profile: &str, settings: &str, opts: &str, export: &str| {
+        chk(
+            "export_tie_calibration",
+            export_tie_calibration(
+                path.into(),
+                profile.into(),
+                settings.into(),
+                opts.into(),
+                "{}".into(),
+                export.into(),
+            ),
+        );
+    };
+    for s in &strs {
+        chk(
+            "tie_calibration_variants",
+            tie_calibration_variants(s.clone(), String::new()),
+        );
+        calib(&p3, s, "", "{}", "{}");
+    }
+    for s in &settings {
+        chk(
+            "tie_calibration_variants",
+            tie_calibration_variants(saturn.clone(), s.clone()),
+        );
+    }
+    for s in settings.iter().take(40) {
+        calib(&p3, &saturn, s, "{}", "{}");
+    }
+    for s in strs.iter().take(20) {
+        calib(&p3, &saturn, "", s, "{}");
+        calib(&p3, &saturn, "", "{}", s);
+    }
+    // paths that cannot be written (the shared `paths()` has some that can, relative to the test's directory)
+    for p in ["", "/", "//", ".", "..", "\u{0}", "/nonexistent/dir/x.3mf", "/dev/zero/x.3mf", "a\u{0}b.3mf"] {
+        calib(p, &saturn, "", "{}", "{}");
+    }
     // reading the document back: hostile files and paths
     for p in paths() {
         chk("plate_ties_of_3mf", plate_ties_of_3mf(p));

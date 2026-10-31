@@ -4,4 +4,4 @@
 mod cut;
 mod ffi;
 
-pub use cut::{CutResult, cut_negatives, cut_negatives_with};
+pub use cut::{CutResult, cut_negatives, cut_negatives_with, union_shells};

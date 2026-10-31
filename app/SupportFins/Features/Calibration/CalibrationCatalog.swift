@@ -1,4 +1,5 @@
 import Foundation
+import SupportFinsCore
 
 /// A test print (`COUPONS`, `web/ui/calibrate.js:19-61`), in print order: angle first, since it decides which faces get
 /// support. The strings are the web's, word for word; they go through `JS.t` where they are shown, as the page's `t()`.
@@ -13,6 +14,19 @@ struct Coupon: Identifiable, Equatable {
     let how: String
 
     var id: String { file }
+}
+
+/// The Plate ties print (issue #50, slice 3): the app's own and optional, listed after the web's coupons. It is not a
+/// bundled file: the engine makes it when it is saved (`export_tie_calibration`), for the printer picked in the
+/// Printer section and with the window's fin settings, so its tie thicknesses follow the printer.
+struct TiePrintInfo {
+    let name: String
+    let file: String
+    let sets: String
+    let note: String
+    let how: String
+    /// The row's and its button's accessibility suffix.
+    var id: String { "plate-ties" }
 }
 
 /// The estimates of `coupons.json` (`prototype/calibration/estimate.py`): each coupon's print time and filament, and
@@ -65,6 +79,23 @@ enum CalibrationCatalog {
                note: "Part and supports are two objects: don't Arrange or move one without the other.",
                how: "One part with every hard shape: ramps, a ball, a thin ledge, a flat table, a mushroom, a cave, sideways holes and an arch, supported in Full coverage. Snap every wall off and tell us which stuck or tore the part, and which undersides sagged. A few droopy layers on the ball and a rougher table near the spine are what we get too."),
     ]
+
+    static let tiePrint = TiePrintInfo(
+        name: "Plate ties", file: "plate-ties-coupon.3mf",
+        sets: "Optional: sets Plate ties ▸ Contact thickness, for tall, thin parts printed side by side",
+        note: "Made when you save it, for the printer picked under Printer and with your fin settings. It is one merged object, as a plate with ties exports.",
+        how: "Three pairs of upright coins, each pair held by three ties of its own thickness, numbered on the coins' outer faces: 1 thinnest, 3 thickest. Check that every pair stood straight, then snap each pair apart. A tie that broke during the print or let its coins lean is too thin; one that tore the coin's face or left a stub is too thick. Use the thinnest that held and snapped off clean as your Contact thickness.")
+
+    /// The print's three thicknesses on `printer`: "On Elegoo Saturn 4 Ultra 16K: 1 = 0.304 mm, 2 = 0.6 mm, 3 = 0.896 mm at
+    /// the contact; 2 is the printer's default." Empty without three variants.
+    static func tieVariantsLine(_ v: [TieCalibrationVariant], printer: String) -> String {
+        guard v.count == 3 else { return "" }
+        let mm = { (x: Double) in String(format: "%g", x) }
+        let d = v.first(where: \.isDefault).map { String($0.label) } ?? "2"
+        return JS.t("On {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm at the contact; {default} is the printer's default.",
+                    ["printer": printer, "one": mm(v[0].contactThickness), "two": mm(v[1].contactThickness),
+                     "three": mm(v[2].contactThickness), "default": d])
+    }
 
     /// `fmtTime`: 19 -> "19 min", 62 -> "1 h 2 min".
     static func fmtTime(_ min: Int) -> String {

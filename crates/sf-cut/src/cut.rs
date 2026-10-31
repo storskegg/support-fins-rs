@@ -195,6 +195,28 @@ fn shells_of(positions: &[f64]) -> Option<Solid> {
     Solid::union(&refs)
 }
 
+/// Not in cut.js (issue #50, the Plate ties calibration print): the closed shells of a soup (as
+/// `shellsOf` splits them) unioned into one solid, as a soup of f32 values; `None` when a shell is
+/// open or Manifold fails. A generated part whose raised details are shells of their own (a coin and
+/// the strokes of its label) becomes one piece, so the engine does not take the details for islands.
+pub fn union_shells(positions: &[f64]) -> Option<Vec<f64>> {
+    let out = shells_of(positions)?.mesh()?;
+    if out.tri_verts.is_empty() {
+        return None;
+    }
+    let np = out.num_prop;
+    Some(
+        out.tri_verts
+            .iter()
+            .flat_map(|&v| {
+                let o = v as usize * np;
+                (0..3).map(move |k| o + k)
+            })
+            .map(|i| f64::from(out.vert_properties[i]))
+            .collect(),
+    )
+}
+
 /// Port of `partSolid` (web/cut.js:169): the part as a closed solid, or `None` when it is not one.
 fn part_solid(positions: &[f64], face_id: &[u32], id: u32) -> Option<Solid> {
     let (verts, tri) = mesh_of(positions, false);

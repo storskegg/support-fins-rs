@@ -367,6 +367,21 @@ impl Part {
         )
     }
 
+    /// A part made here rather than read from a file (the Plate ties calibration print's coins), as an
+    /// STL of one object would load.
+    pub(crate) fn generated(name: &str, positions: Vec<f64>) -> Part {
+        Part::new(
+            name.to_string(),
+            name.to_string(),
+            positions,
+            None,
+            None,
+            ImportMeta::new(Kind::Stl),
+            1,
+            1,
+        )
+    }
+
     fn unwelded(
         name: String,
         stem: String,
