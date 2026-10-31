@@ -735,6 +735,37 @@ impl Part { fn saved_plate_ties(&self) -> Option<String>; }   // the document of
   (`Part::saved_plate_ties`, `None` for a damaged one, a part from any other file, a scaled or merged part): the app no
   longer reads the file twice to restore a tied plate. `plate_ties_of_3mf` stays (the CLI, tests). The parity paths are
   unchanged: the bench_m5 hashes are identical.
+- **Calibration print (slice 3):** the optional "Plate ties" print of Help > Calibration Prints. The geometry and the
+  three thicknesses are `sf_engine::plateties::calibration` (six upright 38 x 40 x 4 mm coins in three pairs 4 mm apart,
+  pairs 14 mm apart along X; the number 1-3 raised 0.5 mm on each coin's outer face as seven-segment strokes whose lower
+  sides slope at 55 degrees, so a label has no overhang); the making is `sf_cli::calibration::tie_print`, shared with the
+  CLI: each coin's strokes are unioned with it (`sf_cut::union_shells`, Manifold: as separate shells the engine took them
+  for islands held up by supports), the coin is finned by the caller and kept where it stood, each pair is tied at its own
+  settings (the pair added by hand and built alone), and the plate is written as one merged object the way
+  `export_plate_tied` writes a tied plate, with no plate-tie document (three pairs, three settings; a print, not a plate
+  to edit).
+
+  ```rust
+  #[derive(uniffi::Record)] struct TieCalibrationVariant { label: u64 /* 1..3, thinnest first */, contact_thickness: f64,
+      middle_thickness: f64, is_default: bool /* the settings' own contact */ }
+  #[derive(uniffi::Record)] struct TieCalibrationResult { variants: Vec<TieCalibrationVariant>, placed: u64, requested: u64,
+      notes: Vec<String> /* English, "1a - 1b: ..." */ }
+  fn tie_calibration_variants(profile_id: String, settings_json: String) -> Result<Vec<TieCalibrationVariant>, FfiError>;
+  fn export_tie_calibration(path: String, profile_id: String, settings_json: String, opts_json: String,
+      tunables_json: String, export_options_json: String /* { "bed": [x, y] } */) -> Result<TieCalibrationResult, FfiError>;
+  ```
+
+  The variants bracket the settings' contact thickness (`settings_json` as `plate_ties_settings` reads it; `""` is the
+  profile's defaults) by the printer's thinnest tie: a step of (contact - thinnest), at least half the thinnest, down and
+  up, lifted so none is under the thinnest (on the Saturn 0.304 / 0.6 / 0.896 mm, middles 0.608 / 1.2 / 1.792 keeping the
+  settings' middle-to-contact ratio). `export_tie_calibration` fins each coin as `build_part` does with `opts_json` and
+  `tunables_json` (the window's `optionsJSON()` / `tunablesJSON()`), placed as `export_plate` places a model; it is
+  synchronous (six builds, ~0.1 s on the app's defaults), so call it off the main actor. With the app's default settings
+  (Auto) an upright coin's rim gets no fins (its overhangs are too shallow for a fin this way up, as for any upright coin);
+  Full fins it, and every tie still clears the fins. CLI: `support-fins --calibration plate-ties [-o out.3mf] [--printer id]
+  [--tie-settings json] [settings flags] [--json]` (default output `plate-ties-coupon.3mf`; `--plate-ties --help`).
+  Tests: `crates/sf-engine/src/plateties/calibration.rs`, `crates/sf-cli/tests/calibration.rs`,
+  `crates/sf-ffi/tests/plate_ties.rs` (`the_tie_calibration_print_exports_as_one_object`), both fuzzed in `tests/hostile.rs`.
 - **CLI:** `support-fins <plate.3mf> --plate-ties [-o out.3mf] [--printer id] [--tie-settings json] [--no-fins] [--json]`
   (`--plate-ties --help`, `--list-printers`) fins each object of a multi-object 3MF as a single part (the usual settings flags),
   keeps it where it stood on the plate, ties the neighbours and writes the merged object. `support-fins --help` is unchanged

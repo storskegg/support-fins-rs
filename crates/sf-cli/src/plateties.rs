@@ -18,11 +18,12 @@ use sf_io::threemf::{Model, read_three_mf_with, write_plate_3mf_parts_checked};
 use crate::cli::{Io, parse_args};
 use crate::entry::{compute_fins, options_from_dialog, report_line};
 
-/// Is this a plate-ties run (`--plate-ties` anywhere before a `--`)?
+/// Is this a plate-ties run (`--plate-ties`, or `--calibration` for the calibration print, anywhere
+/// before a `--`)?
 pub fn wants(argv: &[String]) -> bool {
     argv.iter()
         .take_while(|a| *a != "--")
-        .any(|a| a == "--plate-ties")
+        .any(|a| a == "--plate-ties" || a == "--calibration" || a.starts_with("--calibration="))
 }
 
 /// This mode's help.
@@ -31,6 +32,8 @@ pub fn help_text() -> String {
         "support-fins --plate-ties -- tie neighbouring tall, thin objects of a plate together".to_string(),
         String::new(),
         "usage: support-fins <plate.3mf> --plate-ties [options] [settings]".to_string(),
+        "       support-fins --calibration plate-ties [-o out.3mf] [--printer id] [--tie-settings json] [settings]"
+            .to_string(),
         String::new(),
         "  -o, --output <file>       where to write (.3mf); default: <plate>-ties.3mf next to the input".into(),
         "  --printer <id>            the printer profile the tie defaults come from (default: the first below)".into(),
@@ -41,6 +44,10 @@ pub fn help_text() -> String {
         "                            maxRelief reach }".into(),
         "  --no-fins                 tie the bare objects; by default each is finned with the settings flags".into(),
         "  --list-printers           the printer profiles; write nothing".into(),
+        "  --calibration plate-ties  write the Plate ties calibration print instead (no input): three pairs".into(),
+        "                            of upright 38 x 40 mm coins, each pair tied at another thickness".into(),
+        "                            (labelled 1-3, thinnest first, 2 the settings' own), each coin finned".into(),
+        "                            with the settings flags; default output plate-ties-coupon.3mf".into(),
         "  --json                    one JSON line instead of the summary".into(),
         "  --allow-large             load past the size limits".into(),
         String::new(),
@@ -66,6 +73,7 @@ struct Own {
     settings: Option<String>,
     no_fins: bool,
     list_printers: bool,
+    calibration: Option<String>,
     rest: Vec<String>,
 }
 
@@ -75,6 +83,7 @@ fn own_flags(argv: &[String]) -> Result<Own, String> {
         settings: None,
         no_fins: false,
         list_printers: false,
+        calibration: None,
         rest: Vec::new(),
     };
     let mut i = 0;
@@ -107,6 +116,7 @@ fn own_flags(argv: &[String]) -> Result<Own, String> {
             "--tie-settings" => o.settings = Some(value("JSON settings")?),
             "--no-fins" => o.no_fins = true,
             "--list-printers" => o.list_printers = true,
+            "--calibration" => o.calibration = Some(value("a print (plate-ties)")?),
             _ => o.rest.push(a.clone()),
         }
         i += 1;
@@ -122,7 +132,8 @@ struct Placed {
     report: Option<String>,
 }
 
-fn bbox_centre(p: &[f64]) -> [f64; 3] {
+/// The middle of a soup's box in X and Y, and its lowest Z.
+pub fn bbox_centre(p: &[f64]) -> [f64; 3] {
     let mut lo = [f64::INFINITY; 3];
     let mut hi = [f64::NEG_INFINITY; 3];
     for c in p.chunks(3) {
@@ -132,6 +143,45 @@ fn bbox_centre(p: &[f64]) -> [f64; 3] {
         }
     }
     [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, lo[2]]
+}
+
+/// An object finned as a single part would be ([`compute_fins`], the settings flags), seated on the
+/// bed and moved back to where it stood: its box's middle over the same spot.
+pub struct Finned {
+    /// The part, plate frame (flat triangle soup).
+    pub part: Vec<f64>,
+    /// Its fins and pad, the same frame.
+    pub fins: Vec<f64>,
+    /// The single-part summary line (`report_line`).
+    pub report: String,
+}
+
+/// Fin `positions` and keep it where it stood (see [`Finned`]).
+pub fn fin_in_place(
+    positions: &[f64],
+    engine: &crate::entry::EngineOptions,
+) -> Result<Finned, String> {
+    let at = bbox_centre(positions);
+    let r = compute_fins(positions, engine)?;
+    // the engine seats the part over the origin; put it back where it stood on the plate
+    let seated: Vec<f64> = positions
+        .chunks(3)
+        .flat_map(|c| [c[0] + r.offset.x, c[1] + r.offset.y, c[2] + r.offset.z])
+        .collect();
+    let s = bbox_centre(&seated);
+    let (dx, dy) = (at[0] - s[0], at[1] - s[1]);
+    Ok(Finned {
+        part: seated
+            .chunks(3)
+            .flat_map(|c| [c[0] + dx, c[1] + dy, c[2]])
+            .collect(),
+        fins: r
+            .triangles
+            .chunks(3)
+            .flat_map(|c| [c[0] as f64 + dx, c[1] as f64 + dy, c[2] as f64])
+            .collect(),
+        report: report_line(&r.stats),
+    })
 }
 
 /// Run a plate-ties command line. Exit codes as `cli::run`: 0 ok, 1 the file failed, 2 bad arguments.
@@ -164,7 +214,18 @@ pub fn run(argv: &[String], io: &dyn Io) -> i32 {
         io.out(&help_text());
         return 0;
     }
-    if args.inputs.len() != 1 {
+    if let Some(print) = &own.calibration {
+        if print != "plate-ties" {
+            return usage(&format!(
+                "no calibration print {print:?} (there is plate-ties)"
+            ));
+        }
+        if !args.inputs.is_empty() || own.no_fins {
+            return usage(
+                "--calibration plate-ties makes its own plate: no input file, no --no-fins",
+            );
+        }
+    } else if args.inputs.len() != 1 {
         return usage("--plate-ties takes one plate (.3mf)");
     }
     if args.preserve_project || args.fins_only || args.rot.is_some() || args.object.is_some() {
@@ -188,6 +249,18 @@ pub fn run(argv: &[String], io: &dyn Io) -> i32 {
         Ok(e) => e,
         Err(e) => return usage(&e),
     };
+    if own.calibration.is_some() {
+        return match calibration_print(&args, prof.id.as_str(), &settings, &engine, io) {
+            Ok(line) => {
+                io.out(&line);
+                0
+            }
+            Err(e) => {
+                io.err(&format!("support-fins: {e}"));
+                1
+            }
+        };
+    }
     let input = &args.inputs[0];
     match tie_plate(input, &args, &own, prof.id.as_str(), &settings, &engine, io) {
         Ok(line) => {
@@ -257,8 +330,8 @@ fn tie_plate(
                 .count();
             crate::cut::cut_negatives(&o.positions, &o.extras).positions
         };
-        let at = bbox_centre(&positions);
         if own.no_fins {
+            let at = bbox_centre(&positions);
             let part: Vec<f64> = positions
                 .chunks(3)
                 .flat_map(|c| [c[0], c[1], c[2] - at[2]])
@@ -271,26 +344,12 @@ fn tie_plate(
             });
             continue;
         }
-        let r = compute_fins(&positions, engine).map_err(|e| format!("{}: {e}", o.name))?;
-        // the engine seats the part over the origin; put it back where it stood on the plate
-        let seated: Vec<f64> = positions
-            .chunks(3)
-            .flat_map(|c| [c[0] + r.offset.x, c[1] + r.offset.y, c[2] + r.offset.z])
-            .collect();
-        let s = bbox_centre(&seated);
-        let (dx, dy) = (at[0] - s[0], at[1] - s[1]);
+        let f = fin_in_place(&positions, engine).map_err(|e| format!("{}: {e}", o.name))?;
         placed.push(Placed {
             name: o.name.clone(),
-            part: seated
-                .chunks(3)
-                .flat_map(|c| [c[0] + dx, c[1] + dy, c[2]])
-                .collect(),
-            fins: r
-                .triangles
-                .chunks(3)
-                .flat_map(|c| [c[0] as f64 + dx, c[1] as f64 + dy, c[2] as f64])
-                .collect(),
-            report: Some(report_line(&r.stats)),
+            part: f.part,
+            fins: f.fins,
+            report: Some(f.report),
         });
     }
     let fins_ms = ms(t_fins);
@@ -421,5 +480,85 @@ fn tie_plate(
         placed.len(),
         ties.pairs.len(),
         if ties.pairs.len() == 1 { "" } else { "s" },
+    ))
+}
+
+/// `--calibration plate-ties`: the calibration print (`crate::calibration`), each coin finned with the
+/// settings flags.
+fn calibration_print(
+    args: &crate::cli::Args,
+    profile_id: &str,
+    settings: &PlateTies,
+    engine: &crate::entry::EngineOptions,
+    io: &dyn Io,
+) -> Result<String, String> {
+    let output = args
+        .output
+        .clone()
+        .unwrap_or_else(|| format!("{}.3mf", crate::calibration::TIE_PRINT_NAME));
+    if !output.to_ascii_lowercase().ends_with(".3mf") {
+        return Err(format!("output {output}: the calibration print is a .3mf"));
+    }
+    let t = Instant::now();
+    let mut reports = Vec::new();
+    let mut fin = |c: &sf_engine::plateties::calibration::Coin| {
+        let f = fin_in_place(&c.positions, engine)?;
+        reports.push(f.report);
+        Ok(crate::calibration::FinnedCoin {
+            part: f.part,
+            supports: f.fins,
+        })
+    };
+    let print = crate::calibration::tie_print(settings, None, &mut fin)?;
+    io.write(&output, &print.bytes)?;
+    let total_ms = ms(t);
+    if args.json {
+        let num = |v: f64| Json::Num(v);
+        let pairs = print
+            .pairs
+            .iter()
+            .map(|p| {
+                Json::Obj(vec![
+                    ("label".into(), num(f64::from(p.variant.label))),
+                    ("contactThickness".into(), num(p.variant.contact_thickness)),
+                    ("middleThickness".into(), num(p.variant.middle_thickness)),
+                    ("default".into(), Json::Bool(p.variant.is_default)),
+                    ("requested".into(), num(p.requested as f64)),
+                    ("placed".into(), num(p.placed as f64)),
+                    (
+                        "notes".into(),
+                        Json::Arr(p.notes.iter().map(|n| Json::Str(n.clone())).collect()),
+                    ),
+                ])
+            })
+            .collect();
+        return Ok(Json::Obj(vec![
+            ("output".into(), Json::Str(output)),
+            ("printer".into(), Json::Str(profile_id.into())),
+            ("coins".into(), num(print.coins as f64)),
+            ("objects".into(), num(print.objects as f64)),
+            ("labelTriangles".into(), num(print.label_triangles as f64)),
+            ("pairs".into(), Json::Arr(pairs)),
+            ("ties".into(), num(print.placed() as f64)),
+            ("tieTriangles".into(), num(print.tie_triangles as f64)),
+            (
+                "fins".into(),
+                Json::Arr(reports.into_iter().map(Json::Str).collect()),
+            ),
+            ("ms".into(), num(total_ms)),
+        ])
+        .stringify());
+    }
+    for n in print.pairs.iter().flat_map(|p| &p.notes) {
+        io.err(&format!("support-fins: warning: {n}"));
+    }
+    let mm = |v: f64| format!("{v}");
+    Ok(format!(
+        "plate ties calibration -> {output}: {} of {} ties; 1 = {} mm, 2 = {} mm, 3 = {} mm at the contact",
+        print.placed(),
+        print.requested(),
+        mm(print.pairs[0].variant.contact_thickness),
+        mm(print.pairs[1].variant.contact_thickness),
+        mm(print.pairs[2].variant.contact_thickness),
     ))
 }

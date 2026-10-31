@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import SupportFinsCore
 import Testing
 
 @testable import Support_Fins
@@ -110,5 +111,49 @@ struct CalibrationTests {
         #expect(try Data(contentsOf: dest) == Data("mine".utf8))
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix(".") }
         #expect(leftovers.isEmpty, "\(leftovers)")
+    }
+
+    // MARK: the Plate ties print (issue #50, slice 3: the app's own, made by the engine)
+
+    private static func saturn() throws -> TiePrintInputs {
+        let p = try #require(printerProfiles().first { $0.isDefault })
+        let s = FinSettings()
+        return TiePrintInputs(profile: p.id, printer: p.name, options: s.optionsJSON(), tunables: s.tunablesJSON(), bed: [211.68, 118.37])
+    }
+
+    @Test func thePlateTiesRowNamesItsThicknessesForThePrinter() throws {
+        let model = CalibrationModel()
+        model.refreshTies()
+        #expect(model.tieVariants.isEmpty, "no window: no variants, the Download is greyed")
+        let inputs = try Self.saturn()
+        model.tieInputs = { inputs }
+        model.show()
+        #expect(model.tieVariants.map(\.contactThickness) == [0.304, 0.6, 0.896])
+        #expect(CalibrationCatalog.tieVariantsLine(model.tieVariants, printer: model.tiePrinter)
+            == "On \(inputs.printer): 1 = 0.304 mm, 2 = 0.6 mm, 3 = 0.896 mm at the contact; 2 is the printer's default.")
+        #expect(CalibrationCatalog.tieVariantsLine([], printer: "x") == "")
+        // the web's coupons are still the web's: the Plate ties print is listed apart
+        #expect(!CalibrationCatalog.coupons.contains { $0.name == CalibrationCatalog.tiePrint.name })
+        #expect(inputs.exportOptions == "{\"bed\":[211.68,118.37]}")
+        #expect(TiePrintInputs(profile: "", printer: "", options: "", tunables: "", bed: [.nan, 1]).exportOptions == "{}")
+    }
+
+    @Test func thePlateTiesPrintIsMadeAndSavedAsOneObject() async throws {
+        let model = CalibrationModel()
+        let inputs = try Self.saturn()
+        model.tieInputs = { inputs }
+        let dir = try Scratch.directory()
+        defer { Scratch.remove(dir) }
+        let dest = dir.appending(path: CalibrationCatalog.tiePrint.file)
+        await model.exportTiePrint(to: dest)
+        #expect(model.error == nil, "\(model.error ?? "")")
+        #expect(model.tieSummary == "Plate ties: 9 of 9 ties on 3 pairs")
+        #expect(!model.tieBusy)
+        let parts = try loadParts(path: dest.path(percentEncoded: false))
+        #expect(parts.count == 1, "one merged object")
+        // a destination that cannot be written: the error is shown, nothing is left behind
+        let gone = dir.appending(path: "no-folder").appending(path: "x.3mf")
+        await model.exportTiePrint(to: gone)
+        #expect(model.error != nil && model.tieSummary == nil)
     }
 }

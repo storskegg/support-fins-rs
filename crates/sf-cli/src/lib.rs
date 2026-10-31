@@ -1,6 +1,7 @@
 //! `support-fins`: port of `plugins/cli` and the parts of `plugins/shared/engine` it uses. Read
 //! `docs/AGENTS.md` before changing anything here.
 
+pub mod calibration;
 pub mod cli;
 pub mod cut;
 pub mod entry;

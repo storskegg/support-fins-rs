@@ -6,8 +6,9 @@ use std::sync::Arc;
 
 use sf_ffi::{
     Part, PlateExport, PlateModel, TieModelInput, TieOverrides, TiePairKey, TiePairOrigin,
-    TiePlate, build_part, export, export_plate, export_plate_tied, export_plates_tied, load_parts,
-    plate_ties_document, plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
+    TiePlate, build_part, export, export_plate, export_plate_tied, export_plates_tied,
+    export_tie_calibration, load_parts, plate_ties_document, plate_ties_of_3mf,
+    plate_ties_settings, printer_profile, printer_profiles, tie_calibration_variants,
 };
 use sf_io::json::{Json, parse};
 
@@ -464,4 +465,52 @@ fn a_one_model_3mf_carries_the_plate_document_it_is_given() {
         .unwrap_err();
         assert!(e.to_string().contains("plate ties"), "{e}");
     }
+}
+
+/// The Plate ties calibration print (slice 3) with the app's own settings: one merged object, every tie placed, the
+/// three thicknesses bracketing the Saturn's default from its thinnest tie.
+#[test]
+fn the_tie_calibration_print_exports_as_one_object() {
+    let v = tie_calibration_variants(SATURN.into(), String::new()).unwrap();
+    let c: Vec<f64> = v.iter().map(|v| v.contact_thickness).collect();
+    assert_eq!(c, [0.304, 0.6, 0.896]);
+    assert_eq!(v.iter().map(|v| v.label).collect::<Vec<_>>(), [1, 2, 3]);
+    assert!(v[1].is_default && !v[0].is_default && !v[2].is_default);
+    // the user's settings move the bracket with them
+    let v = tie_calibration_variants(SATURN.into(), r#"{"contactThickness":0.5}"#.into()).unwrap();
+    assert_eq!(v[1].contact_thickness, 0.5);
+    assert!(tie_calibration_variants("nope".into(), String::new()).is_err());
+
+    let path = scratch("plate-ties-coupon.3mf");
+    let r = export_tie_calibration(
+        path.clone(),
+        SATURN.into(),
+        String::new(),
+        common::options(),
+        common::tunables(),
+        r#"{"bed":[211.68,118.37]}"#.into(),
+    )
+    .unwrap();
+    assert_eq!((r.placed, r.requested), (9, 9), "{:?}", r.notes);
+    assert!(r.notes.is_empty(), "{:?}", r.notes);
+    assert_eq!(r.variants.len(), 3);
+    let parts = load_parts(path.clone()).unwrap();
+    assert_eq!(parts.len(), 1, "one merged object");
+    // a print, not a plate to edit: no plate-tie document
+    assert_eq!(plate_ties_of_3mf(path).unwrap(), None);
+    // refused before any build: an unknown printer, a bad setting, bad fin options
+    let bad = |profile: &str, settings: &str, opts: String| {
+        export_tie_calibration(
+            scratch("x.3mf"),
+            profile.into(),
+            settings.into(),
+            opts,
+            common::tunables(),
+            "{}".into(),
+        )
+        .is_err()
+    };
+    assert!(bad("nope", "", common::options()));
+    assert!(bad(SATURN, r#"{"maxGap":99}"#, common::options()));
+    assert!(bad(SATURN, "", "not json".into()));
 }
