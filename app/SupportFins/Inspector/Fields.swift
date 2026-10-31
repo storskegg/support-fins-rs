@@ -7,6 +7,8 @@ import SwiftUI
 /// limits, and the text stays as typed until the edit ends (Return, or focus moving on), when it shows the value. A
 /// `TextField(value:format:)` cannot do that: it wrote the held value back over the text at the next redraw, so 0.1
 /// typed over 0.05 read "0.01.1" (the first "0" held to the 0.01 minimum; `NumberFieldTests`).
+/// The text never takes `value` back while it parses: `value` may be a binding over a snapshot of the settings, a key
+/// behind (`endEdit`).
 struct NumberField: View {
     let title: LocalizedStringKey
     @Binding var value: Double
@@ -40,8 +42,8 @@ struct NumberField: View {
                         // from outside (a printer picked, the stepper, undo): shown, unless it is what the text says
                         if parsed(text).map({ Self.clamp($0, to: limits) }) != v { text = shown(v) }
                     }
-                    .onSubmit { text = shown(value) }
-                    .onChange(of: editing) { _, on in if !on { text = shown(value) } }
+                    .onSubmit(endEdit)
+                    .onChange(of: editing) { _, on in if !on { endEdit() } }
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 64)
@@ -57,6 +59,14 @@ struct NumberField: View {
 
     private var clamped: Binding<Double> {
         Binding(get: { value }, set: { value = Self.clamp($0, to: limits) })
+    }
+
+    /// The edit ends: the text shows the value it set, held to the limits (the value when it does not parse). Read from
+    /// the text, not from `value`: a binding over a snapshot (the Plate ties section's `number(s, …)`) still reads what
+    /// the section drew before the last key, and showing that wrote it back (15 typed into Max gap went back to 1).
+    private func endEdit() {
+        let t = shown(parsed(text).map { Self.clamp($0, to: limits) } ?? value)
+        if t != text { text = t }
     }
 
     private func shown(_ v: Double) -> String { Self.format.locale(locale).format(v) }
