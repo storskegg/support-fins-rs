@@ -12,6 +12,7 @@ mod draw;
 mod footprint;
 mod gpu;
 mod part;
+mod plateties;
 mod records;
 mod report;
 mod session;
@@ -37,6 +38,11 @@ pub use part::{
     AnalysisSummary, FfiError, Island, LimitKind, LoadOptions, Part, PartInfo, island_card,
     load_parts, load_parts_with, load_step_parts, load_step_parts_with, merge_parts, reads_as_step,
     scale_from_percent_text, scale_percent_text,
+};
+pub use plateties::{
+    PlateExport, PrinterProfileInfo, TieBuildResult, TieLink, TieModelInput, TieNoteInfo,
+    TieOverrides, TiePairKey, TiePairOrigin, TiePairResult, TiePlate, export_plate_tied,
+    export_plates_tied, plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
 };
 pub use report::{BuildReport, build_report};
 pub use session::{SessionField, SessionRestore, SessionWall, js_number_text};
