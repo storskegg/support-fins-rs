@@ -17,7 +17,7 @@ struct NumberField: View {
     var body: some View {
         LabeledContent {
             HStack(spacing: 4) {
-                TextField(title, value: clamped, format: .number.precision(.fractionLength(0...3)))
+                TextField(title, value: clamped, format: Self.format)
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 64)
@@ -32,7 +32,15 @@ struct NumberField: View {
     }
 
     private var clamped: Binding<Double> {
-        Binding(get: { value }, set: { value = min(limits.range.upperBound, max(limits.range.lowerBound, $0)) })
+        Binding(get: { value }, set: { value = Self.clamp($0, to: limits) })
+    }
+
+    /// How the field shows and reads a number: up to three decimals.
+    static let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...3))
+
+    /// A value as the field keeps it: held to the limits, never snapped to the step (the Stepper steps from it).
+    static func clamp(_ v: Double, to limits: FinSettings.Limits) -> Double {
+        min(limits.range.upperBound, max(limits.range.lowerBound, v))
     }
 }
 

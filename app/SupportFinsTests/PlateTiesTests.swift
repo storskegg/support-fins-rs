@@ -481,6 +481,33 @@ struct PlateTiesTests {
         #expect(store.id == saturn.id && model.session.settings.layerHeight == 0.1 && model.controller?.volume == .standard)
     }
 
+    /// The UI run of `testPickingThePrinterSetsTheBedAndTheLayerHeight` timed out waiting for "0.1 layers" after 0.1 was
+    /// typed over the printer's 0.05: the value path, headless. The field reads "0.1" as 0.1, keeps it (no snapping to
+    /// the 0.04 step from 0.05 or from the 0.01 minimum), and the Printer row says so.
+    @Test func aLayerTypedOverThePrintersIsKeptAsTyped() async throws {
+        let limits = FinSettings.layerHeightLimits
+        let style = NumberField.format.locale(Locale(identifier: "en_US"))
+        #expect(style.format(0.05) == "0.05")
+        for (typed, want) in [("0.1", 0.1), ("0.2", 0.2), ("0.05", 0.05), ("0.09", 0.09), ("0.13", 0.13), ("0.005", 0.01), ("0.7", 0.6)] {
+            let parsed = try style.parseStrategy.parse(typed)
+            #expect(NumberField.clamp(parsed, to: limits) == want, "\(typed)")
+        }
+        let (model, _, _) = try await coins([-7, 7])
+        defer { withExtendedLifetime(model) {} }
+        let feature = try #require(model.features[PlateTiesFeature.self])
+        let suite = "plate-ties-layer-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        feature.useProfile(try #require(PrinterProfileStore(defaults: defaults).current),
+                           volumes: VolumeStore(defaults: defaults), store: SettingsStore(defaults: defaults))
+        #expect(model.session.settings.printerSummary.contains("0.05 layers"))
+        var s = model.session.settings
+        s.layerHeight = NumberField.clamp(try style.parseStrategy.parse("0.1"), to: limits)
+        model.session.setSettings(s)
+        #expect(model.session.settings.layerHeight == 0.1)
+        #expect(model.session.settings.printerSummary.contains("0.1 layers"), "\(model.session.settings.printerSummary)")
+    }
+
     @Test func everyPrinterLayerFitsTheLayerHeightField() {
         for p in printerProfiles() {
             #expect(FinSettings.layerHeightLimits.range.contains(p.layerHeightDefault), "\(p.id)")

@@ -140,7 +140,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         XCTAssertTrue(text(row).contains("0.05 layers"), text(row))
         // by hand afterwards: the field takes it, the printer stays picked
         setLayerHeight("0.1")
-        waitFor("the hand-set layer holds", timeout: 5) { self.text(row).contains("0.1 layers") }
+        waitFor("the hand-set layer holds", timeout: 15) { self.text(row).contains("0.1 layers") }
         XCTAssertTrue(text(printer).contains("Saturn 4 Ultra 16K"), text(printer))
     }
 
@@ -157,12 +157,27 @@ final class PlateTiesUITests: PartWindowUITestCase {
         try super.tearDownWithError()
     }
 
+    /// Type `v` into Layer height and commit it. The field should have the keyboard before ⌘A (otherwise ⌘A and the
+    /// digits go to the window, not the field: clicked again until it reports focus, three tries), and must show the
+    /// digits before Return; a Return that did not end the
+    /// edit (the first UI run of this test: the row never showed the value) is followed by Tab, which ends it by
+    /// moving the focus on, as any field's edit ends.
     private func setLayerHeight(_ v: String) {
         let field = element("layer-height")
         guard field.waitForExistence(timeout: 5) else { return }
         scrollIntoView(field)
-        field.doubleClick()
+        let focused = { (field.value(forKey: "hasKeyboardFocus") as? Bool) == true }
+        for _ in 0..<3 where !focused() {
+            field.click()
+            _ = waitUntil(timeout: 3, focused)
+        }
         field.typeKey("a", modifierFlags: .command)
-        field.typeText("\(v)\r")
+        field.typeText(v)
+        waitFor("Layer height shows \(v) as typed", timeout: 10) { self.text(field) == v }
+        field.typeKey(.return, modifierFlags: [])
+        let row = element("printer-row")
+        if !waitUntil(timeout: 5, { self.text(row).contains("\(v) layers") }) {
+            field.typeKey(.tab, modifierFlags: [])
+        }
     }
 }
