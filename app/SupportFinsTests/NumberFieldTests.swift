@@ -117,4 +117,48 @@ struct NumberFieldTests {
         settle(hosting)
         #expect(field.stringValue == "0.05")
     }
+
+    // MARK: the Plate ties section's Max gap (its value goes through the engine's check, `PlateTiesModel.update`)
+
+    /// `PlateTiesUITests.tiedCoins()`: two coins 10 mm apart, ties on, then 15 typed into Max gap (the 8 mm default) and
+    /// Return. After #248 the field read "15" while typing, but Return put back the 1 its binding (`number(s, …)`, over
+    /// the settings the section last drew) still read: the field and the settings said 1, and the coins never tied. In a
+    /// VStack, not the inspector's Form: a Form's rows are a table's, made as they scroll into view.
+    @Test("15 typed into the Plate ties section's Max gap ties two coins 10 mm apart")
+    func maxGapTyped() async throws {
+        let (model, _, ties) = try await PlateTiesTests().coins([-6.5, 6.5])
+        defer { withExtendedLifetime(model) {} }
+        try await PlateTiesTests().on(ties)
+        #expect(ties.links.isEmpty, "10 mm apart: not neighbours at the default Max gap")
+        let search = SettingsSearch()
+        search.context = { var c = SearchContext(); c.tiesOn = true; return c }
+        search.query = "Max gap"   // opens the section (its own open state is the scene's)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 600), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        let hosting = NSHostingView(rootView: VStack { PlateTiesSection(model: ties) }
+            .environment(search).environment(\.locale, Locale(identifier: "en_US")).frame(width: 320, height: 600))
+        window.contentView = hosting
+        window.layoutIfNeeded()
+        settle(hosting)
+        // the section's first field (its identifier is on SwiftUI's accessibility element, not on the NSTextField)
+        let field = try #require(fields(in: hosting).first, "the Max gap field")
+        #expect(field.stringValue == "8")
+        #expect(window.makeFirstResponder(field))
+        let editor = try #require(field.currentEditor() as? NSTextView)
+        editor.selectAll(nil)
+        var seen: [String] = []
+        for c in "15" {
+            editor.insertText(String(c), replacementRange: editor.selectedRange())
+            settle(hosting)
+            seen.append((field.currentEditor() as? NSTextView)?.string ?? "<no editor: \(field.stringValue)>")
+        }
+        #expect(seen == ["1", "15"], "the field after each key: \(seen)")
+        editor.insertNewline(nil)
+        settle(hosting)
+        #expect(ties.settings?.maxGap == 15, "\(String(describing: ties.settings?.maxGap))")
+        #expect(await ties.settled())
+        settle(hosting)
+        #expect(field.stringValue == "15", "after Return: \(field.stringValue)")
+        #expect(ties.links.count == 1, "the coins are neighbours at 15 mm")
+    }
 }
