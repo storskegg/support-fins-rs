@@ -5,6 +5,7 @@ pub mod cli;
 pub mod cut;
 pub mod entry;
 pub mod options;
+pub mod plateties;
 pub mod project;
 pub mod project_analysis;
 pub mod project_cache;

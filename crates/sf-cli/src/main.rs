@@ -54,5 +54,9 @@ impl Io for StdIo {
 
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
+    // not in cli.js: plate ties (issue #50), a mode of its own so the ported command line is unchanged
+    if sf_cli::plateties::wants(&argv) {
+        std::process::exit(sf_cli::plateties::run(&argv, &StdIo));
+    }
     std::process::exit(run(&argv, &StdIo));
 }

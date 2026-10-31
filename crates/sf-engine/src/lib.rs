@@ -24,6 +24,7 @@ pub mod orient;
 pub mod overhangs;
 pub mod pieces;
 pub mod planes;
+pub mod plateties;
 pub mod prop;
 pub mod solids;
 pub mod sway;

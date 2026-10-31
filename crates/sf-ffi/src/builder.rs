@@ -820,7 +820,10 @@ pub struct PlateFile {
 
 /// A plate's 3MF (`FORMATS['export-3mf']` over `plateGeometry`, `ui/export.js`; `writePlate3MF`, `web/threemf.js`):
 /// every model its own objects where it stands, the plate's centre the bed's, titled with the first model's name.
-fn plate_3mf_bytes(models: &[PlateModel], bed: Option<Bed>) -> Result<Vec<u8>, FfiError> {
+pub(crate) fn plate_3mf_bytes(
+    models: &[PlateModel],
+    bed: Option<Bed>,
+) -> Result<Vec<u8>, FfiError> {
     let Some(first) = models.first() else {
         return Err(engine("a plate with no models has nothing to write"));
     };
@@ -874,11 +877,11 @@ fn session_json(part: &Part, rot: Option<[f64; 9]>, offset: Xyz, input: &Session
     )
 }
 
-fn plate_bed(options_json: &str) -> Result<Option<Bed>, FfiError> {
+pub(crate) fn plate_bed(options_json: &str) -> Result<Option<Bed>, FfiError> {
     Ok(export_options(options_json)?.bed.map(|(x, y)| Bed { x, y }))
 }
 
-fn write_file(path: &str, bytes: Vec<u8>) -> Result<(), FfiError> {
+pub(crate) fn write_file(path: &str, bytes: Vec<u8>) -> Result<(), FfiError> {
     std::fs::write(path, bytes).map_err(|e| FfiError::Io {
         message: format!("{path}: {e}"),
     })
@@ -928,7 +931,7 @@ pub fn export_plates(
 /// The pose, the seating offset and the supports a model is written with (`modelGeometry`, `ui/export.js`): with a
 /// `build`, the build's own (its fins less the `removed` ones, the `drawn` walls, the pad); without, the part alone
 /// seated from an analysis of `pose` at `threshold`.
-fn seat_and_added(
+pub(crate) fn seat_and_added(
     part: &Part,
     build: Option<&Arc<BuildResult>>,
     drawn: &[sf_engine::types::V4],

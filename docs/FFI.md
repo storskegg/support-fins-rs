@@ -631,3 +631,93 @@ without the `occt` feature, and `just swift-bindings` fails if OpenCascade gets 
 - **OpenCascade's output** (`*** ERR StepReaderData : ...`) goes to the log (subsystem `com.storskegg.SupportFins.StepReader`,
   category `OpenCascade`), not the app's stdout (X-13), nor `step-read`'s result.
 - **The CLI** still links OpenCascade and reads STEP in process (`sf-cli`'s default `occt` feature): a crash ends only the CLI.
+
+## Plate ties and printer profiles (issue #50, slice 1: engine; post-parity)
+
+The first feature with no JS counterpart. Two tall, thin models facing each other across a small gap hold each other up
+with thin breakaway ties. The maths is `sf_engine::plateties` (detection, tie geometry; its module comment has the
+rules), the settings and profiles are `sf_io::plateties` and `sf_io::printer`, and this layer (`crates/sf-ffi/src/plateties.rs`)
+only turns the app's plate into the engine's models and back. Nothing on a parity path calls into it: with ties off,
+`export_plate` / `export_plates` and every build are unchanged (the 87 `bench_m5` hashes are identical).
+
+```rust
+#[derive(uniffi::Record)] struct PrinterProfileInfo { id, name, kind /* "resin" | "fdm" */, is_default: bool,
+    build_volume: Vec<f64> /* x, y, z mm */, pixel_size: Vec<f64> /* resin: x, y mm; [] for FDM */, nozzle: Option<f64>,
+    layer_height_min, layer_height_max, layer_height_default: f64, min_tie_thickness: f64,
+    plate_ties_json: String /* the profile's plate-tie defaults, every key */, source_json: String /* where the figures come from */ }
+fn printer_profiles() -> Vec<PrinterProfileInfo>;                       // the default (Saturn 4 Ultra 16K) first, then by name
+fn printer_profile(id: String) -> Result<PrinterProfileInfo, FfiError>;
+fn plate_ties_settings(profile_id: String, settings_json: String) -> Result<String, FfiError>;
+//   the settings over the profile's defaults, every key written out: "" is "Reset to profile defaults"
+
+#[derive(uniffi::Record)] struct TieModelInput { key: String /* the app's model id: unique, not empty */, model: PlateModel }
+#[derive(uniffi::Record)] struct TiePairKey { a: String, b: String }    // either order
+#[derive(uniffi::Record)] struct TieOverrides { disabled: Vec<TiePairKey> /* links clicked off */, added: Vec<TiePairKey> /* two models clicked */ }
+#[derive(uniffi::Enum)]   enum TiePairOrigin { Auto, Manual }
+#[derive(uniffi::Record)] struct TieLink { a: String, b: String, a_index: u64, b_index: u64, origin: TiePairOrigin,
+    gap: f64 /* mm between the outlines */, from: Vec<f64>, to: Vec<f64> /* x, y, z: the link to draw, plate frame */ }
+#[derive(uniffi::Object)] struct TiePlate;
+impl TiePlate {
+  #[uniffi::constructor] fn new(models: Vec<TieModelInput>, profile_id: String) -> Result<Arc<TiePlate>, FfiError>;
+  fn detect(&self, settings_json: String, overrides: TieOverrides) -> Result<Vec<TieLink>, FfiError>;
+  fn build(self: Arc<Self>, settings_json: String, overrides: TieOverrides) -> Result<Arc<TieBuildResult>, FfiError>;
+  fn model_count(&self) -> u64;
+}
+#[derive(uniffi::Record)] struct TieNoteInfo { kind: String /* face-fallback | shallow-sink | skipped | no-room */, tie: Option<u64>,
+    reason: Option<String> /* no-overlap | missed | too-long | slope | edge | blocked */, model: Option<String> /* key */, text: String /* English */ }
+#[derive(uniffi::Record)] struct TiePairResult { link: TieLink, requested: u64, placed: u64, notes: Vec<TieNoteInfo>,
+    first_vertex: u64, vertex_count: u64 /* this pair's range in mesh() */ }
+#[derive(uniffi::Object)] struct TieBuildResult;
+impl TieBuildResult {
+  fn mesh(&self) -> Arc<GpuBuffer>;        // every tie, laid out as BuildResult::fins (xyz + normal, f32), plate frame
+  fn triangle_count(&self) -> u64;
+  fn pairs(&self) -> Vec<TiePairResult>;
+  fn document_json(&self) -> String;       // { version: 1, profile, settings, disabled, added }: what the session and the 3MF save
+}
+#[derive(uniffi::Record)] struct PlateExport { name: String, models: Vec<PlateModel>, ties: Option<Arc<TieBuildResult>> }
+fn export_plate_tied(path: String, models: Vec<PlateModel>, ties: Option<Arc<TieBuildResult>>, options_json: String) -> Result<(), FfiError>;
+fn export_plates_tied(path: String, plates: Vec<PlateExport>, options_json: String) -> Result<(), FfiError>;
+fn plate_ties_of_3mf(path: String) -> Result<Option<String>, FfiError>;   // a tied 3MF's document, or None
+```
+
+- **Printer profiles** are JSON files in `crates/sf-io/profiles/printers/`, embedded at build time (`crates/sf-io/build.rs`):
+  adding a printer is adding a file. A profile has an `id`, a `name`, a `type` (`resin` with `pixelSize` and `minTiePixels`, or
+  `fdm` with `nozzle` and `minTieLines`), a `buildVolume`, `layerHeights` (`min`, `max`, `default`), optional `plateTies`
+  overrides of the engine's defaults, and a `source` citing its figures; exactly one is the `default`. The thinnest tie
+  (`minThickness`, a hidden tunable no profile or user can set) is `minTiePixels` of the coarser pixel, or `minTieLines` nozzle
+  widths. The Elegoo Saturn 4 Ultra 16K (the default) carries Elegoo's published figures: 211.68 x 118.37 x 220 mm, 14 x 19 um
+  pixels (15120 x 6230), layers 0.01-0.2 mm; its thinnest tie is 16 x 0.019 = 0.304 mm.
+- **Settings** (`plate_ties_json`, `settings_json`): `{ contact: "edge" | "face" | "anywhere", maxGap, minRatio, minHeight,
+  bandWidth, tiesPerPair, contactThickness, middleThickness, heightFrom, heightTo, tunables: { depth, arch, neck, sink, clearance,
+  bedClear, facing, minOverlap, maxRelief, reach, minThickness } }` (the shown ones per Q10, the hidden ones under `tunables`).
+  Each has a range (`sf_engine::plateties::NUMBERS`); a missing key is the profile's default, and an unknown key, a wrong type, a
+  fraction of a tie, a value out of range, `heightFrom >= heightTo`, a middle thinner than the contact or a contact under the
+  printer's thinnest tie is `FfiError::Engine` naming the key. Engine defaults: max gap 8 mm, ratio 2, min height 10 mm, edge
+  band 1 mm, 3 ties per pair, 0.6 mm at the contact, 1.2 mm in the middle, the upper two thirds (1/3..1) of the height the two
+  share; hidden: 2 mm tall, a 45-degree chevron, a 1 mm neck, sunk 0.1 mm (the resin pins' `pinDepth`), 0.3 mm clearance, none
+  under 3 mm off the bed, facing within 45 degrees, 2 mm overlap, 1 mm relief, a tie up to 1.5 x max gap long.
+- **`TiePlate`** measures the plate once: each `PlateModel` placed as `export_plate` writes it (its build's pose and seating, or
+  `pose` / `threshold` without one; the cut part of a file with slicer parts) at `x`, `y`, with its supports (the build's kept
+  fins, drawn walls and pad). A spot past 4000 mm, a bad pose or threshold, an empty or repeated key, or an unknown profile is
+  refused. `detect` and `build` are synchronous (on the Earth Focus plate: 10 models of ~770k triangles, measuring took
+  ~0.2 s, detection 0.2 ms and building 24 ties ~15 ms), so call them off the main actor; `build` re-detects with the same
+  settings and overrides, so the result always matches the links shown. Pairs come in model order, ties bottom up.
+- **Overrides:** a disabled pair naming a model not on the plate is ignored (a stale override); an added one is an error, as is
+  a model added to itself. An added pair the detection also found stays `Auto`.
+- **Notes:** per pair, `face-fallback` (the edge band could not take tie n: it went on the face, "the app says so" of Q3),
+  `shallow-sink` (half the sink depth: a thin section), `skipped` with its reason and the model it is about, and `no-room` (no
+  common height above the bed clearance). The app words them from the codes; `text` is English for logs and the CLI.
+- **Export:** `export_plate_tied` with `ties` writes the plate as ONE object (Q5): every model's cut part as one mesh and every
+  support plus every tie as the other, assembled into one locked build item (the writer's `separate: false` form), titled with
+  the first model's name, with `Metadata/support_fins_plate_ties.json` (`document_json`) beside it; a slicer's own parts are not
+  written (a negative part in one object would cut the supports), and the parts' paint is merged (`mergeColors`). `models` must
+  be the plate the ties were built on: the same `Part`, build and drawn objects, pose, threshold, removals and spot for each,
+  else `FfiError::Engine("the plate changed since its ties were built: build them again")`. Without `ties` it is
+  `export_plate` byte for byte; `export_plates_tied` is `export_plates` with each plate written either way.
+- **Hostile input:** every export above that takes input throws and runs under `crash::guarded`; the getters are listed in
+  `GETTERS` (`tests/hostile.rs`, `plate_tie_exports_take_anything` fuzzes the rest). Tests: `crates/sf-ffi/tests/plate_ties.rs`,
+  `crates/sf-engine/tests/plate_ties.rs`, `crates/sf-io/src/{printer,plateties}.rs`, `crates/sf-cli/tests/plate_ties.rs`.
+- **CLI:** `support-fins <plate.3mf> --plate-ties [-o out.3mf] [--printer id] [--tie-settings json] [--no-fins] [--json]`
+  (`--plate-ties --help`, `--list-printers`) fins each object of a multi-object 3MF as a single part (the usual settings flags),
+  keeps it where it stood on the plate, ties the neighbours and writes the merged object. `support-fins --help` is unchanged
+  (cli-parity compares it with the JS's).

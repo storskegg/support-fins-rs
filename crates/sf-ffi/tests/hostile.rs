@@ -28,6 +28,10 @@ use sf_ffi::{
     load_parts_with, load_step_parts, load_step_parts_with, merge_parts, plate_under,
     reads_as_step, scale_from_percent_text, scale_percent_text,
 };
+use sf_ffi::{
+    PlateExport, TieModelInput, TieOverrides, TiePairKey, TiePlate, export_plate_tied,
+    export_plates_tied, plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
+};
 use sf_io::json::{Json, parse};
 
 const ID: [f64; 9] = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
@@ -1257,6 +1261,223 @@ fn report_and_export_exports_take_anything() {
     let _ = std::fs::remove_dir_all(scratch("out").parent().unwrap());
 }
 
+// ---------------------------------------------------------------------------------------------- plate ties (#50)
+
+fn tie_inputs(part: &Arc<Part>, build: &Arc<BuildResult>) -> Vec<TieModelInput> {
+    [(0.0, "a"), (45.0, "b")]
+        .iter()
+        .map(|&(x, k)| {
+            let mut m = plate_models(part, build, None, None).remove(0);
+            m.x = x;
+            TieModelInput {
+                key: k.into(),
+                model: m,
+            }
+        })
+        .collect()
+}
+
+fn plate_tie_exports_take_anything() {
+    let part = load("lbracket");
+    let build = build_of(&part);
+    let strs = strings();
+    let saturn = printer_profiles()[0].id.clone();
+    let defaults = printer_profile(saturn.clone()).unwrap().plate_ties_json;
+    for s in &strs {
+        chk("printer_profile", printer_profile(s.clone()));
+        chk(
+            "plate_ties_settings",
+            plate_ties_settings(s.clone(), String::new()),
+        );
+    }
+    let settings: Vec<String> = strs.iter().cloned().chain(corrupted(&defaults)).collect();
+    for s in &settings {
+        chk(
+            "plate_ties_settings",
+            plate_ties_settings(saturn.clone(), s.clone()),
+        );
+    }
+    // hostile keys, spots, poses and thresholds
+    for s in strs.iter().take(30) {
+        let mut m = tie_inputs(&part, &build);
+        m[0].key = s.clone();
+        chk("TiePlate::new", TiePlate::new(m, saturn.clone()));
+        chk(
+            "TiePlate::new",
+            TiePlate::new(tie_inputs(&part, &build), s.clone()),
+        );
+    }
+    for f in floats() {
+        let mut m = tie_inputs(&part, &build);
+        m[1].model.x = f;
+        m[1].model.y = -f;
+        chk("TiePlate::new", TiePlate::new(m, saturn.clone()));
+        let mut m = tie_inputs(&part, &build);
+        m[0].model.build = None;
+        m[0].model.threshold = f;
+        chk("TiePlate::new", TiePlate::new(m, saturn.clone()));
+    }
+    for pose in vecs(9).into_iter().chain([vec![], vec![1.0; 12]]) {
+        let mut m = tie_inputs(&part, &build);
+        m[0].model.build = None;
+        m[0].model.pose = pose;
+        chk("TiePlate::new", TiePlate::new(m, saturn.clone()));
+    }
+    for n in indices() {
+        let mut m = tie_inputs(&part, &build);
+        m[0].model.removed = vec![n, u64::MAX];
+        chk("TiePlate::new", TiePlate::new(m, saturn.clone()));
+    }
+    chk("TiePlate::new", TiePlate::new(vec![], saturn.clone()));
+    // a close plate (the brackets side by side) so detection and building reach the engine
+    let mut close = tie_inputs(&part, &build);
+    close[1].model.x = 0.0;
+    close[1].model.y = 0.0;
+    let plate = TiePlate::new(tie_inputs(&part, &build), saturn.clone()).unwrap();
+    let stacked = TiePlate::new(close, saturn.clone()).unwrap();
+    plate.model_count();
+    let added = |a: &str, b: &str| TieOverrides {
+        disabled: vec![TiePairKey {
+            a: b.into(),
+            b: a.into(),
+        }],
+        added: vec![TiePairKey {
+            a: a.into(),
+            b: b.into(),
+        }],
+    };
+    for s in &settings {
+        for p in [&plate, &stacked] {
+            chk("TiePlate::detect", p.detect(s.clone(), added("a", "b")));
+            chk(
+                "TiePlate::build",
+                p.clone().build(s.clone(), added("a", "b")),
+            );
+        }
+    }
+    for k in strs.iter().take(30) {
+        for p in [&plate, &stacked] {
+            chk("TiePlate::detect", p.detect(String::new(), added(k, "a")));
+            chk(
+                "TiePlate::build",
+                p.clone().build(String::new(), added("b", k)),
+            );
+        }
+    }
+    // hidden tunables at their extremes
+    for t in [
+        r#"{"tunables":{"arch":80,"neck":10,"depth":20,"reach":10,"maxRelief":10}}"#,
+        r#"{"tunables":{"arch":0,"neck":0,"depth":0.2,"clearance":0,"sink":0.01,"bedClear":0}}"#,
+        r#"{"maxGap":50,"minRatio":0,"minHeight":0,"tiesPerPair":20,"contact":"anywhere","heightFrom":0,"heightTo":1}"#,
+        r#"{"maxGap":50,"minRatio":0,"minHeight":0,"contact":"edge","bandWidth":20,"middleThickness":20}"#,
+    ] {
+        for p in [&plate, &stacked] {
+            if let Some(b) = chk(
+                "TiePlate::build",
+                p.clone().build(t.into(), added("a", "b")),
+            ) {
+                b.mesh();
+                b.triangle_count();
+                b.pairs();
+                b.document_json();
+            }
+        }
+    }
+    let built = plate.clone().build(String::new(), added("a", "b")).unwrap();
+    built.mesh();
+    built.triangle_count();
+    built.pairs();
+    built.document_json();
+    let models = || -> Vec<PlateModel> {
+        tie_inputs(&part, &build)
+            .into_iter()
+            .map(|t| t.model)
+            .collect()
+    };
+    for p in write_paths() {
+        chk(
+            "export_plate_tied",
+            export_plate_tied(p.clone(), models(), Some(built.clone()), "{}".into()),
+        );
+        chk(
+            "export_plates_tied",
+            export_plates_tied(
+                p,
+                vec![PlateExport {
+                    name: "x".into(),
+                    models: models(),
+                    ties: Some(built.clone()),
+                }],
+                "{}".into(),
+            ),
+        );
+    }
+    let p3 = scratch("tied").to_string_lossy().into_owned() + ".3mf";
+    std::fs::create_dir_all(std::path::Path::new(&p3).parent().unwrap()).unwrap();
+    for s in strs.iter().take(40) {
+        chk(
+            "export_plate_tied",
+            export_plate_tied(p3.clone(), models(), Some(built.clone()), s.clone()),
+        );
+        chk(
+            "export_plates_tied",
+            export_plates_tied(
+                p3.clone(),
+                vec![PlateExport {
+                    name: s.clone(),
+                    models: models(),
+                    ties: Some(built.clone()),
+                }],
+                "{}".into(),
+            ),
+        );
+    }
+    // a different plate than the ties were built on, and none
+    for f in floats() {
+        let mut m = models();
+        m[0].x = f;
+        chk(
+            "export_plate_tied",
+            export_plate_tied(p3.clone(), m, Some(built.clone()), "{}".into()),
+        );
+    }
+    chk(
+        "export_plate_tied",
+        export_plate_tied(p3.clone(), vec![], Some(built.clone()), "{}".into()),
+    );
+    chk(
+        "export_plates_tied",
+        export_plates_tied(p3.clone(), vec![], "{}".into()),
+    );
+    chk(
+        "export_plate_tied",
+        export_plate_tied(p3.clone(), models(), None, "{}".into()),
+    );
+    // reading the document back: hostile files and paths
+    for p in paths() {
+        chk("plate_ties_of_3mf", plate_ties_of_3mf(p));
+    }
+    for f in session_files() {
+        chk(
+            "plate_ties_of_3mf",
+            plate_ties_of_3mf(f.to_string_lossy().into_owned()),
+        );
+    }
+    chk("plate_ties_of_3mf", plate_ties_of_3mf(p3.clone()));
+    // a document of every corrupted shape inside an otherwise good 3MF
+    let doc = built.document_json();
+    for bad in corrupted(&doc).into_iter().chain(strs.iter().cloned()) {
+        let zip = sf_io::zip::zip_store_checked(&[sf_io::zip::ZipFile {
+            name: sf_io::plateties::PLATE_TIES_PART.into(),
+            data: sf_io::zip::ZipData::Text(bad),
+        }])
+        .unwrap();
+        std::fs::write(&p3, zip).unwrap();
+        chk("plate_ties_of_3mf", plate_ties_of_3mf(p3.clone()));
+    }
+    let _ = std::fs::remove_file(&p3);
+}
+
 fn session_text() -> String {
     r#"{"finMode":"auto","finsVisible":true,"form":[["thr","45"],["tines",true]],"walls":[{"kind":"wall","a":[0,0,0],"b":[10,0,0]}],"removed":["1"]}"#.to_string()
 }
@@ -1382,6 +1603,27 @@ const GETTERS: &[(&str, &str)] = &[
     ("GpuBuffer::len_bytes", "reads the allocation"),
     ("GpuBuffer::stride", "reads the allocation"),
     ("GpuBuffer::count", "reads the allocation"),
+    (
+        "printer_profiles",
+        "no input: the embedded profiles, parsed and checked by the crate's tests",
+    ),
+    ("TiePlate::model_count", "reads the measured plate's length"),
+    (
+        "TieBuildResult::mesh",
+        "copies the finished ties into a buffer",
+    ),
+    (
+        "TieBuildResult::triangle_count",
+        "reads the finished ties' length",
+    ),
+    (
+        "TieBuildResult::pairs",
+        "copies the finished pairs and their notes",
+    ),
+    (
+        "TieBuildResult::document_json",
+        "prints the settings the ties were built with",
+    ),
 ];
 
 /// `(name, returns_result)` for every `#[uniffi::export]` fn under `src/`.
@@ -1495,6 +1737,7 @@ fn every_export_is_either_a_listed_getter_or_throws_and_is_fuzzed() {
     builder_takes_anything();
     suggest_exports_take_anything();
     report_and_export_exports_take_anything();
+    plate_tie_exports_take_anything();
     let (oks, errs) = (OKS.load(Ordering::Relaxed), ERRS.load(Ordering::Relaxed));
     eprintln!("hostile: {oks} calls returned Ok, {errs} returned Err");
     // not all one way: the fuzz reaches the engine as well as the front doors
