@@ -30,7 +30,8 @@ use sf_ffi::{
 };
 use sf_ffi::{
     PlateExport, TieModelInput, TieOverrides, TiePairKey, TiePlate, export_plate_tied,
-    export_plates_tied, plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
+    export_plates_tied, plate_ties_document, plate_ties_of_3mf, plate_ties_settings,
+    printer_profile, printer_profiles,
 };
 use sf_io::json::{Json, parse};
 
@@ -1432,6 +1433,38 @@ fn plate_tie_exports_take_anything() {
             ),
         );
     }
+    // the document of a plate's state, and a one-model 3MF carrying a hostile one
+    for s in &settings {
+        chk(
+            "plate_ties_document",
+            plate_ties_document(saturn.clone(), s.clone(), added("a", "b")),
+        );
+    }
+    for k in strs.iter().take(30) {
+        chk(
+            "plate_ties_document",
+            plate_ties_document(k.clone(), String::new(), added(k, k)),
+        );
+        let opts = format!(
+            r#"{{"fins":false,"plateTies":{{"version":1,"profile":{}}}}}"#,
+            Json::Str(k.clone()).stringify()
+        );
+        chk(
+            "export",
+            export(p3.clone(), vec![part.clone()], vec![], opts),
+        );
+    }
+    for d in corrupted(&built.document_json()) {
+        chk(
+            "export",
+            export(
+                p3.clone(),
+                vec![part.clone()],
+                vec![],
+                format!(r#"{{"fins":false,"plateTies":{d}}}"#),
+            ),
+        );
+    }
     // a different plate than the ties were built on, and none
     for f in floats() {
         let mut m = models();
@@ -1542,6 +1575,10 @@ const GETTERS: &[(&str, &str)] = &[
         "reads a flag of the loaded part",
     ),
     ("Part::info", "reads the fields of the loaded part"),
+    (
+        "Part::saved_plate_ties",
+        "a clone of the plate-tie document read (and checked) with the file",
+    ),
     (
         "Part::mesh",
         "copies the loaded part's validated positions into a buffer",

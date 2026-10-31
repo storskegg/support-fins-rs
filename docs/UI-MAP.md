@@ -180,7 +180,7 @@ state is remembered (`sf.sections`, `ui/settings.js:363-380`) and whose collapse
 |---|---|---|---|---|---|---|---|---|
 | `opts-search` | search |  |  |  | Search settings | index.html:261; ui/search.js:23 | `.searchable` on the inspector (⌥⌘F focuses); filters rows by label, then tooltip (`Features/Search`, M7 done; replayed against `search.js`) | M7 |
 | `nozzle` | select | Nozzle mm 0.2 0.25 0.4 0.6 0.8 1.0 1.2 1.4 1.6 | (see choices, * = default) | 0.2=0.2, 0.25=0.25, 0.4=0.4*, 0.6=0.6, 0.8=0.8, 1.0=1.0, 1.2=1.2, 1.4=1.4, 1.6=1.6, 1.8=1.8, 2.0=2.0 | Your printer's nozzle diameter. The walls, contact tips and tines are sized in nozzle lines, so they widen for a bigger nozzle and the tines narrow for a smaller one. | index.html:287; ui/history.js:72 | Inspector > Printer: Picker (menu) | M4b |
-| `layer-height` | number | Layer height mm | 0.2 | 0.08..0.6 step 0.04 | Set this to the layer height you slice at. The grip tines are one layer tall so they snap off clean; if this doesn't match your slicer, the tines tear and leave marks. Default 0.2mm. | index.html:307; ui/export.js:42 | Inspector > Printer: number field with stepper | M4b |
+| `layer-height` | number | Layer height mm | 0.2 | 0.08..0.6 step 0.04 (app: 0.01..0.6, so a resin printer profile's layer fits; issue #50) | Set this to the layer height you slice at. The grip tines are one layer tall so they snap off clean; if this doesn't match your slicer, the tines tear and leave marks. Default 0.2mm. | index.html:307; ui/export.js:42 | Inspector > Printer: number field with stepper | M4b |
 | `gap` | number | Support gap mm | 0.2 | 0.1..0.4 step 0.05 | Clearance between a support top and the part. Bigger = cleaner surface / easier removal; too big stops holding the overhang. Default 0.2mm. | index.html:311; ui/settings.js:404 | Inspector > Printer: number field with stepper | M4b |
 | `iface` | select | Interface material | (see choices, * = default) | off=Off, flat=Flat contacts, all=Everywhere | For a printer with two or more toolheads. The top layer of a wall exports as its own part of the supports, shown purple: give it a material that won't bond to the part (PETG under PLA) for a clean release. Flat contacts: only under flat undersides, where it works and costs a few tool changes. Everywhere: every wall top and the tines too, a tool change every layer on a tilted part. 3MF only. | index.html:320; ui/settings.js:190 | Inspector > Printer: Picker (menu) | M7 |
 | `fin-mode` | select |  | (see choices, * = default) | auto=Auto — place supports for me*, full=Full coverage — every overhang, draw=Draw — place them by hand | Who places the support. | index.html:341; ui/history.js:164 | Inspector > Placement: segmented Picker Auto / Full coverage / Draw (the web hides the <select> and drives it from three buttons) | M4b (Auto, Full) / M6 (Draw) |
@@ -243,6 +243,10 @@ No web counterpart: the first post-parity feature (`Features/PlateTies`, engine 
 
 - **Printer** (`printer-profile`): the first row of the Printer section, a Picker of the engine's printer profiles
   (`printer_profiles()`, the Elegoo Saturn 4 Ultra 16K by default), remembered in `sf.printerProfile`. It sets the ties' defaults.
+  Picking a printer (the one already shown too) also sets each open window's build volume (the toolbar's `volume`, the plate
+  and every export's bed: `sf.volume`) to its build volume and the Layer height to its usual layer (0.05 mm on the Saturn; one
+  undo step, `sf.layerHeight`). Either can be changed by hand afterwards: the picker keeps the printer, the hand-set values hold
+  until a printer is picked again.
 - **Plate ties** (`plate-ties-toggle`): a section after More settings, its header a Toggle; the settings are the plate's
   (each plate keeps its own, `Plate.ties`). Fields, shown while on: Max gap, Min height / thickness, Min height, Contact (Edge band /
   Facing faces / Anywhere), Band width (Edge band only), Ties per pair, Contact thickness, Middle thickness, Ties from / Ties up to
@@ -254,7 +258,14 @@ No web counterpart: the first post-parity feature (`Features/PlateTies`, engine 
   pairs") and a line per note (a tie on the face, a shallow sink, a tie left out and why, no room above the bed).
 - **Lock**: while on, Arrange (toolbar, Model menu, the clash banner, Export's "Arrange first") and Move (toolbar, Model menu, M)
   are greyed or refused with that message. **Export**: the plate's 3MF, and each tied plate of All plates, is one merged object
-  carrying `Metadata/support_fins_plate_ties.json`; opening such a 3MF onto an empty plate turns its ties back on with its settings.
+  carrying `Metadata/support_fins_plate_ties.json`; opening such a 3MF onto an empty plate turns its ties back on with its settings
+  and links (read with the file, `Part.saved_plate_ties`). A plate of one model with ties on (such a 3MF opened again) writes its
+  3MF through the one-model export, which carries the same document, so the ties survive any number of round trips.
+- **Links are keyed by model name** (`TieKey`): a model's key is its name and which model of that name it is on the plate,
+  counted in plate order from 1 (`coin#1`, `coin#2`, `bracket#1`; always suffixed, the name is everything before the last `#`).
+  The links clicked off or added that a document saves therefore come back on any plate holding models of those names (a
+  reopened plate, another window); ones naming no model on the plate are kept and written out again. Removing the first of
+  two same-named models makes the second `#1`: links follow the count, not the model.
 
 ---
 

@@ -2799,6 +2799,9 @@ pub struct ThreeMf {
     /// SESSION_PART is in the file but could not be used (damaged, nested deeper than the JSON limit, or
     /// not a version-1 session): the JS ignores it silently, the app says so
     pub session_unreadable: bool,
+    /// Not in the JS: the plate-tie document (`plateties::PLATE_TIES_PART`, issue #50) as text, unchecked
+    /// (`plateties::PlateTiesDoc::from_json` reads it), `None` when the file has none.
+    pub plate_ties: Option<String>,
 }
 
 /// Port of `readThreeMF` (web/threemf.js:1056-1059): read a .3mf package into per-object
@@ -3170,6 +3173,9 @@ fn read_three_mf_core(
         dropped: agg_dropped,
         session_unreadable: session.is_none() && parts.contains_key(SESSION_PART),
         session,
+        plate_ties: parts
+            .get(crate::plateties::PLATE_TIES_PART)
+            .map(|d| decode(d)),
         objects,
     })
 }

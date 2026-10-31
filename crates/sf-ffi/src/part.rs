@@ -281,6 +281,9 @@ pub struct Part {
     note: Mutex<NoteState>,
     /// the weld's time in ms as `f64` bits; 0 until it has run
     weld_ms: AtomicU64,
+    /// The plate-tie document the 3MF it came from carried (issue #50; `document_json`'s form), read with the file
+    /// so the app need not read it twice. `None` for any other part.
+    pub(crate) plate_ties: Option<String>,
 }
 
 /// `lastImportMeta` with what `renderImportNote` needs of the file, the note it made, and the session a 3MF
@@ -384,6 +387,7 @@ impl Part {
             size,
             note: Mutex::new(note),
             weld_ms: AtomicU64::new(0),
+            plate_ties: None,
         }
     }
 
@@ -404,6 +408,12 @@ impl Part {
     /// A 3MF's session, to be restored once the part is on show (`pendingSession`, `web/ui/io.js:287`).
     fn with_session(self, session: sf_io::json::Json) -> Part {
         self.note.lock().unwrap_or_else(|e| e.into_inner()).pending = Some(session);
+        self
+    }
+
+    /// The plate-tie document of the 3MF the part came from (`Part::saved_plate_ties`).
+    fn with_plate_ties(mut self, doc: Option<String>) -> Part {
+        self.plate_ties = doc;
         self
     }
 
@@ -952,7 +962,7 @@ pub fn load_step_parts_with(
         let opts = IoLoadOptions {
             allow_large: options.allow_large,
         };
-        finish_parts(&path, parts, None, false, &opts)
+        finish_parts(&path, parts, None, false, &opts, None)
     })
 }
 
@@ -1023,6 +1033,9 @@ fn load_parts_on_this_thread(
     // session, not as a mesh (`web/ui/io.js:238-241`). The file's object count and the session.
     let mut own: Option<(usize, sf_io::json::Json)> = None;
     let mut session_unreadable = false;
+    // a tied plate's document (issue #50): checked and written out whole, as `plate_ties_of_3mf` gives it; a
+    // damaged one is no document
+    let mut plate_ties: Option<String> = None;
     if lower.ends_with(".stl") {
         parts.push((
             stem(&path),
@@ -1040,6 +1053,12 @@ fn load_parts_on_this_thread(
         drop(bytes);
         let mut objects = m.objects;
         session_unreadable = m.session_unreadable;
+        plate_ties = m
+            .plate_ties
+            .as_deref()
+            .and_then(sf_io::json::parse)
+            .and_then(|j| sf_io::plateties::PlateTiesDoc::from_json(&j).ok())
+            .map(|d| d.to_json().stringify());
         if let Some(session) = m.session
             && let Some(i) = sf_io::session::part_object_of(&objects)
         {
@@ -1074,17 +1093,19 @@ fn load_parts_on_this_thread(
     } else {
         return Err(format("reads .stl, .3mf, .obj and .step only".into()));
     }
-    finish_parts(&path, parts, own, session_unreadable, opts)
+    finish_parts(&path, parts, own, session_unreadable, opts, plate_ties)
 }
 
 /// The loaded objects as `Part`s: empty ones dropped, unnamed ones named after the file, a saved session (`own`: the
-/// file's object count and the session) put on its part; `session_unreadable`: the 3MF's session could not be read.
+/// file's object count and the session) put on its part; `session_unreadable`: the 3MF's session could not be read;
+/// `plate_ties`: the 3MF's plate-tie document, put on every part.
 fn finish_parts(
     path: &str,
     mut parts: Vec<Loaded>,
     own: Option<(usize, sf_io::json::Json)>,
     session_unreadable: bool,
     opts: &IoLoadOptions,
+    plate_ties: Option<String>,
 ) -> Result<Vec<Arc<Part>>, FfiError> {
     parts.retain(|(_, p, _, _, _)| !p.is_empty());
     if parts.is_empty() {
@@ -1119,6 +1140,7 @@ fn finish_parts(
                 objects_len,
                 1,
             );
+            let part = part.with_plate_ties(plate_ties.clone());
             Arc::new(match &own {
                 Some((_, session)) => part.with_session(session.clone()),
                 None if session_unreadable => part.with_unreadable_session(),

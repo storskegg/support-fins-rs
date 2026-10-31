@@ -34,10 +34,15 @@ struct PlateTiesTests {
 
     /// A window with `xs.count` coins on its plate, standing at x = `xs` (y 0).
     func coins(_ xs: [Double]) async throws -> (ViewerModel, PlateBoard, PlateTiesModel) {
+        try await coins(xs, files: try xs.indices.map { try Self.coin("coin\($0)") })
+    }
+
+    /// A window with the coins of `files` on its plate (a file twice is two models of one name), at x = `xs`.
+    func coins(_ xs: [Double], files: [URL]) async throws -> (ViewerModel, PlateBoard, PlateTiesModel) {
         let model = ViewerModel()
         try #require(model.controller != nil, "no Metal device")
-        await model.load(url: try Self.coin("coin0"))
-        for k in 1..<xs.count { await model.load(url: try Self.coin("coin\(k)"), adding: true) }
+        await model.load(url: files[0])
+        for k in 1..<xs.count { await model.load(url: files[k], adding: true) }
         let board = try #require(model.features[PlatesFeature.self]?.board)
         let ties = try #require(model.features[PlateTiesFeature.self]?.model)
         try #require(board.plate.models.count == xs.count)
@@ -55,7 +60,7 @@ struct PlateTiesTests {
         #expect(ties.error == nil, "\(ties.error ?? "")")
     }
 
-    func key(_ board: PlateBoard, _ k: Int) -> String { board.plate.models[k].id.uuidString }
+    func key(_ board: PlateBoard, _ k: Int) -> String { board.tieKeys(board.active)[k] ?? "" }
 
     // MARK: detect -> links
 
@@ -355,7 +360,132 @@ struct PlateTiesTests {
         // the document round-trips: the same settings written back
         #expect(await back.settled())
         let doc = try #require(try plateTiesOf3mf(path: url.path))
+        // read with the file: the part hands the document over, no second read (#245 decision 6)
+        #expect(other.session.parts.first?.part.savedPlateTies() == doc)
         back.apply(document: doc)
         #expect(back.settings?.maxGap == 6.5)
+    }
+
+    // MARK: links by model name (decision C)
+
+    @Test func tieKeysAreModelNamesCountedInPlateOrder() {
+        #expect(TieKey.keys(["coin", "bracket", "coin", nil, "coin#2", "coin"]) == ["coin#1", "bracket#1", "coin#2", nil, "coin#2#1", "coin#3"])
+        #expect(TieKey.name("coin#2#1") == "coin#2" && TieKey.name("bracket#1") == "bracket" && TieKey.name("odd") == "odd")
+        // no name can take another model's key
+        let keys = TieKey.keys(["a", "a", "a#1", "a#2", "a#1"]).compactMap { $0 }
+        #expect(Set(keys).count == keys.count, "\(keys)")
+    }
+
+    @Test func aPlatesLinksNameItsModels() async throws {
+        let a = try Self.coin("twin"), b = try Self.coin("other")
+        let (model, board, ties) = try await coins([-7, 0, 7], files: [a, b, a])
+        defer { withExtendedLifetime(model) {} }
+        let (twin, other) = (a.deletingPathExtension().lastPathComponent, b.deletingPathExtension().lastPathComponent)
+        #expect(board.tieKeys(0) == ["\(twin)#1", "\(other)#1", "\(twin)#2"])
+        #expect(board.plateWrite(0)?.keys == ["\(twin)#1", "\(other)#1", "\(twin)#2"])
+        try await on(ties)
+        #expect(ties.links.map { [$0.a, $0.b] } == [["\(twin)#1", "\(other)#1"], ["\(other)#1", "\(twin)#2"]])
+        #expect(ties.name("\(twin)#2") == twin)
+        ties.toggle(try #require(ties.links.last))
+        #expect(ties.state.disabled == [TiePairKey(a: "\(other)#1", b: "\(twin)#2")])
+        #expect(try #require(ties.document).contains("\"disabled\":[[\"\(other)#1\",\"\(twin)#2\"]]"))
+    }
+
+    @Test func aDocumentBringsItsLinksBackOnAPlateOfTheSameModels() async throws {
+        let files = try (0..<3).map { try Self.coin("same\($0)") }
+        let (first, _, ties) = try await coins([-7, 0, 7], files: files)
+        defer { withExtendedLifetime(first) {} }
+        try await on(ties)
+        ties.toggle(try #require(ties.links.first))
+        #expect(await ties.settled())
+        #expect(ties.links.count == 1)
+        let doc = try #require(ties.document)
+        // another window, the same models (new slots, new ids): the link clicked off is off again
+        let (second, _, back) = try await coins([-7, 0, 7], files: files)
+        defer { withExtendedLifetime(second) {} }
+        back.apply(document: doc)
+        #expect(await back.settled())
+        #expect(back.error == nil, "\(back.error ?? "")")
+        #expect(back.candidates.count == 2 && back.links.count == 1, "\(back.links.map(\.a))")
+        #expect(back.links.first.map { [$0.a, $0.b] } == ties.links.first.map { [$0.a, $0.b] })
+    }
+
+    // MARK: a tied 3MF written again (decision D)
+
+    @Test func aReopenedTiedThreeMFExportedAgainKeepsItsDocument() async throws {
+        let (model, board, ties) = try await coins([-7, 0, 7])
+        defer { withExtendedLifetime(model) {} }
+        try await on(ties)
+        var s = try #require(ties.settings)
+        s.maxGap = 6.5
+        ties.update(s)
+        ties.toggle(try #require(ties.links.first))
+        #expect(await ties.settled())
+        let d = try dir()
+        let saved = d.appending(path: "saved.3mf")
+        #expect(await board.writePlate(try #require(board.plateWrite(0, deferStanding: true)), to: saved) == saved, "\(board.exportError ?? "")")
+        let doc = try #require(try plateTiesOf3mf(path: saved.path))
+        // opened again: one model, written by the one-model export
+        let other = ViewerModel()
+        await other.load(url: saved)
+        let back = try #require(other.features[PlateTiesFeature.self]?.model)
+        #expect(await eventually { back.state.on })
+        let exporter = try #require(other.wiring?.exporter)
+        let again = d.appending(path: "again.3mf")
+        #expect(await exporter.write(.threeMF, to: again) == again, "\(exporter.error ?? "")")
+        #expect(try plateTiesOf3mf(path: again.path) == doc, "the same printer, settings and links")
+        // ties off: the one-model 3MF has none
+        back.setOn(false)
+        let off = d.appending(path: "off.3mf")
+        #expect(await exporter.write(.threeMF, to: off) == off, "\(exporter.error ?? "")")
+        #expect(try plateTiesOf3mf(path: off.path) == nil)
+    }
+
+    // MARK: the printer's bed and layer (decision A)
+
+    @Test func pickingAPrinterSetsTheBedAndTheLayerHeight() async throws {
+        let suite = "plate-ties-printer-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PrinterProfileStore(defaults: defaults)
+        let saturn = try #require(store.current)
+        #expect(store.picks == 0)
+        store.choose(saturn.id)
+        store.choose(saturn.id)
+        #expect(store.picks == 2 && store.id == saturn.id, "the printer shown, picked again, counts")
+
+        let (model, board, _) = try await coins([-7, 7])
+        defer { withExtendedLifetime(model) {} }
+        let feature = try #require(model.features[PlateTiesFeature.self])
+        let (volumes, settings) = (VolumeStore(defaults: defaults), SettingsStore(defaults: defaults))
+        feature.useProfile(saturn, volumes: volumes, store: settings)
+        let bed = PrinterVolume(x: 211.68, y: 118.37, z: 220)
+        #expect(model.controller?.volume == bed)
+        #expect(model.session.settings.layerHeight == 0.05)
+        // remembered: the next window starts with them
+        #expect(volumes.load() == bed)
+        #expect(settings.load().layerHeight == 0.05)
+        // the Printer section's line and the plate's export bed follow
+        #expect(model.session.settings.printerSummary.contains("0.05 layers"), "\(model.session.settings.printerSummary)")
+        #expect(board.bedOptions == "{\"bed\":[211.68,118.37]}")
+        #expect(model.wiring?.exporter?.optionsJSON(for: .threeMF)?.contains("\"bed\":[211.6") == true)
+        // one undo step
+        model.session.undo()
+        #expect(model.session.settings.layerHeight != 0.05)
+        model.session.redo()
+        // changed by hand afterwards: the printer stays picked, the hand-set values hold
+        model.controller?.volume = PrinterVolume.standard
+        var s = model.session.settings
+        s.layerHeight = 0.1
+        model.session.setSettings(s)
+        #expect(store.id == saturn.id && model.session.settings.layerHeight == 0.1 && model.controller?.volume == .standard)
+    }
+
+    @Test func everyPrinterLayerFitsTheLayerHeightField() {
+        for p in printerProfiles() {
+            #expect(FinSettings.layerHeightLimits.range.contains(p.layerHeightDefault), "\(p.id)")
+            #expect(p.layerHeight == p.layerHeightDefault)
+            #expect(p.volume != nil, "\(p.id)")
+        }
     }
 }

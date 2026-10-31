@@ -678,6 +678,9 @@ impl TieBuildResult {
 fn export_plate_tied(path: String, models: Vec<PlateModel>, ties: Option<Arc<TieBuildResult>>, options_json: String) -> Result<(), FfiError>;
 fn export_plates_tied(path: String, plates: Vec<PlateExport>, options_json: String) -> Result<(), FfiError>;
 fn plate_ties_of_3mf(path: String) -> Result<Option<String>, FfiError>;   // a tied 3MF's document, or None
+fn plate_ties_document(profile_id: String, settings_json: String, overrides: TieOverrides) -> Result<String, FfiError>;
+//   a plate's document without building its ties (settings checked as plate_ties_settings; overrides kept as given)
+impl Part { fn saved_plate_ties(&self) -> Option<String>; }   // the document of the 3MF the part was loaded from
 ```
 
 - **Printer profiles** are JSON files in `crates/sf-io/profiles/printers/`, embedded at build time (`crates/sf-io/build.rs`):
@@ -717,10 +720,21 @@ fn plate_ties_of_3mf(path: String) -> Result<Option<String>, FfiError>;   // a t
 - **Hostile input:** every export above that takes input throws and runs under `crash::guarded`; the getters are listed in
   `GETTERS` (`tests/hostile.rs`, `plate_tie_exports_take_anything` fuzzes the rest). Tests: `crates/sf-ffi/tests/plate_ties.rs`,
   `crates/sf-engine/tests/plate_ties.rs`, `crates/sf-io/src/{printer,plateties}.rs`, `crates/sf-cli/tests/plate_ties.rs`.
-- **App (slice 2, `app/SupportFins/Features/PlateTies`):** a model's key is its plate slot's id (`ModelSlot.id`); the plate is
+- **App (slice 2, `app/SupportFins/Features/PlateTies`):** a model's key is its name key (`TieKey`, slice 2b below); the plate is
   the one an export writes (`PlateBoard.plateWrite`), measured, detected and built in one detached task per change (a generation
   counter drops stale results). An export never reuses the shown `TieBuildResult`: it builds the ties again on the very
   `PlateModel`s it writes (walls stood in the same task), so `export_plate_tied`'s check always passes.
+- **Slice 2b (decisions A, C, D of #50):** `TieModelInput.key` is the model's NAME and its occurrence among the plate's
+  models of that name, in plate order from 1 (`coin#1`, `coin#2`; app `TieKey`): a document's `disabled` / `added` pairs
+  name models, so they find them again on any plate of the same models (no engine change: keys are opaque strings).
+  `export`'s options take `plateTies` (a document object, `plate_ties_document`'s form, checked by
+  `PlateTiesDoc::from_json`, refused naming "plate ties"): a 3MF then carries it as `Metadata/support_fins_plate_ties.json`
+  after the session, every other entry byte for byte as without it (STL ignores it); the app passes it for a one-model
+  plate with ties on, so a reopened tied 3MF written again keeps its document. `load_parts` reads a 3MF's document with the
+  file (`ThreeMf::plate_ties`, the raw text) and hands every part from it the checked, written-out document
+  (`Part::saved_plate_ties`, `None` for a damaged one, a part from any other file, a scaled or merged part): the app no
+  longer reads the file twice to restore a tied plate. `plate_ties_of_3mf` stays (the CLI, tests). The parity paths are
+  unchanged: the bench_m5 hashes are identical.
 - **CLI:** `support-fins <plate.3mf> --plate-ties [-o out.3mf] [--printer id] [--tie-settings json] [--no-fins] [--json]`
   (`--plate-ties --help`, `--list-printers`) fins each object of a multi-object 3MF as a single part (the usual settings flags),
   keeps it where it stood on the plate, ties the neighbours and writes the merged object. `support-fins --help` is unchanged

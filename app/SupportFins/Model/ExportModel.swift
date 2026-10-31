@@ -106,6 +106,9 @@ final class ExportModel {
         var pending: Bool
     }
     @ObservationIgnored var drawn: @MainActor () -> Drawn = { Drawn(sweep: nil, pending: false) }
+    /// The plate's tie document (Features/PlateTies, `plate_ties_document`) a 3MF carries while its ties are on, nil:
+    /// none. A plate of one model is written here, so a tied 3MF opened and exported again keeps it.
+    @ObservationIgnored var plateTies: @MainActor () -> String? = { nil }
 
     deinit { job.cancelWithoutWaiting() }
 
@@ -177,6 +180,7 @@ final class ExportModel {
             o["bed"] = s.bed
             o["placed"] = s.placed
             if let text = s.session, let session = try? JSONSerialization.jsonObject(with: Data(text.utf8)) { o["session"] = session }
+            if let text = plateTies(), let doc = try? JSONSerialization.jsonObject(with: Data(text.utf8)) { o["plateTies"] = doc }
         }
         // a NaN or infinity in the pose, threshold, bed or spot makes `data(withJSONObject:)` raise an ObjC exception,
         // which `try?` does not catch: ask first (S-10)
