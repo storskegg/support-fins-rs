@@ -59,8 +59,8 @@ final class PlateTiesUITests: PartWindowUITestCase {
         gap.doubleClick()
         gap.typeKey("a", modifierFlags: .command)
         gap.typeText("15\r")
-        waitFor("the coins are tied: one link, three ties", timeout: 30) {
-            self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") }
+        if !waitUntil(timeout: 30, { self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") } }) {
+            XCTFail("the coins are tied: one link, three ties. Max gap reads \"\(text(gap))\", the status \(statusNotes)")
         }
     }
 
