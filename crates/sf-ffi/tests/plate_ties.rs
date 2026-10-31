@@ -14,8 +14,12 @@ use sf_io::json::{Json, parse};
 const ID: [f64; 9] = [1., 0., 0., 0., 1., 0., 0., 0., 1.];
 const SATURN: &str = "elegoo-saturn-4-ultra-16k";
 
+/// A fresh path for `name`: the tests run in parallel and several write `coin0.stl`, so each call gets its own
+/// file (one test read another's half-written STL: "not an STL: too short").
 fn scratch(name: &str) -> String {
-    let d = std::env::temp_dir().join(format!("sf-plate-ties-{}", std::process::id()));
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let d = std::env::temp_dir().join(format!("sf-plate-ties-{}-{n}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d.join(name).to_string_lossy().into_owned()
 }
@@ -229,7 +233,7 @@ fn detect_build_and_export_a_plate_of_coins() {
     let (a, b) = (scratch("plain-a.3mf"), scratch("plain-b.3mf"));
     export_plate(a.clone(), copy(&models), "{}".into()).unwrap();
     export_plate_tied(b.clone(), copy(&models), None, "{}".into()).unwrap();
-    assert_eq!(std::fs::read(a).unwrap(), std::fs::read(b).unwrap());
+    assert_eq!(std::fs::read(&a).unwrap(), std::fs::read(b).unwrap());
     // and the zip of plates: one tied, one not
     let z = scratch("all.zip");
     export_plates_tied(
@@ -251,7 +255,7 @@ fn detect_build_and_export_a_plate_of_coins() {
     .unwrap();
     let files = sf_io::zip::unzip(&std::fs::read(z).unwrap()).unwrap();
     assert_eq!(files.len(), 2);
-    assert!(plate_ties_of_3mf(scratch("plain-a.3mf")).unwrap().is_none());
+    assert!(plate_ties_of_3mf(a).unwrap().is_none());
 }
 
 #[test]
