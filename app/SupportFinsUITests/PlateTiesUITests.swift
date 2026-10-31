@@ -128,14 +128,8 @@ final class PlateTiesUITests: PartWindowUITestCase {
         try openFixturePart()
         let row = element("printer-row")
         XCTAssertTrue(row.waitForExistence(timeout: 10), "the printer row")
-        // both are remembered: leave the next test the app's own bed and layer
-        addTeardownBlock { [self] in
-            guard app.state == .runningForeground else { return }
-            let volume = element("volume")
-            volume.click()
-            volume.menuItems["250 × 220 × 270 mm"].click()
-            setLayerHeight("0.2")
-        }
+        // both are remembered: `tearDownWithError` leaves the next test the app's own bed and layer
+        pickedPrinter = true
         row.click()   // unfolds the Printer section
         let printer = element("printer-profile")
         XCTAssertTrue(printer.waitForExistence(timeout: 5), "the Printer picker")
@@ -148,6 +142,19 @@ final class PlateTiesUITests: PartWindowUITestCase {
         setLayerHeight("0.1")
         waitFor("the hand-set layer holds", timeout: 5) { self.text(row).contains("0.1 layers") }
         XCTAssertTrue(text(printer).contains("Saturn 4 Ultra 16K"), text(printer))
+    }
+
+    /// The printer test ran: its bed and layer are put back before the app quits.
+    private var pickedPrinter = false
+
+    override func tearDownWithError() throws {
+        if pickedPrinter, app.state == .runningForeground {
+            let volume = element("volume")
+            volume.click()
+            volume.menuItems["250 × 220 × 270 mm"].click()
+            setLayerHeight("0.2")
+        }
+        try super.tearDownWithError()
     }
 
     private func setLayerHeight(_ v: String) {
