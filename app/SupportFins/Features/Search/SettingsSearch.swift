@@ -19,7 +19,7 @@ final class SettingsSearch {
 
     /// Re-run the current query (the page does it after any change that hides or shows a row).
     func refresh() {
-        result = engine.run(query: query, context())
+        result = engine.run(query: query, context(), rows: SearchCatalog.allRows)
     }
 
     func requestFocus() { focusRequests += 1 }

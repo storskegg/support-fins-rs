@@ -27,7 +27,10 @@ final class MoveFeature: Feature {
 
     func registerTools(in toolbar: ToolbarRegistry) {
         guard host?.controller != nil else { return }
-        toolbar.registerToggle(.move, isOn: { [model] in model.isOn }, setOn: { [model] in model.setOn($0) })
+        // greyed on a tied plate (issue #50): the board's lock is read through the window, which may be gone
+        toolbar.registerToggle(.move, isOn: { [model] in model.isOn }, isEnabled: { [weak host = self.host] in
+            host?.features[PlatesFeature.self]?.board.lockReason() == nil
+        }, setOn: { [model] in model.setOn($0) })
     }
 
     /// A model removed, or another loaded: the tool stays on only with a model to move (`partchange`).
@@ -69,7 +72,7 @@ final class MoveFeature: Feature {
         return [MenuSection(menu: .model, order: 2, entries: [
             .divider,
             .check(JS.t("Move"), help: JS.t("Move models on the plate: drag one to place it (M). Esc to stop."),
-                   enabled: f?.host?.hasPart == true,
+                   enabled: f?.host?.hasPart == true && f?.host?.features[PlatesFeature.self]?.board.lockReason() == nil,
                    isOn: Binding(get: { model?.isOn ?? false }, set: { model?.setOn($0) })),
         ])]
     }

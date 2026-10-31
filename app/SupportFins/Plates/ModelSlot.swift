@@ -98,6 +98,8 @@ final class Plate {
     var live: Int
     var settings: PlateSettings?
     var history: History<SessionSnapshot>?
+    /// The plate's ties (issue #50, `Features/PlateTies`): on or off, their settings and the links clicked off or added.
+    var ties = PlateTieState()
 
     init(models: [ModelSlot] = [ModelSlot()], live: Int = 0) {
         self.models = models

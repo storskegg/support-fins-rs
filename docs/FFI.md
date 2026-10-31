@@ -717,6 +717,10 @@ fn plate_ties_of_3mf(path: String) -> Result<Option<String>, FfiError>;   // a t
 - **Hostile input:** every export above that takes input throws and runs under `crash::guarded`; the getters are listed in
   `GETTERS` (`tests/hostile.rs`, `plate_tie_exports_take_anything` fuzzes the rest). Tests: `crates/sf-ffi/tests/plate_ties.rs`,
   `crates/sf-engine/tests/plate_ties.rs`, `crates/sf-io/src/{printer,plateties}.rs`, `crates/sf-cli/tests/plate_ties.rs`.
+- **App (slice 2, `app/SupportFins/Features/PlateTies`):** a model's key is its plate slot's id (`ModelSlot.id`); the plate is
+  the one an export writes (`PlateBoard.plateWrite`), measured, detected and built in one detached task per change (a generation
+  counter drops stale results). An export never reuses the shown `TieBuildResult`: it builds the ties again on the very
+  `PlateModel`s it writes (walls stood in the same task), so `export_plate_tied`'s check always passes.
 - **CLI:** `support-fins <plate.3mf> --plate-ties [-o out.3mf] [--printer id] [--tie-settings json] [--no-fins] [--json]`
   (`--plate-ties --help`, `--list-printers`) fins each object of a multi-object 3MF as a single part (the usual settings flags),
   keeps it where it stood on the plate, ties the neighbours and writes the merged object. `support-fins --help` is unchanged

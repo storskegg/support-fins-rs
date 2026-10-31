@@ -695,6 +695,41 @@
         }
       }
     },
+    "Add a pair" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paar hinzufügen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加一对"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar um par"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إضافة زوج"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paar toevoegen"
+          }
+        }
+      }
+    },
     "Add a plate" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1105,6 +1140,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elke Part Studio ▸ Aangepaste features ▸ Aangepaste features toevoegen ▸ document Fin Supports ▸ Support-Fins FS; selecteer daarna het onderdeel."
+          }
+        }
+      }
+    },
+    "Anywhere" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überall"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任意位置"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qualquer lugar"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في أي مكان"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overal"
           }
         }
       }
@@ -1525,6 +1595,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Achter"
+          }
+        }
+      }
+    },
+    "Band width" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streifenbreite"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "带宽度"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Largura da faixa"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عرض الشريط"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strookbreedte"
           }
         }
       }
@@ -1995,6 +2100,41 @@
         }
       }
     },
+    "Bring back every link as the detection finds it: the ones turned off, and none added by hand." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Verknüpfungen so wiederherstellen, wie die Erkennung sie findet: ausgeschaltete wieder an, von Hand hinzugefügte weg."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按检测结果恢复所有连线：关闭的重新开启，手动添加的移除。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaura todos os vínculos como a detecção os encontra: os desativados voltam e os adicionados à mão saem."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أعد كل الوصلات كما يجدها الاكتشاف: المُوقفة تعود، والمضافة يدويًا تُزال."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet alle koppelingen terug zoals de detectie ze vindt: uitgezette weer aan, met de hand toegevoegde weg."
+          }
+        }
+      }
+    },
     "Build the supports for this pose" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2096,6 +2236,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bouwvolume, overhang, kalibratie, plug-ins, taal en links."
+          }
+        }
+      }
+    },
+    "Building plate ties…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege werden erstellt…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在生成平台连接条…"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criando ligações da placa…"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ بناء روابط اللوحة…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen worden gemaakt…"
           }
         }
       }
@@ -2323,6 +2498,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cancelar"
+          }
+        }
+      }
+    },
+    "Cancel pair" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paar abbrechen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消配对"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar par"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء الزوج"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paar annuleren"
           }
         }
       }
@@ -2764,6 +2974,41 @@
         }
       }
     },
+    "Click two models to tie them together. Esc to stop." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klicke zwei Modelle an, um sie zu verbinden. Esc zum Beenden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击两个模型将它们连接。按 Esc 停止。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clique em dois modelos para ligá-los. Esc para parar."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقر على نموذجين لربطهما. Esc للإيقاف."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klik op twee modellen om ze te verbinden. Esc om te stoppen."
+          }
+        }
+      }
+    },
     "Click two points across an overhang (a line lands right where you draw it, red faces included) to lay a breakaway wall under it" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2899,6 +3144,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Opdrachtregel"
+          }
+        }
+      }
+    },
+    "Contact" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontakt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接触位置"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contato"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التلامس"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        }
+      }
+    },
+    "Contact thickness" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dicke am Kontakt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接触处厚度"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espessura no contato"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "السماكة عند التلامس"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dikte bij contact"
           }
         }
       }
@@ -4389,6 +4704,41 @@
         }
       }
     },
+    "Edge band" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Randstreifen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边缘带"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faixa da borda"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شريط الحافة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Randstrook"
+          }
+        }
+      }
+    },
     "Edit" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4845,6 +5195,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vlak"
+          }
+        }
+      }
+    },
+    "Facing faces" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zugewandte Flächen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相对的面"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faces opostas"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأوجه المتقابلة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tegenover elkaar liggende vlakken"
           }
         }
       }
@@ -6420,6 +6805,41 @@
         }
       }
     },
+    "How far in from the outline the edge band reaches." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie weit der Randstreifen von der Kontur nach innen reicht."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边缘带从轮廓向内延伸的距离。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Até onde a faixa da borda vai para dentro do contorno."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدى امتداد شريط الحافة إلى الداخل من المحيط."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoe ver de randstrook vanaf de omtrek naar binnen reikt."
+          }
+        }
+      }
+    },
     "How far the brace reaches out at the bed, as a share of its height. Deeper = stiffer, more plastic. Default 15%." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6560,6 +6980,41 @@
         }
       }
     },
+    "How many ties join each pair, spread over the height range." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie viele Stege jedes Paar verbinden, verteilt über den Höhenbereich."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每对之间的连接条数量，分布在高度范围内。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantas ligações unem cada par, distribuídas na faixa de altura."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدد الروابط التي تصل كل زوج، موزعة على نطاق الارتفاع."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoeveel verbindingen elk paar verbinden, verdeeld over het hoogtebereik."
+          }
+        }
+      }
+    },
     "How tall the pad is. Only the first layer grips the plate; more layers make it stiffer and harder to peel." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6591,6 +7046,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "De hoogte van het hechtvlak. Alleen de eerste laag hecht aan het printbed; meer lagen maken het steviger en moeilijker los te trekken."
+          }
+        }
+      }
+    },
+    "How thick a tie is in the middle, between the models: thicker is stiffer." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie dick ein Steg in der Mitte zwischen den Modellen ist: dicker ist steifer."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接条在两个模型之间中部的厚度：越厚越硬。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A espessura da ligação no meio, entre os modelos: mais grossa é mais rígida."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سماكة الرابط في المنتصف بين النموذجين: الأسمك أكثر صلابة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoe dik een verbinding in het midden tussen de modellen is: dikker is stijver."
+          }
+        }
+      }
+    },
+    "How thick a tie is where it meets a model: thinner snaps off cleaner. Never below what the printer can print." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie dick ein Steg dort ist, wo er das Modell trifft: dünner bricht sauberer ab. Nie dünner, als der Drucker drucken kann."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接条与模型接触处的厚度：越薄掰得越干净。不会低于打印机可打印的厚度。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A espessura da ligação onde ela toca o modelo: mais fina se solta mais limpa. Nunca abaixo do que a impressora consegue imprimir."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سماكة الرابط عند ملامسته النموذج: الأرفع ينفصل بشكل أنظف. لا تقل أبدًا عما تستطيع الطابعة طباعته."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoe dik een verbinding is waar die het model raakt: dunner breekt schoner af. Nooit dunner dan de printer kan printen."
           }
         }
       }
@@ -7428,6 +7953,41 @@
         }
       }
     },
+    "Links" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verknüpfungen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连线"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vínculos"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الوصلات"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koppelingen"
+          }
+        }
+      }
+    },
     "Linux (ARM64)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7946,6 +8506,41 @@
         }
       }
     },
+    "Max gap" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max. Abstand"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大间隙"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folga máxima"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أقصى فجوة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Max. tussenruimte"
+          }
+        }
+      }
+    },
     "Merge %lld & load" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7959,6 +8554,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unir %1$lld e carregar"
+          }
+        }
+      }
+    },
+    "Middle thickness" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dicke in der Mitte"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中间厚度"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espessura no meio"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "السماكة في المنتصف"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dikte in het midden"
           }
         }
       }
@@ -8029,6 +8659,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sleep met de middelste muisknop om te draaien, Shift + sleep met de middelste muisknop om te verschuiven en gebruik het muwiel om in of uit te zoomen."
+          }
+        }
+      }
+    },
+    "Min height" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min. Höhe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最小高度"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altura mín."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدنى ارتفاع"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min. hoogte"
+          }
+        }
+      }
+    },
+    "Min height / thickness" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min. Höhe / Dicke"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最小高度/厚度比"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altura / espessura mín."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدنى نسبة ارتفاع / سماكة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min. hoogte / dikte"
           }
         }
       }
@@ -8134,6 +8834,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Modellen overlappen: ze zouden in elkaar geprint worden."
+          }
+        }
+      }
+    },
+    "Models shorter than this are not tied." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niedrigere Modelle werden nicht verbunden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低于此高度的模型不连接。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos mais baixos que isto não são ligados."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا تُربط النماذج الأقصر من هذا."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lagere modellen worden niet verbonden."
           }
         }
       }
@@ -9142,6 +9877,41 @@
         }
       }
     },
+    "Only tall, thin models are tied: height at least this many times their thickness." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur hohe, dünne Modelle werden verbunden: Höhe mindestens so viel mal ihre Dicke."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只连接高而薄的模型：高度至少为厚度的这么多倍。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só modelos altos e finos são ligados: altura de pelo menos tantas vezes a espessura."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُربط النماذج الطويلة الرفيعة فقط: ارتفاع لا يقل عن هذا العدد من أضعاف سماكتها."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alleen hoge, dunne modellen worden verbonden: hoogte minstens zoveel keer hun dikte."
+          }
+        }
+      }
+    },
     "Open an STL, 3MF, STEP or OBJ file." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9979,6 +10749,216 @@
         }
       }
     },
+    "Plate ties" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações da placa"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen"
+          }
+        }
+      }
+    },
+    "Plate ties are on: Arrange and Move are locked so the ties stay where they were built. Turn Plate ties off to move models." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege sind an: Anordnen und Verschieben sind gesperrt, damit die Stege bleiben, wo sie gebaut wurden. Schalte Plattenstege aus, um Modelle zu bewegen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条已开启：排列和移动已锁定，以使连接条保持在生成时的位置。关闭平台连接条即可移动模型。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações da placa ativadas: Organizar e Mover estão bloqueados para que as ligações fiquem onde foram criadas. Desative as Ligações da placa para mover modelos."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة مفعّلة: الترتيب والتحريك مقفلان لتبقى الروابط حيث بُنيت. أوقف روابط اللوحة لتحريك النماذج."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen staan aan: Schikken en Verplaatsen zijn vergrendeld zodat de verbindingen blijven waar ze zijn gemaakt. Zet Plaatverbindingen uit om modellen te verplaatsen."
+          }
+        }
+      }
+    },
+    "Plate ties: every link on this plate is turned off." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege: alle Verknüpfungen dieser Platte sind ausgeschaltet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条：此平台上的所有连线都已关闭。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações da placa: todos os vínculos desta placa estão desativados."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة: كل الوصلات على هذه اللوحة موقفة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen: alle koppelingen op deze plaat staan uit."
+          }
+        }
+      }
+    },
+    "Plate ties: no neighbours to tie on this plate." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege: auf dieser Platte gibt es keine Nachbarn zum Verbinden."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条：此平台上没有可连接的相邻模型。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações da placa: não há vizinhos para ligar nesta placa."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة: لا نماذج متجاورة لربطها على هذه اللوحة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen: geen buren om te verbinden op deze plaat."
+          }
+        }
+      }
+    },
+    "Plate ties: %@ of %@ ties on %@ pairs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege: %1$@ von %2$@ Stegen an %3$@ Paaren"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条：%3$@ 对中放置了 %1$@/%2$@ 条"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações da placa: %1$@ de %2$@ ligações em %3$@ pares"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة: %1$@ من %2$@ روابط على %3$@ أزواج"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen: %1$@ van %2$@ verbindingen op %3$@ paren"
+          }
+        }
+      }
+    },
+    "Plate ties: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条：%1$@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações da placa: %1$@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة: %1$@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen: %1$@"
+          }
+        }
+      }
+    },
     "Plate %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10189,6 +11169,41 @@
         }
       }
     },
+    "Printer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drucker"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打印机"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impressora"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الطابعة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Printer"
+          }
+        }
+      }
+    },
     "Pull the view back to show every plate" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10255,6 +11270,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zet nog een model op deze plaat, naast dit model. Klik op een model om het te bewerken."
+          }
+        }
+      }
+    },
+    "Put every plate tie setting back to the printer profile's defaults." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Einstellungen der Plattenstege auf die Standardwerte des Druckerprofils zurücksetzen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将所有平台连接条设置恢复为打印机配置文件的默认值。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volta todas as configurações das ligações da placa aos padrões do perfil da impressora."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أعد كل إعدادات روابط اللوحة إلى افتراضيات ملف الطابعة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zet alle instellingen van de plaatverbindingen terug naar de standaardwaarden van het printerprofiel."
           }
         }
       }
@@ -11005,6 +12055,41 @@
         }
       }
     },
+    "Reset to profile defaults" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf Profilstandard zurücksetzen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复为配置文件默认值"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redefinir para os padrões do perfil"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة إلى افتراضيات الملف"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standaardwaarden van profiel herstellen"
+          }
+        }
+      }
+    },
     "Restore Fins" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11071,6 +12156,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Alles herstellen"
+          }
+        }
+      }
+    },
+    "Restore links" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verknüpfungen wiederherstellen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复连线"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar vínculos"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استعادة الوصلات"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koppelingen herstellen"
           }
         }
       }
@@ -13626,6 +14746,41 @@
         }
       }
     },
+    "Tall, thin models side by side hold each other up with thin breakaway ties. While on, Arrange and Move are locked, and the plate exports as one object." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hohe, dünne Modelle nebeneinander stützen sich gegenseitig mit dünnen, abbrechbaren Stegen. Solange das an ist, sind Anordnen und Verschieben gesperrt, und die Platte wird als ein Objekt exportiert."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "并排的高而薄的模型用可掰断的细连接条互相支撑。开启时，排列和移动被锁定，平台导出为一个对象。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelos altos e finos lado a lado se sustentam com ligações finas destacáveis. Enquanto ativado, Organizar e Mover ficam bloqueados e a placa é exportada como um único objeto."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النماذج الطويلة الرفيعة المتجاورة يسند بعضها بعضًا بروابط رفيعة قابلة للكسر. أثناء التفعيل يُقفل الترتيب والتحريك، وتُصدَّر اللوحة كجسم واحد."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoge, dunne modellen naast elkaar houden elkaar overeind met dunne afbreekbare verbindingen. Zolang dit aan staat, zijn Schikken en Verplaatsen vergrendeld en wordt de plaat als één object geëxporteerd."
+          }
+        }
+      }
+    },
     "Test prints that tune the settings to your printer and filament." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13992,6 +15147,41 @@
         }
       }
     },
+    "The pairs found on this plate. Turn one off to leave that pair untied; a click on its link in the view does the same." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die auf dieser Platte gefundenen Paare. Schalte eins aus, um das Paar unverbunden zu lassen; ein Klick auf seine Verknüpfung in der Ansicht tut dasselbe."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此平台上找到的模型对。关闭一项即不连接该对；在视图中点击其连线效果相同。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os pares encontrados nesta placa. Desative um para deixar o par sem ligação; clicar no vínculo na vista faz o mesmo."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأزواج الموجودة على هذه اللوحة. أوقف أحدها لترك الزوج بلا روابط؛ والنقر على وصلته في العرض يفعل الشيء نفسه."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De paren op deze plaat. Zet er een uit om dat paar niet te verbinden; een klik op de koppeling in de weergave doet hetzelfde."
+          }
+        }
+      }
+    },
     "The pins attach each wall to the part, as a resin print needs." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14023,6 +15213,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "De pinnen verbinden elke wand met het onderdeel, zoals een harsprint nodig heeft."
+          }
+        }
+      }
+    },
+    "The printer you print on. It sets the plate ties' defaults: the thinnest tie follows from its pixel size." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Drucker, auf dem du druckst. Er bestimmt die Standardwerte der Plattenstege: der dünnste Steg ergibt sich aus seiner Pixelgröße."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你使用的打印机。它决定平台连接条的默认值：最细的连接条取决于它的像素尺寸。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A impressora em que você imprime. Ela define os padrões das ligações da placa: a ligação mais fina depende do tamanho do pixel."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الطابعة التي تطبع عليها. تحدد القيم الافتراضية لروابط اللوحة: أرفع رابط يتبع حجم البكسل فيها."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De printer waarop je print. Die bepaalt de standaardwaarden van de plaatverbindingen: de dunste verbinding volgt uit de pixelgrootte."
           }
         }
       }
@@ -14673,6 +15898,146 @@
         }
       }
     },
+    "Tie two models the detection left apart: click this, then the two models." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwei Modelle verbinden, die die Erkennung getrennt ließ: hier klicken, dann auf die beiden Modelle."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接检测未配对的两个模型：先点此处，再点这两个模型。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligue dois modelos que a detecção deixou separados: clique aqui e depois nos dois modelos."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اربط نموذجين تركهما الاكتشاف منفصلين: انقر هنا ثم على النموذجين."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbind twee modellen die de detectie los liet: klik hierop en dan op de twee modellen."
+          }
+        }
+      }
+    },
+    "Ties from" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stege ab"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接条起始"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações desde"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الروابط من"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbindingen vanaf"
+          }
+        }
+      }
+    },
+    "Ties per pair" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stege pro Paar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每对连接条数"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações por par"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط لكل زوج"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbindingen per paar"
+          }
+        }
+      }
+    },
+    "Ties up to" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stege bis"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接条截至"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligações até"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الروابط حتى"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbindingen tot"
+          }
+        }
+      }
+    },
     "Times and filament from %@; yours will differ." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15054,6 +16419,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bezig met draaien…"
+          }
+        }
+      }
+    },
+    "Two models are neighbours when the gap between them is at most this." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwei Modelle sind Nachbarn, wenn der Abstand zwischen ihnen höchstens so groß ist."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两个模型之间的间隙不超过此值时视为相邻。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dois modelos são vizinhos quando a folga entre eles é no máximo esta."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُعد النموذجان متجاورين إذا كانت الفجوة بينهما لا تزيد على هذه القيمة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twee modellen zijn buren als de tussenruimte hoogstens zoveel is."
           }
         }
       }
@@ -15705,6 +17105,41 @@
         }
       }
     },
+    "Where a tie meets a model. Edge band: a band just inside the outline, easy to clean up; where it has no room the tie goes on the face, and the status says so. Facing faces: the middle of the faces that look at each other. Anywhere: the shortest crossing." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wo ein Steg auf ein Modell trifft. Randstreifen: ein Streifen knapp innerhalb der Kontur, leicht zu versäubern; wo dort kein Platz ist, kommt der Steg auf die Fläche, und der Status sagt es. Zugewandte Flächen: die Mitte der Flächen, die einander zugewandt sind. Überall: der kürzeste Weg."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接条与模型接触的位置。边缘带：轮廓内侧的一条窄带，易于清理；没有空间时连接条放在面上，状态栏会提示。相对的面：彼此相对的面的中部。任意位置：最短的跨越。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onde uma ligação toca um modelo. Faixa da borda: uma faixa logo dentro do contorno, fácil de limpar; onde não houver espaço, a ligação vai para a face e o status avisa. Faces opostas: o meio das faces que se olham. Qualquer lugar: a travessia mais curta."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حيث يلتقي الرابط بالنموذج. شريط الحافة: شريط داخل المحيط مباشرة، سهل التنظيف؛ وحيث لا يتسع يوضع الرابط على الوجه وتذكر الحالة ذلك. الأوجه المتقابلة: منتصف الوجهين المتقابلين. في أي مكان: أقصر عبور."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waar een verbinding een model raakt. Randstrook: een strook net binnen de omtrek, makkelijk schoon te maken; waar daar geen ruimte is, komt de verbinding op het vlak en meldt de status dat. Tegenover elkaar liggende vlakken: het midden van de vlakken die naar elkaar kijken. Overal: de kortste oversteek."
+          }
+        }
+      }
+    },
     "Where supports go" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15771,6 +17206,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Waar het hechtvlak de onderkant van het onderdeel raakt. Een positieve waarde dringt verder in het onderdeel voor een stevigere hechting; 0 is vlak; een negatieve waarde laat een spleet achter, zodat het hechtvlak netter afbreekt."
+          }
+        }
+      }
+    },
+    "Where the ties go, as a share of the height the two models have in common. None go right by the bed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wo die Stege sitzen, als Anteil der Höhe, die beide Modelle gemeinsam haben. Keiner sitzt direkt am Druckbett."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接条的位置，以两个模型共同高度的比例表示。贴近打印平台处不放连接条。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onde as ligações ficam, como fração da altura que os dois modelos têm em comum. Nenhuma fica junto à mesa."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مواضع الروابط كنسبة من الارتفاع المشترك بين النموذجين. لا يوضع أي منها بجوار السرير مباشرة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waar de verbindingen komen, als deel van de hoogte die de twee modellen gemeen hebben. Geen enkele vlak bij het bed."
           }
         }
       }
@@ -16237,6 +17707,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "على طول القطعة"
+          }
+        }
+      }
+    },
+    "another model or a support is in the way" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ein anderes Modell oder eine Stütze ist im Weg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有其他模型或支撑挡住"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "outro modelo ou um suporte está no caminho"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نموذج آخر أو دعامة تعترض الطريق"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "een ander model of een steun zit in de weg"
           }
         }
       }
@@ -17635,6 +19140,41 @@
         }
       }
     },
+    "it would miss %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "er würde %1$@ verfehlen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它会错过 %1$@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ela não alcançaria %1$@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيخطئ %1$@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hij zou %1$@ missen"
+          }
+        }
+      }
+    },
     "it would run into another brace (on the facing wall, or right beside it) — click a spot staggered from it" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17648,6 +19188,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ela bateria em outra escora (na face oposta, ou bem ao lado) — clique num ponto desencontrado dela"
+          }
+        }
+      }
+    },
+    "it would sit on an edge of %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "er säße auf einer Kante von %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它会落在 %1$@ 的边缘上"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ela ficaria numa aresta de %1$@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيقع على حافة %1$@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hij zou op een rand van %1$@ zitten"
           }
         }
       }
@@ -20592,6 +22167,76 @@
         }
       }
     },
+    "the gap is too wide there" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "der Abstand ist dort zu groß"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该处间隙太宽"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a folga é larga demais ali"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفجوة واسعة جدًا هناك"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de tussenruimte is daar te breed"
+          }
+        }
+      }
+    },
+    "the models don't face each other at that height" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "die Modelle stehen sich in dieser Höhe nicht gegenüber"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两个模型在该高度不相对"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "os modelos não ficam frente a frente nessa altura"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النموذجان غير متقابلين عند هذا الارتفاع"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de modellen staan op die hoogte niet tegenover elkaar"
+          }
+        }
+      }
+    },
     "the overhangs here are too small or too low to be worth a wall" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -21290,6 +22935,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ (object %2$@)"
+          }
+        }
+      }
+    },
+    "%@ slopes too much there" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ist dort zu schräg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 在该处坡度过大"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ é inclinado demais ali"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ شديد الانحدار هناك"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ loopt daar te schuin"
           }
         }
       }
@@ -26213,6 +27893,146 @@
         }
       }
     },
+    "%@: no room for ties above the bed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: kein Platz für Stege über dem Druckbett"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：打印平台上方没有放置连接条的空间"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: sem espaço para ligações acima da mesa"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: لا مكان للروابط فوق السرير"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: geen ruimte voor verbindingen boven het bed"
+          }
+        }
+      }
+    },
+    "%@: tie %@ left out: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: Steg %2$@ weggelassen: %3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：省略了连接条 %2$@：%3$@"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: ligação %2$@ omitida: %3$@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: حُذف الرابط %2$@: %3$@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: verbinding %2$@ weggelaten: %3$@"
+          }
+        }
+      }
+    },
+    "%@: tie %@ sinks half as deep: the section there is thin" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: Steg %2$@ sinkt nur halb so tief ein: die Wand ist dort dünn"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：连接条 %2$@ 只嵌入一半深度：该处截面较薄"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: a ligação %2$@ afunda pela metade: a seção ali é fina"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: يغوص الرابط %2$@ نصف العمق: المقطع رقيق هناك"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: verbinding %2$@ zakt half zo diep in: de doorsnede is daar dun"
+          }
+        }
+      }
+    },
+    "%@: tie %@ went on the face: the edge band had no room for it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: Steg %2$@ sitzt auf der Fläche: im Randstreifen war kein Platz"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@：连接条 %2$@ 放在了面上：边缘带没有空间"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: a ligação %2$@ foi para a face: a faixa da borda não tinha espaço"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: وُضع الرابط %2$@ على الوجه: لم يتسع له شريط الحافة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: verbinding %2$@ staat op het vlak: in de randstrook was geen ruimte"
+          }
+        }
+      }
+    },
     "%@ cutouts" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -26226,6 +28046,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "recortes em %1$@"
+          }
+        }
+      }
+    },
+    "…and %@ more" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "…und %1$@ weitere"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "…还有 %1$@ 条"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "…e mais %1$@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "…و%1$@ أخرى"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "…en nog %1$@"
           }
         }
       }

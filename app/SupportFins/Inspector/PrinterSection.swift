@@ -13,6 +13,8 @@ struct PrinterSection: View {
 
     private var group: some View {
         DisclosureGroup(isExpanded: search?.expandedBinding(.printer, user: $open) ?? $open) {
+            // which printer the plate ties are made for (issue #50): the app's choice, not the session's
+            PrinterProfilePicker()
             FindRow("nozzle-fld") {
                 Picker("Nozzle", selection: Binding(get: { settings.nozzle }, set: { settings.setNozzle($0) })) {
                     ForEach(FinSettings.nozzleChoices, id: \.self) { Text("\(FinSettings.nozzleText($0)) mm").tag($0) }

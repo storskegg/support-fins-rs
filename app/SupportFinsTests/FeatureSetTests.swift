@@ -166,7 +166,7 @@ struct FeatureSetTests {
     }
 
     @Test func theEscCascadePutsAnArmedPointerModeBeforeEndingRemoveFins() {
-        #expect(ViewerModel().features.escapeHandlers.map(\.id) == ["lay-face", "draw", "move", "remove-fins"])
+        #expect(ViewerModel().features.escapeHandlers.map(\.id) == ["lay-face", "plate-ties-pair", "draw", "move", "remove-fins"])
     }
 
     @Test func theRealFeaturesRegisterTheirSlotsOnlyWhenTheyCanOpen() {

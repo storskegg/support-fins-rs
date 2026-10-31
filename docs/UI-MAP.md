@@ -237,6 +237,25 @@ Groups' hints and mode gates: Pad numbers are shown only for Custom (`ui/setting
 | `report-link` | button | Something didn’t get supported? |  |  | Opens a GitHub issue filled in with this build’s settings and numbers (not your model: attach it there if you can) | index.html:621; ui/report.js:34 | Link button: opens a prefilled GitHub issue (`Features/Report`, M7 done) | M7 |
 | `report-copy` | button | Copy settings |  |  | Copy this build’s settings as JSON: with the model, they rebuild exactly these supports | index.html:623; ui/report.js:44 | Button: copies the build settings JSON (Edit > Copy Build Settings) | M7 |
 
+### 4.4 Plate ties (app only, issue #50)
+
+No web counterpart: the first post-parity feature (`Features/PlateTies`, engine in docs/FFI.md "Plate ties and printer profiles").
+
+- **Printer** (`printer-profile`): the first row of the Printer section, a Picker of the engine's printer profiles
+  (`printer_profiles()`, the Elegoo Saturn 4 Ultra 16K by default), remembered in `sf.printerProfile`. It sets the ties' defaults.
+- **Plate ties** (`plate-ties-toggle`): a section after More settings, its header a Toggle; the settings are the plate's
+  (each plate keeps its own, `Plate.ties`). Fields, shown while on: Max gap, Min height / thickness, Min height, Contact (Edge band /
+  Facing faces / Anywhere), Band width (Edge band only), Ties per pair, Contact thickness, Middle thickness, Ties from / Ties up to
+  (% of the height the pair shares); then the Links (a switch per pair found, `plate-tie-link-N`), Add a pair, Restore links and
+  Reset to profile defaults. Every edit goes through `plate_ties_settings`; a value the engine refuses is shown in red, not applied.
+- **On the plate**: the links dashed over everything (blue tied, orange added by hand, grey turned off; a click toggles one), the
+  ties drawn in the fin colour. Add a pair arms a pointer mode: the next two models clicked are tied; Esc stops it.
+- **Status card**: the lock ("Plate ties are on: Arrange and Move are locked..."), what was tied ("Plate ties: 6 of 6 ties on 2
+  pairs") and a line per note (a tie on the face, a shallow sink, a tie left out and why, no room above the bed).
+- **Lock**: while on, Arrange (toolbar, Model menu, the clash banner, Export's "Arrange first") and Move (toolbar, Model menu, M)
+  are greyed or refused with that message. **Export**: the plate's 3MF, and each tied plate of All plates, is one merged object
+  carrying `Metadata/support_fins_plate_ties.json`; opening such a 3MF onto an empty plate turns its ties back on with its settings.
+
 ---
 
 ## 5. The view toolbar and its popovers
@@ -386,6 +405,7 @@ New native shortcuts to propose (not in the web app; they use the menu bar, so t
 | `sf.navPreset` | Mouse preset | `ui/navigation.js:11, 31-35` | `UserDefaults` |
 | `support_fins_draw_shape` | Line / Curve | `ui/walls.js:41-44, 618` | `UserDefaults` |
 | `support_fins_lang` | UI language | `ui/i18n.js:16-23` | system language |
+| `sf.printerProfile` | printer profile for plate ties (app only, issue #50) | none | `UserDefaults` |
 
 The other fin settings are not persisted in the web app (they come back from a session in the exported 3MF, `ui/session.js`): persisted per document in the 3MF's session, as the web does (`Metadata/support_fins.json`; done, `Session/`).
 

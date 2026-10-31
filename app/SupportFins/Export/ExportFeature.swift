@@ -37,7 +37,7 @@ final class ExportFeature: Feature {
         // model being edited alone), Arrange to hand
         if ready, board?.clashing == true {
             entries += [.note(JS.t("Models overlap: the 3MF prints them into each other.")),
-                        .item(JS.t("Arrange first")) { Task { await board?.arrange() } }]
+                        .item(JS.t("Arrange first"), enabled: board?.lockReason() == nil) { Task { await board?.arrange() } }]
         }
         entries += ExportFormat.allCases.map { format in
             if format == .threeMF, multi, let board {

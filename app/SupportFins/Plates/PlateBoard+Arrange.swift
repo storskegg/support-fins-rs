@@ -36,6 +36,9 @@ extension PlateBoard {
     /// The toolbar's Arrange shows with a model on show and more than one on the plate (`syncButton`, `ui/arrange.js`).
     var arrangeShown: Bool { hasLive && modelCount > 1 }
 
+    /// Arrange can run now: shown, no builds awaited, not exporting, and the plate not tied.
+    var canArrange: Bool { arrangeShown && !arranging && !busy && lockReason() == nil }
+
     /// Arrange: pack the plate's models -- the biggest first, each at the free spot nearest the bed's centre, `gap` mm
     /// from the others, turned as they are (a turn about Z would be a new pose and rebuild the fins) -- once every fin
     /// build is in: a model packed without the fins it is getting would collide. One undo step. A model the bed has
@@ -43,6 +46,8 @@ extension PlateBoard {
     /// the clash banner, "Arrange first" in the Export menu and the toolbar's Arrange (`arrange`, `ui/arrange.js`).
     func arrange() async {
         guard hasLive, !arranging, !busy, !session.dragLocked else { return }
+        // a tied plate stays where its ties were built (issue #50): say why nothing moves
+        if let why = lockReason() { host?.status = why; return }
         CrashReporter.note("plate: arrange")
         let plate = self.plate
         let building = host?.wiring?.build?.building == true
@@ -54,7 +59,7 @@ extension PlateBoard {
             _ = await parkedSettled(seconds: 30)
             arranging = false
             // switched, or picked up, meanwhile: that press was for another plate
-            guard self.plate === plate, hasLive, !busy, !session.dragLocked else { return }
+            guard self.plate === plate, hasLive, !busy, !session.dragLocked, lockReason() == nil else { return }
         }
         let fps = footprints()
         guard fps.count >= 2, let v = host?.controller?.volume else { return }
@@ -100,7 +105,7 @@ struct ClashBanner: View {
             HStack(spacing: 12) {
                 Text("Models overlap: they would print into each other.")
                 Button("Arrange") { Task { await board.arrange() } }
-                    .disabled(board.arranging)
+                    .disabled(board.arranging || board.lockReason() != nil)
                     .accessibilityIdentifier("clash-arrange")
             }
             .font(.system(size: 13))

@@ -622,5 +622,429 @@
     "pt": "O Support Fins é construído com software de código aberto. As licenças dele pedem estes avisos.",
     "ar": "يعتمد Support Fins على برامج مفتوحة المصدر. وتتطلب تراخيصها هذه الإشعارات.",
     "nl": "Support Fins is gebouwd op opensourcesoftware. De licenties daarvan vragen om deze vermeldingen."
+  },
+  "Plate ties": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Plate ties section and its switch",
+    "de": "Plattenstege",
+    "zh": "平台连接条",
+    "pt": "Ligações da placa",
+    "ar": "روابط اللوحة",
+    "nl": "Plaatverbindingen"
+  },
+  "Printer": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Printer section's printer profile picker",
+    "de": "Drucker",
+    "zh": "打印机",
+    "pt": "Impressora",
+    "ar": "الطابعة",
+    "nl": "Printer"
+  },
+  "Max gap": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Max. Abstand",
+    "zh": "最大间隙",
+    "pt": "Folga máxima",
+    "ar": "أقصى فجوة",
+    "nl": "Max. tussenruimte"
+  },
+  "Min height / thickness": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Min. Höhe / Dicke",
+    "zh": "最小高度/厚度比",
+    "pt": "Altura / espessura mín.",
+    "ar": "أدنى نسبة ارتفاع / سماكة",
+    "nl": "Min. hoogte / dikte"
+  },
+  "Min height": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Min. Höhe",
+    "zh": "最小高度",
+    "pt": "Altura mín.",
+    "ar": "أدنى ارتفاع",
+    "nl": "Min. hoogte"
+  },
+  "Contact": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Kontakt",
+    "zh": "接触位置",
+    "pt": "Contato",
+    "ar": "التلامس",
+    "nl": "Contact"
+  },
+  "Edge band": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties contact mode",
+    "de": "Randstreifen",
+    "zh": "边缘带",
+    "pt": "Faixa da borda",
+    "ar": "شريط الحافة",
+    "nl": "Randstrook"
+  },
+  "Facing faces": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties contact mode",
+    "de": "Zugewandte Flächen",
+    "zh": "相对的面",
+    "pt": "Faces opostas",
+    "ar": "الأوجه المتقابلة",
+    "nl": "Tegenover elkaar liggende vlakken"
+  },
+  "Anywhere": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties contact mode",
+    "de": "Überall",
+    "zh": "任意位置",
+    "pt": "Qualquer lugar",
+    "ar": "في أي مكان",
+    "nl": "Overal"
+  },
+  "Band width": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Streifenbreite",
+    "zh": "带宽度",
+    "pt": "Largura da faixa",
+    "ar": "عرض الشريط",
+    "nl": "Strookbreedte"
+  },
+  "Ties per pair": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Stege pro Paar",
+    "zh": "每对连接条数",
+    "pt": "Ligações por par",
+    "ar": "روابط لكل زوج",
+    "nl": "Verbindingen per paar"
+  },
+  "Contact thickness": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Dicke am Kontakt",
+    "zh": "接触处厚度",
+    "pt": "Espessura no contato",
+    "ar": "السماكة عند التلامس",
+    "nl": "Dikte bij contact"
+  },
+  "Middle thickness": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
+    "de": "Dicke in der Mitte",
+    "zh": "中间厚度",
+    "pt": "Espessura no meio",
+    "ar": "السماكة في المنتصف",
+    "nl": "Dikte in het midden"
+  },
+  "Ties from": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field (the height range's start)",
+    "de": "Stege ab",
+    "zh": "连接条起始",
+    "pt": "Ligações desde",
+    "ar": "الروابط من",
+    "nl": "Verbindingen vanaf"
+  },
+  "Ties up to": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field (the height range's end)",
+    "de": "Stege bis",
+    "zh": "连接条截至",
+    "pt": "Ligações até",
+    "ar": "الروابط حتى",
+    "nl": "Verbindingen tot"
+  },
+  "Links": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the Plate ties section's list of links",
+    "de": "Verknüpfungen",
+    "zh": "连线",
+    "pt": "Vínculos",
+    "ar": "الوصلات",
+    "nl": "Koppelingen"
+  },
+  "Restore links": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: Plate ties button",
+    "de": "Verknüpfungen wiederherstellen",
+    "zh": "恢复连线",
+    "pt": "Restaurar vínculos",
+    "ar": "استعادة الوصلات",
+    "nl": "Koppelingen herstellen"
+  },
+  "Add a pair": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: Plate ties button",
+    "de": "Paar hinzufügen",
+    "zh": "添加一对",
+    "pt": "Adicionar um par",
+    "ar": "إضافة زوج",
+    "nl": "Paar toevoegen"
+  },
+  "Cancel pair": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: Plate ties button while a pair is being picked",
+    "de": "Paar abbrechen",
+    "zh": "取消配对",
+    "pt": "Cancelar par",
+    "ar": "إلغاء الزوج",
+    "nl": "Paar annuleren"
+  },
+  "Reset to profile defaults": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: Plate ties button",
+    "de": "Auf Profilstandard zurücksetzen",
+    "zh": "恢复为配置文件默认值",
+    "pt": "Redefinir para os padrões do perfil",
+    "ar": "إعادة إلى افتراضيات الملف",
+    "nl": "Standaardwaarden van profiel herstellen"
+  },
+  "{pair}: tie {tie} went on the face: the edge band had no room for it": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties note in the status card",
+    "de": "{pair}: Steg {tie} sitzt auf der Fläche: im Randstreifen war kein Platz",
+    "zh": "{pair}：连接条 {tie} 放在了面上：边缘带没有空间",
+    "pt": "{pair}: a ligação {tie} foi para a face: a faixa da borda não tinha espaço",
+    "ar": "{pair}: وُضع الرابط {tie} على الوجه: لم يتسع له شريط الحافة",
+    "nl": "{pair}: verbinding {tie} staat op het vlak: in de randstrook was geen ruimte"
+  },
+  "{pair}: tie {tie} sinks half as deep: the section there is thin": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties note in the status card",
+    "de": "{pair}: Steg {tie} sinkt nur halb so tief ein: die Wand ist dort dünn",
+    "zh": "{pair}：连接条 {tie} 只嵌入一半深度：该处截面较薄",
+    "pt": "{pair}: a ligação {tie} afunda pela metade: a seção ali é fina",
+    "ar": "{pair}: يغوص الرابط {tie} نصف العمق: المقطع رقيق هناك",
+    "nl": "{pair}: verbinding {tie} zakt half zo diep in: de doorsnede is daar dun"
+  },
+  "{pair}: tie {tie} left out: {why}": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties note in the status card",
+    "de": "{pair}: Steg {tie} weggelassen: {why}",
+    "zh": "{pair}：省略了连接条 {tie}：{why}",
+    "pt": "{pair}: ligação {tie} omitida: {why}",
+    "ar": "{pair}: حُذف الرابط {tie}: {why}",
+    "nl": "{pair}: verbinding {tie} weggelaten: {why}"
+  },
+  "{pair}: no room for ties above the bed": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties note in the status card",
+    "de": "{pair}: kein Platz für Stege über dem Druckbett",
+    "zh": "{pair}：打印平台上方没有放置连接条的空间",
+    "pt": "{pair}: sem espaço para ligações acima da mesa",
+    "ar": "{pair}: لا مكان للروابط فوق السرير",
+    "nl": "{pair}: geen ruimte voor verbindingen boven het bed"
+  },
+  "the models don't face each other at that height": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: why a tie was left out (Plate ties note)",
+    "de": "die Modelle stehen sich in dieser Höhe nicht gegenüber",
+    "zh": "两个模型在该高度不相对",
+    "pt": "os modelos não ficam frente a frente nessa altura",
+    "ar": "النموذجان غير متقابلين عند هذا الارتفاع",
+    "nl": "de modellen staan op die hoogte niet tegenover elkaar"
+  },
+  "it would miss {name}": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: why a tie was left out (Plate ties note)",
+    "de": "er würde {name} verfehlen",
+    "zh": "它会错过 {name}",
+    "pt": "ela não alcançaria {name}",
+    "ar": "سيخطئ {name}",
+    "nl": "hij zou {name} missen"
+  },
+  "the gap is too wide there": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: why a tie was left out (Plate ties note)",
+    "de": "der Abstand ist dort zu groß",
+    "zh": "该处间隙太宽",
+    "pt": "a folga é larga demais ali",
+    "ar": "الفجوة واسعة جدًا هناك",
+    "nl": "de tussenruimte is daar te breed"
+  },
+  "{name} slopes too much there": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: why a tie was left out (Plate ties note)",
+    "de": "{name} ist dort zu schräg",
+    "zh": "{name} 在该处坡度过大",
+    "pt": "{name} é inclinado demais ali",
+    "ar": "{name} شديد الانحدار هناك",
+    "nl": "{name} loopt daar te schuin"
+  },
+  "it would sit on an edge of {name}": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: why a tie was left out (Plate ties note)",
+    "de": "er säße auf einer Kante von {name}",
+    "zh": "它会落在 {name} 的边缘上",
+    "pt": "ela ficaria numa aresta de {name}",
+    "ar": "سيقع على حافة {name}",
+    "nl": "hij zou op een rand van {name} zitten"
+  },
+  "another model or a support is in the way": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: why a tie was left out (Plate ties note)",
+    "de": "ein anderes Modell oder eine Stütze ist im Weg",
+    "zh": "有其他模型或支撑挡住",
+    "pt": "outro modelo ou um suporte está no caminho",
+    "ar": "نموذج آخر أو دعامة تعترض الطريق",
+    "nl": "een ander model of een steun zit in de weg"
+  },
+  "Plate ties are on: Arrange and Move are locked so the ties stay where they were built. Turn Plate ties off to move models.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: the status card and the status line when Arrange or Move is refused on a tied plate",
+    "de": "Plattenstege sind an: Anordnen und Verschieben sind gesperrt, damit die Stege bleiben, wo sie gebaut wurden. Schalte Plattenstege aus, um Modelle zu bewegen.",
+    "zh": "平台连接条已开启：排列和移动已锁定，以使连接条保持在生成时的位置。关闭平台连接条即可移动模型。",
+    "pt": "Ligações da placa ativadas: Organizar e Mover estão bloqueados para que as ligações fiquem onde foram criadas. Desative as Ligações da placa para mover modelos.",
+    "ar": "روابط اللوحة مفعّلة: الترتيب والتحريك مقفلان لتبقى الروابط حيث بُنيت. أوقف روابط اللوحة لتحريك النماذج.",
+    "nl": "Plaatverbindingen staan aan: Schikken en Verplaatsen zijn vergrendeld zodat de verbindingen blijven waar ze zijn gemaakt. Zet Plaatverbindingen uit om modellen te verplaatsen."
+  },
+  "The printer you print on. It sets the plate ties' defaults: the thinnest tie follows from its pixel size.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card of the printer profile picker",
+    "de": "Der Drucker, auf dem du druckst. Er bestimmt die Standardwerte der Plattenstege: der dünnste Steg ergibt sich aus seiner Pixelgröße.",
+    "zh": "你使用的打印机。它决定平台连接条的默认值：最细的连接条取决于它的像素尺寸。",
+    "pt": "A impressora em que você imprime. Ela define os padrões das ligações da placa: a ligação mais fina depende do tamanho do pixel.",
+    "ar": "الطابعة التي تطبع عليها. تحدد القيم الافتراضية لروابط اللوحة: أرفع رابط يتبع حجم البكسل فيها.",
+    "nl": "De printer waarop je print. Die bepaalt de standaardwaarden van de plaatverbindingen: de dunste verbinding volgt uit de pixelgrootte."
+  },
+  "Tall, thin models side by side hold each other up with thin breakaway ties. While on, Arrange and Move are locked, and the plate exports as one object.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card of the Plate ties switch",
+    "de": "Hohe, dünne Modelle nebeneinander stützen sich gegenseitig mit dünnen, abbrechbaren Stegen. Solange das an ist, sind Anordnen und Verschieben gesperrt, und die Platte wird als ein Objekt exportiert.",
+    "zh": "并排的高而薄的模型用可掰断的细连接条互相支撑。开启时，排列和移动被锁定，平台导出为一个对象。",
+    "pt": "Modelos altos e finos lado a lado se sustentam com ligações finas destacáveis. Enquanto ativado, Organizar e Mover ficam bloqueados e a placa é exportada como um único objeto.",
+    "ar": "النماذج الطويلة الرفيعة المتجاورة يسند بعضها بعضًا بروابط رفيعة قابلة للكسر. أثناء التفعيل يُقفل الترتيب والتحريك، وتُصدَّر اللوحة كجسم واحد.",
+    "nl": "Hoge, dunne modellen naast elkaar houden elkaar overeind met dunne afbreekbare verbindingen. Zolang dit aan staat, zijn Schikken en Verplaatsen vergrendeld en wordt de plaat als één object geëxporteerd."
+  },
+  "Two models are neighbours when the gap between them is at most this.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Zwei Modelle sind Nachbarn, wenn der Abstand zwischen ihnen höchstens so groß ist.",
+    "zh": "两个模型之间的间隙不超过此值时视为相邻。",
+    "pt": "Dois modelos são vizinhos quando a folga entre eles é no máximo esta.",
+    "ar": "يُعد النموذجان متجاورين إذا كانت الفجوة بينهما لا تزيد على هذه القيمة.",
+    "nl": "Twee modellen zijn buren als de tussenruimte hoogstens zoveel is."
+  },
+  "Only tall, thin models are tied: height at least this many times their thickness.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Nur hohe, dünne Modelle werden verbunden: Höhe mindestens so viel mal ihre Dicke.",
+    "zh": "只连接高而薄的模型：高度至少为厚度的这么多倍。",
+    "pt": "Só modelos altos e finos são ligados: altura de pelo menos tantas vezes a espessura.",
+    "ar": "تُربط النماذج الطويلة الرفيعة فقط: ارتفاع لا يقل عن هذا العدد من أضعاف سماكتها.",
+    "nl": "Alleen hoge, dunne modellen worden verbonden: hoogte minstens zoveel keer hun dikte."
+  },
+  "Models shorter than this are not tied.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Niedrigere Modelle werden nicht verbunden.",
+    "zh": "低于此高度的模型不连接。",
+    "pt": "Modelos mais baixos que isto não são ligados.",
+    "ar": "لا تُربط النماذج الأقصر من هذا.",
+    "nl": "Lagere modellen worden niet verbonden."
+  },
+  "Where a tie meets a model. Edge band: a band just inside the outline, easy to clean up; where it has no room the tie goes on the face, and the status says so. Facing faces: the middle of the faces that look at each other. Anywhere: the shortest crossing.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Wo ein Steg auf ein Modell trifft. Randstreifen: ein Streifen knapp innerhalb der Kontur, leicht zu versäubern; wo dort kein Platz ist, kommt der Steg auf die Fläche, und der Status sagt es. Zugewandte Flächen: die Mitte der Flächen, die einander zugewandt sind. Überall: der kürzeste Weg.",
+    "zh": "连接条与模型接触的位置。边缘带：轮廓内侧的一条窄带，易于清理；没有空间时连接条放在面上，状态栏会提示。相对的面：彼此相对的面的中部。任意位置：最短的跨越。",
+    "pt": "Onde uma ligação toca um modelo. Faixa da borda: uma faixa logo dentro do contorno, fácil de limpar; onde não houver espaço, a ligação vai para a face e o status avisa. Faces opostas: o meio das faces que se olham. Qualquer lugar: a travessia mais curta.",
+    "ar": "حيث يلتقي الرابط بالنموذج. شريط الحافة: شريط داخل المحيط مباشرة، سهل التنظيف؛ وحيث لا يتسع يوضع الرابط على الوجه وتذكر الحالة ذلك. الأوجه المتقابلة: منتصف الوجهين المتقابلين. في أي مكان: أقصر عبور.",
+    "nl": "Waar een verbinding een model raakt. Randstrook: een strook net binnen de omtrek, makkelijk schoon te maken; waar daar geen ruimte is, komt de verbinding op het vlak en meldt de status dat. Tegenover elkaar liggende vlakken: het midden van de vlakken die naar elkaar kijken. Overal: de kortste oversteek."
+  },
+  "How far in from the outline the edge band reaches.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Wie weit der Randstreifen von der Kontur nach innen reicht.",
+    "zh": "边缘带从轮廓向内延伸的距离。",
+    "pt": "Até onde a faixa da borda vai para dentro do contorno.",
+    "ar": "مدى امتداد شريط الحافة إلى الداخل من المحيط.",
+    "nl": "Hoe ver de randstrook vanaf de omtrek naar binnen reikt."
+  },
+  "How many ties join each pair, spread over the height range.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Wie viele Stege jedes Paar verbinden, verteilt über den Höhenbereich.",
+    "zh": "每对之间的连接条数量，分布在高度范围内。",
+    "pt": "Quantas ligações unem cada par, distribuídas na faixa de altura.",
+    "ar": "عدد الروابط التي تصل كل زوج، موزعة على نطاق الارتفاع.",
+    "nl": "Hoeveel verbindingen elk paar verbinden, verdeeld over het hoogtebereik."
+  },
+  "How thick a tie is where it meets a model: thinner snaps off cleaner. Never below what the printer can print.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Wie dick ein Steg dort ist, wo er das Modell trifft: dünner bricht sauberer ab. Nie dünner, als der Drucker drucken kann.",
+    "zh": "连接条与模型接触处的厚度：越薄掰得越干净。不会低于打印机可打印的厚度。",
+    "pt": "A espessura da ligação onde ela toca o modelo: mais fina se solta mais limpa. Nunca abaixo do que a impressora consegue imprimir.",
+    "ar": "سماكة الرابط عند ملامسته النموذج: الأرفع ينفصل بشكل أنظف. لا تقل أبدًا عما تستطيع الطابعة طباعته.",
+    "nl": "Hoe dik een verbinding is waar die het model raakt: dunner breekt schoner af. Nooit dunner dan de printer kan printen."
+  },
+  "How thick a tie is in the middle, between the models: thicker is stiffer.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Wie dick ein Steg in der Mitte zwischen den Modellen ist: dicker ist steifer.",
+    "zh": "连接条在两个模型之间中部的厚度：越厚越硬。",
+    "pt": "A espessura da ligação no meio, entre os modelos: mais grossa é mais rígida.",
+    "ar": "سماكة الرابط في المنتصف بين النموذجين: الأسمك أكثر صلابة.",
+    "nl": "Hoe dik een verbinding in het midden tussen de modellen is: dikker is stijver."
+  },
+  "Where the ties go, as a share of the height the two models have in common. None go right by the bed.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Wo die Stege sitzen, als Anteil der Höhe, die beide Modelle gemeinsam haben. Keiner sitzt direkt am Druckbett.",
+    "zh": "连接条的位置，以两个模型共同高度的比例表示。贴近打印平台处不放连接条。",
+    "pt": "Onde as ligações ficam, como fração da altura que os dois modelos têm em comum. Nenhuma fica junto à mesa.",
+    "ar": "مواضع الروابط كنسبة من الارتفاع المشترك بين النموذجين. لا يوضع أي منها بجوار السرير مباشرة.",
+    "nl": "Waar de verbindingen komen, als deel van de hoogte die de twee modellen gemeen hebben. Geen enkele vlak bij het bed."
+  },
+  "The pairs found on this plate. Turn one off to leave that pair untied; a click on its link in the view does the same.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Die auf dieser Platte gefundenen Paare. Schalte eins aus, um das Paar unverbunden zu lassen; ein Klick auf seine Verknüpfung in der Ansicht tut dasselbe.",
+    "zh": "在此平台上找到的模型对。关闭一项即不连接该对；在视图中点击其连线效果相同。",
+    "pt": "Os pares encontrados nesta placa. Desative um para deixar o par sem ligação; clicar no vínculo na vista faz o mesmo.",
+    "ar": "الأزواج الموجودة على هذه اللوحة. أوقف أحدها لترك الزوج بلا روابط؛ والنقر على وصلته في العرض يفعل الشيء نفسه.",
+    "nl": "De paren op deze plaat. Zet er een uit om dat paar niet te verbinden; een klik op de koppeling in de weergave doet hetzelfde."
+  },
+  "Tie two models the detection left apart: click this, then the two models.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Zwei Modelle verbinden, die die Erkennung getrennt ließ: hier klicken, dann auf die beiden Modelle.",
+    "zh": "连接检测未配对的两个模型：先点此处，再点这两个模型。",
+    "pt": "Ligue dois modelos que a detecção deixou separados: clique aqui e depois nos dois modelos.",
+    "ar": "اربط نموذجين تركهما الاكتشاف منفصلين: انقر هنا ثم على النموذجين.",
+    "nl": "Verbind twee modellen die de detectie los liet: klik hierop en dan op de twee modellen."
+  },
+  "Bring back every link as the detection finds it: the ones turned off, and none added by hand.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Alle Verknüpfungen so wiederherstellen, wie die Erkennung sie findet: ausgeschaltete wieder an, von Hand hinzugefügte weg.",
+    "zh": "按检测结果恢复所有连线：关闭的重新开启，手动添加的移除。",
+    "pt": "Restaura todos os vínculos como a detecção os encontra: os desativados voltam e os adicionados à mão saem.",
+    "ar": "أعد كل الوصلات كما يجدها الاكتشاف: المُوقفة تعود، والمضافة يدويًا تُزال.",
+    "nl": "Zet alle koppelingen terug zoals de detectie ze vindt: uitgezette weer aan, met de hand toegevoegde weg."
+  },
+  "Put every plate tie setting back to the printer profile's defaults.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: tip card (Plate ties)",
+    "de": "Alle Einstellungen der Plattenstege auf die Standardwerte des Druckerprofils zurücksetzen.",
+    "zh": "将所有平台连接条设置恢复为打印机配置文件的默认值。",
+    "pt": "Volta todas as configurações das ligações da placa aos padrões do perfil da impressora.",
+    "ar": "أعد كل إعدادات روابط اللوحة إلى افتراضيات ملف الطابعة.",
+    "nl": "Zet alle instellingen van de plaatverbindingen terug naar de standaardwaarden van het printerprofiel."
+  },
+  "Click two models to tie them together. Esc to stop.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card while Add a pair is armed",
+    "de": "Klicke zwei Modelle an, um sie zu verbinden. Esc zum Beenden.",
+    "zh": "点击两个模型将它们连接。按 Esc 停止。",
+    "pt": "Clique em dois modelos para ligá-los. Esc para parar.",
+    "ar": "انقر على نموذجين لربطهما. Esc للإيقاف.",
+    "nl": "Klik op twee modellen om ze te verbinden. Esc om te stoppen."
+  },
+  "Plate ties: {why}": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card: the engine refused the plate's ties",
+    "de": "Plattenstege: {why}",
+    "zh": "平台连接条：{why}",
+    "pt": "Ligações da placa: {why}",
+    "ar": "روابط اللوحة: {why}",
+    "nl": "Plaatverbindingen: {why}"
+  },
+  "Building plate ties…": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card while the ties are built",
+    "de": "Plattenstege werden erstellt…",
+    "zh": "正在生成平台连接条…",
+    "pt": "Criando ligações da placa…",
+    "ar": "جارٍ بناء روابط اللوحة…",
+    "nl": "Plaatverbindingen worden gemaakt…"
+  },
+  "Plate ties: every link on this plate is turned off.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card",
+    "de": "Plattenstege: alle Verknüpfungen dieser Platte sind ausgeschaltet.",
+    "zh": "平台连接条：此平台上的所有连线都已关闭。",
+    "pt": "Ligações da placa: todos os vínculos desta placa estão desativados.",
+    "ar": "روابط اللوحة: كل الوصلات على هذه اللوحة موقفة.",
+    "nl": "Plaatverbindingen: alle koppelingen op deze plaat staan uit."
+  },
+  "Plate ties: no neighbours to tie on this plate.": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card",
+    "de": "Plattenstege: auf dieser Platte gibt es keine Nachbarn zum Verbinden.",
+    "zh": "平台连接条：此平台上没有可连接的相邻模型。",
+    "pt": "Ligações da placa: não há vizinhos para ligar nesta placa.",
+    "ar": "روابط اللوحة: لا نماذج متجاورة لربطها على هذه اللوحة.",
+    "nl": "Plaatverbindingen: geen buren om te verbinden op deze plaat."
+  },
+  "Plate ties: {placed} of {requested} ties on {pairs} pairs": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card: what the ties came to",
+    "de": "Plattenstege: {placed} von {requested} Stegen an {pairs} Paaren",
+    "zh": "平台连接条：{pairs} 对中放置了 {placed}/{requested} 条",
+    "pt": "Ligações da placa: {placed} de {requested} ligações em {pairs} pares",
+    "ar": "روابط اللوحة: {placed} من {requested} روابط على {pairs} أزواج",
+    "nl": "Plaatverbindingen: {placed} van {requested} verbindingen op {pairs} paren"
+  },
+  "…and {more} more": {
+    "why": "Plate ties (issue #50): the app's own feature, the web has none: status card: Plate ties notes past the first six",
+    "de": "…und {more} weitere",
+    "zh": "…还有 {more} 条",
+    "pt": "…e mais {more}",
+    "ar": "…و{more} أخرى",
+    "nl": "…en nog {more}"
   }
 }

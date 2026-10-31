@@ -194,7 +194,8 @@ struct SettingsSearchTests {
                 guard let r else { continue }
                 #expect(r.show == step.hits, "\(id): rows")
                 // the page hides the blocks that hold no row on show; ours lists the ones that do
-                let hidden = Set(SearchBlock.allCases.map(\.rawValue)).subtracting(r.blocks.map(\.rawValue))
+                // the app's own blocks (Plate ties) are not on the page
+                let hidden = Set(SearchBlock.web.map(\.rawValue)).subtracting(r.blocks.map(\.rawValue))
                 #expect(hidden == step.nohit, "\(id): sections")
                 #expect(r.none == step.empty, "\(id): No settings match")
                 shownBlocks += r.blocks.count

@@ -44,6 +44,7 @@ extension PlateBoard {
         clashing = !clash.isEmpty
         let cells = clash.map { SIMD2<Float>(Float($0.x), Float($0.y)) + shift }
         controller.renderer.setPlateScene(PlateScene(beds: beds, edited: active, parked: parked, clash: cells))
+        didSync()
     }
 
     private func zeroFlags(_ part: CorePart, _ device: MTLDevice) -> MTLBuffer? {

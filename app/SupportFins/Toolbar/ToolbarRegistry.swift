@@ -73,9 +73,10 @@ final class ToolbarRegistry {
     }
 
     /// Register a toggle badge: lit while the tool is on; it has no popover.
-    func registerToggle(_ slot: ToolbarSlot, isOn: @escaping () -> Bool, setOn: @escaping (Bool) -> Void) {
+    func registerToggle(_ slot: ToolbarSlot, isOn: @escaping () -> Bool, isEnabled: @escaping () -> Bool = { true }, setOn: @escaping (Bool) -> Void) {
         var badge = ToolbarBadge(isLit: isOn) { EmptyView() }
         badge.toggle = (isOn, setOn)
+        badge.isEnabled = isEnabled
         badges[slot] = badge
     }
 
