@@ -6,6 +6,8 @@ pub mod json;
 pub mod limits;
 pub mod obj;
 pub mod paintcode;
+pub mod plateties;
+pub mod printer;
 pub mod report;
 pub mod scale;
 pub mod session;

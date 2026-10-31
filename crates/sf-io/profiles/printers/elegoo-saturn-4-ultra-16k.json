@@ -1,0 +1,17 @@
+{
+  "id": "elegoo-saturn-4-ultra-16k",
+  "name": "Elegoo Saturn 4 Ultra 16K",
+  "type": "resin",
+  "default": true,
+  "buildVolume": [211.68, 118.37, 220],
+  "pixelSize": [0.014, 0.019],
+  "layerHeights": { "min": 0.01, "max": 0.2, "default": 0.05 },
+  "minTiePixels": 16,
+  "plateTies": {},
+  "source": {
+    "url": "https://us.elegoo.com/products/saturn-4-ultra-16k-10inch-monochrome-lcd-resin-3d-printer",
+    "retrieved": "2026-10-31",
+    "figures": "Elegoo's specification table: Build Volume 211.68 x 118.37 x 220 mm; XY Resolution 14 x 19 um (15120 x 6230); Layer Thickness 0.01-0.2 mm; Z-axis Accuracy 0.02 mm. 211.68 mm / 15120 px = 0.014 mm along X, 118.37 mm / 6230 px = 0.019 mm along Y.",
+    "ours": "layerHeights.default (0.05 mm, a common resin layer) and minTiePixels (16 pixels of the coarser axis, 0.304 mm: the thinnest tie) are Support Fins' choices, not Elegoo's figures."
+  }
+}

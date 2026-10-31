@@ -918,6 +918,20 @@ pub fn write_plate_3mf_checked(
     session: Option<&Json>,
     bed: Option<Bed>,
 ) -> Result<Vec<u8>, String> {
+    write_plate_3mf_parts_checked(models, title, separate, session, bed, &[])
+}
+
+/// [`write_plate_3mf_checked`] with more parts after the session: `(name, text)`, in order. Not in the
+/// JS: plate ties (issue #50) add their document (`plateties::PLATE_TIES_PART`). With no `extra` the
+/// bytes are `write_plate_3mf_checked`'s.
+pub fn write_plate_3mf_parts_checked(
+    models: &[Model],
+    title: &str,
+    separate: bool,
+    session: Option<&Json>,
+    bed: Option<Bed>,
+    extra: &[(&str, String)],
+) -> Result<Vec<u8>, String> {
     let (xml, configs) = model_xml(models, title, separate, bed);
     let t = |name: &str, data: String| ZipFile {
         name: name.to_string(),
@@ -933,6 +947,9 @@ pub fn write_plate_3mf_checked(
     }
     if let Some(s) = session {
         entries.push(t(SESSION_PART, s.stringify()));
+    }
+    for (name, data) in extra {
+        entries.push(t(name, data.clone()));
     }
     zip_store_checked(&entries)
 }
