@@ -136,11 +136,15 @@ final class PlateTiesUITests: PartWindowUITestCase {
         printer.click()
         printer.menuItems["Elegoo Saturn 4 Ultra 16K"].click()
         waitFor("the build volume is the printer's", timeout: 5) { self.text(self.element("volume")).contains("211 × 118 × 220 mm") }
-        waitFor("the layer height is the printer's", timeout: 5) { self.text(self.element("layer-height")) == "0.05" }
-        XCTAssertTrue(text(row).contains("0.05 layers"), text(row))
+        if !waitUntil(timeout: 5, { self.text(self.element("layer-height")) == "0.05" }) {
+            XCTFail("the layer height is the printer's: the field reads \"\(text(element("layer-height")))\"")
+        }
+        XCTAssertTrue(text(row).contains("0.05 layers"), "the Printer row reads \"\(text(row))\"")
         // by hand afterwards: the field takes it, the printer stays picked
         setLayerHeight("0.1")
-        waitFor("the hand-set layer holds", timeout: 15) { self.text(row).contains("0.1 layers") }
+        if !waitUntil(timeout: 15, { self.text(row).contains("0.1 layers") }) {
+            XCTFail("the hand-set layer holds: the Printer row reads \"\(text(row))\", the field \"\(text(element("layer-height")))\"")
+        }
         XCTAssertTrue(text(printer).contains("Saturn 4 Ultra 16K"), text(printer))
     }
 
@@ -159,23 +163,32 @@ final class PlateTiesUITests: PartWindowUITestCase {
 
     /// Type `v` into Layer height and commit it. The field should have the keyboard before ⌘A (otherwise ⌘A and the
     /// digits go to the window, not the field: clicked again until it reports focus, three tries), and must show the
-    /// digits before Return; a Return that did not end the
-    /// edit (the first UI run of this test: the row never showed the value) is followed by Tab, which ends it by
-    /// moving the focus on, as any field's edit ends.
-    private func setLayerHeight(_ v: String) {
+    /// digits before Return; a Return that did not end the edit is followed by Tab, which ends it by moving the focus on.
+    /// The first two UI runs failed here because the app wrote the held value over the typed text (0.1 over 0.05 read
+    /// "0.01.1": `NumberFieldTests`); a failure says what the field, its focus and the Printer row showed.
+    private func setLayerHeight(_ v: String, file: StaticString = #filePath, line: UInt = #line) {
         let field = element("layer-height")
-        guard field.waitForExistence(timeout: 5) else { return }
+        let row = element("printer-row")
+        guard field.waitForExistence(timeout: 5) else {
+            XCTFail("no Layer height field to type \(v) into", file: file, line: line)
+            return
+        }
         scrollIntoView(field)
         let focused = { (field.value(forKey: "hasKeyboardFocus") as? Bool) == true }
+        var clicks = 0
         for _ in 0..<3 where !focused() {
             field.click()
+            clicks += 1
             _ = waitUntil(timeout: 3, focused)
         }
+        let before = text(field)
         field.typeKey("a", modifierFlags: .command)
         field.typeText(v)
-        waitFor("Layer height shows \(v) as typed", timeout: 10) { self.text(field) == v }
+        if !waitUntil(timeout: 10, { self.text(field) == v }) {
+            XCTFail("Layer height shows \(v) as typed: the field reads \"\(text(field))\" (\"\(before)\" before ⌘A, "
+                    + "\(clicks) click(s), focus \(focused())), the Printer row \"\(text(row))\"", file: file, line: line)
+        }
         field.typeKey(.return, modifierFlags: [])
-        let row = element("printer-row")
         if !waitUntil(timeout: 5, { self.text(row).contains("\(v) layers") }) {
             field.typeKey(.tab, modifierFlags: [])
         }

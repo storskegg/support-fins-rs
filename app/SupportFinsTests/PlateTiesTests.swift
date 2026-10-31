@@ -483,7 +483,8 @@ struct PlateTiesTests {
 
     /// The UI run of `testPickingThePrinterSetsTheBedAndTheLayerHeight` timed out waiting for "0.1 layers" after 0.1 was
     /// typed over the printer's 0.05: the value path, headless. The field reads "0.1" as 0.1, keeps it (no snapping to
-    /// the 0.04 step from 0.05 or from the 0.01 minimum), and the Printer row says so.
+    /// the 0.04 step from 0.05 or from the 0.01 minimum), and the Printer row says so. The field itself, typed key by key
+    /// (where that run actually failed: "0.01.1"), is `NumberFieldTests`.
     @Test func aLayerTypedOverThePrintersIsKeptAsTyped() async throws {
         let limits = FinSettings.layerHeightLimits
         let style = NumberField.format.locale(Locale(identifier: "en_US"))

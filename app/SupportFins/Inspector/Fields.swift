@@ -2,6 +2,11 @@ import SwiftUI
 
 /// A number field with a stepper, clamped to its limits on every edit (the web clamps in `wireGap` and
 /// `readPadCustom`, `web/ui/settings.js`). `unit` follows the value as a muted suffix.
+///
+/// The field edits its own text, as the web's `<input>` does: each key parses it and writes the value held to the
+/// limits, and the text stays as typed until the edit ends (Return, or focus moving on), when it shows the value. A
+/// `TextField(value:format:)` cannot do that: it wrote the held value back over the text at the next redraw, so 0.1
+/// typed over 0.05 read "0.01.1" (the first "0" held to the 0.01 minimum; `NumberFieldTests`).
 struct NumberField: View {
     let title: LocalizedStringKey
     @Binding var value: Double
@@ -14,10 +19,29 @@ struct NumberField: View {
     /// the field's accessibility identifier (UI tests)
     var fieldID: String?
 
+    /// The field's text: what was typed while an edit is on, the value formatted otherwise.
+    @State private var text = ""
+    @FocusState private var editing: Bool
+    @Environment(\.locale) private var locale
+
     var body: some View {
         LabeledContent {
             HStack(spacing: 4) {
-                TextField(title, value: clamped, format: Self.format)
+                TextField(title, text: $text)
+                    .focused($editing)
+                    .onAppear { text = shown(value) }
+                    .onChange(of: text) { _, typed in
+                        // a key: the value follows what parses, held to the limits; the text is left as typed
+                        guard let v = parsed(typed) else { return }
+                        let held = Self.clamp(v, to: limits)
+                        if held != value { value = held }
+                    }
+                    .onChange(of: value) { _, v in
+                        // from outside (a printer picked, the stepper, undo): shown, unless it is what the text says
+                        if parsed(text).map({ Self.clamp($0, to: limits) }) != v { text = shown(v) }
+                    }
+                    .onSubmit { text = shown(value) }
+                    .onChange(of: editing) { _, on in if !on { text = shown(value) } }
                     .labelsHidden()
                     .multilineTextAlignment(.trailing)
                     .frame(width: 64)
@@ -34,6 +58,9 @@ struct NumberField: View {
     private var clamped: Binding<Double> {
         Binding(get: { value }, set: { value = Self.clamp($0, to: limits) })
     }
+
+    private func shown(_ v: Double) -> String { Self.format.locale(locale).format(v) }
+    private func parsed(_ s: String) -> Double? { try? Self.format.locale(locale).parseStrategy.parse(s) }
 
     /// How the field shows and reads a number: up to three decimals.
     static let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...3))
