@@ -237,7 +237,10 @@ extension PlateBoard {
     /// What a click on the view lands on (`plateAt`): a parked model of the plate being edited, another plate's model,
     /// or the bare bed of a plate of the row.
     func tapped(x: Int, y: Int, width: Int, height: Int) {
-        guard !busy, tabsMatter, let renderer = host?.controller?.renderer else { return }
+        guard !busy, let renderer = host?.controller?.renderer else { return }
+        // a tie link, or a model picked for a pair, first (issue #50)
+        if tieTap(x, y, width, height) { return }
+        guard tabsMatter else { return }
         Task { [weak self] in
             let pick = await renderer.pickModel(x: x, y: y, width: width, height: height)
             guard let self else { return }

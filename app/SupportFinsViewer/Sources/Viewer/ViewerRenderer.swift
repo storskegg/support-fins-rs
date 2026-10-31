@@ -95,6 +95,8 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
     var layerFrames: (buffer: MTLBuffer, vertices: Int)?
     /// Draw's layers (see `DrawOverlay.swift`).
     let drawState = DrawRenderState()
+    /// Plate ties' ties and links (see `TieOverlay.swift`).
+    let tieState = TieRenderState()
 
     private var plate: PlateGeometry
     private var plateBuffers: [MTLBuffer?] = [nil, nil, nil, nil]
@@ -415,6 +417,7 @@ public final class ViewerRenderer: NSObject, MTKViewDelegate {
         encodeHUD(into: enc)
         encodeIslandMarkers(into: enc)
         encodeDrawScene(into: enc)
+        encodeTieScene(into: enc)
         encodeSection(into: enc)
     }
 

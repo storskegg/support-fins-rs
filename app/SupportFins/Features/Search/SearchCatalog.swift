@@ -15,6 +15,9 @@ struct SearchContext: Equatable, Sendable {
     var drawHint = false
     var drawStarted = false
     var drawSelected = false
+    /// Plate ties are on (their fields show), and their contact is the edge band (Band width shows).
+    var tiesOn = false
+    var tiesEdge = false
 }
 
 /// The inspector's folded blocks, which a search opens when they hold a match (`details.sec`) or hides when they hold none.
@@ -22,6 +25,11 @@ enum SearchBlock: String, CaseIterable {
     case printer, placement, tines, more, draw
     /// The four groups inside More settings (`.group`).
     case holdThePart, tallParts, whereSupportsGo, display
+    /// Plate ties (issue #50): the app's own, the web has no such section.
+    case plateTies
+
+    /// The blocks the web's options panel has (what its recorded searches hide or show).
+    static var web: [SearchBlock] { allCases.filter { $0 != .plateTies } }
 }
 
 /// One setting row of the options panel (`ROWS` in `web/ui/search.js`: a field, a checkbox, Placement or an action
@@ -144,5 +152,32 @@ enum SearchCatalog {
         SearchEntry("show-islands", .more, .display, names: ["Show midair starts"], tip: Tip.showIslands),
     ]
 
-    static let byID: [String: SearchEntry] = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+    /// Rows the web does not have (issue #50: the printer profile and Plate ties): searched by the window, never by the
+    /// recorded searches of the web's panel, which they would change.
+    static let appRows: [SearchEntry] = [
+        SearchEntry("printer-profile", .printer, names: ["Printer"], tip: PlateTiesTip.profile),
+        SearchEntry("plate-ties-toggle", .plateTies, names: ["Plate ties"], tip: PlateTiesTip.on),
+        SearchEntry("plate-ties-max-gap", .plateTies, names: ["Max gap", "mm"], tip: PlateTiesTip.maxGap, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-min-ratio", .plateTies, names: ["Min height / thickness"], tip: PlateTiesTip.minRatio, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-min-height", .plateTies, names: ["Min height", "mm"], tip: PlateTiesTip.minHeight, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-contact", .plateTies, names: ["Contact", "Edge band", "Facing faces", "Anywhere"], tip: PlateTiesTip.contact,
+                    shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-band", .plateTies, names: ["Band width", "mm"], tip: PlateTiesTip.bandWidth, shown: { $0.tiesOn && $0.tiesEdge },
+                    gate: { $0.tiesOn ? "plate-ties-contact" : "plate-ties-toggle" }),
+        SearchEntry("plate-ties-count", .plateTies, names: ["Ties per pair"], tip: PlateTiesTip.ties, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-contact-thickness", .plateTies, names: ["Contact thickness", "mm"], tip: PlateTiesTip.contactThickness,
+                    shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-middle-thickness", .plateTies, names: ["Middle thickness", "mm"], tip: PlateTiesTip.middleThickness,
+                    shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-height", .plateTies, names: ["Ties from", "Ties up to", "% of height"], tip: PlateTiesTip.heightRange,
+                    shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-links", .plateTies, names: ["Links"], tip: PlateTiesTip.links, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-add-pair", .plateTies, names: ["Add a pair"], tip: PlateTiesTip.addPair, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+        SearchEntry("plate-ties-reset", .plateTies, names: ["Reset to profile defaults"], tip: PlateTiesTip.reset, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
+    ]
+
+    /// What the window searches: the web's rows, then the app's.
+    static let allRows = rows + appRows
+
+    static let byID: [String: SearchEntry] = Dictionary(uniqueKeysWithValues: allRows.map { ($0.id, $0) })
 }

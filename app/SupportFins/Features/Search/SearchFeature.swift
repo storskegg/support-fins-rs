@@ -24,6 +24,10 @@ final class SearchFeature: Feature {
             c.drawStarted = draw.started
             c.drawSelected = draw.selectedID != nil
         }
+        if let ties = host.features[PlateTiesFeature.self]?.model, ties.state.on {
+            c.tiesOn = true
+            c.tiesEdge = ties.settings?.contact == .edge
+        }
         if let removal = host.wiring?.removal {
             c.removeControls = removal.controlsShown
             c.canRestore = removal.canRestore

@@ -52,6 +52,12 @@ final class MoveModel {
     /// mode at a time: Lay a face flat and Remove fins, which wait on a click Move would take, are left.
     func setOn(_ on: Bool) {
         guard let tool else { return }
+        // a tied plate stays where its ties were built (issue #50): Move says why it stays off
+        if on, let why = board?.lockReason() {
+            host?.status = why
+            if tool.isOn { tool.setOn(false) }
+            return
+        }
         let now = on && (board?.hasLive ?? false)
         if now == tool.isOn { return }
         if now { host?.controller?.cancelArmed() }

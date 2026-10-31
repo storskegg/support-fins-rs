@@ -66,6 +66,15 @@ final class PlateBoard {
     @ObservationIgnored var parkedTask: Task<Void, Never>?
     @ObservationIgnored var parkedTimer: Task<Void, Never>?
     @ObservationIgnored var parkedBuilding: ParkedModel?
+    /// Plate ties (`Features/PlateTies`) hook in here; the defaults are a plate without ties.
+    /// Why Arrange and Move are locked (the plate is tied), or nil.
+    @ObservationIgnored var lockReason: () -> String? = { nil }
+    /// After every `sync`: the plate may have changed under its ties.
+    @ObservationIgnored var didSync: () -> Void = {}
+    /// A click on the view, before the board's own: true when it was taken (a link, or a model picked for a pair).
+    @ObservationIgnored var tieTap: (_ x: Int, _ y: Int, _ width: Int, _ height: Int) -> Bool = { _, _, _, _ in false }
+    /// Plate `i`'s ties for an export (nil: written untied).
+    @ObservationIgnored var tieRequest: (_ plate: Int) -> TieRequest? = { _ in nil }
 
     /// What a removal can bring back.
     struct Trash {

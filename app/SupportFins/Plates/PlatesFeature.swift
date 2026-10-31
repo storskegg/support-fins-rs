@@ -28,7 +28,7 @@ final class PlatesFeature: Feature {
     /// more than one; a click packs the plate (`PlateBoard.arrange`), the button greyed while it waits for the builds.
     func registerTools(in toolbar: ToolbarRegistry) {
         guard host?.controller != nil else { return }
-        toolbar.registerAction(.arrange, isShown: { [board] in board.arrangeShown }, isEnabled: { [board] in !board.arranging && !board.busy }) {
+        toolbar.registerAction(.arrange, isShown: { [board] in board.arrangeShown }, isEnabled: { [board] in !board.arranging && !board.busy && board.lockReason() == nil }) {
             [board] in Task { await board.arrange() }
         }
     }
@@ -153,7 +153,7 @@ final class PlatesFeature: Feature {
             // greyed without them
             MenuSection(menu: .model, order: 3, entries: [
                 .item(JS.t("Arrange"), help: arrangeHelp,
-                      enabled: (f?.board.arrangeShown ?? false) && !(f?.board.arranging ?? true) && !(f?.board.busy ?? true)) {
+                      enabled: f?.board.canArrange ?? false) {
                     if let board = f?.board { Task { await board.arrange() } }
                 },
             ]),

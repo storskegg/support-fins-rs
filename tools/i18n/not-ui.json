@@ -135,5 +135,7 @@
   " (also captured natively: %arg)": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
   "Support Fins crashed: uncaught exception %arg": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
   "Support Fins crashed (%arg)": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
-  "\nThe panic aborted the app. Native capture at the abort:\n\n%arg": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI"
+  "\nThe panic aborted the app. Native capture at the abort:\n\n%arg": "crash report text (a file for bug fixes, in English like the engine's panic reports), never shown in the UI",
+  "plate ties: unreadable settings": "TieSettings.validated: an engine-style error for settings JSON the app cannot decode (never expected)",
+  "added": "PlateTiesModel.apply(document:): a key of the plate-tie document the engine writes"
 }

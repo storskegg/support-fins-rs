@@ -24,6 +24,8 @@ extension PlateBoard {
         var fileName: String
         /// Walls still to stand, by index into `models` (`plateWrite(_, deferStanding: true)`): `resolved()` stands them.
         var stands: [Int: @Sendable () -> DrawnSweep?] = [:]
+        /// Each model's slot id, as text: its key for plate ties (`TieModelInput.key`).
+        var keys: [String] = []
 
         /// This write with its walls stood: heavy, so called off the main thread.
         func resolved() -> PlateWrite {
@@ -46,6 +48,7 @@ extension PlateBoard {
         guard plates.indices.contains(i) else { return nil }
         let p = plates[i], settings = plateSettings(i)
         var models: [PlateModel] = []
+        var keys: [String] = []
         var sessions: [String] = []
         var first: String?
         var stands: [Int: @Sendable () -> DrawnSweep?] = [:]
@@ -73,6 +76,7 @@ extension PlateBoard {
             }
             models.append(PlateModel(part: part.part, build: result, drawn: walls, pose: pose.columnMajor,
                                      threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y, session: nil))
+            keys.append(m.id.uuidString)
             if first == nil { first = part.info.name }
         }
         guard let first else { return nil }
@@ -82,7 +86,7 @@ extension PlateBoard {
         // a suggested name only: the plain one when the engine refuses
         let name = (try? exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.nozzle, layerHeight: settings.settings.layerHeight))
             ?? "\(stem)-fins.3mf"
-        return PlateWrite(models: models, fileName: name, stands: stands)
+        return PlateWrite(models: models, fileName: name, stands: stands, keys: keys)
     }
 
     /// Wait until plate `i`'s fins are the ones its settings make: the edited plate's from the live build and the
@@ -139,8 +143,15 @@ extension PlateBoard {
     @discardableResult
     func writePlate(_ w: PlateWrite, to url: URL) async -> URL? {
         let bed = bedOptions
+        // a tied plate is one merged object (issue #50): its ties built on the very models written
+        let ties = tieRequest(active)
         return await write(to: url, title: "3MF") { path in
-            try SupportFinsCore.exportPlate(path: path, models: w.resolved().models, optionsJson: bed)
+            let r = w.resolved()
+            if let ties {
+                try exportPlateTied(path: path, models: r.models, ties: ties.build(models: r.models, keys: r.keys), optionsJson: bed)
+            } else {
+                try SupportFinsCore.exportPlate(path: path, models: r.models, optionsJson: bed)
+            }
         } done: { host?.wiring?.exporter?.lastFormat = .threeMF }
     }
 
@@ -184,12 +195,26 @@ extension PlateBoard {
     func writeAll(_ files: [(Int, PlateWrite)], to url: URL) async -> URL? {
         let bed = bedOptions
         let title = files.count == 1 ? "3MF" : "ZIP"
+        // each tied plate is one merged object (issue #50); the others are written as ever
+        let ties = files.map { tieRequest($0.0) }
         return await write(to: url, title: title) { path in
-            if files.count == 1 {
-                try SupportFinsCore.exportPlate(path: path, models: files[0].1.resolved().models, optionsJson: bed)
+            if ties.allSatisfy({ $0 == nil }) {
+                if files.count == 1 {
+                    try SupportFinsCore.exportPlate(path: path, models: files[0].1.resolved().models, optionsJson: bed)
+                } else {
+                    try SupportFinsCore.exportPlates(path: path, plates: files.map { PlateFile(name: "plate-\($0.0 + 1)-\($0.1.fileName)", models: $0.1.resolved().models) },
+                                                     optionsJson: bed)
+                }
+                return
+            }
+            let plates = try zip(files, ties).map { f, t in
+                let r = f.1.resolved()
+                return PlateExport(name: "plate-\(f.0 + 1)-\(f.1.fileName)", models: r.models, ties: try t?.build(models: r.models, keys: r.keys))
+            }
+            if plates.count == 1 {
+                try exportPlateTied(path: path, models: plates[0].models, ties: plates[0].ties, optionsJson: bed)
             } else {
-                try SupportFinsCore.exportPlates(path: path, plates: files.map { PlateFile(name: "plate-\($0.0 + 1)-\($0.1.fileName)", models: $0.1.resolved().models) },
-                                                 optionsJson: bed)
+                try exportPlatesTied(path: path, plates: plates, optionsJson: bed)
             }
         }
     }
