@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use sf_ffi::{
     Part, PlateExport, PlateModel, TieModelInput, TieOverrides, TiePairKey, TiePairOrigin,
-    TiePlate, build_part, export_plate, export_plate_tied, export_plates_tied, load_parts,
-    plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
+    TiePlate, build_part, export, export_plate, export_plate_tied, export_plates_tied, load_parts,
+    plate_ties_document, plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
 };
 use sf_io::json::{Json, parse};
 
@@ -314,4 +314,154 @@ fn bad_input_is_refused() {
             .is_err()
     );
     assert!(plate_ties_of_3mf(scratch("missing.3mf")).is_err());
+}
+
+/// The overrides of the export tests: a link clicked off, a pair added by hand.
+fn overrides() -> TieOverrides {
+    TieOverrides {
+        disabled: vec![TiePairKey {
+            a: "m2".into(),
+            b: "m1".into(),
+        }],
+        added: vec![TiePairKey {
+            a: "m0".into(),
+            b: "m2".into(),
+        }],
+    }
+}
+
+#[test]
+fn a_plate_document_without_building_is_the_built_one() {
+    let (_parts, models) = row(3, 7.0);
+    let settings = r#"{"maxGap":6.5,"tiesPerPair":2}"#;
+    let built = TiePlate::new(inputs(&models), SATURN.into())
+        .unwrap()
+        .build(settings.into(), overrides())
+        .unwrap();
+    let doc = plate_ties_document(SATURN.into(), settings.into(), overrides()).unwrap();
+    assert_eq!(doc, built.document_json());
+    // overrides naming models on no plate are kept: the document is the plate's state, not its links
+    let stale = TieOverrides {
+        disabled: vec![],
+        added: vec![TiePairKey {
+            a: "gone#1".into(),
+            b: "m0".into(),
+        }],
+    };
+    let doc = parse(&plate_ties_document(SATURN.into(), String::new(), stale).unwrap()).unwrap();
+    assert_eq!(
+        doc.get("added"),
+        Some(&Json::Arr(vec![Json::Arr(vec![
+            Json::Str("gone#1".into()),
+            Json::Str("m0".into())
+        ])]))
+    );
+    assert!(plate_ties_document("nope".into(), String::new(), TieOverrides::default()).is_err());
+    assert!(
+        plate_ties_document(
+            SATURN.into(),
+            r#"{"tiesPerPair":0}"#.into(),
+            TieOverrides::default()
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn a_tied_3mf_hands_its_document_to_the_parts_it_loads() {
+    let (_parts, models) = row(3, 7.0);
+    let built = TiePlate::new(inputs(&models), SATURN.into())
+        .unwrap()
+        .build(String::new(), overrides())
+        .unwrap();
+    let out = scratch("tied-load.3mf");
+    export_plate_tied(out.clone(), copy(&models), Some(built.clone()), "{}".into()).unwrap();
+    let loaded = load_parts(out.clone()).unwrap();
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].saved_plate_ties(), Some(built.document_json()));
+    assert_eq!(
+        loaded[0].saved_plate_ties(),
+        plate_ties_of_3mf(out).unwrap()
+    );
+    // an STL, an untied plate and a part made here have none
+    assert_eq!(models[0].part.saved_plate_ties(), None);
+    let plain = scratch("untied-load.3mf");
+    export_plate(plain.clone(), copy(&models[..1]), "{}".into()).unwrap();
+    assert_eq!(load_parts(plain).unwrap()[0].saved_plate_ties(), None);
+    assert_eq!(loaded[0].scaled(2.0).unwrap().saved_plate_ties(), None);
+}
+
+#[test]
+fn a_damaged_tie_document_loads_the_part_without_it() {
+    let (_parts, models) = row(1, 7.0);
+    let plain = scratch("damaged-src.3mf");
+    export_plate(plain.clone(), copy(&models), "{}".into()).unwrap();
+    // the same package with a document that is not one
+    let mut files: Vec<sf_io::zip::ZipFile> = sf_io::zip::unzip(&std::fs::read(&plain).unwrap())
+        .unwrap()
+        .into_iter()
+        .map(|(name, data)| sf_io::zip::ZipFile {
+            name,
+            data: sf_io::zip::ZipData::Bytes(data),
+        })
+        .collect();
+    files.push(sf_io::zip::ZipFile {
+        name: sf_io::plateties::PLATE_TIES_PART.into(),
+        data: sf_io::zip::ZipData::Bytes(br#"{"version":2}"#.to_vec()),
+    });
+    let damaged = scratch("damaged.3mf");
+    std::fs::write(&damaged, sf_io::zip::zip_store_checked(&files).unwrap()).unwrap();
+    let loaded = load_parts(damaged).unwrap();
+    assert_eq!(loaded[0].saved_plate_ties(), None);
+}
+
+#[test]
+fn a_one_model_3mf_carries_the_plate_document_it_is_given() {
+    let (_parts, models) = row(1, 7.0);
+    let part = models[0].part.clone();
+    let doc = plate_ties_document(SATURN.into(), r#"{"maxGap":6.5}"#.into(), overrides()).unwrap();
+    let base = r#""fins":false,"pose":[1,0,0,0,1,0,0,0,1],"bed":[211.68,118.37]"#;
+    let (plain, tied) = (scratch("one.3mf"), scratch("one-tied.3mf"));
+    export(
+        plain.clone(),
+        vec![part.clone()],
+        vec![],
+        format!("{{{base}}}"),
+    )
+    .unwrap();
+    export(
+        tied.clone(),
+        vec![part.clone()],
+        vec![],
+        format!(r#"{{{base},"plateTies":{doc}}}"#),
+    )
+    .unwrap();
+    assert_eq!(plate_ties_of_3mf(plain.clone()).unwrap(), None);
+    assert_eq!(plate_ties_of_3mf(tied.clone()).unwrap(), Some(doc.clone()));
+    // the rest of the file is the plain one's: the document is one more part
+    let (a, b) = (
+        sf_io::zip::unzip(&std::fs::read(&plain).unwrap()).unwrap(),
+        sf_io::zip::unzip(&std::fs::read(&tied).unwrap()).unwrap(),
+    );
+    assert_eq!(b.len(), a.len() + 1);
+    for (name, data) in &a {
+        assert_eq!(b.get(name), Some(data), "{name}");
+    }
+    // the round trip: loaded, its document is the one written
+    assert_eq!(load_parts(tied).unwrap()[0].saved_plate_ties(), Some(doc));
+    // a document that is not one is refused, as is one on a printer of another version
+    for bad in [
+        r#"{"version":2,"profile":"x"}"#,
+        r#"{"version":1}"#,
+        r#"{"version":1,"profile":"x","settings":{"maxGap":-1}}"#,
+    ] {
+        let e = export(
+            scratch("bad.3mf"),
+            vec![part.clone()],
+            vec![],
+            format!(r#"{{{base},"plateTies":{bad}}}"#),
+        )
+        .unwrap_err();
+        assert!(e.to_string().contains("plate ties"), "{e}");
+    }
 }

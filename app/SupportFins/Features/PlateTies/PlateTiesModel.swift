@@ -40,7 +40,6 @@ final class PlateTiesModel {
     @ObservationIgnored private(set) var generation = 0
     @ObservationIgnored private var fingerprint: Fingerprint?
     @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var restoreTask: Task<Void, Never>?
     /// Polls while a fin build holds the run back: a build landing does not always lay the plate out again.
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     /// The run is held back by a build that is out.
@@ -80,6 +79,7 @@ final class PlateTiesModel {
 
     /// The plate was laid out again: another plate edited, or something on it changed.
     func synced() {
+        hookExporter()
         guard let board else { return }
         if board.plate !== plateShown {
             plateShown = board.plate
@@ -218,10 +218,10 @@ final class PlateTiesModel {
                 let pick = await renderer.pickModel(x: x, y: y, width: width, height: height)
                 guard let self, let board = self.board, self.pairing != nil else { return }
                 switch pick {
-                case .live: self.picked(board.plate.liveSlot.id.uuidString)
+                case .live: if let k = board.tieKey(of: board.plate.liveSlot) { self.picked(k) }
                 case .parked(let i):
                     guard board.parkedSlots.indices.contains(i), board.parkedPlates.indices.contains(i), board.parkedPlates[i] == board.active else { return }
-                    self.picked(board.parkedSlots[i].id.uuidString)
+                    if let k = board.tieKey(of: board.parkedSlots[i]) { self.picked(k) }
                 case nil: break
                 }
             }
@@ -272,8 +272,9 @@ final class PlateTiesModel {
         let parked = board.plate.models.enumerated().compactMap { k, m in k == board.plate.live ? nil : m.stash }
         if parked.contains(where: { $0.build.building || board.isStale($0) }) { return .wait }
         guard let w = board.plateWrite(board.active, deferStanding: true), let req = request(plate: board.active) else { return .none }
+        let slots = Dictionary(zip(board.tieKeys(board.active), board.plate.models).compactMap { k, m in k.map { ($0, m) } }) { a, _ in a }
         let models = w.models.enumerated().map { k, m in
-            let slot = board.plate.models.first { $0.id.uuidString == w.keys[k] }
+            let slot = slots[w.keys[k]]
             return Fingerprint.Model(key: w.keys[k], part: ObjectIdentifier(m.part), build: m.build.map(ObjectIdentifier.init),
                                      drawn: m.drawn.map(ObjectIdentifier.init),
                                      standing: w.stands[k] == nil ? nil : slot.map { board.walls($0).map(\.id) },
@@ -287,7 +288,7 @@ final class PlateTiesModel {
         guard let board, board.plates.indices.contains(i) else { return nil }
         let s = i == board.active ? state : board.plates[i].ties
         guard s.on else { return nil }
-        let keys = Set(board.plates[i].models.map(\.id.uuidString))
+        let keys = Set(board.tieKeys(i).compactMap { $0 })
         do {
             let settings = try plateTiesSettings(profileId: profiles.id, settingsJson: s.settings?.json ?? "")
             return TieRequest(profile: profiles.id, settings: settings, overrides: s.overrides(on: keys))
@@ -433,12 +434,8 @@ final class PlateTiesModel {
 
     // MARK: what the status card says
 
-    /// A model's name on the edited plate, by key.
-    func name(_ key: String) -> String {
-        guard let board, let slot = board.plate.models.first(where: { $0.id.uuidString == key }) else { return "?" }
-        if slot === board.plate.liveSlot { return session.parts.first?.info.name ?? "?" }
-        return slot.stash?.name ?? "?"
-    }
+    /// A model's name, by key (`TieKey`).
+    func name(_ key: String) -> String { TieKey.name(key) }
 
     /// The notes of the last build, in the app's language: a tie on the face, a shallow sink, a tie left out, no room.
     var notes: [String] {
@@ -453,22 +450,22 @@ final class PlateTiesModel {
 
     // MARK: a tied 3MF
 
-    /// A 3MF opened onto an empty plate: the ties it was saved with come back (its document, `plate_ties_of_3mf`). The
-    /// file is read again off the main actor; the plate must still be the one it was opened onto.
-    func restore(from url: URL) {
-        guard let board else { return }
-        let plate = board.plate, slot = board.plate.liveSlot
-        let path = url.path
-        restoreTask?.cancel()
-        restoreTask = Task { [weak self] in
-            let doc = await Task.detached(priority: .utility) { try? plateTiesOf3mf(path: path) }.value
-            guard let self, let doc = doc ?? nil, let board = self.board, board.plate === plate, board.plate.liveSlot === slot else { return }
-            self.apply(document: doc)
-        }
+    /// The plate's tie document while its ties are on (`plate_ties_document`: the printer, the settings, the links
+    /// clicked off and added, by model name), or nil. A one-model 3MF carries it (decision D of #50), so a tied 3MF
+    /// opened and written again keeps its ties; a plate of several writes `TieBuildResult.document_json` instead.
+    var document: String? {
+        guard state.on else { return nil }
+        return try? plateTiesDocument(profileId: profiles.id, settingsJson: state.settings?.json ?? "", overrides: state.overrides)
+    }
+
+    /// The one-model export asks for the document: hooked again whenever the window makes a new exporter.
+    func hookExporter() {
+        host?.wiring?.exporter?.plateTies = { [weak self] in self?.document }
     }
 
     /// Apply a tie document (`TieBuildResult.document_json`): on, its settings checked against the printer chosen
-    /// here, its links as saved (they name the models of the plate it was saved from).
+    /// here, its links as saved. They name models (`TieKey`): on a plate of the models it was saved with they
+    /// come back; ones naming no model here are kept, and written out again with the plate.
     func apply(document doc: String) {
         guard let obj = (try? JSONSerialization.jsonObject(with: Data(doc.utf8))) as? [String: Any] else { return }
         func pairs(_ k: String) -> [TiePairKey] {
@@ -487,7 +484,6 @@ final class PlateTiesModel {
 
     func close() {
         task?.cancel(); task = nil
-        restoreTask?.cancel(); restoreTask = nil
         retryTask?.cancel(); retryTask = nil
     }
 }

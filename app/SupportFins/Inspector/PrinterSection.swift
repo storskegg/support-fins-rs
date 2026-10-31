@@ -23,7 +23,7 @@ struct PrinterSection: View {
             }
             if settings.visibility.layerHeight {
                 FindRow("layerh-fld") {
-                    NumberField(title: "Layer height", value: $settings.layerHeight, limits: FinSettings.layerHeightLimits, unit: "mm", help: Tip.layerHeight, pic: "layer-height")
+                    NumberField(title: "Layer height", value: $settings.layerHeight, limits: FinSettings.layerHeightLimits, unit: "mm", help: Tip.layerHeight, pic: "layer-height", fieldID: "layer-height")
                 }
             }
             FindRow("gap") {

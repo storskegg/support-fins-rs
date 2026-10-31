@@ -91,6 +91,35 @@ pub fn plate_ties_settings(profile_id: String, settings_json: String) -> Result<
     })
 }
 
+/// The plate-tie document (`TieBuildResult::document_json`'s form) of a plate's state without building its ties:
+/// what a one-model 3MF carries (`export`'s `plateTies`), so a reopened tied plate keeps its document. The
+/// settings are checked as `plate_ties_settings` checks them; the overrides are kept as given (they name models
+/// that may not be on this plate).
+#[uniffi::export]
+pub fn plate_ties_document(
+    profile_id: String,
+    settings_json: String,
+    overrides: TieOverrides,
+) -> Result<String, FfiError> {
+    crate::crash::guarded("plate ties document", || {
+        let doc = PlateTiesDoc {
+            profile: profile_id.clone(),
+            settings: settings(&profile_id, &settings_json)?,
+            overrides: overrides.engine(),
+        };
+        Ok(doc.to_json().stringify())
+    })
+}
+
+#[uniffi::export]
+impl Part {
+    /// The plate-tie document of the 3MF this part was loaded from (`plate_ties_of_3mf`'s form, read with the
+    /// file: no second read), `None` for a file without one (or a damaged one) and for a part made here.
+    pub fn saved_plate_ties(&self) -> Option<String> {
+        self.plate_ties.clone()
+    }
+}
+
 fn settings(profile_id: &str, text: &str) -> Result<PlateTies, FfiError> {
     let p = profile_of(profile_id)?;
     settings_from_text(text, &p.plate_ties).map_err(engine)

@@ -55,7 +55,8 @@ struct TieSettings: Codable, Equatable, Sendable {
 }
 
 /// One plate's ties: on or off, its settings (nil: the printer profile's defaults) and the user's changes to the links:
-/// pairs clicked off, and pairs added by clicking two models. Keys are the models' slot ids (`ModelSlot.id`).
+/// pairs clicked off, and pairs added by clicking two models. Keys are the models' names (`TieKey`), so the links
+/// saved in a tied 3MF's document find their models again on any plate of the same models.
 struct PlateTieState: Equatable {
     var on = false
     var settings: TieSettings?
@@ -68,6 +69,51 @@ struct PlateTieState: Equatable {
     /// refuses one); a disabled one stays, the engine ignores it.
     func overrides(on keys: Set<String>) -> TieOverrides {
         TieOverrides(disabled: disabled, added: added.filter { keys.contains($0.a) && keys.contains($0.b) })
+    }
+}
+
+/// A model's plate-tie key (decision C of #50): its name and which of the models of that name it is on the plate,
+/// counted in plate order from 1: `coin#1`, `coin#2`, `bracket#1`. Always suffixed, so a model named `coin#2` (key
+/// `coin#2#1`) never takes the second `coin`'s key; the name is everything before the last `#`. A key outlives the
+/// window (the slot ids do not): a tied 3MF's document names the models it was saved with, and a plate of models with
+/// those names gets the links back. Removing the first of two same-named models makes the second `#1`: the links
+/// follow the count, not the model.
+enum TieKey {
+    /// The keys of models named `names`, in plate order; a nil name (an empty slot) has no key.
+    static func keys(_ names: [String?]) -> [String?] {
+        var seen: [String: Int] = [:]
+        return names.map { name in
+            guard let name else { return nil }
+            let n = (seen[name] ?? 0) + 1
+            seen[name] = n
+            return "\(name)#\(n)"
+        }
+    }
+
+    /// The model name a key was made from.
+    static func name(_ key: String) -> String {
+        guard let i = key.lastIndex(of: "#") else { return key }
+        return String(key[..<i])
+    }
+}
+
+extension PlateBoard {
+    /// Plate `i`'s model names by slot, as the status card and the plate's file name show them (nil: an empty slot).
+    func modelNames(_ i: Int) -> [String?] {
+        guard plates.indices.contains(i) else { return [] }
+        let p = plates[i]
+        return p.models.indices.map { k in
+            i == active && k == p.live ? session.parts.first?.info.name : p.models[k].stash?.part.info.name
+        }
+    }
+
+    /// Plate `i`'s plate-tie keys by slot (`TieKey`).
+    func tieKeys(_ i: Int) -> [String?] { TieKey.keys(modelNames(i)) }
+
+    /// The key of `slot` on the plate being edited, or nil.
+    func tieKey(of slot: ModelSlot) -> String? {
+        guard let k = plate.models.firstIndex(where: { $0 === slot }) else { return nil }
+        return tieKeys(active)[k]
     }
 }
 

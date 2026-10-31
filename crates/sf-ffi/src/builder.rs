@@ -23,7 +23,9 @@ use sf_engine::prop::crest::split_interface;
 use sf_engine::types::{IDENTITY3, Xyz};
 use sf_io::json::{Json, parse};
 use sf_io::stl::write_binary_stl_checked;
-use sf_io::threemf::{Bed, ExtraPart, Model, write_plate_3mf_checked};
+use sf_io::threemf::{
+    Bed, ExtraPart, Model, write_plate_3mf_checked, write_plate_3mf_parts_checked,
+};
 
 use crate::gpu::GpuBuffer;
 use crate::part::{FfiError, Part, engine, rot9};
@@ -688,6 +690,8 @@ struct ExportOptions {
     placed: [f64; 2],
     /// 3MF: the model's session (`session`, `sf_io::session::model_from_json`), written beside the model
     session: Option<SessionInput>,
+    /// Not in the JS: a plate-tie document (issue #50) a 3MF carries beside the session.
+    plate_ties: Option<sf_io::plateties::PlateTiesDoc>,
 }
 
 fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
@@ -700,6 +704,7 @@ fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
         bed: None,
         placed: [0.0, 0.0],
         session: None,
+        plate_ties: None,
     };
     let Some(Json::Obj(kv)) = parse(if text.trim().is_empty() { "{}" } else { text }) else {
         return Err(engine("export options must be a JSON object"));
@@ -739,6 +744,9 @@ fn export_options(text: &str) -> Result<ExportOptions, FfiError> {
                 o.placed = [p[0], p[1]];
             }
             ("session", v @ Json::Obj(_)) => o.session = Some(SessionInput::from_json(v.clone())?),
+            ("plateTies", v @ Json::Obj(_)) => {
+                o.plate_ties = Some(sf_io::plateties::PlateTiesDoc::from_json(v).map_err(engine)?);
+            }
             (k, _) => return Err(engine(format!("unknown or malformed export option {k}"))),
         }
     }
@@ -760,7 +768,9 @@ fn xyz4(v: &[sf_engine::types::V4], at: [f64; 2]) -> Vec<[f64; 3]> {
 ///   empty, the seating then comes from an analysis of the pose);
 /// - `removed`: ids of fins removed by hand, left out;
 /// - 3MF: `bed` (the build volume's x and y; the part is written where it stands on a centred bed) and `placed`
-///   (the model's spot on the plate, mm; STL ignores it, as the page does).
+///   (the model's spot on the plate, mm; STL ignores it, as the page does); `plateTies` (not in the JS, issue #50):
+///   a plate-tie document (`plate_ties_document`) the 3MF carries as `Metadata/support_fins_plate_ties.json`;
+///   STL ignores it. Without it the bytes are the page's.
 ///
 /// The bytes are the page's: STL header `{name} - support-fins` of the file's name (`{name} fins` for fins
 /// only); a 3MF is always the separate form (part, supports, the interface crest as the supports' second part,
@@ -1064,7 +1074,12 @@ fn export_impl(
             .session
             .as_ref()
             .map(|s| session_json(part, rot, offset, s));
-        write_plate_3mf_checked(&[model], name, true, session.as_ref(), bed).map_err(engine)?
+        let ties = o
+            .plate_ties
+            .as_ref()
+            .map(|d| (sf_io::plateties::PLATE_TIES_PART, d.to_json().stringify()));
+        write_plate_3mf_parts_checked(&[model], name, true, session.as_ref(), bed, ties.as_slice())
+            .map_err(engine)?
     } else if o.fins_only {
         write_binary_stl_checked(&xyz4(&added, [0.0, 0.0]), &format!("{name} fins"))
             .map_err(engine)?

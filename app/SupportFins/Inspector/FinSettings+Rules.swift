@@ -190,7 +190,9 @@ extension FinSettings {
 
     /// The input limits of the numeric fields (`index.html`, docs/UI-MAP.md 4.1-4.2): `min...max`, `step`.
     struct Limits { let range: ClosedRange<Double>; let step: Double }
-    static let layerHeightLimits = Limits(range: 0.08...0.6, step: 0.04)
+    /// Layer height: the web's 0.08 lower bound is an FDM one; a resin printer profile's layer (0.05 on the Saturn 4
+    /// Ultra 16K, issue #50) is thinner, so the field goes down to the thinnest layer a printer profile allows.
+    static let layerHeightLimits = Limits(range: 0.01...0.6, step: 0.04)
     static let gapLimits = Limits(range: 0.1...0.4, step: 0.05)
     static let pinDepthLimits = Limits(range: 0.05...1, step: 0.05)
     static let padThicknessLimits = Limits(range: 0.1...1.0, step: 0.05)

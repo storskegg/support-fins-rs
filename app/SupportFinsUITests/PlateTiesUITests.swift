@@ -119,4 +119,50 @@ final class PlateTiesUITests: PartWindowUITestCase {
         XCTAssertEqual(text.components(separatedBy: "<item ").count - 1, 1, "one merged object on the plate")
         XCTAssertTrue(text.contains("support_fins_plate_ties.json"), "the ties' settings go with it")
     }
+
+    // MARK: the printer's bed and layer (decision A of #50)
+
+    /// Picking the printer (the Saturn 4 Ultra 16K, already shown: picking it again counts) sets the toolbar's build
+    /// volume to its 211.68 x 118.37 x 220 mm and the Layer height to its 0.05 mm; a hand edit afterwards holds.
+    func testPickingThePrinterSetsTheBedAndTheLayerHeight() throws {
+        try openFixturePart()
+        let row = element("printer-row")
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the printer row")
+        // both are remembered: `tearDownWithError` leaves the next test the app's own bed and layer
+        pickedPrinter = true
+        row.click()   // unfolds the Printer section
+        let printer = element("printer-profile")
+        XCTAssertTrue(printer.waitForExistence(timeout: 5), "the Printer picker")
+        printer.click()
+        printer.menuItems["Elegoo Saturn 4 Ultra 16K"].click()
+        waitFor("the build volume is the printer's", timeout: 5) { self.text(self.element("volume")).contains("211 × 118 × 220 mm") }
+        waitFor("the layer height is the printer's", timeout: 5) { self.text(self.element("layer-height")) == "0.05" }
+        XCTAssertTrue(text(row).contains("0.05 layers"), text(row))
+        // by hand afterwards: the field takes it, the printer stays picked
+        setLayerHeight("0.1")
+        waitFor("the hand-set layer holds", timeout: 5) { self.text(row).contains("0.1 layers") }
+        XCTAssertTrue(text(printer).contains("Saturn 4 Ultra 16K"), text(printer))
+    }
+
+    /// The printer test ran: its bed and layer are put back before the app quits.
+    private var pickedPrinter = false
+
+    override func tearDownWithError() throws {
+        if pickedPrinter, app.state == .runningForeground {
+            let volume = element("volume")
+            volume.click()
+            volume.menuItems["250 × 220 × 270 mm"].click()
+            setLayerHeight("0.2")
+        }
+        try super.tearDownWithError()
+    }
+
+    private func setLayerHeight(_ v: String) {
+        let field = element("layer-height")
+        guard field.waitForExistence(timeout: 5) else { return }
+        scrollIntoView(field)
+        field.doubleClick()
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("\(v)\r")
+    }
 }

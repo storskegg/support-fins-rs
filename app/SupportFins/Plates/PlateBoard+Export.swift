@@ -24,7 +24,7 @@ extension PlateBoard {
         var fileName: String
         /// Walls still to stand, by index into `models` (`plateWrite(_, deferStanding: true)`): `resolved()` stands them.
         var stands: [Int: @Sendable () -> DrawnSweep?] = [:]
-        /// Each model's slot id, as text: its key for plate ties (`TieModelInput.key`).
+        /// Each model's plate-tie key (`TieKey`, `TieModelInput.key`).
         var keys: [String] = []
 
         /// This write with its walls stood: heavy, so called off the main thread.
@@ -52,6 +52,7 @@ extension PlateBoard {
         var sessions: [String] = []
         var first: String?
         var stands: [Int: @Sendable () -> DrawnSweep?] = [:]
+        let tieKeys = tieKeys(i)
         for (k, m) in p.models.enumerated() {
             let part: CorePart, build: BuildModel?, pose: Pose, removed: Set<FinKey>
             if i == active && k == p.live {
@@ -76,7 +77,7 @@ extension PlateBoard {
             }
             models.append(PlateModel(part: part.part, build: result, drawn: walls, pose: pose.columnMajor,
                                      threshold: settings.settings.threshold, removed: ids, x: m.xy.x, y: m.xy.y, session: nil))
-            keys.append(m.id.uuidString)
+            keys.append(tieKeys[k] ?? m.id.uuidString)
             if first == nil { first = part.info.name }
         }
         guard let first else { return nil }
@@ -111,7 +112,7 @@ extension PlateBoard {
     }
 
     /// The build volume's x and y: the 3MF is written where the models stand on a centred bed.
-    private var bedOptions: String {
+    var bedOptions: String {
         let v = host?.controller?.volume ?? .standard
         return "{\"bed\":[\(v.x),\(v.y)]}"
     }

@@ -42,7 +42,8 @@ pub use part::{
 pub use plateties::{
     PlateExport, PrinterProfileInfo, TieBuildResult, TieLink, TieModelInput, TieNoteInfo,
     TieOverrides, TiePairKey, TiePairOrigin, TiePairResult, TiePlate, export_plate_tied,
-    export_plates_tied, plate_ties_of_3mf, plate_ties_settings, printer_profile, printer_profiles,
+    export_plates_tied, plate_ties_document, plate_ties_of_3mf, plate_ties_settings,
+    printer_profile, printer_profiles,
 };
 pub use report::{BuildReport, build_report};
 pub use session::{SessionField, SessionRestore, SessionWall, js_number_text};

@@ -1,3 +1,4 @@
+import SupportFinsCore
 import SwiftUI
 import Viewer
 
@@ -23,10 +24,11 @@ final class PlateTiesFeature: Feature {
 
     func partDidShow(_ parts: [LoadedPart]) {
         model.wire()
+        model.hookExporter()
         guard let host, let board = host.features[PlatesFeature.self]?.board, !board.swapping else { return }
-        // a tied 3MF opened onto a plate of its own: its ties come back (`plate_ties_of_3mf`)
-        if let url = host.openedURL, url != lookedAt, url.pathExtension.lowercased() == "3mf", board.modelCount == 1 {
-            model.restore(from: url)
+        // a tied 3MF opened onto a plate of its own: its ties come back (`Part.saved_plate_ties`, read with the file)
+        if let url = host.openedURL, url != lookedAt, board.modelCount == 1, let doc = host.session.parts.first?.part.savedPlateTies() {
+            model.apply(document: doc)
         }
         lookedAt = host.openedURL
     }
@@ -34,7 +36,25 @@ final class PlateTiesFeature: Feature {
     func close() { model.close() }
 
     var modifiers: [WindowModifier] {
-        [.onChange("plate-ties-profile", of: { PrinterProfileStore.shared.id }) { _, _ in self.model.profileChanged() }]
+        [.onChange("plate-ties-profile", of: { PrinterProfileStore.shared.id }) { _, _ in self.model.profileChanged() },
+         .onChange("plate-ties-profile-pick", of: { PrinterProfileStore.shared.picks }) { _, _ in
+             if let p = PrinterProfileStore.shared.current { self.useProfile(p) }
+         }]
+    }
+
+    /// A printer picked (decision A of #50): this window's build volume becomes the printer's (`sf.volume`, the plate
+    /// and every export's bed) and its layer height the printer's usual layer (one undo step, remembered as
+    /// `sf.layerHeight`). Either can be changed by hand afterwards; the picker keeps showing the printer.
+    func useProfile(_ p: PrinterProfileInfo, volumes: VolumeStore = VolumeStore(), store: SettingsStore = SettingsStore()) {
+        guard let host else { return }
+        if let v = p.volume {
+            host.controller?.volume = v
+            volumes.save(v)
+        }
+        var s = host.session.settings
+        s.layerHeight = p.layerHeight
+        host.session.setSettings(s)
+        store.save(host.session.settings)
     }
 
     var inspectorSections: [InspectorSection] {
