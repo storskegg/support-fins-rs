@@ -1521,7 +1521,17 @@ fn plate_tie_exports_take_anything() {
         calib(&p3, &saturn, "", "{}", s);
     }
     // paths that cannot be written (the shared `paths()` has some that can, relative to the test's directory)
-    for p in ["", "/", "//", ".", "..", "\u{0}", "/nonexistent/dir/x.3mf", "/dev/zero/x.3mf", "a\u{0}b.3mf"] {
+    for p in [
+        "",
+        "/",
+        "//",
+        ".",
+        "..",
+        "\u{0}",
+        "/nonexistent/dir/x.3mf",
+        "/dev/zero/x.3mf",
+        "a\u{0}b.3mf",
+    ] {
         calib(p, &saturn, "", "{}", "{}");
     }
     // reading the document back: hostile files and paths
