@@ -163,6 +163,19 @@ struct InspectorRulesTests {
         #expect(s.printerSummary == "1.0 nozzle · 0.25 gap")
     }
 
+    /// A resin printer has no nozzle: its line names the pixel instead (the build still reads the nozzle field).
+    @Test func aResinPrintersLineNamesItsPixelNotTheNozzle() {
+        var s = FinSettings()
+        s.layerHeight = 0.05
+        #expect(s.printerSummary(pixelSize: [0.014, 0.019]) == "14×19 µm pixel · 0.05 layers · 0.2 gap")
+        #expect(s.printerSummary(pixelSize: [0.05, 0.05]) == "50 µm pixel · 0.05 layers · 0.2 gap")
+        #expect(s.printerSummary(pixelSize: [0.0345, 0.0345]) == "34.5 µm pixel · 0.05 layers · 0.2 gap")
+        // no profile, or an FDM one: the web's line
+        #expect(s.printerSummary(pixelSize: nil) == s.printerSummary)
+        #expect(s.printerSummary(pixelSize: []) == s.printerSummary)
+        #expect(FinSettings.pixelText([0.014, 0.019]) == "14 × 19 µm")
+    }
+
     @Test func theTinesLineFollowsTheGripAndDirection() {
         var s = FinSettings()
         for (grip, want) in [(0.0, "light grip"), (20, "light grip"), (25, "medium grip"), (75, "medium grip"), (80, "firm grip"), (100, "firm grip")] {

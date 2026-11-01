@@ -59,6 +59,9 @@ extension PrinterProfileInfo {
         return v.isValid ? v : nil
     }
 
+    /// A resin printer's pixel (x, y, mm); nil for an FDM printer or a profile without one.
+    var resinPixel: [Double]? { kind == "resin" && pixelSize.count == 2 ? pixelSize : nil }
+
     /// The printer's usual layer (`layerHeights.default`), held to the Layer height field's range.
     var layerHeight: Double {
         let r = FinSettings.layerHeightLimits.range

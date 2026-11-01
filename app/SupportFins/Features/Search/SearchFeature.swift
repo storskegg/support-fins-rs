@@ -17,6 +17,7 @@ final class SearchFeature: Feature {
     func context() -> SearchContext {
         guard let host else { return SearchContext() }
         var c = SearchContext(settings: host.session.settings)
+        c.resinPrinter = PrinterProfileStore.shared.current?.resinPixel != nil
         if let draw = host.features[DrawFeature.self]?.model {
             c.augmentOffered = draw.augmentOffered
             c.drawControls = draw.controlsShown
@@ -74,7 +75,11 @@ struct SearchField: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search settings", text: $search.query)
+            // the whole width of the row: in the inspector's form the field took a fraction of it, and the placeholder
+            // read "Search settin…" (suggestion S4)
+            TextField(text: $search.query, prompt: Text("Search settings")) { Text("Search settings") }
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
                 .textFieldStyle(.plain)
                 .focused($focused)
@@ -87,7 +92,8 @@ struct SearchField: View {
                     .accessibilityLabel("Clear")
             }
         }
-        .padding(6)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 6)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
         .onChange(of: search.focusRequests) { focused = true }
     }
