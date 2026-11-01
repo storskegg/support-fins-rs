@@ -392,7 +392,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "parity"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "base64",
  "serde",
@@ -564,14 +564,14 @@ dependencies = [
 
 [[package]]
 name = "sf-bindgen"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "uniffi",
 ]
 
 [[package]]
 name = "sf-cli"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "indexmap",
  "miniz_oxide",
@@ -584,7 +584,7 @@ dependencies = [
 
 [[package]]
 name = "sf-cut"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "cc",
  "indexmap",
@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "sf-engine"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "indexmap",
  "libm",
@@ -607,7 +607,7 @@ dependencies = [
 
 [[package]]
 name = "sf-ffi"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "parity",
  "rustc-demangle",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "sf-io"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "flate2",
  "indexmap",
@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "sf-step"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "cc",
  "libc",
@@ -647,7 +647,7 @@ dependencies = [
 
 [[package]]
 name = "sf-step-xpc"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "libc",
  "sf-step",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "sf-testkit"
-version = "0.1.0"
+version = "2026.44.0"
 dependencies = [
  "indexmap",
  "parity",
