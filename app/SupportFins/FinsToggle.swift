@@ -17,6 +17,10 @@ struct FinsToggle: View {
             .controlSize(.small)
             .help("Build the supports for this pose")
             .accessibilityIdentifier("fins-toggle")
+            // a new toggle per state: in the window toolbar, another process (VoiceOver, XCUITest) kept reading the label
+            // the item was made with, "Add fins" while it was on, though the title and the value had changed (UI run after
+            // #263; `DocumentWindowToolbarTests` reads it as they do). An explicit `accessibilityLabel` did not refresh it
+            .id(session.finsOn)
     }
 }
 

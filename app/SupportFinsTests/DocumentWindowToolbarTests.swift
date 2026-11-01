@@ -71,7 +71,36 @@ struct DocumentWindowToolbarTests {
         return found
     }
 
-    @Test func theFinsRowsAddFinsTurnsTheToggleToFinsOn() async throws {
+    /// An element's (description, value) as another process reads it: through the AX API (`AXUIElement`) on this app's
+    /// own pid, from a background thread while the main thread serves the request, which is the path XCUITest and
+    /// VoiceOver take (no Accessibility permission needed for one's own process). The in-process `accessibilityLabel`
+    /// already read "Fins on" while this path still said "Add fins": the UI run of 2026-11-01 (#263) failed on it with
+    /// 'the toggle reads "Add fins", its value Optional(1)'.
+    private func remote(_ id: String) async -> (label: String?, value: Int?) {
+        let pid = getpid()
+        return await Task.detached {
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 3)
+            func attr(_ e: AXUIElement, _ a: String) -> AnyObject? {
+                var v: AnyObject?
+                return AXUIElementCopyAttributeValue(e, a as CFString, &v) == .success ? v : nil
+            }
+            var hit: AXUIElement?
+            func walk(_ e: AXUIElement, _ depth: Int) {
+                guard hit == nil, depth < 40 else { return }
+                if attr(e, "AXIdentifier") as? String == id { hit = e; return }
+                for c in (attr(e, "AXChildren") as? [AXUIElement]) ?? [] { walk(c, depth + 1) }
+            }
+            walk(app, 0)
+            guard let hit else { return (nil, nil) }
+            return (attr(hit, "AXDescription") as? String, (attr(hit, "AXValue") as? NSNumber)?.intValue)
+        }.value
+    }
+
+    /// Add fins turned on from the Fins row (and off again from the toggle): the toolbar toggle's words follow its state
+    /// as another process reads them. SwiftUI's toolbar item kept the label it was made with for remote clients;
+    /// `FinsToggle` gives the toggle a new identity per state.
+    @Test func theToggleSaysFinsOnToOtherProcessesWhenTheFinsRowAddsThem() async throws {
         _ = NSApp.perform(NSSelectorFromString("accessibilitySetValue:forAttribute:"), with: true as NSNumber,
                           with: "AXEnhancedUserInterface" as NSString)
         try await withDocumentWindow { window in
@@ -80,19 +109,25 @@ struct DocumentWindowToolbarTests {
                 try await Task.sleep(for: .milliseconds(100))
                 add = axElement("stat-add-fins", under: window)
             }
-            let toggle = try #require(axElement("fins-toggle", under: window))
-            #expect(get(toggle, "accessibilityLabel") as? String == "Add fins")
+            let off = await remote("fins-toggle")
+            #expect(off.label == "Add fins" && off.value == 0, "off: the toggle reads \(String(describing: off.label)), its value \(String(describing: off.value))")
             _ = try #require(add, "the Fins row offers Add fins").perform(NSSelectorFromString("accessibilityPerformPress"))
-            var label = "", value = ""
-            for _ in 0..<50 {
+            var on = (label: String?.none, value: Int?.none)
+            for _ in 0..<30 {
                 try await Task.sleep(for: .milliseconds(100))
-                let t = axElement("fins-toggle", under: window) ?? toggle
-                label = get(t, "accessibilityLabel") as? String ?? "nil"
-                value = "\(get(t, "accessibilityValue") ?? "nil")"
-                if label == "Fins on" { break }
+                on = await remote("fins-toggle")
+                if on.value == 1 && on.label == "Fins on" { break }
             }
-            print("FINSPROBE label \(label) value \(value) items \(window.toolbar?.items.map(\.label) ?? [])")
-            #expect(label == "Fins on", "the toggle's label \(label), its value \(value)")
+            #expect(on.label == "Fins on" && on.value == 1, "on: the toggle reads \(String(describing: on.label)), its value \(String(describing: on.value))")
+            // off again, from the toggle itself
+            _ = try #require(axElement("fins-toggle", under: window)).perform(NSSelectorFromString("accessibilityPerformPress"))
+            var again = (label: String?.none, value: Int?.none)
+            for _ in 0..<30 {
+                try await Task.sleep(for: .milliseconds(100))
+                again = await remote("fins-toggle")
+                if again.value == 0 && again.label == "Add fins" { break }
+            }
+            #expect(again.label == "Add fins" && again.value == 0, "off again: the toggle reads \(String(describing: again.label)), its value \(String(describing: again.value))")
         }
     }
 
