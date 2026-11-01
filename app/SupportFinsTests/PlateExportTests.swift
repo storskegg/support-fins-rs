@@ -37,7 +37,7 @@ struct PlateExportTests {
     }
 
     func dir() throws -> URL {
-        let d = FileManager.default.temporaryDirectory.appending(path: "plate-export-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let d = Scratch.root.appending(path: "plate-export-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }
@@ -149,7 +149,7 @@ struct PlateExportTests {
     @Test func aTraversalNamedModelExportsASafeZip() async throws {
         let model = ViewerModel()
         try #require(model.controller != nil, "no Metal device")
-        let evil = FileManager.default.temporaryDirectory.appending(path: "evil-\(UUID().uuidString).3mf")
+        let evil = Scratch.root.appending(path: "evil-\(UUID().uuidString).3mf")
         try TestThreeMF.box(named: "x/../../../../Library/LaunchAgents/evil").write(to: evil)
         await model.load(url: evil)
         let board = try #require(model.features[PlatesFeature.self]?.board)

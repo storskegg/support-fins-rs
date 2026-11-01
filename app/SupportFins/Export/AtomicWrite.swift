@@ -5,7 +5,7 @@ import Foundation
 /// name as it was.
 ///
 /// The temp file is `.name.sfexport-<uuid>.ext` (the engine picks the format from the extension) in the temporary-items
-/// directory for the target's volume (the move stays one rename), else the app's tmp: the sandbox gives a save panel's
+/// directory for the target's volume (the move stays one rename; that directory is removed afterwards), else the app's tmp: the sandbox gives a save panel's
 /// URL write access to that one file, not to its folder, so a sibling temp is denied there. The finished file is moved
 /// over `url` with `replaceItemAt`; if even that is refused, its bytes are written into `url`.
 enum AtomicWrite {
@@ -13,10 +13,15 @@ enum AtomicWrite {
     /// (nothing written). Throws `work`'s error or the move's; `url` is untouched then.
     nonisolated static func write(to url: URL, token: CancelToken = CancelToken(), work: (String) throws -> Void) throws -> Bool {
         let fm = FileManager.default
-        let home = (try? fm.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: url, create: true))
-            ?? fm.temporaryDirectory
+        let replacement = try? fm.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: url, create: true)
+        let home = replacement ?? fm.temporaryDirectory
         let temp = home.appending(path: ".\(url.deletingPathExtension().lastPathComponent).sfexport-\(UUID().uuidString).\(url.pathExtension)")
-        defer { try? fm.removeItem(at: temp) }
+        // the replacement directory is a new one for this write (`TemporaryItems/NSIRD_*`): it goes too, or every
+        // export leaves an empty one behind (user suggestion S7 found 1,972)
+        defer {
+            try? fm.removeItem(at: temp)
+            if let replacement { try? fm.removeItem(at: replacement) }
+        }
         try work(temp.path(percentEncoded: false))
         if token.isCancelled { return false }
         do {

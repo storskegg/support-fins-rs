@@ -44,7 +44,7 @@ struct WhatsNewTests {
 
     @Test("a file that is not a changelog is no changelog")
     func broken() throws {
-        let url = FileManager.default.temporaryDirectory.appending(path: "whatsnew-\(UUID().uuidString).json")
+        let url = Scratch.root.appending(path: "whatsnew-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }
         try Data("{\"releases\": 3}".utf8).write(to: url)
         #expect(Changelog.load(url) == nil)

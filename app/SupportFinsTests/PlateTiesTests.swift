@@ -294,7 +294,7 @@ struct PlateTiesTests {
     // MARK: export and persistence
 
     func dir() throws -> URL {
-        let d = FileManager.default.temporaryDirectory.appending(path: "plate-ties-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let d = Scratch.root.appending(path: "plate-ties-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }
