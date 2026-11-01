@@ -23,7 +23,7 @@ struct ObjectPickerSelectAllTests {
         p.setAll(true)
         #expect(p.selected == Set(p.entries.map(\.id)))
         #expect(p.allSelection == .all)
-        #expect(p.loadTitle == "Merge 4 & load" && p.hint == "4 selected — merged into one part")
+        #expect(p.loadTitle == "Merge 4 into one part" && p.hint == "4 selected — merged into one part")
     }
 
     @Test func uncheckingSelectAllUnchecksEveryRow() {
@@ -48,7 +48,7 @@ struct ObjectPickerSelectAllTests {
         p.setAll(true)
         p.set(p.entries[2].id, false)
         #expect(p.allSelection == .some)
-        #expect(p.selected.count == 3 && p.loadTitle == "Merge 3 & load")
+        #expect(p.selected.count == 3 && p.loadTitle == "Merge 3 into one part")
     }
 
     @Test func uncheckingEveryRowByHandUnchecksSelectAll() {

@@ -93,6 +93,28 @@ fn load_parts_reads_an_obj_with_several_objects() {
     assert_eq!(parts[1].info().triangles, 1);
 }
 
+/// `Part::bounds`: each object's box in the file's frame, before and after the weld, and nothing welded to read it.
+#[test]
+fn bounds_are_the_objects_box_in_the_file_frame_without_a_weld() {
+    let path = tmp("two-bounds.obj");
+    std::fs::write(
+        &path,
+        "o a\nv 0 0 0\nv 1 0 0\nv 0 1 2\nf 1 2 3\no b\nv 5 -1 0\nv 6 0 0\nv 5 1 3\nf 4 5 6\n",
+    )
+    .unwrap();
+    let parts = load_parts(path.to_string_lossy().into_owned()).unwrap();
+    assert_eq!(parts[0].bounds(), vec![0.0, 0.0, 0.0, 1.0, 1.0, 2.0]);
+    assert_eq!(parts[1].bounds(), vec![5.0, -1.0, 0.0, 6.0, 1.0, 3.0]);
+    assert!(!parts[1].is_welded(), "read from the soup");
+    let _ = parts[1].mesh();
+    assert!(parts[1].is_welded());
+    assert_eq!(
+        parts[1].bounds(),
+        vec![5.0, -1.0, 0.0, 6.0, 1.0, 3.0],
+        "the same once welded"
+    );
+}
+
 #[test]
 fn load_parts_gives_a_3mf_one_part_per_object() {
     let cube: Vec<[f64; 3]> = block(0.0, 10.0, 0.0, 10.0, 0.0, 10.0)

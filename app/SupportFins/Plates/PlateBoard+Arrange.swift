@@ -88,6 +88,22 @@ extension PlateBoard {
         sync()
     }
 
+    /// Models loaded from one file as separate models (the object picker): each at the centre of its box in the file,
+    /// the group's box centred on the bed, so they stand as they did in the file. `boxes` are `Part.bounds` (six numbers
+    /// each), one per slot; a slot without a box stays where it was put.
+    func placeAsInFile(_ slots: [ModelSlot], boxes: [[Double]]) {
+        let known = zip(slots, boxes).filter { $0.1.count == 6 }
+        guard !known.isEmpty else { return }
+        let lo = SIMD2(known.map { $0.1[0] }.min()!, known.map { $0.1[1] }.min()!)
+        let hi = SIMD2(known.map { $0.1[3] }.max()!, known.map { $0.1[4] }.max()!)
+        let middle = (lo + hi) / 2
+        for (slot, b) in known {
+            let xy = SIMD2((b[0] + b[3]) / 2, (b[1] + b[4]) / 2) - middle
+            if slot === plate.liveSlot { placeLive(slot, xy) } else { slot.xy = xy }
+        }
+        sync()
+    }
+
     /// Put live slot `m` at `xy`: the world shifts by the difference, the camera with it (`placeLive`, `ui/move.js`).
     func placeLive(_ m: ModelSlot, _ xy: SIMD2<Double>) {
         let d = xy - m.xy

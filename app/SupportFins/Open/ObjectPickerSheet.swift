@@ -10,6 +10,10 @@ struct ObjectPickerSheet: View {
             Text("Pick the one to add fins to. Check more than one to merge them into a single part.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            // the app's own: several objects can also go onto one plate as models of their own (Plate ties need them)
+            Text("Or load them as separate models on one plate, each where it stands in the file.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             // "Select all" (user suggestion S1): its checkbox lines up with the rows' (the list's row inset), and shows
             // the mixed dash while only some rows are checked; a click on it when mixed checks every row (macOS).
             Toggle(sources: selectAllSources, isOn: \.self) { Text("Select all") }
@@ -32,13 +36,17 @@ struct ObjectPickerSheet: View {
                 Text(model.hint).font(.callout).foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel", role: .cancel) { model.cancel() }.keyboardShortcut(.cancelAction)
+                if let other = model.otherTitle {
+                    Button(other) { model.loadOther() }.accessibilityIdentifier("picker-load-other")
+                }
                 Button(model.loadTitle) { model.load() }
+                    .accessibilityIdentifier("picker-load")
                     .keyboardShortcut(.defaultAction)
                     .disabled(!model.canLoad)
             }
         }
         .padding(20)
-        .frame(width: 460)
+        .frame(width: 560)
     }
 
     /// How far the list's rows sit in from its edge (the inset list style's margin plus the row's own inset).

@@ -614,6 +614,20 @@ impl Part {
         }
     }
 
+    /// The part's box in the file's frame, `[min x, min y, min z, max x, max y, max z]` (mm), read from its
+    /// positions without welding it (C-05): what the object picker needs to place the objects of a file as
+    /// separate models where they stand, and to tell objects that stand apart from ones that overlap. All zeros
+    /// for an empty part. App-only (the web has no "separate models" load).
+    pub fn bounds(&self) -> Vec<f64> {
+        self.with_positions(|pos| {
+            if pos.is_empty() {
+                return vec![0.0; 6];
+            }
+            let (lo, hi) = bbox(pos);
+            vec![lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]]
+        })
+    }
+
     /// Interleaved position xyz + normal xyz (`f32`, 24-byte vertex), three vertices per face in the
     /// model frame, the normal being the face normal repeated at each vertex.
     pub fn mesh(&self) -> Arc<GpuBuffer> {
