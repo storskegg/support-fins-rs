@@ -12,7 +12,7 @@ import Testing
 @Suite("Crash reports")
 struct CrashReportsTests {
     private func tempFolder() -> CrashFolder {
-        let url = FileManager.default.temporaryDirectory.appending(path: "sf-crash-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let url = Scratch.root.appending(path: "sf-crash-\(UUID().uuidString)", directoryHint: .isDirectory)
         let folder = CrashFolder(url: url)
         folder.create()
         return folder
@@ -133,7 +133,7 @@ struct CrashReportsTests {
         defer { d.removeObject(forKey: "SFCrashDir"); d.removeObject(forKey: "SFPlantCrash") }
         let env = ["XCTestConfigurationFilePath": "/x"]
         #expect(CrashReporter.shouldStart(environment: env), "a named crash folder starts the reporter in a test environment")
-        let r = CrashReporter(folder: CrashFolder(url: FileManager.default.temporaryDirectory.appending(path: "unused-\(UUID().uuidString)")))
+        let r = CrashReporter(folder: CrashFolder(url: Scratch.root.appending(path: "unused-\(UUID().uuidString)")))
         r.start(register: false)
         #expect(r.showsBanner && r.closedUnexpectedly)
         defer { try? FileManager.default.removeItem(at: r.folder.url) }
@@ -155,7 +155,7 @@ struct CrashReportsTests {
         d.set(runnerPath, forKey: "SFCrashDir")
         d.set(true, forKey: "SFPlantCrash")
         defer { d.removeObject(forKey: "SFCrashDir"); d.removeObject(forKey: "SFPlantCrash") }
-        let r = CrashReporter(folder: CrashFolder(url: FileManager.default.temporaryDirectory.appending(path: "unused-\(UUID().uuidString)")))
+        let r = CrashReporter(folder: CrashFolder(url: Scratch.root.appending(path: "unused-\(UUID().uuidString)")))
         r.start(register: false)
         defer { try? FileManager.default.removeItem(at: r.folder.url) }
         #expect(r.folder.markerExists, "the app wrote its marker into \(r.folder.url.path)")

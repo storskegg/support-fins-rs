@@ -19,7 +19,7 @@ struct OpenFlowTests {
             }
             base += 8
         }
-        let url = URL(fileURLWithPath: NSTemporaryDirectory() + "open-flow-three.obj")
+        let url = Scratch.root.appending(path: "open-flow-three.obj")
         try obj.write(to: url, atomically: true, encoding: .utf8)
         return url
     }
