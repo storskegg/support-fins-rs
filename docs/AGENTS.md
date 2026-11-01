@@ -200,6 +200,10 @@ Also not literal, but not engine divergences: a failed open shows the translated
 the app adds a "Load anyway?" prompt over the load limits where the JS drops or loads silently (#221), and the app has crash
 reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and searches (#213, #220, #223, #224, #228).
 
+App-only UI (post-parity, no engine change): the inspector is tabbed (Part, Supports, More, Plate ties) under the search box,
+where the web's options panel is one long column; More settings shows its four groups unfolded in the More tab; a search
+shows the matches of every tab at once, each tab's after a button that shows them in their tab (suggestion S3, 2026-11-01).
+
 ## Pitfalls
 
 - **Swift 6.4 Debug builds abort** in `swift_task_dealloc` ("freed pointer was not the last allocation") when a `Task` or
