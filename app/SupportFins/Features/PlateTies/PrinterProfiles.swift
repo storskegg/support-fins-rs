@@ -27,7 +27,7 @@ final class PrinterProfileStore {
         }
     }
 
-    init(defaults: UserDefaults = .standard, profiles: [PrinterProfileInfo] = printerProfiles()) {
+    init(defaults: UserDefaults = AppDefaults.shared, profiles: [PrinterProfileInfo] = printerProfiles()) {
         self.defaults = defaults
         self.profiles = profiles
         let stored = defaults.string(forKey: Self.key)
@@ -58,6 +58,9 @@ extension PrinterProfileInfo {
         let v = PrinterVolume(x: Float(buildVolume[0]), y: Float(buildVolume[1]), z: Float(buildVolume[2]))
         return v.isValid ? v : nil
     }
+
+    /// A resin printer's pixel (x, y, mm); nil for an FDM printer or a profile without one.
+    var resinPixel: [Double]? { kind == "resin" && pixelSize.count == 2 ? pixelSize : nil }
 
     /// The printer's usual layer (`layerHeights.default`), held to the Layer height field's range.
     var layerHeight: Double {

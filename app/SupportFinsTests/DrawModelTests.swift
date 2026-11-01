@@ -20,7 +20,7 @@ struct DrawModelTests {
     /// A window with a T-shaped part open (a stem under a slab: the slab's underside is an overhang), fins on, Draw mode.
     private func drawWindow(mode: FinSettings.Mode = .draw, sway: Bool = false, parts: [[Float]]? = nil, file: URL? = nil) async throws
         -> (window: ViewerModel, draw: DrawModel, kit: DrawKit) {
-        UserDefaults.standard.removeObject(forKey: DrawModel.shapeKey)     // a crashed run may have left Curve behind
+        AppDefaults.shared.removeObject(forKey: DrawModel.shapeKey)     // a crashed run may have left Curve behind
         let window = ViewerModel()
         try #require(window.controller != nil, "no Metal device")
         let tris = parts ?? (TestParts.box(-5, 5, -5, 5, 0, 20) + TestParts.box(-20, 20, -20, 20, 20, 24))

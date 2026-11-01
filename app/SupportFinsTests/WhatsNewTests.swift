@@ -9,7 +9,7 @@ import Testing
 @Suite("WhatsNew")
 struct WhatsNewTests {
     /// Two releases as the generator writes them: the newest first, each with the card's lines.
-    static let two = Changelog(version: "1.0.1", releases: [
+    static let two = Changelog(releases: [
         .init(version: "1.0.1", tag: "v1.0.1", date: "2026-11-03", lines: ["last", "later"]),
         .init(version: "1.0.0", tag: "v1.0.0", date: "2026-10-28", lines: ["one", "two <b>"]),
     ])
@@ -44,7 +44,7 @@ struct WhatsNewTests {
 
     @Test("a file that is not a changelog is no changelog")
     func broken() throws {
-        let url = FileManager.default.temporaryDirectory.appending(path: "whatsnew-\(UUID().uuidString).json")
+        let url = Scratch.root.appending(path: "whatsnew-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }
         try Data("{\"releases\": 3}".utf8).write(to: url)
         #expect(Changelog.load(url) == nil)
@@ -76,11 +76,9 @@ struct WhatsNewTests {
         }
     }
 
-    @Test("the app's version is the changelog's")
-    func version() throws {
+    @Test("the bundled list is the generator's")
+    func bundled() throws {
         let bundled = try #require(Bundle.main.url(forResource: "changelog", withExtension: "json").flatMap(Changelog.load), "changelog.json is bundled")
-        #expect(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == bundled.version,
-                "MARKETING_VERSION (app/Version.xcconfig) is what tools/whatsnew/gen.js wrote")
         #expect(Changelog.bundled == bundled)
     }
 }

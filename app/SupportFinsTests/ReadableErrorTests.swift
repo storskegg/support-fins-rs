@@ -10,7 +10,7 @@ import Testing
 @Suite("Readable errors")
 struct ReadableErrorTests {
     nonisolated private static func file(_ name: String, _ bytes: Data) throws -> URL {
-        let url = URL(fileURLWithPath: NSTemporaryDirectory() + name)
+        let url = Scratch.root.appending(path: name)
         try bytes.write(to: url)
         return url
     }

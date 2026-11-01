@@ -48,7 +48,7 @@ sources and a thin hand-written Swift layer. The app depends on that package.
 ## Surface (M4a; extended in M4b)
 
 ```rust
-#[uniffi::export] fn engine_version() -> String;            // crate version + UPSTREAM commit
+#[uniffi::export] fn engine_version() -> String;            // crate version (= the app's) + UPSTREAM commit
 
 #[derive(uniffi::Object)] struct GpuBuffer;                  // Rust-owned, page-aligned
 impl GpuBuffer { fn address(&self) -> u64; fn len_bytes(&self) -> u64; fn stride(&self) -> u32; fn count(&self) -> u32; }

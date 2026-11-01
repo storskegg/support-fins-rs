@@ -10,6 +10,9 @@ final class SettingsSearch {
     private(set) var result: SearchEngine.Result?
     /// Bumped by Edit > Search Settings: the field takes the focus.
     private(set) var focusRequests = 0
+    /// The row a search led to ("Show in tab" in the inspector's results): marked like a match for a moment after the
+    /// box is cleared, in its own tab.
+    var revealed: String?
 
     @ObservationIgnored private var engine = SearchEngine()
     /// The window's state the rows depend on; set by `SearchFeature`.
@@ -71,10 +74,12 @@ struct FindRow<Content: View>: View {
         if !hides || (search?.shows(id) ?? true) {
             content
                 .overlay(alignment: .leading) {
-                    if search?.isHit(id) == true {
+                    if search?.isHit(id) == true || search?.revealed == id {
                         Rectangle().fill(Color.accentColor).frame(width: 3).offset(x: -10)
                     }
                 }
+                // where the inspector scrolls to when a search result is shown in its tab
+                .id(id)
         }
     }
 }

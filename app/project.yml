@@ -1,7 +1,8 @@
 # The source of truth for the Xcode project (`just app-project` generates app/SupportFins.xcodeproj, which is
 # git-ignored). The viewer and SupportFinsCore (track D, `just app-core` builds its XCFramework) are local packages.
 name: SupportFins
-# MARKETING_VERSION: generated from web/changelog.json (tools/whatsnew/gen.js)
+# MARKETING_VERSION: Cargo.toml's [workspace.package] version, written by tools/release/release.py (YYYY.WW.PATCH; docs/AGENTS.md
+# "Versioning and releases"). CFBundleVersion (the build number) is set by the app target's "Build number" script.
 configFiles:
   Debug: Version.xcconfig
   Release: Version.xcconfig
@@ -66,6 +67,19 @@ targets:
         # the compiler lists the strings the code localizes (.stringsdata): tools/i18n/parity.ts reads them
         SWIFT_EMIT_LOC_STRINGS: YES
         CODE_SIGN_ENTITLEMENTS: SupportFins/SupportFins.entitlements
+        # the Build number script runs git, which reads the repository's .git (outside any declared input)
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # The build number: CFBundleVersion is the commit count of HEAD (monotonic on main), written into the built
+    # Info.plist before Xcode signs the bundle, so About, crash reports and Help read "2026.44.0 (1234)". Every build,
+    # since a new commit changes no input Xcode sees; without git (a source tarball) it stays CURRENT_PROJECT_VERSION, 0.
+    postBuildScripts:
+      - name: Build number
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          n="$(git -C "${SRCROOT}" rev-list --count HEAD 2>/dev/null || true)"
+          case "$n" in ''|*[!0-9]*) exit 0 ;; esac
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $n" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
     info:
       path: SupportFins/Info.plist
       properties:

@@ -98,7 +98,7 @@ i18n-check: app-uibuild
 tippics-gen *args:
     deno run -A --config tools/tippics/deno.json tools/tippics/gen.ts {{args}}
 
-# What's new (web/changelog.json) as the app's changelog.json and its version (app/Version.xcconfig); `--check` is in `just gate`.
+# What's new (web/changelog.json, the web's releases) as the app's changelog.json; `--check` is in `just gate`.
 whatsnew-gen *args:
     deno run -A --no-config tools/whatsnew/gen.js {{args}}
 
@@ -107,7 +107,18 @@ whatsnew-gen *args:
 swift-warnings: app-core app-project
     tools/gate/swift_warnings.py
 
-# A Release build carries none of the UI-test hooks (-SFChangelogFixture, -SFCrashDir, -SFPlantCrash; X-15) and a Debug
+# A Release build carries none of the UI-test hooks (-SFChangelogFixture, -SFCrashDir, -SFPlantCrash, -SFIsolatedDefaults; X-15) and a Debug
 # build does. Two full builds, so not part of `just gate`; run it when a hook is added.
 app-release-hooks: app-core app-project
     tools/lock/lock.py app-release-hooks -- tools/gate/release_hooks.sh {{xcode_jobs}}
+
+# Make a release, vYYYY.WW.PATCH (ISO week-year and week; docs/AGENTS.md "Versioning and releases"): refuses a dirty tree or a
+# HEAD that is not origin/main, writes the version (Cargo.toml, app/Version.xcconfig), commits "Release vX", tags it, builds
+# the Release app and installs it to /Applications. Local only unless `--push`; `--dry-run` prints the version it would make.
+release *args:
+    python3 tools/release/release.py {{args}}
+
+# The release script's version computation (tools/release/test_release.py) and app/Version.xcconfig against Cargo.toml.
+# Part of `just gate`.
+version-check:
+    python3 -m unittest discover -s tools/release -v

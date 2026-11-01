@@ -88,7 +88,7 @@ struct FeatureSetTests {
             #expect(set.statusLines.map(\.text) == ["PB", "PA"])
             #expect(set.toolbarSlots.map(\.id) == ["PB", "PC", "PA"])
             #expect(set.inspectorSections(.basics).map(\.id) == ["PC", "PB", "PA"])
-            #expect(set.inspectorSections(.top).isEmpty)
+            #expect(set.inspectorSections(.part).isEmpty)
         }
     }
 
@@ -159,7 +159,10 @@ struct FeatureSetTests {
         #expect(model.features.overlays.map(\.id) == expected)
         #expect(model.toolbar.slots.map(\.id) == ["move", "arrange", "rotate", "scale-badge", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
-        #expect(model.features.inspectorSections(.top).map(\.id) == ["search-field", "search-note", "readout", "report"])
+        // the search box above the inspector's tabs; the stats and status cards and the report links in the Part tab
+        #expect(model.features.inspectorSections(.header).map(\.id) == ["search-field", "search-note"])
+        #expect(model.features.inspectorSections(.part).map(\.id) == ["readout", "report"])
+        #expect(model.features.inspectorSections(.plateTies).map(\.id) == ["plate-ties"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)
         #expect(model.features.inspectorSections(.stats).map(\.id) == ["plate-part-buttons"])
         #expect(model.features.inspectorSections(.basics).map(\.id) == ["augment", "remove-fins", "draw-controls"])
@@ -186,7 +189,8 @@ struct FeatureSetTests {
                      "  Lay a Face Flat", "  -", "  Move", "  Arrange", "  -", "  Scale…", "  -", "  Suggest Orientation", "  Strength Arrow…"]
         let file = ["File", "  Export", "  > STL", "  > 3MF", "  > Fins only (STL)", "  Export Again [e]", "  Add Model to Plate…"]
         let edit = ["Edit", "  Remove Model from Plate", "  -", "  Copy Build Settings", "  -", "  Search Settings [⌥⌘f]"]
-        let help = ["Help", "  Calibration Prints…", "  Full Calibration Guide", "  -", "  Support Fins on GitHub", "  Support the project", "  Report a problem", "  Show crash reports"]
+        let help = ["Help", "  Calibration Prints…", "  Full Calibration Guide", "  -", "  Support Fins on GitHub", "  Support the project", "  Report a problem", "  Show crash reports",
+                    "  -", "  (Version \(AppVersion.display))"]
         // no window focused
         #expect(FeatureSet.menuSnapshot(in: nil) == view + model + file + edit + help)
         // a window with nothing to export: the same items (the note under Export appears once there is a build)

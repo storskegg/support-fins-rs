@@ -196,9 +196,16 @@ here in the PR that makes it; one that is not listed fails review.
 | An Esc, Back or Undo pressed while a Draw check runs cancels that click. | Timing only. In the web the check is synchronous, so it finishes first and the key applies after. | #225 |
 | A build whose bed pad or overhang sampling would exceed a budget fails with `LimitExceeded` (`Dimension`): the brim pad's first-layer outline buckets (32 million cells), its lattice (8 million blocks), the Sure hold pad's rings (100,000), and one walk of the leftover overhang faces (32 million sub-triangles, counting faces of 256 or more). So does one whose bucket or fraction counter could no longer advance (past 2^53). The bucketing and the overhang sampling poll the cancel flag every 4096 cells. | The JS runs out of memory or never ends (X-07: a part loaded past the 2 m limit). Any part within the load limits stays under every budget in any pose, so the corpora and hashes are unchanged. | #235 |
 
+App-only UI, no engine change: with a resin printer profile the Printer section shows the profile's Pixel size instead of the
+Nozzle menu, and the Printer row's summary names the pixel instead of the nozzle; the engine still gets the nozzle setting.
+
 Also not literal, but not engine divergences: a failed open shows the translated prefix of the web's English-only alert (#212),
 the app adds a "Load anyway?" prompt over the load limits where the JS drops or loads silently (#221), and the app has crash
 reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and searches (#213, #220, #223, #224, #228).
+
+App-only UI (post-parity, no engine change): the inspector is tabbed (Part, Supports, More, Plate ties) under the search box,
+where the web's options panel is one long column; More settings shows its four groups unfolded in the More tab; a search
+shows the matches of every tab at once, each tab's after a button that shows them in their tab (suggestion S3, 2026-11-01).
 
 ## Pitfalls
 
@@ -212,6 +219,10 @@ reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and se
 - **A bare `[i]` inside `#expect` crashes the test host** when `i` is out of range, and the macOS crash dialog follows.
   Guard it with `#require` (or `try #require(a.indices.contains(i))`) first.
 - **Accessibility identifiers** on a container hide the identified elements inside it (bugs #204 and #206).
+- **Preferences go through `AppDefaults.shared`**, never `UserDefaults.standard`. The test host and the UI tests' app
+  (`-SFIsolatedDefaults YES`, set by `PartWindowUITestCase`) then use a suite of their own, emptied each launch, and never
+  read or write the user's preferences (the installed app shares the container: a remembered 0.05 mm layer height broke
+  PlateTiesTests). A store takes its `defaults` from it; a test that needs a clean slate passes its own suite.
 
 ## Licences and Acknowledgements
 
@@ -220,6 +231,26 @@ Support Fins ▸ Acknowledgements… window shows `app/SupportFins/Resources/Ack
 writes from Cargo.lock (OpenCascade with its LGPL relinking note, Manifold, uniffi, then every shipped crate with its licence
 text). The gate fails when the file is stale: after a dependency change run `tools/licenses/gen.py`. A crate under a licence
 outside the allow-list fails both, so adding one is a decision to make in `deny.toml` and the script's `ALLOWED` together.
+
+## Versioning and releases
+
+- **The version is YYYY.WW.PATCH**: the ISO 8601 week-year, the ISO week (Monday start, 1-53, no leading zero:
+  `2026.5.0`), and PATCH, 0 for the week's first release and +1 for each later one that week (`2026.49.0`,
+  `2026.49.1`). It is the app's own: What's new keeps listing the web's releases (`tools/whatsnew/gen.js`), which
+  no longer set it.
+- **One source of truth:** `[workspace.package] version` in `Cargo.toml`. The engine's `engine_version()`, the CLI's
+  `--build-info` and the engine's crash reports read it at compile time; `app/Version.xcconfig` (`MARKETING_VERSION`) is
+  written from it by `tools/release/release.py`. Don't edit either by hand: the gate's `version` step fails when they
+  disagree.
+- **The build number** (`CFBundleVersion`) is `git rev-list --count HEAD`, written into the built Info.plist by the app
+  target's "Build number" script (app/project.yml). About Support Fins, the crash report header (`appVersion`), the last
+  line of the Help menu and the report link show "2026.44.0 (1234)" (`AppVersion`).
+- **The CLI's `--version`** stays the web command line's (`support-fins 0.7.0`: cli-parity compares it);
+  `support-fins --build-info` prints ours.
+- **Releasing** is the user's: `just release --dry-run` prints the next version; `just release` refuses a dirty tree or
+  a HEAD that is not `origin/main`, writes the version, commits "Release vX", tags `vX`, builds the Release app and
+  installs it to `/Applications/Support Fins.app`. It pushes the commit and the tag only with `--push`. Agents never
+  run `just release`. The version computation's tests are `tools/release/test_release.py` (the gate's `version` step).
 
 ## PR body template
 

@@ -27,7 +27,7 @@ final class ViewSettings {
 
     static let liveDragKey = "sf.rebuildWhileDragging"
 
-    init(controller: ViewerController?, defaults: UserDefaults = .standard) {
+    init(controller: ViewerController?, defaults: UserDefaults = AppDefaults.shared) {
         self.controller = controller
         self.defaults = defaults
         rebuildWhileDragging = defaults.object(forKey: Self.liveDragKey) == nil ? true : defaults.bool(forKey: Self.liveDragKey)
