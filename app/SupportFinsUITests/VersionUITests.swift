@@ -5,8 +5,9 @@ import XCTest
 /// CFBundleShortVersionString and CFBundleVersion, which the Build number script sets).
 final class VersionUITests: PartWindowUITestCase {
     /// "Version <semver> (<build>)", the build a positive number (the script ran; it is 0 without it)
-    static let shown = NSPredicate(format: "title MATCHES %@ OR value MATCHES %@ OR label MATCHES %@",
-                                   pattern, pattern, pattern)
+    static var shown: NSPredicate {
+        NSPredicate(format: "title MATCHES %@ OR value MATCHES %@ OR label MATCHES %@", pattern, pattern, pattern)
+    }
     static let pattern = #"Version \d+\.\d+\.\d+ \([1-9]\d*\)"#
 
     func testTheHelpMenuEndsWithTheVersionAndBuild() throws {
