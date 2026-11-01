@@ -218,7 +218,13 @@ struct BuildWiringTests {
         var s = w.session.settings
         s.nozzle = 0.6
         w.session.setSettings(s)
-        #expect(ex.fileName(for: .stl) == "wiring-tests-bracket-fins-0.6nozzle-0.2layer.stl")
+        // the default printer is a resin one: its fins are built in 0.4 mm lines whatever nozzle is saved, and the name
+        // says what they were built with (an FDM printer's is `ResinNozzleTests`')
+        try #require(PrinterProfileStore.shared.current?.isResin == true)
+        #expect(ex.fileName(for: .stl) == "wiring-tests-bracket-fins-0.4nozzle-0.2layer.stl")
+        s.layerHeight = 0.1
+        w.session.setSettings(s)
+        #expect(ex.fileName(for: .stl) == "wiring-tests-bracket-fins-0.4nozzle-0.1layer.stl")
     }
 
     @Test func aNewFileStartsOver() async throws {

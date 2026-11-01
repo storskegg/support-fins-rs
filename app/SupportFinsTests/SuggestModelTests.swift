@@ -162,8 +162,10 @@ struct SuggestModelTests {
         let mine = try await ranked()
         #expect(mine != plain, "the window's settings changed nothing")
         let direct = SuggestModel(part: window.session.parts.first?.part, pose: FakePose().access)
-        direct.rank(thresholdDegrees: window.controller?.thresholdDegrees ?? 45, optionsJSON: changed.optionsJSON(),
-                    tunablesJSON: changed.tunablesJSON(), currentBore: 0, density: FinReadout.materialDensity)
+        // as the build takes them on the printer picked (a resin printer's nozzle is 0.4: `FinSettings.forBuild`)
+        let built = changed.forBuild()
+        direct.rank(thresholdDegrees: window.controller?.thresholdDegrees ?? 45, optionsJSON: built.optionsJSON(),
+                    tunablesJSON: built.tunablesJSON(), currentBore: 0, density: FinReadout.materialDensity)
         #expect(await eventually(60) { !direct.isRanking })
         guard case .ready(let want) = direct.state else { Issue.record("\(direct.state)"); return }
         #expect(mine.rows.map(\.rot) == want.rows.map(\.rot) && mine.rows.map(\.volume) == want.rows.map(\.volume))

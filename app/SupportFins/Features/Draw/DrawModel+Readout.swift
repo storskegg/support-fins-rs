@@ -39,7 +39,7 @@ extension DrawModel {
     func sweepNow() -> DrawnSource {
         guard session.finsOn, drawShown, !session.drawnWalls.isEmpty, let core = session.parts.first else { return .none }
         if sweepCurrent && sweptIDs == session.drawnWalls.map(\.id) { return sweep.map { .ready($0) } ?? .none }
-        let s = session.settings
+        let s = session.settings.forBuild()
         let part = core.part, rot = session.pose.columnMajor, threshold = s.threshold
         let settings = s.drawSettingsJSON(), tunables = s.tunablesJSON()
         let auto = autoLike ? host?.wiring?.build?.latest : nil

@@ -62,11 +62,35 @@ extension PrinterProfileInfo {
     /// A resin printer's pixel (x, y, mm); nil for an FDM printer or a profile without one.
     var resinPixel: [Double]? { kind == "resin" && pixelSize.count == 2 ? pixelSize : nil }
 
+    /// A resin printer's profile: no nozzle, so the build takes `FinSettings.resinNozzle`.
+    var isResin: Bool { kind == "resin" }
+
     /// The printer's usual layer (`layerHeights.default`), held to the Layer height field's range.
     var layerHeight: Double {
         let r = FinSettings.layerHeightLimits.range
         return min(max(layerHeightDefault, r.lowerBound), r.upperBound)
     }
+}
+
+extension FinSettings {
+    /// The nozzle a resin printer builds with (app-only): its Nozzle row is hidden (#255), so the walls, contact tips
+    /// and tines take the default 0.4 mm lines, not a nozzle saved for an FDM printer.
+    static let resinNozzle = 0.4
+
+    /// These settings as the engine builds them on `printer`: a resin printer's nozzle is `resinNozzle`; everything
+    /// else, and every setting on an FDM printer or none, as it is. The saved nozzle stays the user's, so an FDM printer
+    /// picked again builds with it.
+    func forBuild(on printer: PrinterProfileInfo?) -> FinSettings {
+        guard printer?.isResin == true else { return self }
+        var s = self
+        s.nozzle = Self.resinNozzle
+        return s
+    }
+
+    /// These settings as the engine builds them on the printer picked (`PrinterProfileStore`): what every build,
+    /// export, Draw sweep, Suggest ranking, calibration print and crash report takes. Read in an observation (the
+    /// window's build key), a pick of another printer rebuilds.
+    @MainActor func forBuild(_ store: PrinterProfileStore = .shared) -> FinSettings { forBuild(on: store.current) }
 }
 
 /// The Printer section's first row: which printer the plate ties are made for.

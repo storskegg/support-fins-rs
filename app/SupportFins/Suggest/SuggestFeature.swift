@@ -41,7 +41,7 @@ final class SuggestFeature: Feature {
 
     private static func rank(_ suggest: SuggestModel, in host: ViewerModel) {
         guard let controller = host.controller else { return }
-        let settings = host.session.settings
+        let settings = host.session.settings.forBuild()
         suggest.rank(thresholdDegrees: controller.thresholdDegrees, optionsJSON: settings.optionsJSON(),
                      tunablesJSON: settings.tunablesJSON(),
                      currentBore: host.wiring?.build?.summary?.boreWalls ?? 0,

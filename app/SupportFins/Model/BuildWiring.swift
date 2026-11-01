@@ -7,7 +7,8 @@ import Viewer
 ///
 /// - **Builds** (`BuildController`): a pose or settings change refreshes 180 ms after the last one
 ///   (`debouncedRefresh`), the Add fins toggle at once. Only settings the engine takes cause a rebuild: the
-///   request is the pose, `FinSettings.optionsJSON()` and `tunablesJSON()`, so a display-only setting (Highlight small
+///   request is the pose, `FinSettings.optionsJSON()` and `tunablesJSON()` (on the printer picked: a resin printer
+///   builds with a 0.4 mm nozzle, `FinSettings.forBuild`), so a display-only setting (Highlight small
 ///   overhangs) changes nothing there.
 /// - **Dragging a ring**: with "Rebuild While Dragging" on (the default; `liveDrag`), the fins are rebuilt live at the
 ///   latest pose (`BuildController.refreshLive`) and drawn pale only while they lag the pose; the release does the
@@ -61,7 +62,7 @@ final class BuildWiring {
         let build = kept ?? BuildModel(part: first.part)
         let scheduler = BuildController(
             driver: build,
-            request: { [session] in BuildRequest(rotation: session.pose.columnMajor, settings: session.settings) },
+            request: { [session] in BuildRequest(rotation: session.pose.columnMajor, settings: session.settings.forBuild()) },
             sleep: sleep)
         let removal = RemovalModel(
             build: build,
@@ -73,7 +74,7 @@ final class BuildWiring {
             build: build, finsOn: { [session] in session.finsOn },
             source: { [session, controller] in
                 session.parts.first.map {
-                    .init(partName: $0.info.name, part: $0.part, nozzle: session.settings.nozzle,
+                    .init(partName: $0.info.name, part: $0.part, nozzle: session.settings.forBuild().nozzle,
                           layerHeight: session.settings.layerHeight, pose: session.pose.columnMajor,
                           threshold: session.settings.threshold,
                           bed: [Double(controller.volume.x), Double(controller.volume.y)],
@@ -88,7 +89,8 @@ final class BuildWiring {
         self.removal = removal
         self.exporter = exporter
         controller.renderer.setSupports(nil)
-        CrashReporter.setSettings(options: session.settings.optionsJSON(), tunables: session.settings.tunablesJSON())
+        let built = session.settings.forBuild()
+        CrashReporter.setSettings(options: built.optionsJSON(), tunables: built.tunablesJSON())
         watch()
         // the session's toggle may already be on (a second file in the window)
         scheduler.setEnabled(session.finsOn, reusing: kept != nil)
@@ -161,10 +163,13 @@ final class BuildWiring {
         var removed: Set<FinKey>
     }
 
+    /// The settings go in as the engine builds them on the printer picked (`FinSettings.forBuild`): read here, a pick
+    /// of another printer is a change too.
     var key: Key {
-        Key(pose: session.pose, options: session.settings.optionsJSON(),
-            tunables: session.settings.tunablesJSON(), finsOn: session.finsOn,
-            dragging: session.ringDragging, drags: session.ringDrags, mode: session.settings.mode, removed: session.removedFins)
+        let built = session.settings.forBuild()
+        return Key(pose: session.pose, options: built.optionsJSON(),
+                   tunables: built.tunablesJSON(), finsOn: session.finsOn,
+                   dragging: session.ringDragging, drags: session.ringDrags, mode: session.settings.mode, removed: session.removedFins)
     }
 
     /// Re-arming `withObservationTracking`: `onChange` fires once, just before the first change, so the reaction runs

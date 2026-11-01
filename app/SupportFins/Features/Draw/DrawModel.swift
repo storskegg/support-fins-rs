@@ -193,7 +193,7 @@ final class DrawModel {
 
     var syncKey: SyncKey {
         SyncKey(pose: session.pose, threshold: session.settings.threshold, settings: session.settings.drawSettingsJSON(),
-                tunables: session.settings.tunablesJSON(), parts: session.parts.map { ObjectIdentifier($0) },
+                tunables: session.settings.forBuild().tunablesJSON(), parts: session.parts.map { ObjectIdentifier($0) },
                 walls: session.drawnWalls, finsOn: session.finsOn, mode: session.settings.mode, addByHand: session.addByHand,
                 swayOn: session.settings.sway, build: build?.latest.map { ObjectIdentifier($0) }, building: build?.building ?? false,
                 removed: session.removedFins, facePicking: controller?.facePicking ?? false,
@@ -258,7 +258,7 @@ final class DrawModel {
     private var wantedKit: KitKey? {
         guard let part = session.parts.first, drawShown || drawActive || braceActive else { return nil }
         return KitKey(part: ObjectIdentifier(part), rot: session.pose.columnMajor, threshold: session.settings.threshold,
-                      settings: session.settings.drawSettingsJSON(), tunables: session.settings.tunablesJSON())
+                      settings: session.settings.drawSettingsJSON(), tunables: session.settings.forBuild().tunablesJSON())
     }
 
     /// The pose the supports are stood for is the session's (not lagging behind a turn in progress).
