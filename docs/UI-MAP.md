@@ -62,7 +62,7 @@ stored inside the exported 3MF, `ui/session.js`) come back with M7 (done: a 3MF 
 | `vy` | number |  |  | 20..2000 step 1 | depth | index.html:98; ui/volume.js:30 | Custom volume sheet: depth field | M4b |
 | `vz` | number |  |  | 20..2000 step 1 | height | index.html:99; ui/volume.js:30 | Custom volume sheet: height field | M4b |
 | `thr` | range | Overhang 45° | 45 | 30..70 step 1 | Surface angle from the plate below which a face needs support. | index.html:104; ui/part.js:503 | Toolbar slider with value label (Overhang) | M4b |
-| `fins-toggle` | button | Add fins |  |  |  | index.html:108; ui/settings.js:351 | Toolbar toggle button "Add fins" | M4b |
+| `fins-toggle` | button | Add fins |  |  |  | index.html:108; ui/settings.js:351 | Toolbar toggle button "Add fins", always with its title (the toolbar would draw only the icon, S2); while off, the stats card's Fins row also offers an "Add fins" button (`stat-add-fins`) | M4b |
 | `export` | button | Export ▾ |  |  |  | index.html:112; ui/export.js:189 | File > Export… menu and toolbar menu button | M4b |
 | `export-arrange` | button | Arrange first |  |  |  | index.html:117; ui/export.js:214 | Menu item "Arrange first" (shown only when models overlap) | M6 |
 | `export-stl` | button | STL |  |  | Part and fins merged into one solid. | index.html:118; ui/export.js:199 | Export > STL | M4b |

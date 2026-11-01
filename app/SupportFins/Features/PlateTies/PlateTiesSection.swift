@@ -31,6 +31,11 @@ struct PlateTiesSection: View {
         FindBlock(.plateTies) {
             Section {
                 DisclosureGroup(isExpanded: search?.expandedBinding(.plateTies, user: $open) ?? $open) {
+                    if model.state.on, model.alone {
+                        Text(model.aloneNote).font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("plate-ties-alone")
+                    }
                     if model.state.on, let s = model.settings { fields(s) }
                     if let e = model.settingsError {
                         Text(verbatim: e).font(.caption).foregroundStyle(.red).accessibilityIdentifier("plate-ties-error")

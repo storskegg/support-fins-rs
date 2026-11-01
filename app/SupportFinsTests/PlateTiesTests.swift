@@ -356,7 +356,8 @@ struct PlateTiesTests {
         #expect(back.settings?.maxGap == 6.5 && back.settings?.tiesPerPair == 2)
         #expect(back.state.disabled.count == 1)
         let ob = try #require(other.features[PlatesFeature.self]?.board)
-        #expect(ob.lockReason() != nil && ob.plate.ties.on)
+        // one model: the ties it carries are in its mesh, and nothing on the plate is locked (S2)
+        #expect(ob.lockReason() == nil && ob.plate.ties.on)
         // the document round-trips: the same settings written back
         #expect(await back.settled())
         let doc = try #require(try plateTiesOf3mf(path: url.path))
@@ -458,6 +459,11 @@ struct PlateTiesTests {
         defer { withExtendedLifetime(model) {} }
         let feature = try #require(model.features[PlateTiesFeature.self])
         let (volumes, settings) = (VolumeStore(defaults: defaults), SettingsStore(defaults: defaults))
+        // a layer the printer does not set: the window's first settings come from the test host's own saved ones,
+        // which may already say 0.05 (then the undo below could not tell)
+        var first = model.session.settings
+        first.layerHeight = 0.2
+        model.session.setSettings(first)
         feature.useProfile(saturn, volumes: volumes, store: settings)
         let bed = PrinterVolume(x: 211.68, y: 118.37, z: 220)
         #expect(model.controller?.volume == bed)
@@ -471,7 +477,7 @@ struct PlateTiesTests {
         #expect(model.wiring?.exporter?.optionsJSON(for: .threeMF)?.contains("\"bed\":[211.6") == true)
         // one undo step
         model.session.undo()
-        #expect(model.session.settings.layerHeight != 0.05)
+        #expect(model.session.settings.layerHeight == 0.2)
         model.session.redo()
         // changed by hand afterwards: the printer stays picked, the hand-set values hold
         model.controller?.volume = PrinterVolume.standard

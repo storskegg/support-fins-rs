@@ -1031,6 +1031,30 @@
     "ar": "روابط اللوحة: لا نماذج متجاورة لربطها على هذه اللوحة.",
     "nl": "Plaatverbindingen: geen buren om te verbinden op deze plaat."
   },
+  "Plate ties join separate models, and this plate has one: its {n} objects were merged into one part. To tie them, load each object as its own model (pick one, then Add model for each of the others) instead of merging them.": {
+    "why": "Plate ties (issue #50): status card and section, ties on with one merged part on the plate (S2)",
+    "de": "Plattenstege verbinden getrennte Modelle, und auf dieser Platte liegt nur eines: seine {n} Objekte wurden zu einem Teil zusammengeführt. Um sie zu verbinden, lade jedes Objekt als eigenes Modell (eines wählen, dann für jedes weitere Modell hinzufügen), statt sie zusammenzuführen.",
+    "zh": "平台连接条连接的是分开的模型，而此平台上只有一个：它的 {n} 个对象已合并为一个零件。要连接它们，请把每个对象作为单独的模型载入（先选一个，再为其余每个使用“添加模型”），不要合并。",
+    "pt": "As ligações da placa unem modelos separados, e esta placa tem só um: os seus {n} objetos foram unidos numa só peça. Para os ligar, carregue cada objeto como modelo próprio (escolha um e depois Adicionar modelo para cada um dos outros) em vez de os unir.",
+    "ar": "روابط اللوحة تربط نماذج منفصلة، وعلى هذه اللوحة نموذج واحد: دُمجت كائناته الـ {n} في جزء واحد. لربطها، حمّل كل كائن نموذجًا مستقلًا (اختر واحدًا، ثم «إضافة نموذج» لكل من البقية) بدل دمجها.",
+    "nl": "Plaatverbindingen verbinden losse modellen, en deze plaat heeft er één: de {n} objecten zijn samengevoegd tot één onderdeel. Laad elk object als eigen model (kies er één, dan Model toevoegen voor elk van de andere) in plaats van ze samen te voegen om ze te verbinden."
+  },
+  "Plate ties join separate models, and this plate has one. Use Add model to put the models to tie on the plate.": {
+    "why": "Plate ties (issue #50): status card and section, ties on with one model on the plate (S2)",
+    "de": "Plattenstege verbinden getrennte Modelle, und auf dieser Platte liegt nur eines. Lege mit Modell hinzufügen die zu verbindenden Modelle auf die Platte.",
+    "zh": "平台连接条连接的是分开的模型，而此平台上只有一个。请用“添加模型”把要连接的模型放到平台上。",
+    "pt": "As ligações da placa unem modelos separados, e esta placa tem só um. Use Adicionar modelo para pôr na placa os modelos a ligar.",
+    "ar": "روابط اللوحة تربط نماذج منفصلة، وعلى هذه اللوحة نموذج واحد. استخدم «إضافة نموذج» لوضع النماذج المراد ربطها على اللوحة.",
+    "nl": "Plaatverbindingen verbinden losse modellen, en deze plaat heeft er één. Zet met Model toevoegen de te verbinden modellen op de plaat."
+  },
+  "The supports could not be built: {why} Change a setting or the pose to try again.": {
+    "why": "status card: the fin build failed (the web shows its page error badge; the app showed nothing, S2)",
+    "de": "Die Stützen konnten nicht erzeugt werden: {why} Ändere eine Einstellung oder die Lage, um es erneut zu versuchen.",
+    "zh": "无法生成支撑：{why} 请更改设置或姿态后重试。",
+    "pt": "Não foi possível gerar os suportes: {why} Mude uma definição ou a posição para tentar de novo.",
+    "ar": "تعذّر إنشاء الدعامات: {why} غيّر إعدادًا أو الوضعية للمحاولة مجددًا.",
+    "nl": "De steunen konden niet worden gemaakt: {why} Wijzig een instelling of de stand om het opnieuw te proberen."
+  },
   "Plate ties: {placed} of {requested} ties on {pairs} pairs": {
     "why": "Plate ties (issue #50): the app's own feature, the web has none: status card: what the ties came to",
     "de": "Plattenstege: {placed} von {requested} Stegen an {pairs} Paaren",

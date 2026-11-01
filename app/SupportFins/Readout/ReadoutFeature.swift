@@ -18,4 +18,19 @@ final class ReadoutFeature: Feature {
             }
         }]
     }
+
+    /// A build that failed says so, in red, with the engine's words (S2: a failed build left Fins "—" and nothing else).
+    var statusLines: [StatusLine] {
+        guard let host else { return [] }
+        return Self.buildFailure(finsOn: host.session.finsOn, building: host.wiring?.build?.building ?? false,
+                                 error: host.wiring?.build?.error)
+    }
+
+    static func buildFailure(finsOn: Bool, building: Bool, error: String?) -> [StatusLine] {
+        guard finsOn, !building, let error, !error.isEmpty else { return [] }
+        let why = error.hasSuffix(".") ? error : error + "."
+        return [StatusLine("build-error", order: 5,
+                           text: JS.t("The supports could not be built: {why} Change a setting or the pose to try again.", ["why": why]),
+                           color: .primary, bar: StatusCard.red)]
+    }
 }

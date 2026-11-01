@@ -10924,6 +10924,76 @@
         }
       }
     },
+    "Plate ties join separate models, and this plate has one. Use Add model to put the models to tie on the plate." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege verbinden getrennte Modelle, und auf dieser Platte liegt nur eines. Lege mit Modell hinzufügen die zu verbindenden Modelle auf die Platte."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条连接的是分开的模型，而此平台上只有一个。请用“添加模型”把要连接的模型放到平台上。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As ligações da placa unem modelos separados, e esta placa tem só um. Use Adicionar modelo para pôr na placa os modelos a ligar."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة تربط نماذج منفصلة، وعلى هذه اللوحة نموذج واحد. استخدم «إضافة نموذج» لوضع النماذج المراد ربطها على اللوحة."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen verbinden losse modellen, en deze plaat heeft er één. Zet met Model toevoegen de te verbinden modellen op de plaat."
+          }
+        }
+      }
+    },
+    "Plate ties join separate models, and this plate has one: its %lld objects were merged into one part. To tie them, load each object as its own model (pick one, then Add model for each of the others) instead of merging them." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plattenstege verbinden getrennte Modelle, und auf dieser Platte liegt nur eines: seine %1$lld Objekte wurden zu einem Teil zusammengeführt. Um sie zu verbinden, lade jedes Objekt als eigenes Modell (eines wählen, dann für jedes weitere Modell hinzufügen), statt sie zusammenzuführen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台连接条连接的是分开的模型，而此平台上只有一个：它的 %1$lld 个对象已合并为一个零件。要连接它们，请把每个对象作为单独的模型载入（先选一个，再为其余每个使用“添加模型”），不要合并。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As ligações da placa unem modelos separados, e esta placa tem só um: os seus %1$lld objetos foram unidos numa só peça. Para os ligar, carregue cada objeto como modelo próprio (escolha um e depois Adicionar modelo para cada um dos outros) em vez de os unir."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "روابط اللوحة تربط نماذج منفصلة، وعلى هذه اللوحة نموذج واحد: دُمجت كائناته الـ %1$lld في جزء واحد. لربطها، حمّل كل كائن نموذجًا مستقلًا (اختر واحدًا، ثم «إضافة نموذج» لكل من البقية) بدل دمجها."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatverbindingen verbinden losse modellen, en deze plaat heeft er één: de %1$lld objecten zijn samengevoegd tot één onderdeel. Laad elk object als eigen model (kies er één, dan Model toevoegen voor elk van de andere) in plaats van ze samen te voegen om ze te verbinden."
+          }
+        }
+      }
+    },
     "Plate ties: every link on this plate is turned off." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15423,6 +15493,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "De in dit bestand opgeslagen instellingen konden niet worden gelezen; de standaardwaarden worden gebruikt."
+          }
+        }
+      }
+    },
+    "The supports could not be built: %@ Change a setting or the pose to try again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Stützen konnten nicht erzeugt werden: %1$@ Ändere eine Einstellung oder die Lage, um es erneut zu versuchen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法生成支撑：%1$@ 请更改设置或姿态后重试。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível gerar os suportes: %1$@ Mude uma definição ou a posição para tentar de novo."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر إنشاء الدعامات: %1$@ غيّر إعدادًا أو الوضعية للمحاولة مجددًا."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De steunen konden niet worden gemaakt: %1$@ Wijzig een instelling of de stand om het opnieuw te proberen."
           }
         }
       }

@@ -14,11 +14,10 @@ struct PlacementSection: View {
     private var picker: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Placement")
-            HStack(spacing: 0) {
+            HStack(spacing: 2) {
                 ForEach(Self.modes, id: \.0) { mode, title in
                     Button(title) { settings.mode = mode }
-                        .buttonStyle(.bordered)
-                        .tint(settings.mode == mode ? .accentColor : nil)
+                        .buttonStyle(ModeSegmentStyle(selected: settings.mode == mode))
                         .tipCard(JS.t("Who places the support."))
                         .accessibilityIdentifier("fin-mode-\(mode.rawValue)")
                         .accessibilityAddTraits(settings.mode == mode ? .isSelected : [])
@@ -26,5 +25,22 @@ struct PlacementSection: View {
             }
             Text(settings.modeNote).font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// One of the Placement buttons: the chosen mode filled with the accent colour, the others plain, whether or not the
+/// window is the key one. (`.bordered` tinted with the accent drew the chosen mode paler than the others on macOS 26,
+/// so Auto, chosen, looked switched off: S2, November 2026.)
+struct ModeSegmentStyle: ButtonStyle {
+    var selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(selected ? Color.accentColor : Color.primary.opacity(0.08)))
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .contentShape(Rectangle())
     }
 }
