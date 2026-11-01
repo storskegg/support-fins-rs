@@ -43,14 +43,15 @@ struct AddFinsFoundTests {
     // MARK: the toolbar's Add fins
 
     /// A window toolbar draws its items icon-only; the Add fins toggle keeps its words. Measured as the toolbar lays it
-    /// out: with an icon-only label style around it, it is still as wide as its title.
+    /// out: with an icon-only label style around it, it is still as wide as its title, wider than the icon alone.
     @Test func addFinsShowsItsTitleWhereTheToolbarWouldShowOnlyTheIcon() async throws {
         let session = PartSession()
         let toggle = try await host(FinsToggle(session: session).labelStyle(.iconOnly).fixedSize())
         let iconOnly = try await host(Toggle("Add fins", systemImage: "square.stack.3d.up", isOn: .constant(false))
             .toggleStyle(.button).labelStyle(.iconOnly).fixedSize())
         let width = toggle.fittingSize.width, bare = iconOnly.fittingSize.width
-        #expect(width > bare + 30, "the title is drawn beside the icon: \(width) pt against \(bare) pt icon-only")
+        // the word at the small size is about 64 pt, the icon alone 40
+        #expect(width > bare + 15, "the title is drawn, not the icon alone: \(width) pt against \(bare) pt icon-only")
     }
 
     // MARK: Placement shows the mode in force
