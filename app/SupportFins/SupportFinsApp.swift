@@ -9,7 +9,7 @@ struct SupportFinsApp: App {
         if CrashReporter.shouldStart(environment: ProcessInfo.processInfo.environment) {
             // the settings a new window starts with, until a window says otherwise, in the file the launch writes (S6: a
             // run killed before its first build reported none)
-            let s = SettingsStore().load()
+            let s = SettingsStore().load().forBuild()
             CrashReporter.setSettings(options: s.optionsJSON(), tunables: s.tunablesJSON())
             CrashReporter.shared.start()
         } else {

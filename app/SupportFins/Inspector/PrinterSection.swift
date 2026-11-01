@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Printer: the one-line summary with Edit / Done, unfolding to Nozzle, Layer height, Support gap and
 /// Interface material (`index.html:289-326`, `docs/UI-MAP.md` 4.1). With a resin printer profile (app-only, issue #50) the
-/// Nozzle row and the summary's nozzle give way to the printer's pixel size: a resin printer has no nozzle. The build still
-/// reads the Nozzle setting (the walls' and tines' widths), unchanged.
+/// Nozzle row and the summary's nozzle give way to the printer's pixel size: a resin printer has no nozzle. The build then
+/// takes 0.4 mm lines (`FinSettings.forBuild`); the Nozzle setting stays as saved, for an FDM printer.
 struct PrinterSection: View {
     @Binding var settings: FinSettings
     @Binding var open: Bool

@@ -85,7 +85,7 @@ extension PlateBoard {
         let base = ExportModel.base(of: first)
         let stem = models.count == 1 ? base : "\(base)-and-\(models.count - 1)-more"
         // a suggested name only: the plain one when the engine refuses
-        let name = (try? exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.nozzle, layerHeight: settings.settings.layerHeight))
+        let name = (try? exportFileName(base: stem, kind: .threeMf, nozzle: settings.settings.forBuild().nozzle, layerHeight: settings.settings.layerHeight))
             ?? "\(stem)-fins.3mf"
         return PlateWrite(models: models, fileName: name, stands: stands, keys: keys)
     }
@@ -102,7 +102,7 @@ extension PlateBoard {
         guard ps.finsOn else { return true }
         for m in plates[i].models {
             guard let s = m.stash else { continue }
-            let want = BuildRequest(rotation: s.pose.columnMajor, settings: ps.settings)
+            let want = BuildRequest(rotation: s.pose.columnMajor, settings: ps.settings.forBuild())
             if s.build.requested != want {
                 s.build.build(rotation: want.rotation, optionsJSON: want.optionsJSON, tunablesJSON: want.tunablesJSON)
             }

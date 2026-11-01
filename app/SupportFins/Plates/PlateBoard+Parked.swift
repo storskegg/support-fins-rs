@@ -11,7 +11,7 @@ import simd
 extension PlateBoard {
     /// The request the plate's settings make for `s`, or nil with the fins off (nothing is built or shown).
     func wantedRequest(for s: ParkedModel) -> BuildRequest? {
-        session.finsOn ? BuildRequest(rotation: s.pose.columnMajor, settings: session.settings) : nil
+        session.finsOn ? BuildRequest(rotation: s.pose.columnMajor, settings: session.settings.forBuild()) : nil
     }
 
     /// Greyed: built under settings the plate has since changed, or not built yet (`ghostLook`).

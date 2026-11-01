@@ -134,8 +134,8 @@ extension FinSettings {
     }
 
     /// The Printer row with the printer profile's pixel in place of the nozzle, for a resin printer (app-only: the web
-    /// has no printer profile): `"14×19 µm pixel · 0.05 layers · 0.2 gap"`. A resin printer has no nozzle to name, though
-    /// the build still sizes its walls by the Nozzle setting. `pixelSize` is the profile's (x, y) in mm; nil or not two
+    /// has no printer profile): `"14×19 µm pixel · 0.05 layers · 0.2 gap"`. A resin printer has no nozzle to name: the
+    /// build sizes its walls in 0.4 mm lines (`FinSettings.forBuild`). `pixelSize` is the profile's (x, y) in mm; nil or not two
     /// numbers (no profile, an FDM one) gives the web's line.
     func printerSummary(pixelSize: [Double]?) -> String {
         guard let p = pixelSize, p.count == 2 else { return printerSummary }

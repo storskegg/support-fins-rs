@@ -16,7 +16,7 @@ final class CalibrationFeature: Feature {
     static func tieInputs(_ host: ViewerModel) -> TiePrintInputs? {
         let store = PrinterProfileStore.shared
         guard let printer = store.current else { return nil }
-        let s = host.session.settings
+        let s = host.session.settings.forBuild()
         let bed = host.controller.map { [Double($0.volume.x), Double($0.volume.y)] } ?? []
         return TiePrintInputs(profile: printer.id, printer: printer.name, options: s.optionsJSON(), tunables: s.tunablesJSON(), bed: bed)
     }

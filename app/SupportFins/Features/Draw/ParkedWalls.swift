@@ -61,6 +61,7 @@ final class ParkedWalls {
 
     /// What `s` under `settings` asks to be stood, and Auto's build it stands clear of (none in Draw).
     private func request(for s: ParkedModel, settings: FinSettings) -> (Key, BuildResult?) {
+        let settings = settings.forBuild()
         let auto = settings.mode != .draw ? s.build.latest : nil
         let removed = auto == nil ? [] : s.build.matchedRemovals(of: s.removedFins).keys.sorted().map { UInt64($0) }
         return (Key(pose: s.pose.columnMajor, threshold: settings.threshold, settings: settings.drawSettingsJSON(),

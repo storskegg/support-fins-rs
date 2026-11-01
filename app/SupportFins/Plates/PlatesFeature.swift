@@ -99,8 +99,9 @@ final class PlatesFeature: Feature {
         var finsOn: Bool
 
         @MainActor init(session: PartSession) {
-            options = session.settings.optionsJSON()
-            tunables = session.settings.tunablesJSON()
+            let built = session.settings.forBuild()
+            options = built.optionsJSON()
+            tunables = built.tunablesJSON()
             mode = session.settings.mode
             finsOn = session.finsOn
         }
