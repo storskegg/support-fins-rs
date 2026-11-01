@@ -7,8 +7,14 @@ struct ContentView: View {
     let document: PartDocument
     @Environment(\.documentConfiguration) private var configuration
     @State private var model = ViewerModel()
-    @State private var inspector = true
+    @State private var inspector: Bool
     @Environment(\.undoManager) private var undoManager
+
+    /// `inspectorStarts`: whether the window opens with the inspector shown (it does; tests open it closed too).
+    init(document: PartDocument, inspectorStarts: Bool = true) {
+        self.document = document
+        _inspector = State(initialValue: inspectorStarts)
+    }
 
     var body: some View {
         let features = model.features!
@@ -17,6 +23,12 @@ struct ContentView: View {
             // Esc ends the armed mode wherever the focus is (the viewer handles it too when it has the keys)
             .onExitCommand { features.escape() }
             .environment(model.session)
+    }
+
+    private var inspectorToggle: some View {
+        Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector)
+            .accessibilityIdentifier("inspector-toggle")
+            .toolbarVisibilityPriority(.high)
     }
 
     private func featureLayers(_ features: FeatureSet) -> some View {
@@ -38,20 +50,30 @@ struct ContentView: View {
         .overlay { OverlayStack(overlays: overlays) }
         .environment(model.toolbar)
         .inspector(isPresented: $inspector) {
-            if let controller = model.controller {
-                InspectorView(controller: controller, settings: model.session.settingsBinding,
-                              top: features.inspectorSections(.top), basics: features.inspectorSections(.basics),
-                              bottom: features.inspectorSections(.bottom))
-                    .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
+            Group {
+                if let controller = model.controller {
+                    InspectorView(controller: controller, settings: model.session.settingsBinding,
+                                  top: features.inspectorSections(.top), basics: features.inspectorSections(.basics),
+                                  bottom: features.inspectorSections(.bottom))
+                }
+            }
+            .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
+            // the toggle is the inspector's own toolbar item: it sits over the inspector (at the window's end when the
+            // inspector is closed), and the window's items stay left of the inspector instead of running across its edge
+            .toolbar {
+                ToolbarSpacer(.flexible)
+                ToolbarItem { inspectorToggle }
             }
         }
         .toolbar {
-            ToolbarItem { if let controller = model.controller { VolumePicker(controller: controller) } }
-            ToolbarItem { OverhangSlider(session: model.session) }
-            ToolbarItem { FinsToggle(session: model.session) }
+            ToolbarItem { if let controller = model.controller { VolumePicker(controller: controller).toolbarVisibilityPriority(.low) } }
+            ToolbarItem { OverhangSlider(session: model.session).toolbarVisibilityPriority(.low) }
+            // its own capsule: without the spacer macOS draws Add fins in the Overhang slider's
+            ToolbarSpacer(.fixed)
+            ToolbarItem { FinsToggle(session: model.session).toolbarVisibilityPriority(.high) }
             ForEach(features.windowToolbarItems) { item in ToolbarItem { ContributionView(content: item.content) } }
-            ToolbarItem { Toggle("Inspector", systemImage: "sidebar.right", isOn: $inspector) }
         }
+        .background(WindowReader { ToolbarPriorities.apply(in: $0) })
         .navigationTitle(model.openedName ?? document.filename)
         .task {
             await model.load(url: configuration?.fileURL)

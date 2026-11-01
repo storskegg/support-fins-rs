@@ -27,6 +27,9 @@ struct PartDocument: FileDocument {
         filename = configuration.file.filename ?? JS.t("Part")
     }
 
+    /// A document by name only, for a window built without a file (tests that host `ContentView`).
+    init(filename: String) { self.filename = filename }
+
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         throw CocoaError(.featureUnsupported)
     }
