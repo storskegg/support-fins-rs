@@ -221,6 +221,26 @@ writes from Cargo.lock (OpenCascade with its LGPL relinking note, Manifold, unif
 text). The gate fails when the file is stale: after a dependency change run `tools/licenses/gen.py`. A crate under a licence
 outside the allow-list fails both, so adding one is a decision to make in `deny.toml` and the script's `ALLOWED` together.
 
+## Versioning and releases
+
+- **The version is YYYY.WW.PATCH**: the ISO 8601 week-year, the ISO week (Monday start, 1-53, no leading zero:
+  `2026.5.0`), and PATCH, 0 for the week's first release and +1 for each later one that week (`2026.49.0`,
+  `2026.49.1`). It is the app's own: What's new keeps listing the web's releases (`tools/whatsnew/gen.js`), which
+  no longer set it.
+- **One source of truth:** `[workspace.package] version` in `Cargo.toml`. The engine's `engine_version()`, the CLI's
+  `--build-info` and the engine's crash reports read it at compile time; `app/Version.xcconfig` (`MARKETING_VERSION`) is
+  written from it by `tools/release/release.py`. Don't edit either by hand: the gate's `version` step fails when they
+  disagree.
+- **The build number** (`CFBundleVersion`) is `git rev-list --count HEAD`, written into the built Info.plist by the app
+  target's "Build number" script (app/project.yml). About Support Fins, the crash report header (`appVersion`), the last
+  line of the Help menu and the report link show "2026.44.0 (1234)" (`AppVersion`).
+- **The CLI's `--version`** stays the web command line's (`support-fins 0.7.0`: cli-parity compares it);
+  `support-fins --build-info` prints ours.
+- **Releasing** is the user's: `just release --dry-run` prints the next version; `just release` refuses a dirty tree or
+  a HEAD that is not `origin/main`, writes the version, commits "Release vX", tags `vX`, builds the Release app and
+  installs it to `/Applications/Support Fins.app`. It pushes the commit and the tag only with `--push`. Agents never
+  run `just release`. The version computation's tests are `tools/release/test_release.py` (the gate's `version` step).
+
 ## PR body template
 
 ```markdown

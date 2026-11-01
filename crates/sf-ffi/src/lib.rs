@@ -55,7 +55,8 @@ pub use suggest::{
 
 uniffi::setup_scaffolding!();
 
-/// The crate version and the pinned upstream commit, e.g. `0.1.0 (upstream 23039e2)`.
+/// The crate version (the app's, YYYY.WW.PATCH: Cargo.toml's `[workspace.package]`) and the pinned upstream commit,
+/// e.g. `2026.44.0 (upstream 23039e2)`.
 #[uniffi::export]
 pub fn engine_version() -> String {
     format!(
