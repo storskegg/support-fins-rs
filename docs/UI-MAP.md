@@ -44,7 +44,7 @@ what `docs/FFI.md` exposes.
 | `#viewbar` (popovers, view cube, badges: Undo, Redo, Move, Arrange, Rotate, Scale, Suggest, Strength, Section, View) | `index.html:631-748` | A **floating bottom toolbar** over the view (a glass capsule) with the same badges, each opening a `.popover`; the view cube is a SwiftUI/Metal overlay above it. Undo/Redo also live in the Edit menu. |
 | `#plates` (plate tabs, See all) | `ui/plates.js:353-400` | A tab strip under the toolbar (`TabView` style) for multi-plate documents. M6. |
 | `#drop` (intro, empty state, What's new) | `index.html:752-775` | The `DocumentGroup` launch/empty state; drag-and-drop onto the window. The What's new card under the intro is `WhatsNewCard` (see "What's new" below). |
-| `#picker` (object picker) | `index.html:779-791` | A sheet. |
+| `#picker` (object picker) | `index.html:779-791` | A sheet. The app adds a "Select all" checkbox above the rows (user suggestion S1; mixed while only some rows are checked). |
 | `#toast`, `#clash-banner`, `#spinner`, `#fps` | `index.html:244-246, 83, 598` | An overlay banner / toast with Undo, a progress overlay on the view (appears after 300 ms of building, `ui/finbuild.js:101-106`), and the debug-only frame-time overlay. |
 
 **Documents.** One window per part file (`DocumentGroup`, read-only part import in M4a/M4b: STL, OBJ, 3MF, STEP). A plate with several models is one window (M6). Sessions (the supports a user placed by hand,
