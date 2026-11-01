@@ -127,7 +127,7 @@ struct CrashReportsTests {
     @Test func plantingTheMarkerBeforeStartShowsTheBanner() throws {
         let folder = tempFolder()
         defer { try? FileManager.default.removeItem(at: folder.url) }
-        let d = UserDefaults.standard
+        let d = AppDefaults.shared
         d.set(folder.url.path, forKey: "SFCrashDir")
         d.set(true, forKey: "SFPlantCrash")
         defer { d.removeObject(forKey: "SFCrashDir"); d.removeObject(forKey: "SFPlantCrash") }
@@ -151,7 +151,7 @@ struct CrashReportsTests {
         let home = String(cString: pw.pointee.pw_dir)       // the real home: NSHomeDirectory() is the app's container
         let id = "sf-uitest-\(UUID().uuidString)"
         let runnerPath = "\(home)/Library/Containers/com.storskegg.SupportFinsUITests.xctrunner/Data/tmp/\(id)/crash-reports"
-        let d = UserDefaults.standard
+        let d = AppDefaults.shared
         d.set(runnerPath, forKey: "SFCrashDir")
         d.set(true, forKey: "SFPlantCrash")
         defer { d.removeObject(forKey: "SFCrashDir"); d.removeObject(forKey: "SFPlantCrash") }

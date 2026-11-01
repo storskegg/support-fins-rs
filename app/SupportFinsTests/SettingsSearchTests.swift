@@ -140,6 +140,18 @@ struct SettingsSearchTests {
         #expect(n?.blocks == [.printer])
     }
 
+    /// With a resin printer the Printer section has no Nozzle row: "nozzle" finds nothing, "pixel" the pixel size.
+    @Test func aResinPrinterHasAPixelSizeInsteadOfANozzle() {
+        var engine = SearchEngine()
+        var ctx = SearchContext()
+        #expect(engine.run(query: "nozzle", ctx, rows: SearchCatalog.allRows)?.show == ["nozzle-fld"])
+        #expect(engine.run(query: "pixel size", ctx, rows: SearchCatalog.allRows)?.none == true)
+        ctx.resinPrinter = true
+        #expect(engine.run(query: "nozzle", ctx, rows: SearchCatalog.allRows)?.none == true)
+        let pixel = engine.run(query: "pixel size", ctx, rows: SearchCatalog.allRows)
+        #expect(pixel?.show == ["pixel-size"] && pixel?.blocks == [.printer])
+    }
+
     // MARK: against the page
 
     private struct Step {

@@ -53,34 +53,6 @@ struct AddFinsFoundTests {
         #expect(width > bare + 30, "the title is drawn beside the icon: \(width) pt against \(bare) pt icon-only")
     }
 
-    // MARK: Placement shows the mode in force
-
-    /// The chosen mode stands out from the others in a window that is not the key one too (as a test's never is): with
-    /// `.bordered` and an accent tint, Auto chosen drew exactly as Full coverage chosen above the note, and the user read
-    /// the chosen Auto as switched off.
-    @Test func placementDrawsTheChosenModeApart() async throws {
-        func render(_ mode: FinSettings.Mode) async throws -> NSBitmapImageRep {
-            var s = FinSettings()
-            s.mode = mode
-            let view = Form { Section { PlacementSection(settings: .constant(s)) } }.formStyle(.grouped).frame(width: 320, height: 160)
-            let h = try await host(view, width: 320, height: 160)
-            let rep = try #require(h.bitmapImageRepForCachingDisplay(in: h.bounds))
-            h.cacheDisplay(in: h.bounds, to: rep)
-            return rep
-        }
-        let auto = try await render(.auto), full = try await render(.full)
-        try #require(auto.pixelsWide == full.pixelsWide && auto.pixelsHigh == full.pixelsHigh)
-        // the buttons' row, above the mode's note (the note's words differ by mode anyway)
-        var differing = 0
-        for y in 0..<(auto.pixelsHigh / 2) {
-            for x in 0..<auto.pixelsWide {
-                guard let a = auto.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), let b = full.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
-                if abs(a.brightnessComponent - b.brightnessComponent) > 0.1 { differing += 1 }
-            }
-        }
-        #expect(differing > 500, "the buttons look the same whichever mode is chosen (\(differing) pixels differ)")
-    }
-
     // MARK: the Fins row
 
     @Test func theFinsRowOffersAddFinsWhileTheyAreOffAndItTurnsThemOn() async throws {

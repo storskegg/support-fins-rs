@@ -27,6 +27,15 @@ final class HelpFeature: Feature {
                 NSWorkspace.shared.open(Link.kofi)
             },
             .item(JS.t("Report a problem")) { NSWorkspace.shared.open(Link.report) },
-        ])]
+        ]), versionSection]
     }
+
+    /// The menu's last line, under Show crash reports: "Version 2026.44.0 (1234)", the app's version and build
+    /// (`AppVersion`), as a line of text rather than an item.
+    static var versionSection: MenuSection {
+        MenuSection(menu: .help, order: 90, entries: [.divider, .note(versionLine)])
+    }
+
+    /// "Version 2026.44.0 (1234)" ("Version" is the web's word, translated).
+    static var versionLine: String { "\(JS.t("Version")) \(AppVersion.display)" }
 }

@@ -48,6 +48,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         chooseInPanel(try writeCoin("coin-b.stl").path)
         waitFor("the second coin is on the plate", timeout: 20) { self.text(name).hasPrefix("coin-b") }
 
+        showInspectorTab(.plateTies)
         let toggle = element("plate-ties-toggle")
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the Plate ties switch")
         scrollIntoView(toggle)
@@ -59,6 +60,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         gap.doubleClick()
         gap.typeKey("a", modifierFlags: .command)
         gap.typeText("15\r")
+        showInspectorTab(.part)     // the status card
         if !waitUntil(timeout: 30, { self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") } }) {
             XCTFail("the coins are tied: one link, three ties. Max gap reads \"\(text(gap))\", the status \(statusNotes)")
         }
@@ -66,26 +68,31 @@ final class PlateTiesUITests: PartWindowUITestCase {
 
     func testTurningTiesOnShowsTheLink() throws {
         try tiedCoins()
+        XCTAssertTrue(statusNotes.contains { $0.hasPrefix("Plate ties are on: Arrange and Move are locked") }, "\(statusNotes)")
+        showInspectorTab(.plateTies)
         let link = element("plate-tie-link-0")
         XCTAssertTrue(link.waitForExistence(timeout: 5), "the link is listed")
         XCTAssertFalse(element("plate-tie-link-1").exists, "one pair")
-        XCTAssertTrue(statusNotes.contains { $0.hasPrefix("Plate ties are on: Arrange and Move are locked") }, "\(statusNotes)")
     }
 
     func testAClickedLinkTurnsOff() throws {
         try tiedCoins()
+        showInspectorTab(.plateTies)
         let link = element("plate-tie-link-0")
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         scrollIntoView(link)
         link.click()
+        showInspectorTab(.part)     // the status card
         waitFor("the pair is untied", timeout: 20) {
             self.statusNotes.contains { $0 == "Plate ties: every link on this plate is turned off." }
         }
-        XCTAssertTrue(element("plate-tie-link-0").exists, "the link stays listed, off")
+        showInspectorTab(.plateTies)
+        XCTAssertTrue(element("plate-tie-link-0").waitForExistence(timeout: 5), "the link stays listed, off")
         let restore = element("plate-ties-restore-links")
         XCTAssertTrue(restore.waitForExistence(timeout: 5), "Restore links")
         scrollIntoView(restore)
         restore.click()
+        showInspectorTab(.part)
         waitFor("tied again", timeout: 20) { self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") } }
     }
 
@@ -100,6 +107,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         XCTAssertFalse(menuBarItem("Model").menuItems["Move"].isEnabled, "Model > Move is greyed")
         app.typeKey(.escape, modifierFlags: [])
         // off: unlocked
+        showInspectorTab(.plateTies)
         let toggle = element("plate-ties-toggle")
         scrollIntoView(toggle)
         toggle.click()
@@ -126,6 +134,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
     /// volume to its 211.68 x 118.37 x 220 mm and the Layer height to its 0.05 mm; a hand edit afterwards holds.
     func testPickingThePrinterSetsTheBedAndTheLayerHeight() throws {
         try openFixturePart()
+        showInspectorTab(.supports)
         let row = element("printer-row")
         XCTAssertTrue(row.waitForExistence(timeout: 10), "the printer row")
         // both are remembered: `tearDownWithError` leaves the next test the app's own bed and layer
@@ -140,6 +149,9 @@ final class PlateTiesUITests: PartWindowUITestCase {
             XCTFail("the layer height is the printer's: the field reads \"\(text(element("layer-height")))\"")
         }
         XCTAssertTrue(text(row).contains("0.05 layers"), "the Printer row reads \"\(text(row))\"")
+        // a resin printer: its pixel size, no nozzle
+        XCTAssertTrue(element("pixel-size").exists, "the Pixel size row")
+        XCTAssertTrue(text(row).contains("14×19 µm pixel") && !text(row).contains("nozzle"), "the Printer row reads \"\(text(row))\"")
         // by hand afterwards: the field takes it, the printer stays picked
         setLayerHeight("0.1")
         if !waitUntil(timeout: 15, { self.text(row).contains("0.1 layers") }) {

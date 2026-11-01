@@ -17,6 +17,7 @@ final class FinsLoopUITests: PartWindowUITestCase {
         waitFor("the Fins row shows a count", timeout: 60) { (fins.value as? String ?? fins.label).first?.isNumber == true }
 
         // change a setting the engine takes -> the rebuild lands (the spinner shows after 300 ms, only on a slow one)
+        showInspectorTab(.supports)
         let slider = element("tine-density")
         XCTAssertTrue(slider.waitForExistence(timeout: 5))
         let before = String(describing: slider.value)   // a number or a string, depending on the control
@@ -27,6 +28,7 @@ final class FinsLoopUITests: PartWindowUITestCase {
         XCTAssertNotEqual(String(describing: slider.value), before, "the slider moved")
         Thread.sleep(forTimeInterval: 1)           // the 180 ms debounce, then the build
         waitFor("the rebuild is done", timeout: 60) { !self.element("build-spinner").exists }
+        showInspectorTab(.part)
         waitFor("the Fins row still shows a count", timeout: 5) { (fins.value as? String ?? fins.label).first?.isNumber == true }
 
         // Export > STL -> the save panel -> a file in the temp dir

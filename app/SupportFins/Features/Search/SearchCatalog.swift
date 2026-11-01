@@ -18,6 +18,8 @@ struct SearchContext: Equatable, Sendable {
     /// Plate ties are on (their fields show), and their contact is the edge band (Band width shows).
     var tiesOn = false
     var tiesEdge = false
+    /// The printer profile is a resin printer's: the Printer section shows its Pixel size, not the Nozzle (app-only).
+    var resinPrinter = false
 }
 
 /// The inspector's folded blocks, which a search opens when they hold a match (`details.sec`) or hides when they hold none.
@@ -77,7 +79,8 @@ struct SearchEntry: Sendable {
 enum SearchCatalog {
     static let rows: [SearchEntry] = [
         // Printer
-        SearchEntry("nozzle-fld", .printer, names: ["Nozzle", "mm", "0.2", "0.25", "0.4", "0.6", "0.8", "1.0", "1.2", "1.4", "1.6", "1.8", "2.0"], tip: Tip.nozzle),
+        SearchEntry("nozzle-fld", .printer, names: ["Nozzle", "mm", "0.2", "0.25", "0.4", "0.6", "0.8", "1.0", "1.2", "1.4", "1.6", "1.8", "2.0"], tip: Tip.nozzle,
+                    shown: { !$0.resinPrinter }),
         SearchEntry("layerh-fld", .printer, names: ["Layer height", "mm"], tip: Tip.layerHeight,
                     shown: { $0.settings.visibility.layerHeight }, gate: { _ in "tines" }),
         SearchEntry("gap", .printer, names: ["Support gap", "mm"], tip: Tip.gap),
@@ -156,6 +159,7 @@ enum SearchCatalog {
     /// recorded searches of the web's panel, which they would change.
     static let appRows: [SearchEntry] = [
         SearchEntry("printer-profile", .printer, names: ["Printer"], tip: PlateTiesTip.profile),
+        SearchEntry("pixel-size", .printer, names: ["Pixel size", "µm"], tip: PrinterSection.pixelTip, shown: { $0.resinPrinter }),
         SearchEntry("plate-ties-toggle", .plateTies, names: ["Plate ties"], tip: PlateTiesTip.on),
         SearchEntry("plate-ties-max-gap", .plateTies, names: ["Max gap", "mm"], tip: PlateTiesTip.maxGap, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),
         SearchEntry("plate-ties-min-ratio", .plateTies, names: ["Min height / thickness"], tip: PlateTiesTip.minRatio, shown: { $0.tiesOn }, gate: { _ in "plate-ties-toggle" }),

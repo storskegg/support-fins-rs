@@ -639,6 +639,30 @@
     "ar": "الطابعة",
     "nl": "Printer"
   },
+  "pixel": {
+    "why": "the Printer row's summary for a resin printer profile: its pixel size where the web names the nozzle (app-only, issue #50)",
+    "de": "Pixel",
+    "zh": "像素",
+    "pt": "pixel",
+    "ar": "بكسل",
+    "nl": "pixel"
+  },
+  "Pixel size": {
+    "why": "the Printer section's row for a resin printer profile, in place of Nozzle (app-only, issue #50)",
+    "de": "Pixelgröße",
+    "zh": "像素尺寸",
+    "pt": "Tamanho do pixel",
+    "ar": "حجم البكسل",
+    "nl": "Pixelgrootte"
+  },
+  "Your resin printer's pixel size, from its profile. A resin printer has no nozzle to set.": {
+    "why": "tip card of the Pixel size row (app-only, issue #50)",
+    "de": "Die Pixelgröße deines Resin-Druckers, aus seinem Profil. Ein Resin-Drucker hat keine Düse einzustellen.",
+    "zh": "树脂打印机的像素尺寸，来自其配置。树脂打印机没有喷嘴需要设置。",
+    "pt": "O tamanho do pixel da sua impressora de resina, do perfil dela. Uma impressora de resina não tem bico para ajustar.",
+    "ar": "حجم بكسل طابعة الراتنج، من ملفها التعريفي. لا فوهة لضبطها في طابعة الراتنج.",
+    "nl": "De pixelgrootte van je harsprinter, uit zijn profiel. Een harsprinter heeft geen nozzle om in te stellen."
+  },
   "Max gap": {
     "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
     "de": "Max. Abstand",
@@ -1102,5 +1126,29 @@
     "pt": "Na {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm no contato; {default} é o padrão da impressora.",
     "ar": "على {printer}: 1 = {one} مم، 2 = {two} مم، 3 = {three} مم عند التلامس؛ و{default} هو الافتراضي للطابعة.",
     "nl": "Op {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm bij het contact; {default} is de standaard van de printer."
+  },
+  "Supports": {
+    "why": "the inspector's Supports tab (app-only tabs: Printer, Placement, Tines, Cutouts)",
+    "de": "Stützen",
+    "zh": "支撑",
+    "pt": "Suportes",
+    "ar": "الدعامات",
+    "nl": "Steunen"
+  },
+  "More": {
+    "why": "the inspector's More tab (app-only tabs: the groups of More settings)",
+    "de": "Mehr",
+    "zh": "更多",
+    "pt": "Mais",
+    "ar": "المزيد",
+    "nl": "Meer"
+  },
+  "Show in its tab": {
+    "why": "tooltip of a settings-search result's tab button: clears the search and shows the match in its inspector tab",
+    "de": "Im eigenen Tab zeigen",
+    "zh": "在所在标签页中显示",
+    "pt": "Mostrar na sua aba",
+    "ar": "اعرضه في علامة تبويبه",
+    "nl": "Tonen in zijn tabblad"
   }
 }

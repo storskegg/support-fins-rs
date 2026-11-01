@@ -42,6 +42,7 @@ struct ReportModelTests {
 
     @Test func todayIsTheUTCDateAndTheSiteNamesTheEngine() {
         #expect(ReportModel.today.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil)
-        #expect(ReportModel.site.hasPrefix("Support Fins for Mac ") && ReportModel.site.contains("upstream"))
+        #expect(ReportModel.site == "Support Fins for Mac \(AppVersion.display), engine \(engineVersion())")
+        #expect(ReportModel.site.contains("upstream"))
     }
 }

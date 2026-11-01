@@ -67,8 +67,9 @@ final class ReportModel {
         }
     }
 
-    /// `where: location.host || 'local file'`: the page names its site; the app names itself and the engine it runs.
-    static var site: String { "Support Fins for Mac \(engineVersion())" }
+    /// `where: location.host || 'local file'`: the page names its site; the app names its version and build and the
+    /// engine it runs: "Support Fins for Mac 2026.44.0 (1234), engine 2026.44.0 (upstream 23039e2)".
+    static var site: String { "Support Fins for Mac \(AppVersion.display), engine \(engineVersion())" }
 
     /// `new Date().toISOString().slice(0, 10)`: today's date in UTC.
     static var today: String {
