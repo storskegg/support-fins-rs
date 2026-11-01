@@ -1624,6 +1624,10 @@ const GETTERS: &[(&str, &str)] = &[
     ),
     ("Part::info", "reads the fields of the loaded part"),
     (
+        "Part::bounds",
+        "min/max over the loaded soup: no input, no weld, an empty part is all zeros",
+    ),
+    (
         "Part::saved_plate_ties",
         "a clone of the plate-tie document read (and checked) with the file",
     ),
