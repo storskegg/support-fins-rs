@@ -196,6 +196,9 @@ here in the PR that makes it; one that is not listed fails review.
 | An Esc, Back or Undo pressed while a Draw check runs cancels that click. | Timing only. In the web the check is synchronous, so it finishes first and the key applies after. | #225 |
 | A build whose bed pad or overhang sampling would exceed a budget fails with `LimitExceeded` (`Dimension`): the brim pad's first-layer outline buckets (32 million cells), its lattice (8 million blocks), the Sure hold pad's rings (100,000), and one walk of the leftover overhang faces (32 million sub-triangles, counting faces of 256 or more). So does one whose bucket or fraction counter could no longer advance (past 2^53). The bucketing and the overhang sampling poll the cancel flag every 4096 cells. | The JS runs out of memory or never ends (X-07: a part loaded past the 2 m limit). Any part within the load limits stays under every budget in any pose, so the corpora and hashes are unchanged. | #235 |
 
+App-only UI, no engine change: with a resin printer profile the Printer section shows the profile's Pixel size instead of the
+Nozzle menu, and the Printer row's summary names the pixel instead of the nozzle; the engine still gets the nozzle setting.
+
 Also not literal, but not engine divergences: a failed open shows the translated prefix of the web's English-only alert (#212),
 the app adds a "Load anyway?" prompt over the load limits where the JS drops or loads silently (#221), and the app has crash
 reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and searches (#213, #220, #223, #224, #228).

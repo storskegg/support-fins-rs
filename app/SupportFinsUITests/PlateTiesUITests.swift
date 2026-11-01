@@ -140,6 +140,9 @@ final class PlateTiesUITests: PartWindowUITestCase {
             XCTFail("the layer height is the printer's: the field reads \"\(text(element("layer-height")))\"")
         }
         XCTAssertTrue(text(row).contains("0.05 layers"), "the Printer row reads \"\(text(row))\"")
+        // a resin printer: its pixel size, no nozzle
+        XCTAssertTrue(element("pixel-size").exists, "the Pixel size row")
+        XCTAssertTrue(text(row).contains("14×19 µm pixel") && !text(row).contains("nozzle"), "the Printer row reads \"\(text(row))\"")
         // by hand afterwards: the field takes it, the printer stays picked
         setLayerHeight("0.1")
         if !waitUntil(timeout: 15, { self.text(row).contains("0.1 layers") }) {

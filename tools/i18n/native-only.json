@@ -639,6 +639,30 @@
     "ar": "الطابعة",
     "nl": "Printer"
   },
+  "pixel": {
+    "why": "the Printer row's summary for a resin printer profile: its pixel size where the web names the nozzle (app-only, issue #50)",
+    "de": "Pixel",
+    "zh": "像素",
+    "pt": "pixel",
+    "ar": "بكسل",
+    "nl": "pixel"
+  },
+  "Pixel size": {
+    "why": "the Printer section's row for a resin printer profile, in place of Nozzle (app-only, issue #50)",
+    "de": "Pixelgröße",
+    "zh": "像素尺寸",
+    "pt": "Tamanho do pixel",
+    "ar": "حجم البكسل",
+    "nl": "Pixelgrootte"
+  },
+  "Your resin printer's pixel size, from its profile. A resin printer has no nozzle to set.": {
+    "why": "tip card of the Pixel size row (app-only, issue #50)",
+    "de": "Die Pixelgröße deines Resin-Druckers, aus seinem Profil. Ein Resin-Drucker hat keine Düse einzustellen.",
+    "zh": "树脂打印机的像素尺寸，来自其配置。树脂打印机没有喷嘴需要设置。",
+    "pt": "O tamanho do pixel da sua impressora de resina, do perfil dela. Uma impressora de resina não tem bico para ajustar.",
+    "ar": "حجم بكسل طابعة الراتنج، من ملفها التعريفي. لا فوهة لضبطها في طابعة الراتنج.",
+    "nl": "De pixelgrootte van je harsprinter, uit zijn profiel. Een harsprinter heeft geen nozzle om in te stellen."
+  },
   "Max gap": {
     "why": "Plate ties (issue #50): the app's own feature, the web has none: a Plate ties field",
     "de": "Max. Abstand",

@@ -1,11 +1,18 @@
 import SwiftUI
 
 /// Printer: the one-line summary with Edit / Done, unfolding to Nozzle, Layer height, Support gap and
-/// Interface material (`index.html:289-326`, `docs/UI-MAP.md` 4.1).
+/// Interface material (`index.html:289-326`, `docs/UI-MAP.md` 4.1). With a resin printer profile (app-only, issue #50) the
+/// Nozzle row and the summary's nozzle give way to the printer's pixel size: a resin printer has no nozzle. The build still
+/// reads the Nozzle setting (the walls' and tines' widths), unchanged.
 struct PrinterSection: View {
     @Binding var settings: FinSettings
     @Binding var open: Bool
+    var profiles: PrinterProfileStore = .shared
     @Environment(SettingsSearch.self) private var search: SettingsSearch?
+
+    nonisolated static var pixelTip: String { JS.t("Your resin printer's pixel size, from its profile. A resin printer has no nozzle to set.") }
+
+    private var pixel: [Double]? { profiles.current?.resinPixel }
 
     var body: some View {
         FindBlock(.printer) { group }
@@ -15,11 +22,20 @@ struct PrinterSection: View {
         DisclosureGroup(isExpanded: search?.expandedBinding(.printer, user: $open) ?? $open) {
             // which printer the plate ties are made for (issue #50): the app's choice, not the session's
             PrinterProfilePicker()
-            FindRow("nozzle-fld") {
-                Picker("Nozzle", selection: Binding(get: { settings.nozzle }, set: { settings.setNozzle($0) })) {
-                    ForEach(FinSettings.nozzleChoices, id: \.self) { Text("\(FinSettings.nozzleText($0)) mm").tag($0) }
+            if let pixel {
+                FindRow("pixel-size") {
+                    LabeledContent("Pixel size") { Text(verbatim: FinSettings.pixelText(pixel)) }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("pixel-size")
+                        .tipCard(Self.pixelTip)
                 }
-                .tipCard(pic: "nozzle", Tip.nozzle)
+            } else {
+                FindRow("nozzle-fld") {
+                    Picker("Nozzle", selection: Binding(get: { settings.nozzle }, set: { settings.setNozzle($0) })) {
+                        ForEach(FinSettings.nozzleChoices, id: \.self) { Text("\(FinSettings.nozzleText($0)) mm").tag($0) }
+                    }
+                    .tipCard(pic: "nozzle", Tip.nozzle)
+                }
             }
             if settings.visibility.layerHeight {
                 FindRow("layerh-fld") {
@@ -40,7 +56,7 @@ struct PrinterSection: View {
         } label: {
             HStack {
                 Image(systemName: "printer")
-                Text(settings.printerSummary).lineLimit(1)
+                Text(settings.printerSummary(pixelSize: pixel)).lineLimit(1)
                 Spacer()
                 Text(open ? "Done" : "Edit").foregroundStyle(.secondary)
             }
