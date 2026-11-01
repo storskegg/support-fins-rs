@@ -212,6 +212,10 @@ reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and se
 - **A bare `[i]` inside `#expect` crashes the test host** when `i` is out of range, and the macOS crash dialog follows.
   Guard it with `#require` (or `try #require(a.indices.contains(i))`) first.
 - **Accessibility identifiers** on a container hide the identified elements inside it (bugs #204 and #206).
+- **Preferences go through `AppDefaults.shared`**, never `UserDefaults.standard`. The test host and the UI tests' app
+  (`-SFIsolatedDefaults YES`, set by `PartWindowUITestCase`) then use a suite of their own, emptied each launch, and never
+  read or write the user's preferences (the installed app shares the container: a remembered 0.05 mm layer height broke
+  PlateTiesTests). A store takes its `defaults` from it; a test that needs a clean slate passes its own suite.
 
 ## Licences and Acknowledgements
 

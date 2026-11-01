@@ -27,7 +27,7 @@ final class PrinterProfileStore {
         }
     }
 
-    init(defaults: UserDefaults = .standard, profiles: [PrinterProfileInfo] = printerProfiles()) {
+    init(defaults: UserDefaults = AppDefaults.shared, profiles: [PrinterProfileInfo] = printerProfiles()) {
         self.defaults = defaults
         self.profiles = profiles
         let stored = defaults.string(forKey: Self.key)

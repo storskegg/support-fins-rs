@@ -39,7 +39,7 @@ final class RotateModel {
     /// `DRAG_FADE_MS` (`ui/pose.js:127`).
     static let dragFadeSeconds = 1.2
 
-    init(session: PartSession, controller: ViewerController? = nil, defaults: UserDefaults = .standard) {
+    init(session: PartSession, controller: ViewerController? = nil, defaults: UserDefaults = AppDefaults.shared) {
         self.session = session
         self.controller = controller
         self.defaults = defaults

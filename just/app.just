@@ -107,7 +107,7 @@ whatsnew-gen *args:
 swift-warnings: app-core app-project
     tools/gate/swift_warnings.py
 
-# A Release build carries none of the UI-test hooks (-SFChangelogFixture, -SFCrashDir, -SFPlantCrash; X-15) and a Debug
+# A Release build carries none of the UI-test hooks (-SFChangelogFixture, -SFCrashDir, -SFPlantCrash, -SFIsolatedDefaults; X-15) and a Debug
 # build does. Two full builds, so not part of `just gate`; run it when a hook is added.
 app-release-hooks: app-core app-project
     tools/lock/lock.py app-release-hooks -- tools/gate/release_hooks.sh {{xcode_jobs}}

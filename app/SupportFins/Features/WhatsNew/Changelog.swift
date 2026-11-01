@@ -35,7 +35,7 @@ struct Changelog: Decodable, Equatable, Sendable {
     /// The file a DEBUG launch's `-SFChangelogFixture <path>` names to read instead of the bundled list (the UI tests
     /// use it, since the real list is empty until a release is stamped). Compiled out of Release builds (X-15): there
     /// it is always nil, so a Release app never reads a list from a launch argument or a default.
-    static func fixtureURL(defaults: UserDefaults = .standard) -> URL? {
+    static func fixtureURL(defaults: UserDefaults = AppDefaults.shared) -> URL? {
         #if DEBUG
         return defaults.string(forKey: "SFChangelogFixture").map { URL(fileURLWithPath: $0) }
         #else
