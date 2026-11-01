@@ -1127,6 +1127,14 @@
     "ar": "على {printer}: 1 = {one} مم، 2 = {two} مم، 3 = {three} مم عند التلامس؛ و{default} هو الافتراضي للطابعة.",
     "nl": "Op {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm bij het contact; {default} is de standaard van de printer."
   },
+  "Select all": {
+    "why": "the object picker's Select all checkbox above its rows (user suggestion S1; the web's picker has none)",
+    "de": "Alle auswählen",
+    "zh": "全选",
+    "pt": "Selecionar tudo",
+    "ar": "تحديد الكل",
+    "nl": "Alles selecteren"
+  },
   "Supports": {
     "why": "the inspector's Supports tab (app-only tabs: Printer, Placement, Tines, Cutouts)",
     "de": "Stützen",

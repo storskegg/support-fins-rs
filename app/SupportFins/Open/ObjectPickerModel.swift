@@ -46,6 +46,24 @@ final class ObjectPickerModel: Identifiable {
         if on { selected.insert(id) } else { selected.remove(id) }
     }
 
+    /// The "Select all" checkbox above the rows (user suggestion S1; the web has none): checked when every row is,
+    /// unchecked when none is, mixed in between.
+    enum AllSelection: Equatable { case none, some, all }
+
+    var allSelection: AllSelection {
+        if selected.isEmpty { return .none }
+        return entries.allSatisfy { selected.contains($0.id) } ? .all : .some
+    }
+
+    /// Check every row, or uncheck every row.
+    func setAll(_ on: Bool) {
+        selected = on ? Set(entries.map(\.id)) : []
+    }
+
+    /// The checkbox's state as the two sources of SwiftUI's mixed-state `Toggle(sources:)`: any row checked, every row
+    /// checked. Both off is unchecked, both on is checked, one of each is the mixed dash.
+    var selectAllSources: [Bool] { [allSelection != .none, allSelection == .all] }
+
     /// Load is disabled until one is checked (`io.js:172`).
     var canLoad: Bool { !selected.isEmpty }
 

@@ -101,21 +101,37 @@ struct CustomVolumeSheet: View {
 /// threshold is a session setting, so a drag is one undo step (`PartSession.settingsEditing`).
 struct OverhangSlider: View {
     let session: PartSession
+    static let range: ClosedRange<Double> = 30...70
 
     var body: some View {
         let threshold = Binding(get: { session.settings.threshold }, set: { v in
+            let t = Self.snap(v, from: session.settings.threshold)
+            guard t != session.settings.threshold else { return }
             var s = session.settings
-            s.threshold = v
+            s.threshold = t
             session.setSettings(s)
         })
         HStack(spacing: 6) {
             Text("Overhang")
-            Slider(value: threshold, in: 30...70, step: 1, onEditingChanged: session.settingsEditing) { Text("Overhang") }
+            // whole degrees by `snap`, not `step: 1`: a stepped slider draws a tick mark per step, and 41 of them read
+            // as a faint second track under the slider (user suggestion S5)
+            Slider(value: threshold, in: Self.range, onEditingChanged: session.settingsEditing) { Text("Overhang") }
+                .labelsHidden()
                 .frame(width: 110)
                 .accessibilityIdentifier("thr")
                 .accessibilityValue(JS.t("{n} degrees", ["n": String(Int(session.settings.threshold))]))
             Text("\(Int(session.settings.threshold))°").monospacedDigit().frame(minWidth: 32, alignment: .trailing)
         }
+        // off the capsule's ends: the label and the readout are text, not controls with margins of their own
+        .padding(.horizontal, 8)
         .help("Surface angle from the plate below which a face needs support.")
+    }
+
+    /// The whole degree a move of the slider to `proposed` lands on, from `current`: a drag rounds; a nudge of under
+    /// half a degree (an arrow key or an accessibility increment on a slider without steps) still moves one degree.
+    static func snap(_ proposed: Double, from current: Double) -> Double {
+        var t = proposed.rounded()
+        if t == current && proposed != current { t = current + (proposed > current ? 1 : -1) }
+        return min(max(t, range.lowerBound), range.upperBound)
     }
 }

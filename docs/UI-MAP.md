@@ -37,7 +37,7 @@ what `docs/FFI.md` exposes.
 | Web region | Source | Native |
 |---|---|---|
 | `#viewport` (the 3D canvas, full window) | `index.html:79`, `ui/scene.js` | The Metal view filling the document window's content area (M4a). |
-| `#topbar` (brand, Import, Build volume, Overhang, Add fins, Export, Calibrate, Plugins, Language, links, error badge) | `index.html:86-195` | The window **toolbar** (`.toolbar` items: Open, volume pop-up, overhang slider, Add fins, Export menu) plus the **menu bar**. Calibrate, language, GitHub and Ko-fi go to the Help menu / Settings; Plugins, the error badge and the phone ☰ are dropped. |
+| `#topbar` (brand, Import, Build volume, Overhang, Add fins, Export, Calibrate, Plugins, Language, links, error badge) | `index.html:86-195` | The window **toolbar** (`.toolbar` items: Open, volume pop-up, overhang slider, Add fins, Export menu; the inspector toggle is the inspector's own toolbar item, over the inspector; in a narrow window the volume pop-up and the slider go to the toolbar's » menu first, Add fins, Export and the toggle stay: `Toolbar/ToolbarPriority.swift`) plus the **menu bar**. Calibrate, language, GitHub and Ko-fi go to the Help menu / Settings; Plugins, the error badge and the phone ☰ are dropped. |
 | `#left-rail` > `#stats` (File, Triangles, Size, Volume; Overhangs, Area, Bed contact, Fins, Bed pad, Analysis; Add/Remove model) | `index.html:198-229` | The top of the **inspector** (trailing sidebar, `.inspector`): a "Part" section. |
 | `#right-rail` > `#fin-opts` (search, Printer row, Placement, Tines, basics, Draw controls, More settings) | `index.html:253-596` | The rest of the **inspector**: the same sections, same order, same labels (Form with `DisclosureGroup`s). |
 | `#right-rail` > `#status` (notes, warnings, grams receipt, report links) | `index.html:603-625` | A "Status" section pinned at the bottom of the inspector. |
@@ -45,7 +45,7 @@ what `docs/FFI.md` exposes.
 | `#viewbar` (popovers, view cube, badges: Undo, Redo, Move, Arrange, Rotate, Scale, Suggest, Strength, Section, View) | `index.html:631-748` | A **floating bottom toolbar** over the view (a glass capsule) with the same badges, each opening a `.popover`; the view cube is a SwiftUI/Metal overlay above it. Undo/Redo also live in the Edit menu. |
 | `#plates` (plate tabs, See all) | `ui/plates.js:353-400` | A tab strip under the toolbar (`TabView` style) for multi-plate documents. M6. |
 | `#drop` (intro, empty state, What's new) | `index.html:752-775` | The `DocumentGroup` launch/empty state; drag-and-drop onto the window. The What's new card under the intro is `WhatsNewCard` (see "What's new" below). |
-| `#picker` (object picker) | `index.html:779-791` | A sheet. |
+| `#picker` (object picker) | `index.html:779-791` | A sheet. The app adds a "Select all" checkbox above the rows (user suggestion S1; mixed while only some rows are checked). |
 | `#toast`, `#clash-banner`, `#spinner`, `#fps` | `index.html:244-246, 83, 598` | An overlay banner / toast with Undo, a progress overlay on the view (appears after 300 ms of building, `ui/finbuild.js:101-106`), and the debug-only frame-time overlay. |
 
 **Documents.** One window per part file (`DocumentGroup`, read-only part import in M4a/M4b: STL, OBJ, 3MF, STEP). A plate with several models is one window (M6). Sessions (the supports a user placed by hand,
@@ -62,7 +62,7 @@ stored inside the exported 3MF, `ui/session.js`) come back with M7 (done: a 3MF 
 | `vx` | number |  |  | 20..2000 step 1 | width | index.html:98; ui/volume.js:30 | Custom volume sheet: width field | M4b |
 | `vy` | number |  |  | 20..2000 step 1 | depth | index.html:98; ui/volume.js:30 | Custom volume sheet: depth field | M4b |
 | `vz` | number |  |  | 20..2000 step 1 | height | index.html:99; ui/volume.js:30 | Custom volume sheet: height field | M4b |
-| `thr` | range | Overhang 45° | 45 | 30..70 step 1 | Surface angle from the plate below which a face needs support. | index.html:104; ui/part.js:503 | Toolbar slider with value label (Overhang) | M4b |
+| `thr` | range | Overhang 45° | 45 | 30..70 step 1 | Surface angle from the plate below which a face needs support. | index.html:104; ui/part.js:503 | Toolbar slider with value label (Overhang); whole degrees without tick marks (`OverhangSlider.snap`) | M4b |
 | `fins-toggle` | button | Add fins |  |  |  | index.html:108; ui/settings.js:351 | Toolbar toggle button "Add fins", always with its title (the toolbar would draw only the icon, S2); while off, the stats card's Fins row also offers an "Add fins" button (`stat-add-fins`) | M4b |
 | `export` | button | Export ▾ |  |  |  | index.html:112; ui/export.js:189 | File > Export… menu and toolbar menu button | M4b |
 | `export-arrange` | button | Arrange first |  |  |  | index.html:117; ui/export.js:214 | Menu item "Arrange first" (shown only when models overlap) | M6 |

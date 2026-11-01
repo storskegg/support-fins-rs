@@ -204,6 +204,7 @@ struct ReadoutSections: View {
         let weld = core.info.weldMs
         let dragging = controller.ringDragging != nil
         let kept = analysis?.islands ?? 0
+        if !dragging { CrashReporter.stage("analysis started (\(controller.faceCount) triangles)") }
         let result = await Task.detached(priority: .userInitiated) { () -> Analysis? in
             guard let summary = try? part.analyze(thresholdDeg: threshold, rot: rot) else { return nil }
             // mid-drag none are found, and the last count stands so the notes do not flash (`hadIslands`)
@@ -211,6 +212,7 @@ struct ReadoutSections: View {
             return Analysis(summary: summary, islands: dragging ? kept : starts.count, starts: starts, weldMs: weld)
         }.value
         if Task.isCancelled { return }
+        if !dragging { CrashReporter.stage("analysis done: \(result.map { "\($0.summary.regionCount) regions, \($0.islands) midair starts" } ?? "failed")") }
         analysis = result
         // One model on the plate: the engine seats a part the way the viewer does. A group is seated as one.
         controller.islandMarkers = session.parts.count == 1

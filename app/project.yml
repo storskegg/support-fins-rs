@@ -72,14 +72,32 @@ targets:
     # The build number: CFBundleVersion is the commit count of HEAD (monotonic on main), written into the built
     # Info.plist before Xcode signs the bundle, so About, crash reports and Help read "2026.44.0 (1234)". Every build,
     # since a new commit changes no input Xcode sees; without git (a source tarball) it stays CURRENT_PROJECT_VERSION, 0.
+    # It also writes CFBundleShortVersionString (MARKETING_VERSION): an incremental build does not always reprocess the
+    # Info.plist after app/Version.xcconfig changes, and a product plist built before #252 had 1.0.0 and no
+    # CFBundleVersion at all (PlistBuddy's Set then failed the build). So each key is Set, or Added when missing, and the
+    # script never fails the build: at worst it warns and the bundle keeps what Xcode wrote. The processed Info.plist is
+    # its input, so it runs after Xcode has written it.
     postBuildScripts:
       - name: Build number
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
         script: |
-          set -e
+          plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          put() {  # key value: Set, or Add when the key is missing
+            /usr/libexec/PlistBuddy -c "Set :$1 $2" "$plist" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Add :$1 string $2" "$plist" \
+              || echo "warning: Build number: could not write $1 into $plist"
+          }
+          if [ ! -f "$plist" ]; then echo "warning: Build number: no $plist"; exit 0; fi
+          [ -n "${MARKETING_VERSION}" ] && put CFBundleShortVersionString "${MARKETING_VERSION}"
           n="$(git -C "${SRCROOT}" rev-list --count HEAD 2>/dev/null || true)"
-          case "$n" in ''|*[!0-9]*) exit 0 ;; esac
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $n" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          case "$n" in
+            ''|*[!0-9]*) echo "warning: Build number: git gave no commit count; CFBundleVersion stays ${CURRENT_PROJECT_VERSION:-0}"
+                         put CFBundleVersion "${CURRENT_PROJECT_VERSION:-0}" ;;
+            *) put CFBundleVersion "$n" ;;
+          esac
+          exit 0
     info:
       path: SupportFins/Info.plist
       properties:
