@@ -12,6 +12,7 @@ final class TipCardUITests: PartWindowUITestCase {
 
     /// Rest the pointer on the printer row until the card is up (it waits 350 ms).
     private func restOnPrinterRow() {
+        showInspectorTab(.supports)
         let row = element("printer-row")
         XCTAssertTrue(row.waitForExistence(timeout: 10), "the printer row")
         row.hover()
@@ -33,6 +34,7 @@ final class TipCardUITests: PartWindowUITestCase {
     /// moves away, Shift-Tab leaves the field and Tab comes back to it.
     func testTabbingIntoANumberFieldShowsItsCard() throws {
         try openFixturePart()
+        showInspectorTab(.supports)
         let row = element("printer-row")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.click()   // unfolds the Printer section
@@ -57,6 +59,7 @@ final class TipCardArabicUITests: PartWindowUITestCase {
     func testTheCardShowsTheArabicTooltip() throws {
         app.launchArguments += ["-AppleLanguages", "(ar)", "-AppleLocale", "ar_SA", "-AppleTextDirection", "YES"]
         try openFixturePart()
+        showInspectorTab(.supports, title: "الدعامات")    // "Supports"
         let row = element("printer-row")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.hover()

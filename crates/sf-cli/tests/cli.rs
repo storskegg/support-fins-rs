@@ -982,6 +982,22 @@ fn cli_version_names_the_build() {
     );
 }
 
+// Not in the JS: `--build-info` names the port's own version (Cargo.toml) and the upstream commit; `--version` stays
+// the web command line's (above, and cli-parity).
+#[test]
+fn build_info_names_the_ports_version_and_the_upstream_commit() {
+    let r = cli(&["--build-info"]);
+    assert_eq!(r.code, 0, "{:?}", r.out);
+    assert_eq!(
+        r.out,
+        vec![format!(
+            "support-fins {} (upstream 23039e2, web CLI 0.7.0)",
+            env!("CARGO_PKG_VERSION")
+        )]
+    );
+    assert_eq!(r.out, vec![sf_cli::build_info()]);
+}
+
 // cli.test.js:375
 #[test]
 fn a_slicers_negative_part_is_cut_out_of_the_part_104() {

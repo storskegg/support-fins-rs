@@ -7,6 +7,7 @@ final class KeysUITests: PartWindowUITestCase {
     func testBackspaceTakesBackAPointFromTheInspector() throws {
         try openFixturePart()
         element("fins-toggle").click()
+        showInspectorTab(.supports)
         let draw = element("fin-mode-draw")
         scrollIntoView(draw)
         draw.click()

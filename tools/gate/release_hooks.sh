@@ -4,7 +4,7 @@
 # them (otherwise the check proves nothing). Builds in `.dd-release` inside the worktree, under the machine lock.
 set -euo pipefail
 jobs="${1:-4}"
-hooks=(SFChangelogFixture SFCrashDir SFPlantCrash)
+hooks=(SFChangelogFixture SFCrashDir SFPlantCrash SFIsolatedDefaults)
 dd="$PWD/.dd-release"
 build() {
     xcodebuild build -jobs "$jobs" -quiet -project app/SupportFins.xcodeproj -scheme SupportFins \

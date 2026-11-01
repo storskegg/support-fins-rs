@@ -8,7 +8,7 @@ final class ReadoutFeature: Feature {
     init(host: ViewerModel) { self.host = host }
 
     var inspectorSections: [InspectorSection] {
-        [InspectorSection("readout", slot: .top) {
+        [InspectorSection("readout", slot: .part) {
             if let host = self.host, let controller = host.controller {
                 ReadoutSections(controller: controller, session: host.session, build: host.wiring?.build,
                                 extraLines: host.features.statusLines,

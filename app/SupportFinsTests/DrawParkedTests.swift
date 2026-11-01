@@ -17,7 +17,7 @@ struct DrawParkedTests {
     }
 
     @Test func parkingAModelKeepsItsWallsAndBringingItBackRestoresThemAndTheNewOneStartsClean() async throws {
-        UserDefaults.standard.removeObject(forKey: DrawModel.shapeKey)
+        AppDefaults.shared.removeObject(forKey: DrawModel.shapeKey)
         let window = ViewerModel()
         try #require(window.controller != nil, "no Metal device")
         await window.load(url: try stl("park-first"))

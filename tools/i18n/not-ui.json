@@ -18,7 +18,7 @@
   "Format": "MenuID: the system menu's name, matched against the feature menus",
   "Window": "MenuID: the system menu's name, matched against the feature menus",
   "Help": "MenuID: the system menu's name, matched against the feature menus",
-  "Support Fins for Mac %arg": "ReportModel.site: the issue report's `where` (the web writes location.host, untranslated); the report is for the maintainers",
+  "Support Fins for Mac %arg, engine %arg": "ReportModel.site: the issue report's `where` (the web writes location.host, untranslated); the report is for the maintainers",
   "Nozzle": "settings search (Features/Search/SearchCatalog.swift): the English text a query is matched against; what the user sees goes through JS.t / SwiftUI",
   "Layer height": "settings search (Features/Search/SearchCatalog.swift): the English text a query is matched against; what the user sees goes through JS.t / SwiftUI",
   "Support gap": "settings search (Features/Search/SearchCatalog.swift): the English text a query is matched against; what the user sees goes through JS.t / SwiftUI",
@@ -155,5 +155,6 @@
   "open: picker, %arg objects": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
   "open: merging %arg of %arg objects, %arg triangles": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
   "merging %arg objects": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
-  "welding and meshing the merged part (%arg triangles)": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)"
+  "welding and meshing the merged part (%arg triangles)": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "resin": "PrinterProfileInfo.kind: the engine's printer kind (\"resin\" or \"fdm\"), compared, never shown"
 }

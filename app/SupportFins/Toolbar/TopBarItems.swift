@@ -4,7 +4,7 @@ import Viewer
 /// The remembered build volume (`sf.volume`, `web/ui/volume.js:25-37`): the JSON object `{x, y, z}` in
 /// `UserDefaults`. A stored volume with a side at zero or less is ignored, as the web ignores it.
 struct VolumeStore {
-    var defaults: UserDefaults = .standard
+    var defaults: UserDefaults = AppDefaults.shared
     static let key = "sf.volume"
     /// The custom fields' range (`index.html:98-99`, `ui/volume.js:30`).
     static let sideRange: ClosedRange<Double> = 20...2000

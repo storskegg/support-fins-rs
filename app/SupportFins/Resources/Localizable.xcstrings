@@ -8908,6 +8908,41 @@
         }
       }
     },
+    "More" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehr"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المزيد"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meer"
+          }
+        }
+      }
+    },
     "More settings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10693,6 +10728,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pinnen per wand"
+          }
+        }
+      }
+    },
+    "Pixel size" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixelgröße"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素尺寸"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tamanho do pixel"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجم البكسل"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixelgrootte"
           }
         }
       }
@@ -13629,6 +13699,41 @@
         }
       }
     },
+    "Show in its tab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im eigenen Tab zeigen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所在标签页中显示"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar na sua aba"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اعرضه في علامة تبويبه"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tonen in zijn tabblad"
+          }
+        }
+      }
+    },
     "Show layers" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14637,6 +14742,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Steun het project"
+          }
+        }
+      }
+    },
+    "Supports" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stützen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支撑"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suportes"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الدعامات"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steunen"
           }
         }
       }
@@ -17766,6 +17906,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Je printer: nozzle, laaghoogte, afstand tot de steun en contactmateriaal. Klik om dit te wijzigen."
+          }
+        }
+      }
+    },
+    "Your resin printer's pixel size, from its profile. A resin printer has no nozzle to set." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Pixelgröße deines Resin-Druckers, aus seinem Profil. Ein Resin-Drucker hat keine Düse einzustellen."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "树脂打印机的像素尺寸，来自其配置。树脂打印机没有喷嘴需要设置。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O tamanho do pixel da sua impressora de resina, do perfil dela. Uma impressora de resina não tem bico para ajustar."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجم بكسل طابعة الراتنج، من ملفها التعريفي. لا فوهة لضبطها في طابعة الراتنج."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De pixelgrootte van je harsprinter, uit zijn profiel. Een harsprinter heeft geen nozzle om in te stellen."
           }
         }
       }
@@ -21237,6 +21412,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "pinnen"
+          }
+        }
+      }
+    },
+    "pixel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "像素"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pixel"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بكسل"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pixel"
           }
         }
       }

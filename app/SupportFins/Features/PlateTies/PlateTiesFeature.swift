@@ -58,7 +58,7 @@ final class PlateTiesFeature: Feature {
     }
 
     var inspectorSections: [InspectorSection] {
-        [InspectorSection("plate-ties", slot: .bottom) {
+        [InspectorSection("plate-ties", slot: .plateTies) {
             if self.host?.hasPart == true { PlateTiesSection(model: self.model) }
         }]
     }

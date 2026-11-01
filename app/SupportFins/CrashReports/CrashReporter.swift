@@ -74,7 +74,7 @@ final class CrashReporter {
 
     /// False in a unit-test host (it would write markers into the user's folder). A DEBUG build launched with its own
     /// `-SFCrashDir` (the UI tests) starts, whatever the environment says.
-    static func shouldStart(environment: [String: String], defaults: UserDefaults = .standard) -> Bool {
+    static func shouldStart(environment: [String: String], defaults: UserDefaults = AppDefaults.shared) -> Bool {
         #if DEBUG
         if defaults.string(forKey: "SFCrashDir") != nil { return true }
         #endif
@@ -84,7 +84,7 @@ final class CrashReporter {
     /// Where a test's raw native dumps go: `<temp>/sf-native-crash/<run>/` in the process's own temporary directory
     /// (the app's sandbox container for the app and its unit-test host). `<run>` is `SF_CRASH_RUN` when set (`just
     /// app-test` passes it as `TEST_RUNNER_SF_CRASH_RUN`), else the launch time and pid. Nil outside tests.
-    static func nativeTestFolder(environment: [String: String], defaults: UserDefaults = .standard) -> URL? {
+    static func nativeTestFolder(environment: [String: String], defaults: UserDefaults = AppDefaults.shared) -> URL? {
         var testing = environment["XCTestConfigurationFilePath"] != nil
         #if DEBUG
         if defaults.string(forKey: "SFCrashDir") != nil { testing = true }
@@ -118,7 +118,7 @@ final class CrashReporter {
         guard !started else { return }
         started = true
         #if DEBUG
-        let args = UserDefaults.standard
+        let args = AppDefaults.shared
         // test hooks, DEBUG builds only: a folder of the test's own, and a marker planted as if the last run crashed
         if let dir = args.string(forKey: "SFCrashDir") { folder = CrashFolder(url: CrashFolder.testFolder(named: dir)) }
         if args.bool(forKey: "SFPlantCrash") {
@@ -191,10 +191,8 @@ final class CrashReporter {
         folder.clearMarker()
     }
 
-    static var appVersion: String {
-        let info = Bundle.main.infoDictionary
-        return "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
-    }
+    /// "2026.44.0 (1234)": the version and the build number (`AppVersion`).
+    static var appVersion: String { AppVersion.display }
 
     // MARK: breadcrumbs and settings
 
