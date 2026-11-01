@@ -92,7 +92,8 @@ struct SearchField: View {
                     .accessibilityLabel("Clear")
             }
         }
-        .padding(6)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 6)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
         .onChange(of: search.focusRequests) { focused = true }
     }
