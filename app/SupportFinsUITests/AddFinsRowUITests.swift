@@ -15,7 +15,9 @@ final class AddFinsRowUITests: PartWindowUITestCase {
         }
         XCTAssertEqual(toggle.label, "Add fins", "the toggle's words while the fins are off (its value \(String(describing: toggle.value)))")
         XCTAssertTrue(add.waitForExistence(timeout: 10), "the Fins row offers Add fins while they are off")
-        scrollIntoView(add)
+        // pinned above the inspector's tabs: on show in any tab, with nothing to scroll
+        showInspectorTab(.more)
+        XCTAssertTrue(add.isHittable, "Add fins is on show in the More tab too")
         add.click()
         let fins = element("stat-fins")
         waitFor("the Fins row shows a count", timeout: 60) { (fins.value as? String ?? fins.label).first?.isNumber == true }

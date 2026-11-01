@@ -33,7 +33,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         return url
     }
 
-    /// The status card's lines.
+    /// The status card's lines: pinned above the inspector's tabs, read in whichever tab is on show.
     var statusNotes: [String] {
         partWindow.descendants(matching: .any).matching(identifier: "status-note").allElementsBoundByIndex.map { text($0) }
     }
@@ -57,7 +57,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         let gap = element("plate-ties-max-gap")
         XCTAssertTrue(gap.waitForExistence(timeout: 10), "Max gap shows once the ties are on")
         enterText("15", into: gap, context: { "The status: \(self.statusNotes)" })
-        showInspectorTab(.part)     // the status card
+        // the status card is read in the Plate ties tab: it is pinned above the tabs
         if !waitUntil(timeout: 30, { self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") } }) {
             XCTFail("the coins are tied: one link, three ties. Max gap reads \"\(text(gap))\", the status \(statusNotes)")
         }
@@ -79,17 +79,14 @@ final class PlateTiesUITests: PartWindowUITestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         scrollIntoView(link)
         link.click()
-        showInspectorTab(.part)     // the status card
         waitFor("the pair is untied", timeout: 20) {
             self.statusNotes.contains { $0 == "Plate ties: every link on this plate is turned off." }
         }
-        showInspectorTab(.plateTies)
         XCTAssertTrue(element("plate-tie-link-0").waitForExistence(timeout: 5), "the link stays listed, off")
         let restore = element("plate-ties-restore-links")
         XCTAssertTrue(restore.waitForExistence(timeout: 5), "Restore links")
         scrollIntoView(restore)
         restore.click()
-        showInspectorTab(.part)
         waitFor("tied again", timeout: 20) { self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") } }
     }
 

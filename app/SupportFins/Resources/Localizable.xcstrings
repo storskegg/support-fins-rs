@@ -14431,41 +14431,6 @@
         }
       }
     },
-    "Status" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Status"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "状态"
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Status"
-          }
-        },
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الحالة"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Status"
-          }
-        }
-      }
-    },
     "Strength" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -1,8 +1,8 @@
 import SwiftUI
 import Viewer
 
-/// The inspector: the search box on top, then four tabs (`InspectorTab`, app-only: the web's options panel is one long
-/// column). Part holds the stats and status cards; Supports the web's settings block in its order (docs/UI-MAP.md
+/// The inspector: the search box and the status card on top (the header, on show in every tab), then four tabs
+/// (`InspectorTab`, app-only: the web's options panel is one long column). Part holds the stats card; Supports the web's settings block in its order (docs/UI-MAP.md
 /// section 4: Printer, Placement, Tines, the basics); More the four groups of More settings; Plate ties its section.
 /// The settings are the session's (`PartSession.settings`): a change is one undoable step.
 ///
@@ -14,8 +14,8 @@ import Viewer
 struct InspectorView: View {
     @Bindable var controller: ViewerController
     @Binding var settings: FinSettings
-    /// The features' sections (`Feature.inspectorSections`) by slot: above the tabs, the Part tab (an empty one keeps
-    /// M4a's Part block in place of the stats and status cards), the Supports tab after Cutouts, and the Plate ties tab.
+    /// The features' sections (`Feature.inspectorSections`) by slot: above the tabs (the search box, the status card),
+    /// the Part tab (an empty one keeps M4a's Part block in place of the stats card), the Supports tab after Cutouts, and the Plate ties tab.
     var header: [InspectorSection] = []
     var part: [InspectorSection] = []
     var basics: [InspectorSection] = []

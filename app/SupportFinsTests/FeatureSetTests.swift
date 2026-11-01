@@ -159,8 +159,8 @@ struct FeatureSetTests {
         #expect(model.features.overlays.map(\.id) == expected)
         #expect(model.toolbar.slots.map(\.id) == ["move", "arrange", "rotate", "scale-badge", "suggest", "strength", "section", "view"])
         #expect(model.features.windowToolbarItems.map(\.id) == ["export"])
-        // the search box above the inspector's tabs; the stats and status cards and the report links in the Part tab
-        #expect(model.features.inspectorSections(.header).map(\.id) == ["search-field", "search-note"])
+        // the search box and the status card above the inspector's tabs; the stats card and the report links in the Part tab
+        #expect(model.features.inspectorSections(.header).map(\.id) == ["search-field", "search-note", "status"])
         #expect(model.features.inspectorSections(.part).map(\.id) == ["readout", "report"])
         #expect(model.features.inspectorSections(.plateTies).map(\.id) == ["plate-ties"])
         // Add model and Remove model end the stats card, before the status card (`part-btns`, index.html:219-224)

@@ -21,14 +21,14 @@ final class FinsLoopUITests: PartWindowUITestCase {
         let slider = element("tine-density")
         XCTAssertTrue(slider.waitForExistence(timeout: 5))
         let before = String(describing: slider.value)   // a number or a string, depending on the control
-        // the build's Status block pushes the slider below the inspector's fold. adjust(toNormalizedSliderPosition:)
+        // the pinned status card takes the top of the inspector: the slider may sit below the fold. adjust(toNormalizedSliderPosition:)
         // leaves a SwiftUI slider on macOS where it was; a click on the track moves it
         scrollIntoView(slider)
         slider.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.5)).click()
         XCTAssertNotEqual(String(describing: slider.value), before, "the slider moved")
         Thread.sleep(forTimeInterval: 1)           // the 180 ms debounce, then the build
         waitFor("the rebuild is done", timeout: 60) { !self.element("build-spinner").exists }
-        showInspectorTab(.part)
+        // still in the Supports tab: the Fins line is pinned above the tabs
         waitFor("the Fins row still shows a count", timeout: 5) { (fins.value as? String ?? fins.label).first?.isNumber == true }
 
         // Export > STL -> the save panel -> a file in the temp dir

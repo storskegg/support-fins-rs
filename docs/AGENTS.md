@@ -206,6 +206,8 @@ reports, a STEP reader in a sandboxed XPC helper, and cancellable exports and se
 App-only UI (post-parity, no engine change): the inspector is tabbed (Part, Supports, More, Plate ties) under the search box,
 where the web's options panel is one long column; More settings shows its four groups unfolded in the More tab; a search
 shows the matches of every tab at once, each tab's after a button that shows them in their tab (suggestion S3, 2026-11-01).
+The status card (the Fins row and the notes) is pinned above the tabs, where the web has it at the foot of the column, and
+the stats card in the Part tab no longer carries the Fins row.
 
 ## Pitfalls
 

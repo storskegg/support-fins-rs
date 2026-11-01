@@ -91,7 +91,8 @@ struct AddFinsFoundTests {
         await model.load(url: stl)
         try #require(model.hasPart)
         func rowButton() async throws -> Bool {
-            let view = Form { ReadoutSections(controller: controller, session: model.session, build: model.wiring?.build) }.formStyle(.grouped)
+            // the Fins line heads the status card, pinned above the inspector's tabs
+            let view = PinnedStatus(inputs: ReadoutInputs(controller: controller, session: model.session, build: model.wiring?.build, state: ReadoutState()))
             return elements(under: try await host(view, width: 360, height: 700)).contains { $0.id == "stat-add-fins" }
         }
         #expect(!model.session.finsOn)

@@ -3,7 +3,8 @@ import SwiftUI
 /// The inspector's tabs (app-only: the web's options panel is one long column, docs/AGENTS.md "Divergences"). The
 /// search box sits above them; a search shows the matches of every tab at once (`InspectorView`).
 enum InspectorTab: String, CaseIterable, Identifiable {
-    /// The stats card (File ... Analysis, Add model, Remove model), the status card and the report links.
+    /// The stats card (File ... Analysis, Add model, Remove model) and the report links. The status card (the Fins line
+    /// and the notes) is pinned above the tabs.
     case part
     /// Printer, Placement, Tines, Cutouts, and what features add after them (Remove fins, the Draw controls).
     case supports

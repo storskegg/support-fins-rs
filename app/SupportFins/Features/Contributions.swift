@@ -64,9 +64,9 @@ struct WindowToolbarItem: Identifiable {
 /// Where in the inspector a section goes. The inspector is tabbed (`InspectorTab`): a header above the tabs, then the
 /// Part, Supports, More and Plate ties tabs.
 enum InspectorSlot: Int, CaseIterable {
-    /// Above the tabs, on show in every tab: the settings search box and its note.
+    /// Above the tabs, on show in every tab: the settings search box and its note, then the status card.
     case header
-    /// The Part tab: the stats and status cards and what follows them.
+    /// The Part tab: the stats card and what follows it (the report links).
     case part
     /// Inside the stats card (Part), after Analysis: the web's `part-btns` (Add model, Remove model). The readout
     /// draws these, not the inspector.

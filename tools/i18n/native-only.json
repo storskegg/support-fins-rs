@@ -107,14 +107,6 @@
     "ar": "{face} (الكائن {object})",
     "nl": "{face} (object {object})"
   },
-  "Status": {
-    "why": "title of the inspector's status card",
-    "de": "Status",
-    "zh": "状态",
-    "pt": "Status",
-    "ar": "الحالة",
-    "nl": "Status"
-  },
   "Inspector": {
     "why": "toolbar toggle of the inspector sidebar",
     "de": "Informationen",
