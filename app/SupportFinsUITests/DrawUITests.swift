@@ -20,11 +20,9 @@ final class DrawUITests: PartWindowUITestCase {
         let hint = element("draw-hint")
         XCTAssertTrue(hint.waitForExistence(timeout: 10), "the Draw hint")
         XCTAssertTrue(text(hint).hasPrefix("Click two points across an overhang"))
-        // the Fins row is the Part tab's
-        showInspectorTab(.part)
+        // the Fins line is the status card's, pinned above the tabs: read here in the Supports tab
         let fins = element("stat-fins")
         waitFor("nothing drawn yet", timeout: 30) { self.text(fins) == "none yet" }
-        showInspectorTab(.supports)
 
         // look at the part from below, then click two points across the slab's red underside
         // View > Bottom, looked up in the View menu only: `app.menuBars.menuItems["Bottom"]` also finds Window > Move &
@@ -46,9 +44,7 @@ final class DrawUITests: PartWindowUITestCase {
         a.click()
         XCTAssertTrue(back.waitForExistence(timeout: 10))
         b.click()
-        showInspectorTab(.part)
         waitFor("the Fins row counts the drawn wall", timeout: 60) { self.text(fins).hasPrefix("1 drawn wall") }
-        showInspectorTab(.supports)
         XCTAssertTrue(element("draw-clear").waitForExistence(timeout: 10), "the Draw controls")
         XCTAssertFalse(back.exists, "the wall is placed: no point to take back")
 
@@ -56,7 +52,6 @@ final class DrawUITests: PartWindowUITestCase {
         let clear = element("draw-clear")
         scrollIntoView(clear)
         clear.click()
-        showInspectorTab(.part)
         waitFor("cleared", timeout: 30) { self.text(fins) == "none yet" }
     }
 }

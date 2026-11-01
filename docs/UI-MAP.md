@@ -40,8 +40,8 @@ what `docs/FFI.md` exposes.
 | `#topbar` (brand, Import, Build volume, Overhang, Add fins, Export, Calibrate, Plugins, Language, links, error badge) | `index.html:86-195` | The window **toolbar** (`.toolbar` items: Open, volume pop-up, overhang slider, Add fins, Export menu; the inspector toggle is the inspector's own toolbar item, over the inspector; in a narrow window the volume pop-up and the slider go to the toolbar's » menu first, Add fins, Export and the toggle stay: `Toolbar/ToolbarPriority.swift`) plus the **menu bar**. Calibrate, language, GitHub and Ko-fi go to the Help menu / Settings; Plugins, the error badge and the phone ☰ are dropped. |
 | `#left-rail` > `#stats` (File, Triangles, Size, Volume; Overhangs, Area, Bed contact, Fins, Bed pad, Analysis; Add/Remove model) | `index.html:198-229` | The top of the **inspector** (trailing sidebar, `.inspector`): a "Part" section. |
 | `#right-rail` > `#fin-opts` (search, Printer row, Placement, Tines, basics, Draw controls, More settings) | `index.html:253-596` | The rest of the **inspector**: the same sections, same order, same labels (Form with `DisclosureGroup`s). |
-| `#right-rail` > `#status` (notes, warnings, grams receipt, report links) | `index.html:603-625` | A "Status" section pinned at the bottom of the inspector. |
-| (app-only) the inspector's tabs | `Inspector/InspectorView.swift` | The search box on top, then a segmented control: **Part** (the stats card with Add/Remove model, the Status card, the report links), **Supports** (Printer, Placement, Tines, Cutouts, Remove fins, Draw controls), **More** (More settings' four groups, unfolded), **Plate ties**. The tab is the window's (`SceneStorage` `sf.inspectorTab`). A search shows every tab's matches in one list, each tab's after a button that clears the box, selects the tab and scrolls to the first match. A divergence from the web's single column (docs/AGENTS.md). |
+| `#right-rail` > `#status` (notes, warnings, grams receipt, report links) | `index.html:603-625` | The status card, pinned above the inspector's tabs under the search box (app-only, 4.3); the report links end the Part tab. |
+| (app-only) the inspector's tabs | `Inspector/InspectorView.swift` | The search box on top, then the status card (pinned: the Fins line and the notes, on show in every tab, 4.3), then a segmented control: **Part** (the stats card with Add/Remove model, the report links), **Supports** (Printer, Placement, Tines, Cutouts, Remove fins, Draw controls), **More** (More settings' four groups, unfolded), **Plate ties**. The tab is the window's (`SceneStorage` `sf.inspectorTab`). A search shows every tab's matches in one list, each tab's after a button that clears the box, selects the tab and scrolls to the first match. A divergence from the web's single column (docs/AGENTS.md). |
 | `#viewbar` (popovers, view cube, badges: Undo, Redo, Move, Arrange, Rotate, Scale, Suggest, Strength, Section, View) | `index.html:631-748` | A **floating bottom toolbar** over the view (a glass capsule) with the same badges, each opening a `.popover`; the view cube is a SwiftUI/Metal overlay above it. Undo/Redo also live in the Edit menu. |
 | `#plates` (plate tabs, See all) | `ui/plates.js:353-400` | A tab strip under the toolbar (`TabView` style) for multi-plate documents. M6. |
 | `#drop` (intro, empty state, What's new) | `index.html:752-775` | The `DocumentGroup` launch/empty state; drag-and-drop onto the window. The What's new card under the intro is `WhatsNewCard` (see "What's new" below). |
@@ -231,6 +231,15 @@ state is remembered (`sf.sections`, `ui/settings.js:363-380`) and whose collapse
 Groups' hints and mode gates: Pad numbers are shown only for Custom (`ui/settings.js:117-153`); the Sway fields only with Sway braces (`:214-241`); coverage is Auto's, disabled in Full and hidden in Draw (`:46-62`); Separate walls shows in Full coverage and with Curved walls (it ticks itself for Vertical tines, `:172-195`); Long walls only in Full; Curved walls hidden in Draw; Wall lines options a big nozzle cannot take are disabled (`fitWallLines`, `:333-349`).
 
 ### 4.3 Status card
+
+App-only placement: the card is pinned above the inspector's tabs, under the search box (`InspectorSlot.header`,
+`ReadoutFeature`'s `status` section, `StatusCard`), so the fin count and the warnings stay on show while Supports, More or
+Plate ties is edited. It holds the stats card's **Fins** row (`stat-fins`; Add fins, `stat-add-fins`, while the fins are
+off; the (i) popover), then the notes (`import-note`, `status-note`: import, flat, fin lead, over-warn, island-warn, the
+features' `statusLines`) and the grams receipt. Past 120 pt the notes scroll inside the card, so a long run of warnings
+(slivers, midair starts, plate ties) leaves the tabs most of the column. The Part tab keeps the rest of the stats card
+(File, Triangles, Size, Volume, Overhangs, Area, Bed contact, Bed pad, Analysis, Add / Remove model) and the report links.
+The settings search does not reach the card (it holds no setting).
 
 | Control (`id`) | Type | Label | Default | Range / choices | Tooltip (verbatim) | Source | Native element | M |
 |---|---|---|---|---|---|---|---|---|

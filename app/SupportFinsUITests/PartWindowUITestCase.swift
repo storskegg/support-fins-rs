@@ -171,7 +171,8 @@ class PartWindowUITestCase: XCTestCase {
         segment.click()
     }
 
-    /// `target` is not in the tab on show: try the tabs in turn until it is.
+    /// `target` is not in the tab on show: try the tabs in turn until it is. The status card (`stat-fins`, `stat-add-fins`,
+    /// `status-note`, `import-note`) is pinned above the tabs: it is on show in every one.
     func showInspectorTab(holding target: XCUIElement) {
         guard !target.exists else { return }
         for tab in InspectorTab.allCases where inspectorTabSegment(tab.rawValue).exists {
@@ -197,6 +198,8 @@ class PartWindowUITestCase: XCTestCase {
         showInspectorTab(holding: target)
         // the innermost scroll view holding it (the smallest), not one that only contains that one
         let holders = partWindow.scrollViews.containing(.any, identifier: target.identifier).allElementsBoundByIndex
+        // in no scroll view and on show: the status card's Fins line, pinned above the inspector's tabs
+        if holders.isEmpty && target.isHittable { return }
         guard let scroller = holders.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
             XCTFail("no scroll view holds \(target.identifier) (it exists: \(target.exists), frame \(target.frame))", file: file, line: line)
             return
