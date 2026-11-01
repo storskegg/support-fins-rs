@@ -101,6 +101,80 @@ struct CrashReportsTests {
         #expect(mj["diagnostic"] != nil && mj["breadcrumbs"] is [String])
     }
 
+    // MARK: saved as they go (S6, November 2026)
+
+    private func saved(_ folder: CrashFolder) throws -> [String: Any] {
+        try #require(JSONSerialization.jsonObject(with: Data(contentsOf: folder.breadcrumbsURL)) as? [String: Any])
+    }
+
+    /// A run killed before its first action leaves a file of its own: the next launch must not report the run before
+    /// it (the user's report carried breadcrumbs saved the day before, and no settings).
+    @Test func launchWritesThisRunsFileAtOnce() throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        try Data(#"{"breadcrumbs":["2020-01-01T00:00:00Z  open file: old.stl"],"savedAt":"2020-01-01T00:00:00Z","settings":{}}"#.utf8)
+            .write(to: folder.breadcrumbsURL)
+        let r = CrashReporter(folder: folder)
+        r.setSettings(options: FinSettings().optionsJSON(), tunables: FinSettings().tunablesJSON())
+        r.start(register: false)
+        let file = try saved(folder)
+        #expect(file["savedAt"] as? String != "2020-01-01T00:00:00Z", "the launch wrote this run's file")
+        #expect((file["breadcrumbs"] as? [String])?.isEmpty == true)
+        #expect((file["settings"] as? [String: Any])?["options"] != nil, "with the settings in force")
+        #expect((file["memory"] as? [String: Any])?["lastMB"] as? Int ?? 0 > 0, "and the memory footprint")
+        r.stop()
+    }
+
+    /// An action is on disk within a quarter second, not two seconds later: a kill right after it still has it.
+    @Test func anActionIsSavedAtOnce() async throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        let r = CrashReporter(folder: folder)
+        r.start(register: false)
+        try await Task.sleep(for: CrashReporter.saveDelay + .milliseconds(50))
+        r.note("open: merging 10 of 10 objects, 7723400 triangles")
+        #expect((try saved(folder)["breadcrumbs"] as? [String])?.last?.hasSuffix("open: merging 10 of 10 objects, 7723400 triangles") == true,
+                "written on the spot")
+        // a burst: one write a quarter second later carries the rest
+        r.note("edit: Add fins")
+        r.note("build requested")
+        try await Task.sleep(for: CrashReporter.saveDelay + .milliseconds(150))
+        #expect((try saved(folder)["breadcrumbs"] as? [String])?.last?.hasSuffix("build requested") == true)
+        r.stop()
+    }
+
+    /// The last build or analysis stage and the memory go into the file and into the unexpected-exit report.
+    @Test func theStageAndTheMemoryReachTheReport() throws {
+        let folder = tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder.url) }
+        let dying = CrashReporter(folder: folder)
+        dying.start(register: false)
+        dying.note("open file: Earth Focus Many Vertical.3mf (3MF), 1 objects, 7723400 triangles")
+        dying.stage("build 3 started (7723400 triangles)")
+        dying.saveNow()
+        let file = try saved(folder)
+        #expect((file["lastStage"] as? String)?.hasSuffix("build 3 started (7723400 triangles)") == true)
+        let mem = try #require(file["memory"] as? [String: Any])
+        #expect((mem["lastMB"] as? Int ?? 0) > 0 && (mem["peakMB"] as? Int ?? 0) >= (mem["lastMB"] as? Int ?? 0))
+        // killed: no stop(); the next launch reports it with the stage and the memory
+        let next = CrashReporter(folder: folder)
+        next.start(register: false)
+        let report = try #require(folder.reports().first { $0.stem.hasPrefix("crash-session-") })
+        let jsonURL = try #require(report.files.first { $0.pathExtension == "json" })
+        let textURL = try #require(report.files.first { $0.pathExtension == "txt" })
+        let json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: jsonURL)) as? [String: Any])
+        #expect((json["lastStage"] as? String)?.hasSuffix("build 3 started (7723400 triangles)") == true)
+        #expect((json["memory"] as? [String: Any])?["peakMB"] != nil && json["lastSavedAt"] != nil)
+        let text = try String(contentsOf: textURL, encoding: .utf8)
+        #expect(text.contains("lastStage: ") && text.contains("build 3 started") && text.contains("memory: "), "\(text)")
+        next.stop()
+    }
+
+    @Test func theMemoryFootprintIsTheProcesss() throws {
+        let bytes = try #require(MemoryFootprint.current())
+        #expect(bytes > 1_000_000 && bytes < 1_000_000_000_000)
+    }
+
     @Test func aCaughtPanicReportAloneNeverRaisesTheBanner() throws {
         let folder = tempFolder()
         defer { try? FileManager.default.removeItem(at: folder.url) }

@@ -66,6 +66,8 @@ final class ViewerModel {
         addingModel = adding && hasPart
         loadingURL = url
         defer { isLoading = false; loadingURL = nil }
+        CrashReporter.note("open: reading \(url?.lastPathComponent ?? "-")\(adding ? " (add model)" : "")")
+        CrashReporter.stage("reading \(url?.pathExtension.uppercased() ?? "-") file")
         do {
             let parts = try await loadAsking(url: url, device: controller.renderer.device)
             guard let parts else { addingModel = false; return }     // Cancel at "Load anyway?": nothing loads
@@ -78,6 +80,7 @@ final class ViewerModel {
                 let d = $0.mesh.bounds.max - $0.mesh.bounds.min
                 return (name: $0.name, triangles: $0.mesh.faceCount, size: [Double(d.x), Double(d.y), Double(d.z)])
             })
+            CrashReporter.note("open: picker, \(parts.count) objects")
             picker.onCancel = { [weak self] in self?.picker = nil; self?.addingModel = false }
             picker.onLoad = { [weak self] chosen in
                 guard let self else { return }
@@ -147,8 +150,11 @@ final class ViewerModel {
         do {
             let cores = chosen.compactMap { ($0.mesh as? CorePart)?.part }
             guard cores.count == chosen.count else { addingModel = false; status = JS.t("These objects cannot be merged."); return }
+            CrashReporter.note("open: merging \(cores.count) of \(total) objects, \(chosen.reduce(0) { $0 + $1.mesh.faceCount }) triangles")
+            CrashReporter.stage("merging \(cores.count) objects")
             let merged = try await Task.detached(priority: .userInitiated) { try mergeParts(parts: cores, objectCount: UInt64(total)) }.value
             let core = CorePart(lazy: merged, device: controller.renderer.device)
+            CrashReporter.stage("welding and meshing the merged part (\(core.faceCount) triangles)")
             guard await core.prepare() else { addingModel = false; status = JS.t("The merged mesh could not be shared with the GPU."); return }
             show([LoadedPart(name: core.info.name, mesh: core)], url: url)
         } catch {

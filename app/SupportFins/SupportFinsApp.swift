@@ -7,6 +7,10 @@ struct SupportFinsApp: App {
         // environment, so a test that names its own crash folder (DEBUG-only `-SFCrashDir`) starts it anyway.
         // A unit-test host still gets the native crash handlers, writing into a per-run folder of its own (1E).
         if CrashReporter.shouldStart(environment: ProcessInfo.processInfo.environment) {
+            // the settings a new window starts with, until a window says otherwise, in the file the launch writes (S6: a
+            // run killed before its first build reported none)
+            let s = SettingsStore().load()
+            CrashReporter.setSettings(options: s.optionsJSON(), tunables: s.tunablesJSON())
             CrashReporter.shared.start()
         } else {
             CrashReporter.startTestCapture()

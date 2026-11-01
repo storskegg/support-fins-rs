@@ -458,6 +458,11 @@ struct PlateTiesTests {
         defer { withExtendedLifetime(model) {} }
         let feature = try #require(model.features[PlateTiesFeature.self])
         let (volumes, settings) = (VolumeStore(defaults: defaults), SettingsStore(defaults: defaults))
+        // a layer the printer does not set: the window's first settings come from the test host's own saved ones,
+        // which may already say 0.05 (then the undo below could not tell)
+        var first = model.session.settings
+        first.layerHeight = 0.2
+        model.session.setSettings(first)
         feature.useProfile(saturn, volumes: volumes, store: settings)
         let bed = PrinterVolume(x: 211.68, y: 118.37, z: 220)
         #expect(model.controller?.volume == bed)
@@ -471,7 +476,7 @@ struct PlateTiesTests {
         #expect(model.wiring?.exporter?.optionsJSON(for: .threeMF)?.contains("\"bed\":[211.6") == true)
         // one undo step
         model.session.undo()
-        #expect(model.session.settings.layerHeight != 0.05)
+        #expect(model.session.settings.layerHeight == 0.2)
         model.session.redo()
         // changed by hand afterwards: the printer stays picked, the hand-set values hold
         model.controller?.volume = PrinterVolume.standard

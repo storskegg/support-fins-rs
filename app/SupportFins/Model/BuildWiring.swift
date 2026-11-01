@@ -88,6 +88,7 @@ final class BuildWiring {
         self.removal = removal
         self.exporter = exporter
         controller.renderer.setSupports(nil)
+        CrashReporter.setSettings(options: session.settings.optionsJSON(), tunables: session.settings.tunablesJSON())
         watch()
         // the session's toggle may already be on (a second file in the window)
         scheduler.setEnabled(session.finsOn, reusing: kept != nil)
@@ -194,6 +195,8 @@ final class BuildWiring {
 
     /// One change of the session -> the right amount of work.
     func react(from old: Key?, to new: Key) {
+        // the settings in force go into every crash report as they change, fins on or off (S6)
+        if old?.options != new.options || old?.tunables != new.tunables { CrashReporter.setSettings(options: new.options, tunables: new.tunables) }
         guard let scheduler, let removal else { return }
         let poseChanged = old?.pose != new.pose || old?.options != new.options || old?.tunables != new.tunables
         if old?.finsOn != new.finsOn { scheduler.setEnabled(new.finsOn) }

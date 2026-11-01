@@ -557,7 +557,12 @@ Nothing is sent over the network; reports are files in a folder Swift names (`~/
   ("suggest", "suggest wide", "strength"), `export*`, `build_report`, `DrawKit::ghost`/`check_wall`/`sweep`/`brace_at` ("draw ...").
   Rayon worker threads carry none (the thread name says where it ran).
 - **Breadcrumbs:** `crash_breadcrumb(text)` pushes into a ring of the last 50 (`crash_breadcrumbs()` reads it). Swift keeps its own copy
-  and saves it to the folder; both end up in the reports.
+  and saves it to the folder (`breadcrumbs.json`): at launch, so the file is always this run's, then within 250 ms of each action (S6).
+  The same file carries the last build or analysis stage (`CrashReporter.stage`: a file read, a merge, a weld, an analysis, a build
+  started, done or failed) and the process's memory footprint (`phys_footprint`, last and peak, sampled every 5 s and at each stage; a
+  new peak or a 256 MB move saves it). An unexpected-exit report copies `lastStage`, `memory` and `lastSavedAt` from it; its `time`
+  is when the next launch wrote the report, not when the run ended. The settings in force are recorded at launch and on every change
+  (`BuildWiring`), fins on or off. The native handler gets the stage and memory as two extra breadcrumb lines.
 - **`crash_zip(names, datas)`** is `sf_io::zip::zip_store` for Save crash report... .
 - Test: `crates/sf-ffi/tests/crash.rs` forces a panic inside `catch_unwind` and reads the report back.
 - **When the banner shows.** Only for a leftover running marker (the last run did not end normally) and for MetricKit crash or hang

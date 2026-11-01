@@ -48,6 +48,8 @@ final class BuildModel {
     @ObservationIgnored private var wanted: UInt64?
     @ObservationIgnored private var wantedRotation: [Double]?
     @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
+    /// When the newest build started, for the crash reports' stage line.
+    @ObservationIgnored private var buildStarted: ContinuousClock.Instant?
 
     init(part: Part) {
         self.part = part
@@ -67,6 +69,7 @@ final class BuildModel {
         CrashReporter.setSettings(options: optionsJSON, tunables: tunablesJSON)
         CrashReporter.note("build requested")
         let g: UInt64
+        buildStarted = ContinuousClock().now
         do {
             g = try builder.build(rot: rotation, optsJson: optionsJSON, tunablesJson: tunablesJSON, listener: listener)
         } catch {
@@ -80,6 +83,7 @@ final class BuildModel {
             return generation
         }
         generation = g
+        CrashReporter.stage("build \(g) started (\(part.info().triangles) triangles)")
         wanted = g
         wantedRotation = rotation
         requested = BuildRequest(rotation: rotation, optionsJSON: optionsJSON, tunablesJSON: tunablesJSON)
@@ -144,6 +148,7 @@ final class BuildModel {
                 latestRotation = wantedRotation
                 latestRequest = requested
                 error = nil
+                CrashReporter.stage("build \(g) done in \(elapsedMs) ms: \(records.fins.count) fins")
             } catch {
                 // the engine's JSON is the contract (docs/FFI.md): a mismatch is a bug to see, not to hide
                 self.error = "The build's records could not be read: \(error)"
@@ -151,11 +156,19 @@ final class BuildModel {
         case .failed(let g, let err):
             guard g == wanted else { return }
             error = Self.message(err)
+            CrashReporter.stage("build \(g) failed after \(elapsedMs) ms")
+            CrashReporter.note("build failed: \(error ?? "")")
         }
         building = false
         wanted = nil
         resumeWaiters()
         if case .done = event { onUpdate?() }
+    }
+
+    private var elapsedMs: Int {
+        guard let buildStarted else { return 0 }
+        let d = ContinuousClock().now - buildStarted
+        return Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
     }
 
     private func resumeWaiters() {
