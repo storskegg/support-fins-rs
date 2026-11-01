@@ -135,15 +135,52 @@ class PartWindowUITestCase: XCTestCase {
         return found
     }
 
+    // MARK: the inspector's tabs
+
+    /// The inspector's tabs, by their English titles (the app's `InspectorTab`).
+    enum InspectorTab: String, CaseIterable {
+        case part = "Part", supports = "Supports", more = "More", plateTies = "Plate ties"
+    }
+
+    /// The segment of the inspector's tab control titled `title`. The control has no identifier of its own (#204, #206):
+    /// its segments are found by their title, as a radio button (an `NSSegmentedControl`'s) or a button.
+    func inspectorTabSegment(_ title: String) -> XCUIElement {
+        let types = [XCUIElement.ElementType.radioButton, .button].map { NSNumber(value: $0.rawValue) }
+        return partWindow.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ AND elementType IN %@", title, types)).firstMatch
+    }
+
+    /// Select an inspector tab: `tab`, or the segment titled `title` (another language's title for it).
+    func showInspectorTab(_ tab: InspectorTab, title: String? = nil, file: StaticString = #filePath, line: UInt = #line) {
+        let segment = inspectorTabSegment(title ?? tab.rawValue)
+        guard segment.waitForExistence(timeout: 10) else {
+            XCTFail("no \(title ?? tab.rawValue) tab in the inspector", file: file, line: line)
+            return
+        }
+        segment.click()
+    }
+
+    /// `target` is not in the tab on show: try the tabs in turn until it is.
+    func showInspectorTab(holding target: XCUIElement) {
+        guard !target.exists else { return }
+        for tab in InspectorTab.allCases where inspectorTabSegment(tab.rawValue).exists {
+            inspectorTabSegment(tab.rawValue).click()
+            if target.waitForExistence(timeout: 1) { return }
+        }
+    }
+
     // MARK: scrolling
 
-    /// Scroll `target` into view in the scroll view that holds it, by scrolling that scroll view (whose centre stays
-    /// put), never by scrolling over a row that moves with the content; between steps, wait for the content to settle.
+    /// Scroll `target` into view in the scroll view that holds it (selecting the inspector tab that holds it first), by
+    /// scrolling that scroll view (whose centre stays put), never by scrolling over a row that moves with the content;
+    /// between steps, wait for the content to settle.
     /// In view means hittable, wholly below the scroll view's top and at least `bottomMargin` above its bottom: XCUITest
     /// calls an element hittable while something drawn over the view's bottom edge covers it (#184 saw a click on the
     /// Tine grip slider land on the debug Benchmark orbit bar).
     func scrollIntoView(_ target: XCUIElement, bottomMargin: CGFloat = 60, maxSteps: Int = 20,
                         file: StaticString = #filePath, line: UInt = #line) {
+        // a row of another inspector tab: that tab first
+        showInspectorTab(holding: target)
         // the innermost scroll view holding it (the smallest), not one that only contains that one
         let holders = partWindow.scrollViews.containing(.any, identifier: target.identifier).allElementsBoundByIndex
         guard let scroller = holders.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {

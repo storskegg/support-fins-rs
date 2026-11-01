@@ -40,8 +40,8 @@ final class SearchFeature: Feature {
     }
 
     var inspectorSections: [InspectorSection] {
-        [InspectorSection("search-field", slot: .top, order: -20) { SearchField(search: self.model) },
-         InspectorSection("search-note", slot: .top, order: -10) { SearchEmptyNote(search: self.model) }]
+        [InspectorSection("search-field", slot: .header, order: -20) { SearchField(search: self.model) },
+         InspectorSection("search-note", slot: .header, order: -10) { SearchEmptyNote(search: self.model) }]
     }
 
     static func menus(_ f: SearchFeature?) -> [MenuSection] {

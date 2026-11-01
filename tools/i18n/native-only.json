@@ -1078,5 +1078,29 @@
     "pt": "Na {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm no contato; {default} é o padrão da impressora.",
     "ar": "على {printer}: 1 = {one} مم، 2 = {two} مم، 3 = {three} مم عند التلامس؛ و{default} هو الافتراضي للطابعة.",
     "nl": "Op {printer}: 1 = {one} mm, 2 = {two} mm, 3 = {three} mm bij het contact; {default} is de standaard van de printer."
+  },
+  "Supports": {
+    "why": "the inspector's Supports tab (app-only tabs: Printer, Placement, Tines, Cutouts)",
+    "de": "Stützen",
+    "zh": "支撑",
+    "pt": "Suportes",
+    "ar": "الدعامات",
+    "nl": "Steunen"
+  },
+  "More": {
+    "why": "the inspector's More tab (app-only tabs: the groups of More settings)",
+    "de": "Mehr",
+    "zh": "更多",
+    "pt": "Mais",
+    "ar": "المزيد",
+    "nl": "Meer"
+  },
+  "Show in its tab": {
+    "why": "tooltip of a settings-search result's tab button: clears the search and shows the match in its inspector tab",
+    "de": "Im eigenen Tab zeigen",
+    "zh": "在所在标签页中显示",
+    "pt": "Mostrar na sua aba",
+    "ar": "اعرضه في علامة تبويبه",
+    "nl": "Tonen in zijn tabblad"
   }
 }
