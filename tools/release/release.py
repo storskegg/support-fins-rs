@@ -170,6 +170,9 @@ def build_and_install(version):
 
 
 def release(argv):
+    unknown = [a for i, a in enumerate(argv) if a not in ("--dry-run", "--push", "--date") and (i == 0 or argv[i - 1] != "--date")]
+    if unknown:
+        raise SystemExit(f"release: unknown argument {unknown[0]} (--dry-run, --push)")
     dry = "--dry-run" in argv
     push = "--push" in argv
     day = datetime.date.today()
