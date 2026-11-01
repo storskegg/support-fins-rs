@@ -5,7 +5,11 @@ import SupportFinsCore
 
 /// Crash reports, the app's side (docs/FIX-PLAN-2026-10.md, 1D). The engine's panic hook writes its own reports into
 /// the same folder (`crates/sf-ffi/src/crash.rs`); this class
-/// - keeps the last 50 user actions (breadcrumbs) and saves them from time to time, so they survive a crash;
+/// - keeps the last 50 user actions (breadcrumbs) and saves them as they go (at launch, then within a quarter second of
+///   each action), so they survive a crash or a kill: a run killed outright (SIGKILL: memory pressure, a force quit) has
+///   no handler to save them then (S6, November 2026);
+/// - keeps the last build or analysis stage and the process's memory footprint (last and peak; sampled every few
+///   seconds and at each stage) in the same file, so a report says what the app was doing and how big it was;
 /// - sets a "running" marker at launch and clears it at normal termination: a marker at the next launch means the last
 ///   run did not end normally, and a report is written from the saved breadcrumbs;
 /// - writes the MetricKit crash and hang diagnostics the system delivers on a later launch;
@@ -31,6 +35,22 @@ final class CrashReporter {
     @ObservationIgnored private var settingsJSON = "{}"
     @ObservationIgnored private var started = false
     @ObservationIgnored private var saveScheduled = false
+    @ObservationIgnored private var lastSave: ContinuousClock.Instant?
+    /// The last build or analysis stage (`stage(_:)`), `<ISO time>  text`; not a breadcrumb (they come many a second).
+    @ObservationIgnored private(set) var lastStage: String?
+    /// The memory footprint: the last sample, the highest seen this run, and when the last was taken.
+    struct Memory: Equatable {
+        var lastMB: Int
+        var peakMB: Int
+        var at: Date
+    }
+    @ObservationIgnored private(set) var memory: Memory?
+    @ObservationIgnored private var sampler: Task<Void, Never>?
+    /// How soon after an action the file is written (the first one at once).
+    static let saveDelay = Duration.milliseconds(250)
+    /// How often the memory is sampled while the app runs; a move of `memoryStepMB` or a new peak saves the file.
+    static let memoryInterval = Duration.seconds(5)
+    static let memoryStepMB = 256
     @ObservationIgnored private var subscriber: MetricsSubscriber?
     /// The native handlers are installed in this process (by any reporter, or the test-host capture).
     private static var nativeInstalled = false
@@ -115,6 +135,12 @@ final class CrashReporter {
         if folder.markerExists { recordUnexpectedExit(writeReport: imported.isEmpty) }
         folder.writeMarker()
         breadcrumbs.replace(with: [])
+        lastStage = nil
+        memory = nil
+        sampleMemory()
+        // this run's file from the start: a run killed before its first action leaves its own (empty) file, not the
+        // previous run's (the report of S6 carried breadcrumbs saved a day before)
+        saveNow()
         guard register else { refresh(); return }
         crashReportsStart(dir: folder.url.path, appVersion: Self.appVersion, settingsJson: settingsJSON)
         let testDir = Self.nativeTestFolder(environment: ProcessInfo.processInfo.environment)
@@ -126,11 +152,41 @@ final class CrashReporter {
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { CrashReporter.shared.stop() }
         }
+        startMemorySampler()
         refresh()
+    }
+
+    /// Samples the memory footprint every `memoryInterval`; a new peak, or a move of `memoryStepMB` since the last save,
+    /// writes the file, so a run that grows until the system kills it leaves how big it got.
+    private func startMemorySampler() {
+        sampler?.cancel()
+        sampler = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.memoryInterval)
+                guard let self else { return }
+                let before = self.savedMemory
+                self.sampleMemory()
+                if let m = self.memory, before == nil || m.peakMB > before!.peakMB || abs(m.lastMB - before!.lastMB) >= Self.memoryStepMB {
+                    self.scheduleSave()
+                }
+            }
+        }
+    }
+
+    /// The memory as last written to the file.
+    @ObservationIgnored private var savedMemory: Memory?
+
+    /// Takes a memory sample now.
+    func sampleMemory(now: Date = Date()) {
+        guard let bytes = MemoryFootprint.current() else { return }
+        let mb = MemoryFootprint.megabytes(bytes)
+        memory = Memory(lastMB: mb, peakMB: max(mb, memory?.peakMB ?? 0), at: now)
     }
 
     /// Normal termination: the marker goes, the breadcrumbs of this run are saved.
     func stop() {
+        sampler?.cancel()
+        sampler = nil
         saveNow()
         folder.clearMarker()
     }
@@ -152,10 +208,31 @@ final class CrashReporter {
         scheduleSave()
     }
 
-    /// The breadcrumbs and settings a native crash writes, preserialized for the handler.
+    /// The stage the app is in now: a build or an analysis starting or ending, a file being read or merged. Kept apart
+    /// from the breadcrumbs (a drag makes many a second), with a memory sample, and saved like them.
+    static func stage(_ text: String) { shared.stage(text) }
+
+    func stage(_ text: String, now: Date = Date()) {
+        lastStage = "\(now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true)))  \(text)"
+        sampleMemory(now: now)
+        pushNativeContext()
+        scheduleSave()
+    }
+
+    /// The breadcrumbs and settings a native crash writes, preserialized for the handler; the stage and the memory
+    /// ride as the last two lines.
     private func pushNativeContext() {
         guard Self.nativeInstalled else { return }
-        NativeCrashCapture.setContext(breadcrumbs: breadcrumbs.lines, settingsJSON: settingsJSON)
+        NativeCrashCapture.setContext(breadcrumbs: breadcrumbs.lines + contextLines, settingsJSON: settingsJSON)
+    }
+
+    /// The stage and the memory as report lines.
+    private var contextLines: [String] {
+        (lastStage.map { ["stage: \($0)"] } ?? []) + (memory.map { ["memory: \(Self.memoryText($0))"] } ?? [])
+    }
+
+    static func memoryText(_ m: Memory) -> String {
+        "\(m.lastMB) MB (peak \(m.peakMB) MB) at \(ISO8601DateFormatter().string(from: m.at))"
     }
 
     /// The options and tunables texts of the build now in force: they go into every report.
@@ -170,19 +247,33 @@ final class CrashReporter {
         scheduleSave()
     }
 
+    /// Writes the file now when the last write is older than `saveDelay`, else once that much after it: an action is
+    /// on disk a quarter second after it at most, and a burst of them is one write each quarter second.
     private func scheduleSave() {
         guard started, !saveScheduled else { return }
-        saveScheduled = true
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2))
-            self?.saveScheduled = false
-            self?.saveNow()
+        let clock = ContinuousClock()
+        if let last = lastSave, clock.now - last < Self.saveDelay {
+            saveScheduled = true
+            let wait = Self.saveDelay - (clock.now - last)
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: wait)
+                self?.saveScheduled = false
+                self?.saveNow()
+            }
+            return
         }
+        saveNow()
     }
 
     /// Write the breadcrumbs and settings of this run to the folder.
     func saveNow() {
-        let object: [String: Any] = ["savedAt": ISO8601DateFormatter().string(from: Date()), "breadcrumbs": breadcrumbs.lines, "settings": Self.object(settingsJSON)]
+        lastSave = ContinuousClock().now
+        savedMemory = memory
+        var object: [String: Any] = ["savedAt": ISO8601DateFormatter().string(from: Date()), "breadcrumbs": breadcrumbs.lines, "settings": Self.object(settingsJSON)]
+        if let lastStage { object["lastStage"] = lastStage }
+        if let memory {
+            object["memory"] = ["lastMB": memory.lastMB, "peakMB": memory.peakMB, "at": ISO8601DateFormatter().string(from: memory.at)] as [String: Any]
+        }
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]) else { return }
         try? data.write(to: folder.breadcrumbsURL)
     }
@@ -195,9 +286,13 @@ final class CrashReporter {
 
     /// The saved breadcrumbs and settings of the last run (a missing file: none).
     private func savedSession() -> (breadcrumbs: [String], settings: Any) {
-        guard let data = try? Data(contentsOf: folder.breadcrumbsURL),
-              let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return ([], NSNull()) }
-        return (o["breadcrumbs"] as? [String] ?? [], o["settings"] ?? NSNull())
+        let s = savedFile()
+        return (s?["breadcrumbs"] as? [String] ?? [], s?["settings"] ?? NSNull())
+    }
+
+    private func savedFile() -> [String: Any]? {
+        guard let data = try? Data(contentsOf: folder.breadcrumbsURL) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 
     /// The marker was there at launch: keep the last run's breadcrumbs and write a report from them. MetricKit's
@@ -206,23 +301,31 @@ final class CrashReporter {
     private func recordUnexpectedExit(writeReport: Bool = true, now: Date = Date()) {
         closedUnexpectedly = true
         let saved = savedSession()
+        let file = savedFile()
         try? FileManager.default.removeItem(at: folder.crashedBreadcrumbsURL)
         try? FileManager.default.moveItem(at: folder.breadcrumbsURL, to: folder.crashedBreadcrumbsURL)
         guard writeReport else { return }
         let iso = ISO8601DateFormatter()
         let started = folder.markerDate().map(iso.string(from:)) ?? "unknown"
-        let json: [String: Any] = [
+        var json: [String: Any] = [
             "kind": "unexpected-exit", "time": iso.string(from: now), "runStartedAt": started,
             "appVersion": Self.appVersion, "engineVersion": engineVersion(), "os": ProcessInfo.processInfo.operatingSystemVersionString,
             "breadcrumbs": saved.breadcrumbs, "settings": saved.settings,
         ]
+        // what the run was doing and how big it was when its file was last written (the exit came after that)
+        if let stage = file?["lastStage"] { json["lastStage"] = stage }
+        if let m = file?["memory"] { json["memory"] = m }
+        if let at = file?["savedAt"] { json["lastSavedAt"] = at }
         let text = Self.text(title: "Support Fins closed unexpectedly (no normal quit)", json: json, crumbs: saved.breadcrumbs)
         folder.write(kind: "session", json: json, text: text, now: now)
     }
 
     private static func text(title: String, json: [String: Any], crumbs: [String]) -> String {
         var out = "\(title)\n"
-        for k in ["time", "runStartedAt", "appVersion", "engineVersion", "os"] { if let v = json[k] { out += "\(k): \(v)\n" } }
+        for k in ["time", "runStartedAt", "lastSavedAt", "appVersion", "engineVersion", "os", "lastStage"] { if let v = json[k] { out += "\(k): \(v)\n" } }
+        if let m = json["memory"] as? [String: Any], let last = m["lastMB"], let peak = m["peakMB"] {
+            out += "memory: \(last) MB (peak \(peak) MB) at \(m["at"] ?? "?")\n"
+        }
         out += "\nLast actions (oldest first):\n" + crumbs.map { "  \($0)\n" }.joined()
         if let s = json["settings"], !(s is NSNull),
            let d = try? JSONSerialization.data(withJSONObject: s, options: [.prettyPrinted, .sortedKeys, .fragmentsAllowed]) {

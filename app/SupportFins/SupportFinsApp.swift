@@ -8,6 +8,10 @@ struct SupportFinsApp: App {
         // A unit-test host still gets the native crash handlers, writing into a per-run folder of its own (1E).
         if CrashReporter.shouldStart(environment: ProcessInfo.processInfo.environment) {
             CrashReporter.shared.start()
+            // the settings a new window starts with, until a window says otherwise (S6: a run killed before its first
+            // build reported none)
+            let s = SettingsStore().load()
+            CrashReporter.setSettings(options: s.optionsJSON(), tunables: s.tunablesJSON())
         } else {
             CrashReporter.startTestCapture()
         }
