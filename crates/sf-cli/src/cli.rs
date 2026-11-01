@@ -212,6 +212,9 @@ pub struct Args {
     pub json: bool,
     pub help: bool,
     pub version: bool,
+    /// `--build-info`: the app's own version (not in the JS, whose `--version` this keeps; docs/AGENTS.md "Versioning
+    /// and releases").
+    pub build_info: bool,
     /// `dialog`: `{options.json key: value}` in the entry's units, in the order given.
     pub dialog: Vec<(String, Json)>,
     pub preserve_project: bool,
@@ -285,6 +288,8 @@ pub fn parse_args(argv: &[String]) -> Result<Args, ArgError> {
             out.help = true;
         } else if a == "--version" {
             out.version = true;
+        } else if a == "--build-info" {
+            out.build_info = true;
         } else if a == "-o" || a == "--output" {
             out.output = Some(next(&mut i)?);
         } else if a == "--rot" {
@@ -976,6 +981,9 @@ pub fn run(argv: &[String], io: &dyn Io) -> i32 {
         if args.version {
             return Err("\0version".into());
         }
+        if args.build_info {
+            return Err("\0build-info".into());
+        }
         if args.inputs.is_empty() {
             return Err("no input file (see --help)".into());
         }
@@ -1057,6 +1065,10 @@ pub fn run(argv: &[String], io: &dyn Io) -> i32 {
         }
         Err(m) if m == "\0version" => {
             io.out(&format!("support-fins {VERSION}"));
+            return 0;
+        }
+        Err(m) if m == "\0build-info" => {
+            io.out(&crate::build_info());
             return 0;
         }
         Err(m) => {

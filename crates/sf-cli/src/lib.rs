@@ -16,8 +16,24 @@ pub mod project_report;
 pub mod project_xml;
 pub mod uuid;
 
-/// `VERSION` (plugins/cli/version.js): run from a checkout it is the unstamped base.
+/// `VERSION` (plugins/cli/version.js): run from a checkout it is the unstamped base. `--version` prints it, as the JS
+/// command line does (cli-parity compares it); the app's own version is [`build_info`]'s.
 pub const VERSION: &str = "0.7.0";
+
+/// `--build-info` (not in the JS): the port's own version, YYYY.WW.PATCH from Cargo.toml's `[workspace.package]`
+/// (docs/AGENTS.md "Versioning and releases"), the pinned upstream commit and the web command line it matches, e.g.
+/// `support-fins 2026.44.0 (upstream 23039e2, web CLI 0.7.0)`.
+pub fn build_info() -> String {
+    let commit = include_str!("../../../UPSTREAM")
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("commit="))
+        .unwrap_or("unknown");
+    format!(
+        "support-fins {} (upstream {}, web CLI {VERSION})",
+        env!("CARGO_PKG_VERSION"),
+        &commit[..commit.len().min(7)]
+    )
+}
 
 /// JS `String.prototype.trim` (the `\s` set).
 pub fn js_trim(s: &str) -> &str {

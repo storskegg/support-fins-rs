@@ -135,10 +135,8 @@ final class CrashReporter {
         folder.clearMarker()
     }
 
-    static var appVersion: String {
-        let info = Bundle.main.infoDictionary
-        return "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
-    }
+    /// "2026.44.0 (1234)": the version and the build number (`AppVersion`).
+    static var appVersion: String { AppVersion.display }
 
     // MARK: breadcrumbs and settings
 

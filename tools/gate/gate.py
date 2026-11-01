@@ -40,6 +40,8 @@ BASE = [
     ("i18n-catalog", ["just", "i18n-catalog"]),
     ("tippics", ["just", "tippics-gen", "--check"]),
     ("whatsnew", ["just", "whatsnew-gen", "--check"]),
+    # the release version computation's unit tests, and MARKETING_VERSION (app/Version.xcconfig) is Cargo.toml's version
+    ("version", ["just", "version-check"]),
 ]
 # --no-deps: the gate runs app-core and app-project itself, so app-test must not run them again
 APP = [
