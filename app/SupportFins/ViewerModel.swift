@@ -74,12 +74,15 @@ final class ViewerModel {
             guard !parts.isEmpty else { addingModel = false; status = JS.t("The file has no mesh."); return }
             // a plate of several goes to the picker; cancelling it keeps whatever is on show (`io.js:200-205`)
             guard parts.count > 1 else { show(parts, url: url); return }
+            // each object's box in the file, from its soup (no weld): where it stands, and whether the objects overlap
+            let cores = parts.map { ($0.mesh as? CorePart)?.part }
+            let boxes = await Task.detached(priority: .userInitiated) { cores.map { $0?.bounds() ?? [] } }.value
             let picker = ObjectPickerModel(objects: parts.map {
                 // from the engine's description: asking a CorePart for its bounds would weld and mesh it (C-05)
                 if let core = $0.mesh as? CorePart { return (name: $0.name, triangles: core.faceCount, size: core.info.size) }
                 let d = $0.mesh.bounds.max - $0.mesh.bounds.min
                 return (name: $0.name, triangles: $0.mesh.faceCount, size: [Double(d.x), Double(d.y), Double(d.z)])
-            })
+            }, bounds: boxes)
             CrashReporter.note("open: picker, \(parts.count) objects")
             picker.onCancel = { [weak self] in self?.picker = nil; self?.addingModel = false }
             picker.onLoad = { [weak self] chosen in
@@ -87,6 +90,11 @@ final class ViewerModel {
                 self.picker = nil
                 guard chosen.count > 1 else { Task { await self.showPrepared([parts[chosen[0]]], url: url) }; return }
                 Task { await self.showMerged(chosen.map { parts[$0] }, of: parts.count, url: url) }
+            }
+            picker.onLoadSeparately = { [weak self] chosen in
+                guard let self else { return }
+                self.picker = nil
+                Task { await self.showSeparately(chosen.map { parts[$0] }, boxes: chosen.map { boxes[$0] }, url: url) }
             }
             self.picker = picker
         } catch {
@@ -161,6 +169,29 @@ final class ViewerModel {
             addingModel = false
             status = ReadFailure.text(of: error, reading: url?.lastPathComponent)
         }
+    }
+
+    /// "Load N as separate models": each chosen object a model of its own on this plate, in file order, the first in
+    /// place of the model on show (or beside the plate's, when adding), each where it stands in the file: the group
+    /// keeps the file's layout, centred on the bed (`PlateBoard.placeAsInFile`). Plate ties need models apart.
+    private func showSeparately(_ chosen: [LoadedPart], boxes: [[Double]], url: URL?) async {
+        isLoading = true
+        defer { isLoading = false }
+        CrashReporter.note("open: \(chosen.count) objects as separate models, \(chosen.reduce(0) { $0 + $1.mesh.faceCount }) triangles")
+        var slots: [ModelSlot] = []
+        for (k, part) in chosen.enumerated() {
+            if k > 0 { addingModel = hasPart }
+            CrashReporter.stage("welding and meshing model \(k + 1) of \(chosen.count)")
+            if let core = part.mesh as? CorePart, !(await core.prepare()) {
+                addingModel = false
+                status = JS.t("The file's mesh could not be shared with the GPU.")
+                return
+            }
+            show([part], url: url)
+            if let slot = features[PlatesFeature.self]?.board.plate.liveSlot { slots.append(slot) }
+        }
+        guard slots.count == chosen.count else { return }
+        features[PlatesFeature.self]?.board.placeAsInFile(slots, boxes: boxes)
     }
 
     /// The part on show again at another size (Scale, `ui/scale.js setScale`): `setPart` with the pose kept. Like a

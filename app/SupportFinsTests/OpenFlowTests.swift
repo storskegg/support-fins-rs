@@ -88,7 +88,7 @@ struct OpenFlowTests {
         await model.load(url: try Self.threeObjects())
         let picker = try #require(model.picker)
         picker.set(picker.entries[1].id, true)
-        #expect(picker.loadTitle == "Merge 2 & load" && picker.hint == "2 selected — merged into one part")
+        #expect(picker.loadTitle == "Merge 2 into one part" && picker.hint == "2 selected — merged into one part")
         picker.load()
         #expect(await eventually { model.hasPart })
         #expect(model.picker == nil && model.status == nil)

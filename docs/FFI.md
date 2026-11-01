@@ -68,6 +68,7 @@ fn scale_from_percent_text(text: String) -> Result<Option<f64>, FfiError>;  // M
 fn scale_percent_text(factor: f64) -> Result<String, FfiError>;             // M6: the field's text, +(factor * 100).toFixed(2) as JS prints it ("150", "33.33")
 impl Part {
   fn info(&self) -> PartInfo;
+  fn bounds(&self) -> Vec<f64>;                              // [min x, y, z, max x, y, z] in the file's frame, from the soup (no weld); zeros for an empty part. App-only: the object picker's "Load N as separate models" places each object where it stands and defaults to it when no two boxes overlap
   fn mesh(&self) -> Arc<GpuBuffer>;                          // interleaved position+normal, f32, model frame
   fn analyze(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<AnalysisSummary, FfiError>;   // rot: 9, column-major; a bad threshold or pose is FfiError::Engine, a panic is caught (crash::guarded)
   fn islands(&self, threshold_deg: f64, rot: Vec<f64>) -> Result<Vec<Island>, FfiError>;       // findIslands: the midair starts (see "Readout data")

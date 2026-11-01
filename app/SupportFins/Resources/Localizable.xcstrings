@@ -8180,6 +8180,41 @@
         }
       }
     },
+    "Load %lld as separate models" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld als einzelne Modelle laden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作为 %1$lld 个独立模型载入"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregar %1$lld como modelos separados"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحميل %1$lld كنماذج منفصلة"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld laden als losse modellen"
+          }
+        }
+      }
+    },
     "Long walls" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8589,6 +8624,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unir %1$lld e carregar"
+          }
+        }
+      }
+    },
+    "Merge %lld into one part" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld zu einem Teil zusammenführen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %1$lld 个合并为一个零件"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unir %1$lld numa só peça"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دمج %1$lld في جزء واحد"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld samenvoegen tot één onderdeel"
           }
         }
       }
@@ -10153,6 +10223,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Optioneel: stelt Plaatverbindingen ▸ Dikte bij contact in, voor hoge, dunne onderdelen die naast elkaar worden geprint"
+          }
+        }
+      }
+    },
+    "Or load them as separate models on one plate, each where it stands in the file." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oder lade sie als einzelne Modelle auf eine Platte, jedes dort, wo es in der Datei steht."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "或将它们作为独立模型载入同一平台，位置与文件中相同。"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou carregue-os como modelos separados numa placa, cada um onde está no ficheiro."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أو حمّلها نماذج منفصلة على لوحة واحدة، كلٌّ في موضعه من الملف."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Of laad ze als losse modellen op één plaat, elk waar het in het bestand staat."
           }
         }
       }
@@ -26281,6 +26386,41 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld selected — each its own model, where it stands in the file" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld ausgewählt — jedes ein eigenes Modell, wo es in der Datei steht"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选 %1$lld 个——各自作为独立模型，位置与文件中相同"
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld selecionados — cada um um modelo próprio, onde está no ficheiro"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تحديد %1$lld — كلٌّ نموذج مستقل في موضعه من الملف"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld geselecteerd — elk een eigen model, waar het in het bestand staat"
           }
         }
       }

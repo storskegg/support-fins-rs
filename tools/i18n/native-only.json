@@ -1134,5 +1134,37 @@
     "pt": "Mostrar na sua aba",
     "ar": "اعرضه في علامة تبويبه",
     "nl": "Tonen in zijn tabblad"
+  },
+  "Load {n} as separate models": {
+    "why": "object picker: several objects as separate models on one plate (the app's own; the web only merges): the button",
+    "de": "{n} als einzelne Modelle laden",
+    "zh": "作为 {n} 个独立模型载入",
+    "pt": "Carregar {n} como modelos separados",
+    "ar": "تحميل {n} كنماذج منفصلة",
+    "nl": "{n} laden als losse modellen"
+  },
+  "Merge {n} into one part": {
+    "why": "object picker: several objects as separate models on one plate (the app's own; the web only merges): the merge button beside it",
+    "de": "{n} zu einem Teil zusammenführen",
+    "zh": "将 {n} 个合并为一个零件",
+    "pt": "Unir {n} numa só peça",
+    "ar": "دمج {n} في جزء واحد",
+    "nl": "{n} samenvoegen tot één onderdeel"
+  },
+  "{n} selected — each its own model, where it stands in the file": {
+    "why": "object picker: several objects as separate models on one plate (the app's own; the web only merges): the hint when they stand apart",
+    "de": "{n} ausgewählt — jedes ein eigenes Modell, wo es in der Datei steht",
+    "zh": "已选 {n} 个——各自作为独立模型，位置与文件中相同",
+    "pt": "{n} selecionados — cada um um modelo próprio, onde está no ficheiro",
+    "ar": "تم تحديد {n} — كلٌّ نموذج مستقل في موضعه من الملف",
+    "nl": "{n} geselecteerd — elk een eigen model, waar het in het bestand staat"
+  },
+  "Or load them as separate models on one plate, each where it stands in the file.": {
+    "why": "object picker: several objects as separate models on one plate (the app's own; the web only merges): the sheet's second line",
+    "de": "Oder lade sie als einzelne Modelle auf eine Platte, jedes dort, wo es in der Datei steht.",
+    "zh": "或将它们作为独立模型载入同一平台，位置与文件中相同。",
+    "pt": "Ou carregue-os como modelos separados numa placa, cada um onde está no ficheiro.",
+    "ar": "أو حمّلها نماذج منفصلة على لوحة واحدة، كلٌّ في موضعه من الملف.",
+    "nl": "Of laad ze als losse modellen op één plaat, elk waar het in het bestand staat."
   }
 }

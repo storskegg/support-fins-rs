@@ -156,5 +156,7 @@
   "open: merging %arg of %arg objects, %arg triangles": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
   "merging %arg objects": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
   "welding and meshing the merged part (%arg triangles)": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
-  "resin": "PrinterProfileInfo.kind: the engine's printer kind (\"resin\" or \"fdm\"), compared, never shown"
+  "resin": "PrinterProfileInfo.kind: the engine's printer kind (\"resin\" or \"fdm\"), compared, never shown",
+  "open: %arg objects as separate models, %arg triangles": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)",
+  "welding and meshing model %arg of %arg": "crash breadcrumb / crash report text (English on purpose: it is read by the developer)"
 }
