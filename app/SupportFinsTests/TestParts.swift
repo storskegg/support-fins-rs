@@ -36,7 +36,7 @@ enum TestParts {
     }
 
     static func write(_ tris: [[Float]], name: String) throws -> String {
-        try write(tris, to: URL(fileURLWithPath: NSTemporaryDirectory() + name))
+        try write(tris, to: Scratch.root.appending(path: name))
     }
 
     /// A 40 mm cube: it sits flat with nothing to support.
