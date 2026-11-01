@@ -96,7 +96,7 @@ final class DrawModel {
     init(host: ViewerModel) {
         self.host = host
         session = host.session
-        shape = UserDefaults.standard.string(forKey: Self.shapeKey) == "curve" ? .curve : .line
+        shape = AppDefaults.shared.string(forKey: Self.shapeKey) == "curve" ? .curve : .line
         motion.onChange = { [weak self] in self?.refresh() }
         motion.onRings = { [weak self] fade in self?.controller?.ringFade = fade }
         if let c = host.controller {
@@ -153,7 +153,7 @@ final class DrawModel {
     func setShape(_ new: Shape) {
         guard new != shape else { return }
         shape = new
-        UserDefaults.standard.set(new.rawValue, forKey: Self.shapeKey)
+        AppDefaults.shared.set(new.rawValue, forKey: Self.shapeKey)
         clearPreview()           // a wall half drawn as the other shape starts over
         refresh()
     }

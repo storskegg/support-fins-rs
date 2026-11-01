@@ -35,7 +35,10 @@ class PartWindowUITestCase: XCTestCase {
         app = XCUIApplication()
         // the app writes its crash reports into a folder of this test's own (DEBUG-only hook), never the user's. It is a
         // name, not a path: the app is sandboxed and puts it in its own temporary directory (it cannot write `dir`)
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO", "-SFCrashDir", dir.lastPathComponent]
+        // and keeps its preferences in a suite of its own, emptied at launch (AppDefaults, DEBUG-only): a run neither starts
+        // from what the user last picked in the installed app nor changes it
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO", "-SFCrashDir", dir.lastPathComponent,
+                               "-SFIsolatedDefaults", "YES"]
     }
 
     override func tearDownWithError() throws {

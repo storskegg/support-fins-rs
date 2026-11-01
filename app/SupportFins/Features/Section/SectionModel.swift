@@ -12,7 +12,7 @@ final class SectionModel {
 
     static let ghostKey = "sf.sectionGhost"
 
-    init(tool: SectionTool, defaults: UserDefaults = .standard) {
+    init(tool: SectionTool, defaults: UserDefaults = AppDefaults.shared) {
         self.tool = tool
         self.defaults = defaults
         // Ghost unless the stored value says Hide (`localStorage.getItem(GHOST_KEY) !== '0'`)
