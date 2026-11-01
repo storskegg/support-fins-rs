@@ -34,12 +34,12 @@ final class ObjectPickerUITests: PartWindowUITestCase {
         let all = sheetElement("picker-select-all")
         XCTAssertTrue(all.waitForExistence(timeout: 10), "the picker shows Select all")
         let rows = (0..<3).map { sheetElement("picker-row-\($0)") }
-        XCTAssertTrue(rows.allSatisfy(\.exists), "the picker's three rows")
+        XCTAssertTrue(rows.allSatisfy { $0.exists }, "the picker's three rows")
         XCTAssertFalse(isChecked(all), "one row of three pre-selected: Select all is not checked")
 
         // Select all: every row checked, the button merges three
         all.click()
-        waitFor("every row checked", timeout: 5) { rows.allSatisfy(self.isChecked) && self.isChecked(all) }
+        waitFor("every row checked", timeout: 5) { rows.allSatisfy { self.isChecked($0) } && self.isChecked(all) }
         XCTAssertTrue(app.sheets.buttons["Merge 3 & load"].exists, "the button merges all three")
 
         // one row unchecked by hand: Select all is no longer checked
@@ -53,7 +53,7 @@ final class ObjectPickerUITests: PartWindowUITestCase {
 
         // Select all unchecked: no row checked, nothing to load
         all.click()
-        waitFor("every row unchecked", timeout: 5) { !rows.contains(where: self.isChecked) && !self.isChecked(all) }
+        waitFor("every row unchecked", timeout: 5) { !rows.contains { self.isChecked($0) } && !self.isChecked(all) }
         XCTAssertFalse(app.sheets.buttons["Load"].isEnabled, "Load is off with nothing checked")
 
         app.typeKey(.escape, modifierFlags: [])
