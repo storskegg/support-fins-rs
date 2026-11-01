@@ -10,6 +10,9 @@ struct StatsCard: View {
     var fins: FinReadout?
     /// Rows other features add after Analysis (`InspectorSlot.stats`: Add model, Remove model).
     var rows: [InspectorSection] = []
+    /// Turns Add fins on, while it is off: the Fins row then offers it where "—" would stand (S2: the toolbar's
+    /// toggle alone was not found). Nil while the fins are on.
+    var addFins: (() -> Void)?
     @State private var showFinInfo = false
 
     var body: some View {
@@ -29,6 +32,12 @@ struct StatsCard: View {
             LabeledContent("Bed contact") { Text(part.bed).foregroundStyle(part.bedWarn ? Color.orange : Color.primary) }
             LabeledContent("Fins") {
                 HStack(spacing: 4) {
+                    if let addFins {
+                        Button("Add fins", action: addFins)
+                            .controlSize(.small)
+                            .help("Build the supports for this pose")
+                            .accessibilityIdentifier("stat-add-fins")
+                    }
                     Text(fins?.fins ?? "—").foregroundStyle(fins?.finsWarn == true ? Color.orange : Color.primary)
                         .accessibilityIdentifier("stat-fins")
                     if let info = fins?.info, !info.isEmpty {

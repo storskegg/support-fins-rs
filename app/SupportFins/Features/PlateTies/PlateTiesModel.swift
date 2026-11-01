@@ -13,6 +13,8 @@ import Viewer
 /// - The plate is re-tied when what the engine builds on changes (`Fingerprint`): a model added, removed or turned,
 ///   its fins rebuilt, the settings or the links changed. `PlateBoard.sync` asks after every change.
 /// - While the ties are on, Arrange and Move are locked (`lockReason`): the ties are built for where the models stand.
+///   A plate of one model (a file's objects merged into one part, say) has nothing to tie: nothing is locked, and the
+///   status card and the section say that ties need separate models (`aloneNote`).
 @MainActor
 @Observable
 final class PlateTiesModel {
@@ -72,9 +74,37 @@ final class PlateTiesModel {
         synced()
     }
 
-    /// Why Arrange and Move are locked, or nil.
+    /// Why Arrange and Move are locked, or nil. With one model on the plate there is nothing to tie and nothing for the
+    /// lock to keep in place, so nothing is locked (S2: ten objects merged into one part were locked for no tie).
     var lockReason: String? {
-        state.on ? JS.t("Plate ties are on: Arrange and Move are locked so the ties stay where they were built. Turn Plate ties off to move models.") : nil
+        state.on && !alone ? JS.t("Plate ties are on: Arrange and Move are locked so the ties stay where they were built. Turn Plate ties off to move models.") : nil
+    }
+
+    /// The plate holds one model (or none): plate ties join separate models, so there is nothing to tie.
+    var alone: Bool { (board?.modelCount ?? 0) < 2 }
+
+    /// How many objects of its file the model on show merged (`merge_parts`' note "merged N of M objects into one
+    /// part"), or nil when it is not a merge.
+    var mergedObjects: Int? {
+        guard let info = session.parts.first?.info else { return nil }
+        return Self.mergedObjects(notes: info.notes + [info.importNote])
+    }
+
+    static func mergedObjects(notes: [String]) -> Int? {
+        // the engine's note (`merge_parts`), in English whatever the app's language
+        for n in notes {
+            if let m = n.firstMatch(of: /merged (\d+) of \d+ objects/), let k = Int(m.1), k > 1 { return k }
+        }
+        return nil
+    }
+
+    /// What the status card and the section say when the plate holds one model: ties need separate models, and a
+    /// merged file's objects are one model here.
+    var aloneNote: String {
+        if let n = mergedObjects {
+            return JS.t("Plate ties join separate models, and this plate has one: its {n} objects were merged into one part. To tie them, load each object as its own model (pick one, then Add model for each of the others) instead of merging them.", ["n": String(n)])
+        }
+        return JS.t("Plate ties join separate models, and this plate has one. Use Add model to put the models to tie on the plate.")
     }
 
     /// The plate was laid out again: another plate edited, or something on it changed.
@@ -88,6 +118,8 @@ final class PlateTiesModel {
             fingerprint = nil
             clearResults()
         }
+        // a second model came onto a tied plate: from now on the ties hold the models where they stand
+        if lockReason != nil, let move = host?.features[MoveFeature.self]?.model, move.isOn { move.setOn(false) }
         schedule()
     }
 
@@ -103,8 +135,8 @@ final class PlateTiesModel {
                 settingsError = Self.describe(error)
                 return
             }
-            // Move stops: the models stay where the ties are built
-            host?.features[MoveFeature.self]?.model.setOn(false)
+            // Move stops: the models stay where the ties are built (one model alone has none, and keeps Move)
+            if !alone { host?.features[MoveFeature.self]?.model.setOn(false) }
         } else {
             pairing = nil
         }

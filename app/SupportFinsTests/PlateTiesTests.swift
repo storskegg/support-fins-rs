@@ -356,7 +356,8 @@ struct PlateTiesTests {
         #expect(back.settings?.maxGap == 6.5 && back.settings?.tiesPerPair == 2)
         #expect(back.state.disabled.count == 1)
         let ob = try #require(other.features[PlatesFeature.self]?.board)
-        #expect(ob.lockReason() != nil && ob.plate.ties.on)
+        // one model: the ties it carries are in its mesh, and nothing on the plate is locked (S2)
+        #expect(ob.lockReason() == nil && ob.plate.ties.on)
         // the document round-trips: the same settings written back
         #expect(await back.settled())
         let doc = try #require(try plateTiesOf3mf(path: url.path))

@@ -76,6 +76,8 @@ final class PlateTiesFeature: Feature {
         let m = model
         guard m.state.on, host?.hasPart == true else { return [] }
         var lines: [StatusLine] = []
+        // one model: nothing to tie and nothing locked; say why, and what to do instead
+        if m.alone { return [StatusLine("plate-ties-alone", order: 40, text: m.aloneNote, color: .orange, bar: .orange)] }
         if let why = m.lockReason { lines.append(StatusLine("plate-ties-lock", order: 40, text: why)) }
         if m.pairing != nil {
             lines.append(StatusLine("plate-ties-pairing", order: 41, text: JS.t("Click two models to tie them together. Esc to stop."), color: .accentColor))
