@@ -19,7 +19,7 @@ public func sfTestRustPanickingStandIn() {}
 @Suite("Native crash reports")
 struct NativeCrashImportTests {
     private func tempFolder() -> CrashFolder {
-        let url = FileManager.default.temporaryDirectory.appending(path: "sf-native-import-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let url = Scratch.root.appending(path: "sf-native-import-\(UUID().uuidString)", directoryHint: .isDirectory)
         let folder = CrashFolder(url: url)
         folder.create()
         return folder

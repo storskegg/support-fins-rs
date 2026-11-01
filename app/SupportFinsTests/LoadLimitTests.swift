@@ -113,7 +113,7 @@ struct LoadLimitTests {
         let shown = model.session.parts.map(\.info.name)
         #expect(shown.count == 1)
 
-        let url = URL(fileURLWithPath: NSTemporaryDirectory() + "limit-fanout.3mf")
+        let url = Scratch.root.appending(path: "limit-fanout.3mf")
         try TestThreeMF.fanOut(depth: 8, fan: 10).write(to: url)       // 10^8 triangles, counted not built
         let (load, prompt) = try await loadUntilAsked(model, url)
         #expect(prompt.kind == .triangles && prompt.estimate == 1e8 && prompt.limit == 20_000_000)
@@ -161,7 +161,7 @@ struct LoadLimitTests {
     func unreadableSession() async throws {
         let model = ViewerModel()
         let deep = "{\"v\":1,\"x\":" + String(repeating: "[", count: 200) + String(repeating: "]", count: 200) + "}"
-        let url = URL(fileURLWithPath: NSTemporaryDirectory() + "limit-deep-session.3mf")
+        let url = Scratch.root.appending(path: "limit-deep-session.3mf")
         try TestThreeMF.triangle(session: deep).write(to: url)
         await model.load(url: url)
         #expect(model.hasPart && model.limitPrompt == nil)
@@ -172,7 +172,7 @@ struct LoadLimitTests {
     func readableSession() async throws {
         for (i, session) in [nil, "{\"v\":1}"].enumerated() {
             let model = ViewerModel()
-            let url = URL(fileURLWithPath: NSTemporaryDirectory() + "limit-ok-session-\(i).3mf")
+            let url = Scratch.root.appending(path: "limit-ok-session-\(i).3mf")
             try TestThreeMF.triangle(session: session).write(to: url)
             await model.load(url: url)
             #expect(model.hasPart && model.status == nil, "session \(session ?? "none")")
