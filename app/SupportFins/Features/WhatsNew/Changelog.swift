@@ -16,8 +16,7 @@ struct Changelog: Decodable, Equatable, Sendable {
         var id: String { tag }
     }
 
-    /// The app's version (`app/Version.xcconfig`): the newest release's, or the one the first release will take.
-    let version: String
+    /// The web's releases. The app's own version is not among them (`AppVersion`).
     let releases: [Release]
 
     /// The newest release: the card names it in its heading and the top bar showed it on the page.
@@ -30,12 +29,12 @@ struct Changelog: Decodable, Equatable, Sendable {
     /// `RELEASES_URL` (web/changelog.js): "See all releases".
     static let releasesURL = URL(string: "https://github.com/gittrahan/support-fins/releases")!
 
-    static let none = Changelog(version: "", releases: [])
+    static let none = Changelog(releases: [])
 
     /// The file a DEBUG launch's `-SFChangelogFixture <path>` names to read instead of the bundled list (the UI tests
     /// use it, since the real list is empty until a release is stamped). Compiled out of Release builds (X-15): there
     /// it is always nil, so a Release app never reads a list from a launch argument or a default.
-    static func fixtureURL(defaults: UserDefaults = .standard) -> URL? {
+    static func fixtureURL(defaults: UserDefaults = AppDefaults.shared) -> URL? {
         #if DEBUG
         return defaults.string(forKey: "SFChangelogFixture").map { URL(fileURLWithPath: $0) }
         #else

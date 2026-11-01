@@ -18,7 +18,7 @@ To add one:
 What a feature may register (`Features/Contributions.swift`): `overlays` (alignment, `order`: higher is on top),
 `modifiers` (sheets, drop targets, `WindowModifier.onChange`), `windowToolbarItems`, `toolbarSlots` plus
 `registerTools(in:)` for the floating toolbar's badges (declare a `static let` `ToolbarSlot` of your own),
-`inspectorSections` (slot `.top`, `.stats` (rows at the end of the stats card), `.basics` or `.bottom`), `statusLines` (the status card), `escapeHandlers`
+`inspectorSections` (slot `.header` (above the inspector's tabs), `.part` (the Part tab), `.stats` (rows at the end of the stats card), `.basics` (the Supports tab, after Cutouts) or `.plateTies` (its tab)), `statusLines` (the status card), `escapeHandlers`
 (priority: higher first; return true to take the key and stop the cascade), `partWillShow` / `partDidShow`, and
 `static func menus(_:)` (`MenuSection`s for `.view`, `.model`, `.fileExport`, `.edit` (items after Undo and Redo), or your own `MenuID`; items come
 in section `order`, so a feature's items sit where the menu has them).

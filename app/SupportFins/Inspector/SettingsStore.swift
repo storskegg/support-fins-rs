@@ -4,7 +4,7 @@ import Foundation
 /// `UserDefaults` under the same `sf.*` names. The other fin settings are per part: M7 stores them in the
 /// document's session.
 struct SettingsStore {
-    var defaults: UserDefaults = .standard
+    var defaults: UserDefaults = AppDefaults.shared
 
     enum Key {
         static let nozzle = "sf.nozzle"                  // web/ui/settings.js:297-306

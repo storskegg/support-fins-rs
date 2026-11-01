@@ -18,6 +18,7 @@ final class SessionUITests: PartWindowUITestCase {
         XCTAssertTrue(note.waitForExistence(timeout: 20), "the import note")
         XCTAssertEqual(text(note), "3MF: restored 4 hand-placed supports and the settings.")
         // the session put Placement in Draw (the web's fin-mode), where "Clear walls" lists the walls it brought back
+        showInspectorTab(.supports)
         XCTAssertTrue(element("draw-clear").waitForExistence(timeout: 10), "Draw's controls, with walls to clear")
     }
 }

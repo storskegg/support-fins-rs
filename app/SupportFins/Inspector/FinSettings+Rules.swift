@@ -133,6 +133,29 @@ extension FinSettings {
         ].compactMap { $0 }.joined(separator: " · ")
     }
 
+    /// The Printer row with the printer profile's pixel in place of the nozzle, for a resin printer (app-only: the web
+    /// has no printer profile): `"14×19 µm pixel · 0.05 layers · 0.2 gap"`. A resin printer has no nozzle to name, though
+    /// the build still sizes its walls by the Nozzle setting. `pixelSize` is the profile's (x, y) in mm; nil or not two
+    /// numbers (no profile, an FDM one) gives the web's line.
+    func printerSummary(pixelSize: [Double]?) -> String {
+        guard let p = pixelSize, p.count == 2 else { return printerSummary }
+        return [
+            "\(Self.pixelText(p, compact: true)) \(JS.t("pixel"))",
+            visibility.layerHeight ? "\(Self.numberText(layerHeight)) \(JS.t("layers"))" : nil,
+            "\(Self.numberText(gap)) \(JS.t("gap"))",
+            interfaceMaterial == .off ? nil : JS.t("interface"),
+        ].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// A printer's pixel (x, y in mm) in micrometres: `"14 × 19 µm"`, or `"50 µm"` for a square one; `compact` drops
+    /// the spaces around the ×.
+    static func pixelText(_ p: [Double], compact: Bool = false) -> String {
+        let um = p.map { numberText(($0 * 10_000).rounded() / 10) }
+        guard let x = um.first else { return "" }
+        let size = um.count == 2 && um[1] != x ? (compact ? "\(x)×\(um[1])" : "\(x) × \(um[1])") : x
+        return "\(size) µm"
+    }
+
     /// The Tines section's collapsed line (`settings.js:406-410`).
     var tinesSummary: String {
         if !tines { return "off" }

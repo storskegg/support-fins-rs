@@ -14,7 +14,7 @@ final class ReportFeature: Feature {
     func close() { model.close() }
 
     var inspectorSections: [InspectorSection] {
-        [InspectorSection("report", slot: .top, order: 10) { ReportRow(model: self.model) }]
+        [InspectorSection("report", slot: .part, order: 10) { ReportRow(model: self.model) }]
     }
 
     static func menus(_ f: ReportFeature?) -> [MenuSection] {

@@ -53,8 +53,8 @@ struct ContentView: View {
             Group {
                 if let controller = model.controller {
                     InspectorView(controller: controller, settings: model.session.settingsBinding,
-                                  top: features.inspectorSections(.top), basics: features.inspectorSections(.basics),
-                                  bottom: features.inspectorSections(.bottom))
+                                  header: features.inspectorSections(.header), part: features.inspectorSections(.part),
+                                  basics: features.inspectorSections(.basics), plateTies: features.inspectorSections(.plateTies))
                 }
             }
             .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
