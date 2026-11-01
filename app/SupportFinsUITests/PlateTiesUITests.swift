@@ -56,10 +56,7 @@ final class PlateTiesUITests: PartWindowUITestCase {
         // Add model leaves 10 mm between them: Max gap 15 makes them neighbours
         let gap = element("plate-ties-max-gap")
         XCTAssertTrue(gap.waitForExistence(timeout: 10), "Max gap shows once the ties are on")
-        scrollIntoView(gap)
-        gap.doubleClick()
-        gap.typeKey("a", modifierFlags: .command)
-        gap.typeText("15\r")
+        enterText("15", into: gap, context: { "The status: \(self.statusNotes)" })
         showInspectorTab(.part)     // the status card
         if !waitUntil(timeout: 30, { self.statusNotes.contains { $0.hasPrefix("Plate ties: 3 of 3 ties on 1 pairs") } }) {
             XCTFail("the coins are tied: one link, three ties. Max gap reads \"\(text(gap))\", the status \(statusNotes)")
@@ -173,36 +170,12 @@ final class PlateTiesUITests: PartWindowUITestCase {
         try super.tearDownWithError()
     }
 
-    /// Type `v` into Layer height and commit it. The field should have the keyboard before ⌘A (otherwise ⌘A and the
-    /// digits go to the window, not the field: clicked again until it reports focus, three tries), and must show the
-    /// digits before Return; a Return that did not end the edit is followed by Tab, which ends it by moving the focus on.
-    /// The first two UI runs failed here because the app wrote the held value over the typed text (0.1 over 0.05 read
-    /// "0.01.1": `NumberFieldTests`); a failure says what the field, its focus and the Printer row showed.
+    /// Type `v` into Layer height and commit it (`enterText`: focus-checked; Tab when Return did not reach the Printer
+    /// row). The first two UI runs failed here because the app wrote the held value over the typed text (0.1 over 0.05
+    /// read "0.01.1": `NumberFieldTests`); a failure says what the field, its focus and the Printer row showed.
     private func setLayerHeight(_ v: String, file: StaticString = #filePath, line: UInt = #line) {
-        let field = element("layer-height")
         let row = element("printer-row")
-        guard field.waitForExistence(timeout: 5) else {
-            XCTFail("no Layer height field to type \(v) into", file: file, line: line)
-            return
-        }
-        scrollIntoView(field)
-        let focused = { (field.value(forKey: "hasKeyboardFocus") as? Bool) == true }
-        var clicks = 0
-        for _ in 0..<3 where !focused() {
-            field.click()
-            clicks += 1
-            _ = waitUntil(timeout: 3, focused)
-        }
-        let before = text(field)
-        field.typeKey("a", modifierFlags: .command)
-        field.typeText(v)
-        if !waitUntil(timeout: 10, { self.text(field) == v }) {
-            XCTFail("Layer height shows \(v) as typed: the field reads \"\(text(field))\" (\"\(before)\" before ⌘A, "
-                    + "\(clicks) click(s), focus \(focused())), the Printer row \"\(text(row))\"", file: file, line: line)
-        }
-        field.typeKey(.return, modifierFlags: [])
-        if !waitUntil(timeout: 5, { self.text(row).contains("\(v) layers") }) {
-            field.typeKey(.tab, modifierFlags: [])
-        }
+        enterText(v, into: element("layer-height"), committed: { self.text(row).contains("\(v) layers") },
+                  context: { "The Printer row \"\(self.text(row))\"" }, file: file, line: line)
     }
 }

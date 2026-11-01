@@ -22,6 +22,7 @@ final class LanguageUITests: PartWindowUITestCase {
         XCTAssertEqual(element("toolbar-scale-badge").label, "Skalieren")
         XCTAssertEqual(element("toolbar-rotate").label, "Drehen")
         // left to right: the build volume, the toolbar's first item, is left of Add fins
+        XCTAssertTrue(element("volume").exists, "the build volume is in the toolbar, not in its »")
         XCTAssertLessThan(element("volume").frame.midX, element("fins-toggle").frame.midX)
     }
 
