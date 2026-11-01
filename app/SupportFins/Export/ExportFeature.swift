@@ -21,7 +21,7 @@ final class ExportFeature: Feature {
     }
 
     var windowToolbarItems: [WindowToolbarItem] {
-        [WindowToolbarItem("export", order: 0) { ExportMenu(model: self.host?.wiring?.exporter, board: self.host?.features[PlatesFeature.self]?.board) }]
+        [WindowToolbarItem("export", order: 0) { ExportMenu(model: self.host?.wiring?.exporter, board: self.host?.features[PlatesFeature.self]?.board).toolbarVisibilityPriority(.high) }]
     }
 
     /// The Export items (docs/UI-MAP.md `export`, `export-stl`, `export-3mf`, `export-fins`, `export-all`,
