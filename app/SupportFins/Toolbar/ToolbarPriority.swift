@@ -31,12 +31,37 @@ enum ToolbarPriorities {
     }
 }
 
+/// The marker in a toolbar item's content. It holds its item at its priority: in a document window (the app's
+/// `DocumentGroup`) SwiftUI configures the items after their views, and so the markers, are in the window, and sets each
+/// item's priority back to standard as it does; with no marker moving again, every item stayed standard and AppKit sent
+/// the trailing ones (Add fins, Export) to » first (the German window, UI run of 2026-11-01; `DocumentWindowToolbarTests`).
+/// So the marker watches its item's priority and puts it back on the next turn of the main loop when anything else sets it.
 final class ToolbarPriorityMarkerView: NSView {
-    var priority: NSToolbarItem.VisibilityPriority = .standard
+    var priority: NSToolbarItem.VisibilityPriority = .standard {
+        didSet { if priority != oldValue { holdPriority() } }
+    }
+    /// The item whose view holds this marker, once found, and the watch on its priority.
+    private weak var item: NSToolbarItem?
+    private var watch: NSKeyValueObservation?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         ToolbarPriorities.apply(in: window)
+        holdPriority()
+    }
+
+    /// Find the item (the window toolbar's item whose view holds this marker), watch its priority, and set it.
+    func holdPriority() {
+        guard let toolbar = window?.toolbar,
+              let item = toolbar.items.first(where: { $0.view.map { self.isDescendant(of: $0) } ?? false }) else { return }
+        if item !== self.item {
+            self.item = item
+            watch = item.observe(\.visibilityPriority) { [weak self] _, _ in
+                // KVO reports on the thread that set it (the main one) while the setter runs: put it back after
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.holdPriority() } }
+            }
+        }
+        if item.visibilityPriority != priority { item.visibilityPriority = priority }
     }
 }
 
@@ -51,6 +76,6 @@ private struct ToolbarPriorityMarker: NSViewRepresentable {
 
     func updateNSView(_ v: ToolbarPriorityMarkerView, context: Context) {
         v.priority = priority
-        ToolbarPriorities.apply(in: v.window)
+        v.holdPriority()
     }
 }

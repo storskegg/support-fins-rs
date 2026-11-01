@@ -79,7 +79,15 @@ class PartWindowUITestCase: XCTestCase {
         if !panel { app.typeKey("o", modifierFlags: .command) }
         XCTAssertTrue(panelExists("open-panel", timeout: 10), "the Open panel")
         chooseInPanel(part.path)
-        XCTAssertTrue(partWindow.waitForExistence(timeout: timeout), "the part's window opened")
+        if !partWindow.waitForExistence(timeout: timeout) {
+            // the window is found by Add fins in its toolbar: say what windows there are, and whether Add fins went to
+            // the toolbar's » (the German window did in the UI run of 2026-11-01)
+            let windows = app.windows.allElementsBoundByIndex.map { w in
+                "\"\(w.title)\" (\(w.descendants(matching: .any)["viewport"].exists ? "a part's" : "no viewport"), "
+                    + "toolbar items \(w.toolbars.firstMatch.descendants(matching: .any).allElementsBoundByIndex.compactMap { $0.identifier.isEmpty ? ($0.label.isEmpty ? nil : $0.label) : $0.identifier }))"
+            }
+            XCTFail("the part's window opened: no window holds \(Self.windowMark); the windows: \(windows)")
+        }
         XCTAssertEqual(partWindows.count, 1, "one part window")
     }
 
@@ -179,7 +187,10 @@ class PartWindowUITestCase: XCTestCase {
     /// between steps, wait for the content to settle.
     /// In view means hittable, wholly below the scroll view's top and at least `bottomMargin` above its bottom: XCUITest
     /// calls an element hittable while something drawn over the view's bottom edge covers it (#184 saw a click on the
-    /// Tine grip slider land on the debug Benchmark orbit bar).
+    /// Tine grip slider land on the debug Benchmark orbit bar, since a row of the form). The margin cannot hold for the
+    /// last row of a form: the report links end the Part tab since #251, and scrolled to the end they sit about 25 pt
+    /// above its bottom (20 scrolls failed "report-copy scrolled into view"). So once a scroll down no longer moves the
+    /// target, the content has ended, and wholly inside the scroll view is in view.
     func scrollIntoView(_ target: XCUIElement, bottomMargin: CGFloat = 60, maxSteps: Int = 20,
                         file: StaticString = #filePath, line: UInt = #line) {
         // a row of another inspector tab: that tab first
@@ -187,20 +198,66 @@ class PartWindowUITestCase: XCTestCase {
         // the innermost scroll view holding it (the smallest), not one that only contains that one
         let holders = partWindow.scrollViews.containing(.any, identifier: target.identifier).allElementsBoundByIndex
         guard let scroller = holders.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
-            XCTFail("no scroll view holds \(target.identifier)", file: file, line: line)
+            XCTFail("no scroll view holds \(target.identifier) (it exists: \(target.exists), frame \(target.frame))", file: file, line: line)
             return
         }
+        var atEnd = false
         func inView() -> Bool {
             let f = target.frame, s = scroller.frame
-            return target.isHittable && f.minY >= s.minY && f.maxY <= s.maxY - bottomMargin
+            return target.isHittable && f.minY >= s.minY && f.maxY <= s.maxY - (atEnd ? 0 : bottomMargin)
         }
         for _ in 0..<maxSteps where !inView() {
             // content below the middle: scroll down (negative delta), above it: up
             let down = target.frame.midY > scroller.frame.midY
+            let before = target.frame
             scroller.scroll(byDeltaX: 0, deltaY: down ? -60 : 60)
             waitForFrameToSettle(target)
+            if down && target.frame == before { atEnd = true }
         }
-        XCTAssertTrue(inView(), "\(target.identifier) scrolled into view", file: file, line: line)
+        XCTAssertTrue(inView(), "\(target.identifier) scrolled into view: its frame \(target.frame), hittable \(target.isHittable), "
+                      + "the scroll view \(scroller.frame), at the content's end \(atEnd)", file: file, line: line)
+    }
+
+    // MARK: typing
+
+    /// Whether `field` has the keyboard focus.
+    func hasFocus(_ field: XCUIElement) -> Bool { (field.value(forKey: "hasKeyboardFocus") as? Bool) == true }
+
+    /// Type `text` over a text field's contents and press Return. A click does not always give a field the keyboard
+    /// (PlateTiesUITests' Max gap: after a double click `typeText` failed "Neither element nor any descendant has
+    /// keyboard focus" in 3 of the 4 tests that tie two coins, UI run of 2026-11-01; Layer height before it), so the field is clicked until it reports focus, three
+    /// tries, before ⌘A and the text, and must show the text before Return. When `committed` is given and does not hold
+    /// 5 s after Return, Tab ends the edit by moving the focus on. A failure says what the field showed, its focus, and
+    /// `context()`.
+    func enterText(_ text: String, into field: XCUIElement, committed: (() -> Bool)? = nil, context: @escaping () -> String = { "" },
+                   file: StaticString = #filePath, line: UInt = #line) {
+        guard field.waitForExistence(timeout: 5) else {
+            XCTFail("no \(field.identifier) field to type \(text) into. \(context())", file: file, line: line)
+            return
+        }
+        scrollIntoView(field, file: file, line: line)
+        var clicks = 0
+        for _ in 0..<3 where !hasFocus(field) {
+            field.click()
+            clicks += 1
+            _ = waitUntil(timeout: 3) { self.hasFocus(field) }
+        }
+        let before = self.text(field)
+        guard hasFocus(field) else {
+            XCTFail("\(field.identifier) never took the keyboard: \(clicks) click(s), it reads \"\(before)\", hittable "
+                    + "\(field.isHittable), enabled \(field.isEnabled), frame \(field.frame). \(context())", file: file, line: line)
+            return
+        }
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText(text)
+        if !waitUntil(timeout: 10, { self.text(field) == text }) {
+            XCTFail("\(field.identifier) shows \(text) as typed: it reads \"\(self.text(field))\" (\"\(before)\" before ⌘A, "
+                    + "\(clicks) click(s), focus \(hasFocus(field))). \(context())", file: file, line: line)
+        }
+        field.typeKey(.return, modifierFlags: [])
+        if let committed, !waitUntil(timeout: 5, committed) {
+            field.typeKey(.tab, modifierFlags: [])
+        }
     }
 
     // MARK: the menu bar
